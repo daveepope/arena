@@ -1,35 +1,35 @@
 use crate::arena::dependency::RunnableDependency;
 use crate::Dependency;
 
-pub struct PostgresDependency {
+pub struct CouchbaseDependency {
     pub name: String,
     pub dependencies: Vec<Dependency>,
     started: bool
 }
 
-impl PostgresDependency {
+impl CouchbaseDependency {
     pub fn new(name: String) -> Self {
-        PostgresDependency { name, dependencies: vec![], started: false }
+        CouchbaseDependency { name, dependencies: vec![], started: false }
     }
 }
 
-impl crate::arena::dependency::RunnableDependency for PostgresDependency {
+impl RunnableDependency for CouchbaseDependency {
     fn start(&mut self) {
         if self.started { return; }
-        println!("[{}] (DB) Starting connection.", self.name);
+        println!("[{}] (Couchbase) Starting connection.", self.name);
         for dep in self.dependencies.iter_mut() {
             dep.start();
         }
         self.started = true;
-        println!("[{}] (DB) Connection started.", self.name);
+        println!("[{}] (Couchbase) Connection started.", self.name);
     }
 
     fn stop(&mut self) {
-        println!("[{}] Stopping connection.", self.name);
+        println!("[{}] (Couchbase) Stopping connection.", self.name);
         for dep in self.dependencies.iter_mut().rev() {
             dep.stop();
         }
-        println!("[{}] (DB) Connection stopped.", self.name);
+        println!("[{}] (Couchbase) Connection stopped.", self.name);
     }
 
     fn add_child_internal(&mut self, dep: Dependency) {
@@ -37,7 +37,7 @@ impl crate::arena::dependency::RunnableDependency for PostgresDependency {
     }
 }
 
-impl Drop for PostgresDependency {
+impl Drop for CouchbaseDependency {
     fn drop(&mut self) {
         self.stop();
     }
