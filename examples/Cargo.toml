@@ -1,9 +1,9 @@
 [package]
-name = "arena-examples-project"
+name = "arena-examples"
 version = "0.1.0"
 edition = "2021"
 authors = ["David Pope"]
-description = "Example project"
+description = "Examples using the arena framework. Intended as documentation and for testing."
 license = "BSD 3-Claus"
 
 [dependencies]

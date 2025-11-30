@@ -25,27 +25,27 @@ impl ArenaMatch {
 
     pub fn start(&mut self) {
         if self.started { return; }
-        println!("[Match:{}] Starting.", self.name);
+        println!("[Match-{}] starting.", self.name);
         for dep in self.dependencies.iter_mut() {
             dep.start();
         }
         for comp in self.components.iter() {
             comp.start();
         }
-        println!("[Match:{}] Started.", self.name);
+        println!("[Match-{}] started.", self.name);
         self.started = true;
     }
 
     pub fn stop(&mut self) {
         if !self.started { return; }
-        println!("[Match:{}] Stopping.", self.name);
+        println!("[Match-{}] stopping.", self.name);
         for comp in self.components.iter_mut().rev() {
             comp.stop();
         }
         for dep in self.dependencies.iter_mut().rev() {
             dep.stop();
         }
-        println!("[Match:{}] Stopped.", self.name);
+        println!("[Match-{}] stopped.", self.name);
         self.started = false;
     }
 }
