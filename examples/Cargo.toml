@@ -1,0 +1,10 @@
+[package]
+name = "arena-examples-project"
+version = "0.1.0"
+edition = "2021"
+authors = ["David Pope"]
+description = "Example project"
+license = "BSD 3-Claus"
+
+[dependencies]
+arena = { workspace = true }

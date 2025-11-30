@@ -2,20 +2,20 @@ use std::ops::Drop;
 use super::component::Component;
 use super::dependency::Dependency;
 
-pub struct AMatch {
+pub struct ArenaMatch {
     pub name: String,
     dependencies: Vec<Dependency>,
     components: Vec<Component>,
     started: bool
 }
 
-impl AMatch {
+impl ArenaMatch {
     pub fn new(
         name: &str,
         dependencies: Vec<Dependency>,
         components: Vec<Component>,
     ) -> Self {
-        AMatch {
+        ArenaMatch {
             name: name.to_string(),
             dependencies,
             components,
@@ -50,7 +50,7 @@ impl AMatch {
     }
 }
 
-impl Drop for AMatch {
+impl Drop for ArenaMatch {
     fn drop(&mut self) {
         self.stop();
     }
