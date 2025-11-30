@@ -1,6 +1,5 @@
-pub(crate)
-use crate::arena::postgres_dependency::PostgresDependency;
-use crate::arena::couchbase_dependency::CouchbaseDependency;
+use crate::couchbase_dependency::CouchbaseDependency;
+use crate::postgres_dependency::PostgresDependency;
 
 pub enum Dependency {
     PostgresDependency(PostgresDependency),

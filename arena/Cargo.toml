@@ -1,0 +1,10 @@
+[package]
+name = "arena"
+version = "0.1.0"
+edition = "2021"
+authors = ["David Pope"]
+description = "The base Arena module containing contracts and core Arena behaviour."
+license = "BSD 3-Claus"
+
+[lib]
+path = "src/lib.rs"

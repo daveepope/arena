@@ -1,4 +1,4 @@
-use arena::{Arena, AMatch, Component, ManagedProcessComponent, Dependency, PostgresDependency, CouchbaseDependency};
+use arena::{Arena, ArenaMatch, Component, ManagedProcessComponent, Dependency, PostgresDependency, CouchbaseDependency};
 
 fn main() {
     let mut postgres_db = Dependency::PostgresDependency(PostgresDependency::new(
@@ -16,6 +16,6 @@ fn main() {
         Component::Application(ManagedProcessComponent::new("web app".to_string())),
     ];
 
-    let mut arena = Arena::new(String::from("Component Test Suite"), vec![AMatch::new("end too end happy path", dependencies, component)]);
+    let mut arena = Arena::new(String::from("Component Test Suite"), vec![ArenaMatch::new("end too end happy path", dependencies, component)]);
     arena.commence();
 }
