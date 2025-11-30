@@ -1,9 +1,9 @@
-use crate::couchbase_dependency::CouchbaseDependency;
+use crate::kafka_dependency::KafkaDependency;
 use crate::postgres_dependency::PostgresDependency;
 
 pub enum Dependency {
     PostgresDependency(PostgresDependency),
-    CouchbaseDependency(CouchbaseDependency)
+    KafkaDependency(KafkaDependency)
 }
 
 pub trait RunnableDependency {
@@ -16,20 +16,20 @@ impl Dependency {
     pub fn start(&mut self) {
         match self {
             Dependency::PostgresDependency(dep) => dep.start(),
-            Dependency::CouchbaseDependency(dep) => dep.start()
+            Dependency::KafkaDependency(dep) => dep.start()
         }
     }
     pub fn stop(&mut self) {
         match self {
             Dependency::PostgresDependency(dep) => dep.stop(),
-            Dependency::CouchbaseDependency(dep) => dep.stop()
+            Dependency::KafkaDependency(dep) => dep.stop()
         }
     }
 
     pub fn add_child(&mut self, dep: Dependency) {
         match self {
             Dependency::PostgresDependency(db_dep) => db_dep.add_child_internal(dep),
-            Dependency::CouchbaseDependency(db_dep) => db_dep.add_child_internal(dep)
+            Dependency::KafkaDependency(db_dep) => db_dep.add_child_internal(dep)
         }
     }
 }

@@ -14,21 +14,21 @@ impl Arena {
 
     pub fn commence(&mut self) {
         if self.running { return; }
-        println!("[ARENA:{}] Starting.", self.name);
+        println!("[Arena-{}] starting.", self.name);
         for m in self.encounters.iter_mut() {
             m.start();
         }
         self.running = true;
-        println!("[ARENA{}] Started.", self.name);
+        println!("[Arena-{}] all matches started.", self.name);
     }
 
     pub fn conclude(&mut self) {
         if !self.running { return;}
-        println!("[ARENA:{}] Stopping matches.", self.name);
+        println!("[Arena-{}] stopping matches.", self.name);
         for m in self.encounters.iter_mut().rev() {
             m.stop();
         }
-        println!("[ARENA:{}] Stopped matches.", self.name);
+        println!("[Arena-{}] all matches stopped.", self.name);
         self.running = false;
     }
 }

@@ -28,14 +28,14 @@ impl ManagedProcessComponent {
     }
 
     pub fn start(&self) {
-        println!("[Application:{}] Starting.", self.endpoint);
-        println!("[Application:{}] Started.", self.endpoint);
+        println!("[Component-{}] starting.", self.endpoint);
+        println!("[Component-{}] started.", self.endpoint);
     }
 
     pub fn stop(&mut self) {
         if self.stopped { return; }
-        println!("[Application:{}] Stopping.", self.endpoint);
-        println!("[Application:{}] Stopped.", self.endpoint);
+        println!("[Component-{}] stopping.", self.endpoint);
+        println!("[Component-{}] stopped.", self.endpoint);
         self.stopped = true;
     }
 }

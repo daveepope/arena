@@ -3,32 +3,34 @@ use crate::dependency::{Dependency, RunnableDependency};
 pub struct PostgresDependency {
     pub name: String,
     pub dependencies: Vec<Dependency>,
-    started: bool
+    running: bool
 }
 
 impl PostgresDependency {
     pub fn new(name: String) -> Self {
-        PostgresDependency { name, dependencies: vec![], started: false }
+        PostgresDependency { name, dependencies: vec![], running: false }
     }
 }
 
 impl RunnableDependency for PostgresDependency {
     fn start(&mut self) {
-        if self.started { return; }
-        println!("[{}] (DB) Starting connection.", self.name);
+        if self.running { return; }
+        println!("[Postgres-{}] starting.", self.name);
         for dep in self.dependencies.iter_mut() {
             dep.start();
         }
-        self.started = true;
-        println!("[{}] (DB) Connection started.", self.name);
+        self.running = true;
+        println!("[Postgres-{}] started.", self.name);
     }
 
     fn stop(&mut self) {
-        println!("[{}] Stopping connection.", self.name);
+        if(!self.running) { return; }
+        println!("[Postgres-{}] stopping.", self.name);
         for dep in self.dependencies.iter_mut().rev() {
             dep.stop();
         }
-        println!("[{}] (DB) Connection stopped.", self.name);
+        println!("[Postgres-{}] stopped.", self.name);
+        self.running = false;
     }
 
     fn add_child_internal(&mut self, dep: Dependency) {

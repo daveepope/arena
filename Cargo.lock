@@ -7,7 +7,7 @@ name = "arena"
 version = "0.1.0"
 
 [[package]]
-name = "arena-examples-project"
+name = "arena-examples"
 version = "0.1.0"
 dependencies = [
  "arena",

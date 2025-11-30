@@ -1,34 +1,36 @@
 use crate::dependency::{Dependency, RunnableDependency};
 
-pub struct CouchbaseDependency {
+pub struct KafkaDependency {
     pub name: String,
     pub dependencies: Vec<Dependency>,
-    started: bool
+    running: bool
 }
 
-impl CouchbaseDependency {
+impl KafkaDependency {
     pub fn new(name: String) -> Self {
-        CouchbaseDependency { name, dependencies: vec![], started: false }
+        KafkaDependency { name, dependencies: vec![], running: false }
     }
 }
 
-impl RunnableDependency for CouchbaseDependency {
+impl RunnableDependency for KafkaDependency {
     fn start(&mut self) {
-        if self.started { return; }
-        println!("[{}] (Couchbase) Starting connection.", self.name);
+        if self.running { return; }
+        println!("[Kafka-{}] starting.", self.name);
         for dep in self.dependencies.iter_mut() {
             dep.start();
         }
-        self.started = true;
-        println!("[{}] (Couchbase) Connection started.", self.name);
+        self.running = true;
+        println!("[Kafka-{}] started.", self.name);
     }
 
     fn stop(&mut self) {
-        println!("[{}] (Couchbase) Stopping connection.", self.name);
+        if(!self.running) { return; }
+        println!("[Kafka-{}] stopping.", self.name);
         for dep in self.dependencies.iter_mut().rev() {
             dep.stop();
         }
-        println!("[{}] (Couchbase) Connection stopped.", self.name);
+        println!("[Kafka-{}] stopped.", self.name);
+        self.running = false;
     }
 
     fn add_child_internal(&mut self, dep: Dependency) {
@@ -36,7 +38,7 @@ impl RunnableDependency for CouchbaseDependency {
     }
 }
 
-impl Drop for CouchbaseDependency {
+impl Drop for KafkaDependency {
     fn drop(&mut self) {
         self.stop();
     }
