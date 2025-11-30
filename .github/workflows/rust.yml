@@ -1,0 +1,30 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "master" ] 
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+
+      - name: Build all crates
+        run: cargo build --verbose --workspace 
+
+      - name: Run tests for all crates
+        run: cargo test --verbose --workspace
+        
+          #- name: Run Clippy
+          #run: cargo clippy --all-targets --all-features -- -D warnings
