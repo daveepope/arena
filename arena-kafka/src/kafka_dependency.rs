@@ -1,8 +1,8 @@
-use crate::dependency::{Dependency, RunnableDependency};
+use arena::dependency::RunnableDependency;
 
 pub struct KafkaDependency {
     pub name: String,
-    pub dependencies: Vec<Dependency>,
+    dependencies: Vec<Box<dyn RunnableDependency>>,
     running: bool
 }
 
@@ -24,7 +24,7 @@ impl RunnableDependency for KafkaDependency {
     }
 
     fn stop(&mut self) {
-        if(!self.running) { return; }
+        if !self.running { return; }
         println!("[Kafka-{}] stopping.", self.name);
         for dep in self.dependencies.iter_mut().rev() {
             dep.stop();
@@ -33,13 +33,7 @@ impl RunnableDependency for KafkaDependency {
         self.running = false;
     }
 
-    fn add_child_internal(&mut self, dep: Dependency) {
+    fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
         self.dependencies.push(dep);
-    }
-}
-
-impl Drop for KafkaDependency {
-    fn drop(&mut self) {
-        self.stop();
     }
 }

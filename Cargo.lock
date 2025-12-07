@@ -11,4 +11,20 @@ name = "arena-examples"
 version = "0.1.0"
 dependencies = [
  "arena",
+ "arena-kafka",
+ "arena-postgres",
+]
+
+[[package]]
+name = "arena-kafka"
+version = "0.1.0"
+dependencies = [
+ "arena",
+]
+
+[[package]]
+name = "arena-postgres"
+version = "0.1.0"
+dependencies = [
+ "arena",
 ]

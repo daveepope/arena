@@ -8,3 +8,5 @@ license = "BSD 3-Claus"
 
 [dependencies]
 arena = { workspace = true }
+arena-kafka = { workspace = true }
+arena-postgres = { workspace = true }

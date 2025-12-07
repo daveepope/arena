@@ -1,14 +1,14 @@
 use std::ops::Drop;
-use super::arena_match::ArenaMatch;
+use super::encounter::Encounter;
 
 pub struct Arena {
     pub name: String,
-    pub encounters: Vec<ArenaMatch>,
+    pub encounters: Vec<Encounter>,
     running: bool
 }
 
 impl Arena {
-    pub fn new(name: String, encounters: Vec<ArenaMatch>) -> Self {
+    pub fn new(name: String, encounters: Vec<Encounter>) -> Self {
         Arena { name, encounters, running: false }
     }
 
@@ -24,11 +24,11 @@ impl Arena {
 
     pub fn conclude(&mut self) {
         if !self.running { return;}
-        println!("[Arena-{}] stopping matches.", self.name);
+        println!("[Arena-{}] stopping encounters.", self.name);
         for m in self.encounters.iter_mut().rev() {
             m.stop();
         }
-        println!("[Arena-{}] all matches stopped.", self.name);
+        println!("[Arena-{}] all encounters stopped.", self.name);
         self.running = false;
     }
 }
