@@ -3,8 +3,8 @@ name = "arena-examples"
 version = "0.1.0"
 edition = "2021"
 authors = ["David Pope"]
-description = "Examples using the arena framework. Intended as documentation and for testing."
-license = "BSD 3-Claus"
+description = "Examples using the arena framework. Intended as documentation and testing."
+license = "BSD-3-Clause"
 
 [dependencies]
 arena = { workspace = true }
