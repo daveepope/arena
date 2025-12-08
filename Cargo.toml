@@ -1,8 +1,12 @@
 [workspace]
-members = [
+resolver = "2"
+members = ["arena-postgres",
     "arena",
+    "arena-kafka",
     "examples"
 ]
 
 [workspace.dependencies]
 arena = { path = "arena" }
+arena-kafka = { path = "arena-kafka" }
+arena-postgres = { path = "arena-postgres" }

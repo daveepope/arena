@@ -1,0 +1,10 @@
+[package]
+name = "arena-kafka"
+version = "0.1.0"
+edition = "2021"
+authors = ["David Pope"]
+description = "Arena Kafka implmentation"
+license = "BSD-3-Clause"
+
+[dependencies]
+arena = { workspace = true }
