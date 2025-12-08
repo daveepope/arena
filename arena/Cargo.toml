@@ -8,3 +8,6 @@ license = "BSD-3-Clause"
 
 [lib]
 path = "src/lib.rs"
+
+[dev-dependencies]
+mockall = "0.14.0"

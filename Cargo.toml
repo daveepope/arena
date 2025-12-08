@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = ["arena-postgres",
     "arena",
     "arena-kafka",

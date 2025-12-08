@@ -2,6 +2,11 @@ use std::ops::Drop;
 use super::component::Component;
 use super::dependency::Dependency;
 
+pub trait EncounterTrait: Send + Sync {
+    fn start(&mut self);
+    fn stop(&mut self);
+}
+
 pub struct Encounter {
     pub name: String,
     dependencies: Vec<Dependency>,
@@ -22,8 +27,10 @@ impl Encounter {
             started: false,
         }
     }
+}
 
-    pub fn start(&mut self) {
+impl EncounterTrait for Encounter {
+    fn start(&mut self) {
         if self.started { return; }
         println!("[Encounters-{}] starting.", self.name);
         for dep in self.dependencies.iter_mut() {
@@ -36,7 +43,7 @@ impl Encounter {
         self.started = true;
     }
 
-    pub fn stop(&mut self) {
+    fn stop(&mut self) {
         if !self.started { return; }
         println!("[Encounters-{}] stopping.", self.name);
         for comp in self.components.iter_mut().rev() {
