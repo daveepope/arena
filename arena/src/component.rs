@@ -1,5 +1,3 @@
-use std::ops::Drop;
-
 pub enum Component {
     Application(ManagedProcessComponent),
 }

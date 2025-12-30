@@ -10,3 +10,4 @@ license = "BSD-3-Clause"
 arena = { workspace = true }
 arena-kafka = { workspace = true }
 arena-postgres = { workspace = true }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

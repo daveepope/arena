@@ -1,17 +1,18 @@
-use std::ops::Drop;
 use super::component::Component;
 use super::dependency::Dependency;
+use async_trait::async_trait;
 
+#[async_trait]
 pub trait EncounterTrait: Send + Sync {
-    fn start(&mut self);
-    fn stop(&mut self);
+    async fn start(&mut self);
+    async fn stop(&mut self);
 }
 
 pub struct Encounter {
     pub name: String,
     dependencies: Vec<Dependency>,
     components: Vec<Component>,
-    started: bool
+    started: bool,
 }
 
 impl Encounter {
@@ -29,36 +30,43 @@ impl Encounter {
     }
 }
 
+#[async_trait]
 impl EncounterTrait for Encounter {
-    fn start(&mut self) {
-        if self.started { return; }
-        println!("[Encounters-{}] starting.", self.name);
-        for dep in self.dependencies.iter_mut() {
-            dep.start();
+    async fn start(&mut self) {
+        if self.started {
+            return;
         }
+
+        println!("[Encounters-{}] starting.", self.name);
+
+        for dep in self.dependencies.iter_mut() {
+            dep.start().await;
+        }
+
         for comp in self.components.iter() {
             comp.start();
         }
+
         println!("[Encounters-{}] started.", self.name);
         self.started = true;
     }
 
-    fn stop(&mut self) {
-        if !self.started { return; }
+    async fn stop(&mut self) {
+        if !self.started {
+            return;
+        }
+
         println!("[Encounters-{}] stopping.", self.name);
+
         for comp in self.components.iter_mut().rev() {
             comp.stop();
         }
+
         for dep in self.dependencies.iter_mut().rev() {
-            dep.stop();
+            dep.stop().await;
         }
+
         println!("[Encounters-{}] stopped.", self.name);
         self.started = false;
-    }
-}
-
-impl Drop for Encounter {
-    fn drop(&mut self) {
-        self.stop();
     }
 }
