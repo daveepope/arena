@@ -1,6 +1,7 @@
 use super::component::Component;
 use super::dependency::Dependency;
 use async_trait::async_trait;
+use futures::future::join_all;
 
 #[async_trait]
 pub trait EncounterTrait: Send + Sync {
@@ -16,11 +17,7 @@ pub struct Encounter {
 }
 
 impl Encounter {
-    pub fn new(
-        name: &str,
-        dependencies: Vec<Dependency>,
-        components: Vec<Component>,
-    ) -> Self {
+    pub fn new(name: &str, dependencies: Vec<Dependency>, components: Vec<Component>) -> Self {
         Encounter {
             name: name.to_string(),
             dependencies,
@@ -37,17 +34,24 @@ impl EncounterTrait for Encounter {
             return;
         }
 
-        println!("[Encounters-{}] starting.", self.name);
+        log::info!("[Encounters-{}] starting.", self.name);
 
-        for dep in self.dependencies.iter_mut() {
+        let deps = std::mem::take(&mut self.dependencies);
+
+        let mut started = join_all(deps.into_iter().enumerate().map(|(i, mut dep)| async move {
             dep.start().await;
-        }
+            (i, dep)
+        }))
+        .await;
+
+        started.sort_by_key(|(i, _)| *i);
+        self.dependencies = started.into_iter().map(|(_, dep)| dep).collect();
 
         for comp in self.components.iter() {
             comp.start();
         }
 
-        println!("[Encounters-{}] started.", self.name);
+        log::info!("[Encounters-{}] started.", self.name);
         self.started = true;
     }
 
@@ -56,7 +60,7 @@ impl EncounterTrait for Encounter {
             return;
         }
 
-        println!("[Encounters-{}] stopping.", self.name);
+        log::info!("[Encounters-{}] stopping.", self.name);
 
         for comp in self.components.iter_mut().rev() {
             comp.stop();
@@ -66,7 +70,7 @@ impl EncounterTrait for Encounter {
             dep.stop().await;
         }
 
-        println!("[Encounters-{}] stopped.", self.name);
+        log::info!("[Encounters-{}] stopped.", self.name);
         self.started = false;
     }
 }

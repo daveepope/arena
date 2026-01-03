@@ -10,3 +10,4 @@ license = "BSD-3-Clause"
 arena = { workspace = true }
 async-trait = "0.1"
 testcontainers-modules = { version = "0.14.0", features = ["kafka"] }
+log = "0.4"

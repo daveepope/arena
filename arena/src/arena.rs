@@ -16,14 +16,14 @@ impl Arena {
             return;
         }
 
-        println!("[Arena-{}] starting.", self.name);
+        log::info!("[Arena-{}] starting.", self.name);
 
         for m in self.encounters.iter_mut() {
             m.start().await;
         }
 
         self.running = true;
-        println!("[Arena-{}] all Encounters started.", self.name);
+        log::info!("[Arena-{}] all Encounters started.", self.name);
     }
 
     pub async fn conclude(&mut self) {
@@ -31,13 +31,13 @@ impl Arena {
             return;
         }
 
-        println!("[Arena-{}] stopping Encounters.", self.name);
+        log::info!("[Arena-{}] stopping Encounters.", self.name);
 
         for m in self.encounters.iter_mut().rev() {
             m.stop().await;
         }
 
-        println!("[Arena-{}] all Encounters stopped.", self.name);
+        log::info!("[Arena-{}] all Encounters stopped.", self.name);
         self.running = false;
     }
 }
@@ -59,6 +59,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_arena_calls_start_and_stop_on_all_encounters() {
+        let _ = env_logger::builder().is_test(true).try_init();
         let encounters: Vec<Box<dyn EncounterTrait>> = vec![
             Box::new(create_and_setup_stub_encounter()),
             Box::new(create_and_setup_stub_encounter()),
@@ -74,11 +75,11 @@ mod tests {
         mock_encounter
             .expect_start()
             .times(1)
-            .returning(|| Box::pin(async {}));
+            .returning(|| ());
         mock_encounter
             .expect_stop()
             .times(1)
-            .returning(|| Box::pin(async {}));
+            .returning(|| ());
         mock_encounter
     }
 }
