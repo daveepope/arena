@@ -1,10 +1,9 @@
-use std::ops::Drop;
-use super::encounter::{EncounterTrait};
+use crate::encounter::EncounterTrait;
 
 pub struct Arena {
     pub name: String,
     pub encounters: Vec<Box<dyn EncounterTrait>>,
-    running: bool
+    running: bool,
 }
 
 impl Arena {
@@ -12,60 +11,75 @@ impl Arena {
         Arena { name, encounters, running: false }
     }
 
-    pub fn commence(&mut self) {
-        if self.running { return; }
-        println!("[Arena-{}] starting.", self.name);
+    pub async fn commence(&mut self) {
+        if self.running {
+            return;
+        }
+
+        log::info!("[Arena-{}] starting.", self.name);
+
         for m in self.encounters.iter_mut() {
-            m.start();
+            m.start().await;
         }
+
         self.running = true;
-        println!("[Arena-{}] all Encounters started.", self.name);
+        log::info!("[Arena-{}] all Encounters started.", self.name);
     }
 
-    pub fn conclude(&mut self) {
-        if !self.running { return;}
-        println!("[Arena-{}] stopping Encounters.", self.name);
-        for m in self.encounters.iter_mut().rev() {
-            m.stop();
+    pub async fn conclude(&mut self) {
+        if !self.running {
+            return;
         }
-        println!("[Arena-{}] all Encounters stopped.", self.name);
-        self.running = false;
-    }
-}
 
-impl Drop for Arena {
-    fn drop(&mut self) {
-        self.conclude();
+        log::info!("[Arena-{}] stopping Encounters.", self.name);
+
+        for m in self.encounters.iter_mut().rev() {
+            m.stop().await;
+        }
+
+        log::info!("[Arena-{}] all Encounters stopped.", self.name);
+        self.running = false;
     }
 }
 
 #[cfg(test)]
 mod tests {
-
+    use super::*;
+    use async_trait::async_trait;
     use mockall::mock;
-    use crate::{Arena, EncounterTrait};
 
     mock! {
         Encounter {}
+        #[async_trait]
         impl EncounterTrait for Encounter {
-            fn start(&mut self);
-            fn stop(&mut self);
+            async fn start(&mut self);
+            async fn stop(&mut self);
         }
     }
 
-    #[test]
-    fn test_arena_calls_start_on_all_encounters() {
-        let mut mock1 = MockEncounter::new();
-        mock1.expect_start().times(1).returning(|| {});
-        mock1.expect_stop().times(1).returning(|| {});
-
-        let mut mock2 = MockEncounter::new();
-        mock2.expect_start().times(1).returning(|| {});
-        mock2.expect_stop().times(1).returning(|| {});
-
-        let encounters: Vec<Box<dyn EncounterTrait>> = vec![Box::new(mock1), Box::new(mock2)];
+    #[tokio::test]
+    async fn test_arena_calls_start_and_stop_on_all_encounters() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let encounters: Vec<Box<dyn EncounterTrait>> = vec![
+            Box::new(create_and_setup_stub_encounter()),
+            Box::new(create_and_setup_stub_encounter()),
+        ];
         let mut arena = Arena::new("TestArena".to_string(), encounters);
 
-        arena.commence();
+        arena.commence().await;
+        arena.conclude().await;
+    }
+
+    fn create_and_setup_stub_encounter() -> MockEncounter {
+        let mut mock_encounter = MockEncounter::new();
+        mock_encounter
+            .expect_start()
+            .times(1)
+            .returning(|| ());
+        mock_encounter
+            .expect_stop()
+            .times(1)
+            .returning(|| ());
+        mock_encounter
     }
 }
