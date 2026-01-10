@@ -8,13 +8,21 @@ use env_logger::Env;
 async fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
+    let startup_sql_scripts = vec![
+        include_str!("../resources/instrument_reading_db_schema.sql").to_string(),
+    ];
+
     let postgres_db: Dependency = Box::new(
-        PostgresDependency::builder("my_db")
-            .with_port(5555)
+        PostgresDependency::builder("postgres custom dependency name")
+            .with_port(4444)
+            .with_database_name("my_database")
+                                                .with_database_username("my_user")
+            .with_database_password("my_password")
+            .with_startup_sql_scripts(startup_sql_scripts)
             .build());
 
     let kafka: Dependency = Box::new(KafkaDependency::new(
-        String::from("my_kafka"),
+        String::from("kafka custom dependency name"),
         Box::new(InternalKafkaTestContainerImpl::new()),
     ));
 
