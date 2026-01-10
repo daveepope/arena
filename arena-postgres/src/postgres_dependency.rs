@@ -2,7 +2,8 @@ use arena::dependency::RunnableDependency;
 use async_trait::async_trait;
 use crate::builder::PostgresDependencyBuilder;
 use crate::postgres_container_impl::PostgresImpl;
-use tokio::time::{Duration, Instant};
+use futures::channel::oneshot;
+use std::time::{Duration, Instant};
 
 pub struct PostgresDependency {
     pub identifier: String,
@@ -48,44 +49,30 @@ impl PostgresDependency {
         PostgresDependencyBuilder::new(identifier)
     }
 
-    async fn run_startup_sql_scripts(&self, scripts: Vec<String>) {
-        let conn_str = self
-            .connection_string()
-            .expect("connection string should be available after postgres starts");
-
-        let (client, connection) = tokio_postgres::connect(conn_str, tokio_postgres::NoTls)
-            .await
+    fn run_startup_sql_scripts(identifier: &str, conn_str: &str, scripts: &[String]) {
+        let mut client = postgres::Client::connect(conn_str, postgres::NoTls)
             .expect("connect to postgres to run startup scripts");
-
-        tokio::spawn(async move {
-            if let Err(err) = connection.await {
-                log::warn!(
-                    "[PostgresDependency] postgres connection error while running startup scripts: {err}"
-                );
-            }
-        });
 
         log::info!(
             "[PostgresDependency-{}] running {} startup sql script(s).",
-            self.identifier,
+            identifier,
             scripts.len()
         );
 
         for (idx, sql) in scripts.iter().enumerate() {
             log::info!(
                 "[PostgresDependency-{}] running startup sql script {}/{}.",
-                self.identifier,
+                identifier,
                 idx + 1,
                 scripts.len()
             );
 
             client
                 .batch_execute(sql)
-                .await
                 .unwrap_or_else(|err| {
                     panic!(
                         "[PostgresDependency-{}] startup sql script {}/{} failed: {err}",
-                        self.identifier,
+                        identifier,
                         idx + 1,
                         scripts.len()
                     )
@@ -94,30 +81,17 @@ impl PostgresDependency {
 
         log::info!(
             "[PostgresDependency-{}] startup sql scripts complete.",
-            self.identifier
+            identifier
         );
     }
 
-    async fn is_ready_once(&self) -> bool {
-        let conn_str = match self.connection_string() {
-            Some(s) => s,
-            None => return false,
-        };
-
-        let (client, connection) = match tokio_postgres::connect(conn_str, tokio_postgres::NoTls).await
-        {
+    fn is_ready_once(conn_str: &str) -> bool {
+        let mut client = match postgres::Client::connect(conn_str, postgres::NoTls) {
             Ok(v) => v,
             Err(_) => return false,
         };
 
-        // Drive the connection in the background for the duration of this check.
-        tokio::spawn(async move {
-            if let Err(err) = connection.await {
-                log::debug!("[PostgresDependency] connection error while checking readiness: {err}");
-            }
-        });
-
-        client.simple_query("SELECT 1").await.is_ok()
+        client.simple_query("SELECT 1").is_ok()
     }
 }
 
@@ -148,25 +122,47 @@ impl RunnableDependency for PostgresDependency {
             )
             .await;
 
-        let timeout = Duration::from_secs(10);
-        let poll_every = Duration::from_millis(250);
-        let start = Instant::now();
+        let identifier = self.identifier.clone();
+        let conn_str = self
+            .connection_string()
+            .expect("connection string should be available after postgres starts")
+            .to_string();
 
-        while !self.is_ready_once().await {
-            if start.elapsed() >= timeout {
-                panic!(
-                    "[PostgresDependency-{}] postgres did not become ready within {:?}. conn_str={:?}",
-                    self.identifier,
-                    timeout,
-                    self.connection_string(),
-                );
+        let (tx, rx) = oneshot::channel::<Result<(), String>>();
+
+        std::thread::spawn(move || {
+            let timeout = Duration::from_secs(10);
+            let poll_every = Duration::from_millis(250);
+            let start = Instant::now();
+
+            while !PostgresDependency::is_ready_once(&conn_str) {
+                if start.elapsed() >= timeout {
+                    let _ = tx.send(Err(format!(
+                        "[PostgresDependency-{}] postgres did not become ready within {:?}. conn_str={:?}",
+                        identifier,
+                        timeout,
+                        conn_str
+                    )));
+                    return;
+                }
+
+                std::thread::sleep(poll_every);
             }
 
-            tokio::time::sleep(poll_every).await;
-        }
+            if let Some(scripts) = scripts {
+                PostgresDependency::run_startup_sql_scripts(&identifier, &conn_str, &scripts);
+            }
 
-        if let Some(scripts) = scripts {
-            self.run_startup_sql_scripts(scripts).await;
+            let _ = tx.send(Ok(()));
+        });
+
+        match rx.await {
+            Ok(Ok(())) => {}
+            Ok(Err(msg)) => panic!("{msg}"),
+            Err(_canceled) => panic!(
+                "[PostgresDependency-{}] readiness/scripts worker thread unexpectedly stopped.",
+                self.identifier
+            ),
         }
 
         self.running = true;
