@@ -45,6 +45,7 @@ impl OpenArena {
 
         self.closed = true;
 
+        // transfer ownership between arenas
         let name = std::mem::take(&mut self.name);
         let encounters = std::mem::take(&mut self.encounters);
 

@@ -8,7 +8,10 @@ use env_logger::Env;
 async fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
-    let postgres_db: Dependency = Box::new(PostgresDependency::builder("my_db").build());
+    let postgres_db: Dependency = Box::new(
+        PostgresDependency::builder("my_db")
+            .with_port(5555)
+            .build());
 
     let kafka: Dependency = Box::new(KafkaDependency::new(
         String::from("my_kafka"),

@@ -1,7 +1,15 @@
 use async_trait::async_trait;
 use testcontainers_modules::{postgres, testcontainers, testcontainers::runners::AsyncRunner};
+use testcontainers_modules::testcontainers::core::ContainerPort;
+use testcontainers_modules::testcontainers::ImageExt;
 
-use crate::postgres_dependency::PostgresDependencyWrapper;
+#[async_trait]
+pub trait PostgresImpl: Send + Sync {
+    async fn start(&mut self, name: &str, port: u16, startup_sql_scripts: Option<Vec<String>>);
+    async fn stop(&mut self, name: &str);
+
+    fn connection_string(&self) -> Option<&str>;
+}
 
 pub(crate) struct PostgresContainerImpl {
     container: Option<testcontainers::core::ContainerAsync<postgres::Postgres>>,
@@ -15,20 +23,28 @@ impl PostgresContainerImpl {
 }
 
 #[async_trait]
-impl PostgresDependencyWrapper for PostgresContainerImpl {
-    async fn start(&mut self, name: &str) {
+impl PostgresImpl for PostgresContainerImpl {
+    async fn start(&mut self, name: &str, port: u16, _startup_sql_scripts: Option<Vec<String>>) {
         if self.container.is_some() {
             return;
         }
 
+        const CONTAINER_PORT: u16 = 5432;
+
         let container = postgres::Postgres::default()
+            .with_mapped_port(port, ContainerPort::from(5432))
             .start()
             .await
             .expect("start postgres container");
 
-        let host = container.get_host().await.expect("Failed to get host").to_string();
+        let host = container
+            .get_host()
+            .await
+            .expect("Failed to get host")
+            .to_string();
+
         let port = container
-            .get_host_port_ipv4(5432)
+            .get_host_port_ipv4(CONTAINER_PORT)
             .await
             .expect("Failed to get port")
             .to_string();
