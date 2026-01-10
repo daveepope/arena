@@ -1,44 +1,63 @@
 use crate::encounter::EncounterTrait;
 
-pub struct Arena {
+pub struct ClosedArena {
     pub name: String,
     pub encounters: Vec<Box<dyn EncounterTrait>>,
-    running: bool,
 }
 
-impl Arena {
+#[must_use = "Arena is open; call .close().await to stop it cleanly"]
+pub struct OpenArena {
+    name: String,
+    encounters: Vec<Box<dyn EncounterTrait>>,
+    closed: bool,
+}
+
+impl ClosedArena {
     pub fn new(name: String, encounters: Vec<Box<dyn EncounterTrait>>) -> Self {
-        Arena { name, encounters, running: false }
+        Self { name, encounters }
     }
 
-    pub async fn commence(&mut self) {
-        if self.running {
-            return;
+    pub async fn open(mut self) -> OpenArena {
+        log::info!("[Arena-{}] opening.", self.name);
+
+        for e in self.encounters.iter_mut() {
+            e.start().await;
         }
 
-        log::info!("[Arena-{}] starting.", self.name);
+        log::info!("[Arena-{}] opened.", self.name);
 
-        for m in self.encounters.iter_mut() {
-            m.start().await;
+        OpenArena {
+            name: self.name,
+            encounters: self.encounters,
+            closed: false,
         }
-
-        self.running = true;
-        log::info!("[Arena-{}] all Encounters started.", self.name);
     }
+}
+impl OpenArena {
+    pub async fn close(mut self) -> ClosedArena {
+        log::info!("[Arena-{}] closing.", self.name);
 
-    pub async fn conclude(&mut self) {
-        if !self.running {
-            return;
+        for e in self.encounters.iter_mut().rev() {
+            e.stop().await;
         }
 
-        log::info!("[Arena-{}] stopping Encounters.", self.name);
+        log::info!("[Arena-{}] closed.", self.name);
 
-        for m in self.encounters.iter_mut().rev() {
-            m.stop().await;
-        }
+        self.closed = true;
 
-        log::info!("[Arena-{}] all Encounters stopped.", self.name);
-        self.running = false;
+        let name = std::mem::take(&mut self.name);
+        let encounters = std::mem::take(&mut self.encounters);
+
+        ClosedArena { name, encounters }
+    }
+}
+
+impl Drop for OpenArena {
+    fn drop(&mut self) {
+        assert!(
+            self.closed,
+            "OpenArena dropped without calling close().await"
+        );
     }
 }
 
@@ -64,22 +83,26 @@ mod tests {
             Box::new(create_and_setup_stub_encounter()),
             Box::new(create_and_setup_stub_encounter()),
         ];
-        let mut arena = Arena::new("TestArena".to_string(), encounters);
 
-        arena.commence().await;
-        arena.conclude().await;
+        let closed = ClosedArena::new("TestArena".to_string(), encounters);
+        let open = closed.open().await;
+        let _closed = open.close().await;
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "OpenArena dropped without close().await")]
+    async fn test_open_arena_panics_on_drop_if_not_closed() {
+        let _ = env_logger::builder().is_test(true).try_init();
+        let encounters: Vec<Box<dyn EncounterTrait>> = vec![Box::new(create_and_setup_stub_encounter())];
+
+        let closed = ClosedArena::new("TestArena".to_string(), encounters);
+        let _open = closed.open().await;
     }
 
     fn create_and_setup_stub_encounter() -> MockEncounter {
         let mut mock_encounter = MockEncounter::new();
-        mock_encounter
-            .expect_start()
-            .times(1)
-            .returning(|| ());
-        mock_encounter
-            .expect_stop()
-            .times(1)
-            .returning(|| ());
+        mock_encounter.expect_start().times(1).returning(|| ());
+        mock_encounter.expect_stop().times(1).returning(|| ());
         mock_encounter
     }
 }
