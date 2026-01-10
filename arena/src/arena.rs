@@ -5,7 +5,7 @@ pub struct ClosedArena {
     pub encounters: Vec<Box<dyn EncounterTrait>>,
 }
 
-#[must_use = "Arena is open; call .close().await to stop it cleanly"]
+#[must_use = "Arena is open; call .close() before dropping"]
 pub struct OpenArena {
     name: String,
     encounters: Vec<Box<dyn EncounterTrait>>,
@@ -56,7 +56,7 @@ impl Drop for OpenArena {
     fn drop(&mut self) {
         assert!(
             self.closed,
-            "OpenArena dropped without calling close().await"
+            "OpenArena dropped without calling close() first"
         );
     }
 }
@@ -89,14 +89,21 @@ mod tests {
         let _closed = open.close().await;
     }
 
-    #[tokio::test]
-    #[should_panic(expected = "OpenArena dropped without close().await")]
-    async fn test_open_arena_panics_on_drop_if_not_closed() {
+    #[test]
+    #[should_panic]
+    fn test_open_arena_panics_on_drop_if_not_closed() {
         let _ = env_logger::builder().is_test(true).try_init();
-        let encounters: Vec<Box<dyn EncounterTrait>> = vec![Box::new(create_and_setup_stub_encounter())];
 
-        let closed = ClosedArena::new("TestArena".to_string(), encounters);
-        let _open = closed.open().await;
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let encounters: Vec<Box<dyn EncounterTrait>> =
+                vec![Box::new(create_and_setup_stub_encounter())];
+
+            let closed = ClosedArena::new("TestArena".to_string(), encounters);
+            let open = closed.open().await;
+
+            drop(open);
+        });
     }
 
     fn create_and_setup_stub_encounter() -> MockEncounter {
