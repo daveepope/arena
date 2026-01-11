@@ -10,11 +10,11 @@ license = "BSD-3-Clause"
 path = "src/lib.rs"
 
 [dependencies]
-async-trait = "0.1"
-futures = "0.3"
-log = "0.4"
+async-trait = { workspace = true }
+futures = { workspace = true }
+log = { workspace = true }
 
 [dev-dependencies]
-mockall = "0.14.0"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-env_logger = "0.11"
+mockall = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+env_logger = { workspace = true }

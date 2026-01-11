@@ -2,6 +2,7 @@ use arena::dependency::RunnableDependency;
 use async_trait::async_trait;
 use crate::builder::PostgresDependencyBuilder;
 use crate::postgres_container_impl::PostgresImpl;
+use backon::{BlockingRetryable, ConstantBuilder};
 use futures::channel::oneshot;
 use std::time::{Duration, Instant};
 
@@ -93,6 +94,108 @@ impl PostgresDependency {
 
         client.simple_query("SELECT 1").is_ok()
     }
+
+    async fn is_ready(&self) {
+        let identifier = self.identifier.clone();
+        let conn_str = self
+            .connection_string()
+            .expect("connection string should be available after postgres starts")
+            .to_string();
+
+        let conn_str_for_thread = conn_str.clone();
+        let (tx, rx) = oneshot::channel::<Result<(), String>>();
+
+        std::thread::spawn(move || {
+            let timeout = Duration::from_secs(10);
+            let poll_every = Duration::from_millis(250);
+            let start = Instant::now();
+
+            let policy = ConstantBuilder::default()
+                .with_delay(poll_every)
+                .without_max_times();
+
+            let is_ready_once = || {
+                if PostgresDependency::is_ready_once(&conn_str_for_thread) {
+                    Ok(())
+                } else {
+                    Err(())
+                }
+            };
+
+            let result = is_ready_once
+                .retry(policy)
+                .sleep(std::thread::sleep)
+                // Preserve wall-clock timeout semantics (includes connect time).
+                .when(|_| start.elapsed() < timeout)
+                .call();
+
+            match result {
+                Ok(()) => {
+                    let _ = tx.send(Ok(()));
+                }
+                Err(()) => {
+                    let _ = tx.send(Err(format!(
+                        "[PostgresDependency-{}] postgres did not become ready within {:?}. conn_str={:?}",
+                        identifier, timeout, conn_str_for_thread
+                    )));
+                }
+            }
+        });
+
+        match rx.await {
+            Ok(Ok(())) => (),
+            Ok(Err(msg)) => panic!("{msg}"),
+            Err(_canceled) => panic!(
+                "[PostgresDependency-{}] readiness/health-check worker thread unexpectedly stopped.",
+                self.identifier
+            ),
+        }
+    }
+
+    async fn run_startup_sql_scripts_blocking(&self, scripts: Vec<String>) {
+        // `postgres::Client::connect` can spin up a Tokio runtime internally, which will panic
+        // if invoked from within an already-running Tokio runtime thread. To stay runtime-agnostic
+        // and avoid that nested-runtime panic, run startup scripts on a dedicated OS thread.
+        let identifier = self.identifier.clone();
+        let conn_str = self
+            .connection_string()
+            .expect("connection string should be available after postgres starts")
+            .to_string();
+
+        let (tx, rx) = oneshot::channel::<Result<(), String>>();
+
+        std::thread::spawn(move || {
+            let res = std::panic::catch_unwind(|| {
+                PostgresDependency::run_startup_sql_scripts(&identifier, &conn_str, &scripts);
+            });
+
+            match res {
+                Ok(()) => {
+                    let _ = tx.send(Ok(()));
+                }
+                Err(panic_payload) => {
+                    let msg = if let Some(s) = panic_payload.downcast_ref::<String>() {
+                        s.clone()
+                    } else if let Some(s) = panic_payload.downcast_ref::<&str>() {
+                        s.to_string()
+                    } else {
+                        format!("[PostgresDependency-{}] startup sql scripts panicked.", identifier)
+                    };
+
+                    let _ = tx.send(Err(msg));
+                }
+            }
+        });
+
+        match rx.await {
+            Ok(Ok(())) => {}
+            Ok(Err(msg)) => panic!("{msg}"),
+            Err(_canceled) => panic!(
+                "[PostgresDependency-{}] startup-scripts worker thread unexpectedly stopped.",
+                self.identifier
+            ),
+        }
+    }
 }
 
 #[async_trait]
@@ -122,47 +225,10 @@ impl RunnableDependency for PostgresDependency {
             )
             .await;
 
-        let identifier = self.identifier.clone();
-        let conn_str = self
-            .connection_string()
-            .expect("connection string should be available after postgres starts")
-            .to_string();
+        self.is_ready().await;
 
-        let (tx, rx) = oneshot::channel::<Result<(), String>>();
-
-        std::thread::spawn(move || {
-            let timeout = Duration::from_secs(10);
-            let poll_every = Duration::from_millis(250);
-            let start = Instant::now();
-
-            while !PostgresDependency::is_ready_once(&conn_str) {
-                if start.elapsed() >= timeout {
-                    let _ = tx.send(Err(format!(
-                        "[PostgresDependency-{}] postgres did not become ready within {:?}. conn_str={:?}",
-                        identifier,
-                        timeout,
-                        conn_str
-                    )));
-                    return;
-                }
-
-                std::thread::sleep(poll_every);
-            }
-
-            if let Some(scripts) = scripts {
-                PostgresDependency::run_startup_sql_scripts(&identifier, &conn_str, &scripts);
-            }
-
-            let _ = tx.send(Ok(()));
-        });
-
-        match rx.await {
-            Ok(Ok(())) => {}
-            Ok(Err(msg)) => panic!("{msg}"),
-            Err(_canceled) => panic!(
-                "[PostgresDependency-{}] readiness/scripts worker thread unexpectedly stopped.",
-                self.identifier
-            ),
+        if let Some(scripts) = scripts {
+            self.run_startup_sql_scripts_blocking(scripts).await;
         }
 
         self.running = true;

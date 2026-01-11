@@ -73,7 +73,6 @@ impl PostgresImpl for PostgresContainerImpl {
             .await
             .expect("Failed to get port")
             .to_string();
-
         self.conn = Some(format!(
             "postgres://{database_username}:{database_password}@{host}:{port}/{database_name}"
         ));

@@ -10,3 +10,11 @@ members = ["arena-postgres",
 arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }
 arena-postgres = { path = "arena-postgres" }
+backon = "1.5.2"
+async-trait = "0.1"
+env_logger = "0.11"
+futures = "0.3"
+log = "0.4"
+testcontainers-modules = "0.14.0"
+tokio = "1"
+mockall = "0.14.0"
