@@ -7,6 +7,14 @@ members = ["arena-postgres",
 ]
 
 [workspace.dependencies]
-arena = { path = "arena" }
-arena-kafka = { path = "arena-kafka" }
-arena-postgres = { path = "arena-postgres" }
+arena = { path = "arena", version = "0.1.0-alpha.1" }
+arena-kafka = { path = "arena-kafka", version = "0.1.0-alpha.1" }
+arena-postgres = { path = "arena-postgres", version = "0.1.0-alpha.1" }
+backon = "1.5.2"
+async-trait = "0.1"
+env_logger = "0.11"
+futures = "0.3"
+log = "0.4"
+testcontainers-modules = "0.14.0"
+tokio = "1"
+mockall = "0.14.0"

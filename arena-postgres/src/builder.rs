@@ -10,15 +10,17 @@ pub struct PostgresDependencyBuilder {
     database_username: Option<String>,
     database_password: Option<String>,
     startup_sql_scripts: Option<Vec<String>>,
-    dependencies: Option<Vec<Box<dyn RunnableDependency>>>
+    dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
+    container_name: Option<String>
 }
 
 impl PostgresDependencyBuilder {
 
     const DEFAULT_PORT: u16 = 5432;
-    const DEFAULT_DATABASE_NAME: &'static str = "postgres";
-    const DEFAULT_DATABASE_USERNAME: &'static str = "postgres";
+    const DEFAULT_DATABASE_NAME: &'static str = "arena_db";
+    const DEFAULT_DATABASE_USERNAME: &'static str = "arena_user";
     const DEFAULT_DATABASE_PASSWORD: &'static str = "postgres";
+    const DEFAULT_CONTAINER_NAME: &'static str = "postgres:latest";
 
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {
@@ -30,6 +32,7 @@ impl PostgresDependencyBuilder {
             database_password: None,
             startup_sql_scripts: None,
             dependencies: None,
+            container_name: None
         }
     }
 
@@ -77,6 +80,12 @@ impl PostgresDependencyBuilder {
         self
     }
 
+    pub fn with_container_name(mut self, container_name: impl Into<String>) -> Self
+    {
+        self.container_name = Option::from(container_name.into());
+        self
+    }
+
     pub fn build(self) -> PostgresDependency {
         let postgres_impl = self
             .postgres_impl
@@ -94,6 +103,9 @@ impl PostgresDependencyBuilder {
             .unwrap_or_else(|| Self::DEFAULT_DATABASE_PASSWORD.to_string());
         let startup_sql_scripts = self.startup_sql_scripts;
         let dependencies = self.dependencies;
+        let container_name = self
+            .container_name
+            .unwrap_or_else(|| Self::DEFAULT_CONTAINER_NAME.to_string());
     
         PostgresDependency::new(
             self.identifier,
@@ -104,6 +116,7 @@ impl PostgresDependencyBuilder {
             database_password,
             startup_sql_scripts,
             dependencies,
+            container_name
         )
     }
 }

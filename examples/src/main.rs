@@ -13,10 +13,11 @@ async fn main() {
     ];
 
     let postgres_db: Dependency = Box::new(
-        PostgresDependency::builder("postgres custom dependency name")
+        PostgresDependency::builder("arena example database")
+            .with_container_name("postgres:14.20-trixie")
             .with_port(4444)
             .with_database_name("my_database")
-                                                .with_database_username("my_user")
+            .with_database_username("my_user")
             .with_database_password("my_password")
             .with_startup_sql_scripts(startup_sql_scripts)
             .build());
