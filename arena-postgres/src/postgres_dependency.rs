@@ -209,6 +209,7 @@ impl RunnableDependency for PostgresDependency {
         }
 
         log::info!("[PostgresDependency-{}] starting.", self.identifier);
+        let sw = Instant::now();
 
         for dep in self.dependencies.iter_mut().flatten() {
             dep.start().await;
@@ -220,6 +221,7 @@ impl RunnableDependency for PostgresDependency {
         let database_password = self.database_password.clone();
         let container_tag = self.container_tag.clone();
 
+        let sw_container = Instant::now();
         self.postgres_impl
             .start(
                 self.port,
@@ -229,14 +231,36 @@ impl RunnableDependency for PostgresDependency {
                 &container_tag
             )
             .await;
+        log::debug!(
+            "[PostgresDependency-{}] container start in {:?}.",
+            self.identifier,
+            sw_container.elapsed()
+        );
 
+        let sw_ready = Instant::now();
         self.is_ready().await;
+        log::debug!(
+            "[PostgresDependency-{}] readiness in {:?}.",
+            self.identifier,
+            sw_ready.elapsed()
+        );
 
         if let Some(scripts) = scripts {
+            let sw_scripts = Instant::now();
             self.run_startup_sql_scripts_blocking(scripts).await;
+            log::debug!(
+                "[PostgresDependency-{}] startup scripts in {:?}.",
+                self.identifier,
+                sw_scripts.elapsed()
+            );
         }
 
         self.running = true;
+        log::debug!(
+            "[PostgresDependency-{}] start complete in {:?}.",
+            self.identifier,
+            sw.elapsed()
+        );
         log::info!("[PostgresDependency-{}] started and ready.", self.identifier);
     }
 
@@ -246,6 +270,7 @@ impl RunnableDependency for PostgresDependency {
         }
 
         log::info!("[PostgresDependency-{}] stopping.", self.identifier);
+        let sw = Instant::now();
 
         self.postgres_impl.stop().await;
 
@@ -254,6 +279,11 @@ impl RunnableDependency for PostgresDependency {
         }
 
         self.running = false;
+        log::debug!(
+            "[PostgresDependency-{}] stop complete in {:?}.",
+            self.identifier,
+            sw.elapsed()
+        );
         log::info!("[PostgresDependency-{}] stopped.", self.identifier);
     }
 

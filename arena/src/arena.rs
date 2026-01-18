@@ -1,4 +1,5 @@
 use crate::encounter::EncounterTrait;
+use std::time::Instant;
 
 pub struct ClosedArena {
     pub name: String,
@@ -19,11 +20,17 @@ impl ClosedArena {
 
     pub async fn open(mut self) -> OpenArena {
         log::info!("[Arena-{}] opening.", self.name);
+        let sw = Instant::now();
 
         for e in self.encounters.iter_mut() {
             e.start().await;
         }
 
+        log::debug!(
+            "[Arena-{}] open in {:?}.",
+            self.name,
+            sw.elapsed()
+        );
         log::info!("[Arena-{}] opened.", self.name);
 
         OpenArena {
@@ -36,11 +43,17 @@ impl ClosedArena {
 impl OpenArena {
     pub async fn close(mut self) -> ClosedArena {
         log::info!("[Arena-{}] closing.", self.name);
+        let sw = Instant::now();
 
         for e in self.encounters.iter_mut().rev() {
             e.stop().await;
         }
 
+        log::debug!(
+            "[Arena-{}] closed in {:?}.",
+            self.name,
+            sw.elapsed()
+        );
         log::info!("[Arena-{}] closed.", self.name);
 
         self.closed = true;

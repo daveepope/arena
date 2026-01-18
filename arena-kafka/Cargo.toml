@@ -1,6 +1,6 @@
 [package]
 name = "arena-kafka"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 edition = "2021"
 authors = ["David Pope"]
 description = "Arena Kafka implmentation"
@@ -11,3 +11,4 @@ arena = { workspace = true }
 async-trait = { workspace = true }
 testcontainers-modules = { workspace = true, features = ["kafka"] }
 log = { workspace = true }
+futures-timer = "3.0.3"

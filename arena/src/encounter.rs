@@ -2,6 +2,7 @@ use super::component::Component;
 use super::dependency::Dependency;
 use async_trait::async_trait;
 use futures::future::join_all;
+use std::time::Instant;
 
 #[async_trait]
 pub trait EncounterTrait: Send + Sync {
@@ -35,6 +36,7 @@ impl EncounterTrait for Encounter {
         }
 
         log::info!("[Encounters-{}] starting.", self.name);
+        let sw = Instant::now();
 
         let deps = std::mem::take(&mut self.dependencies);
 
@@ -51,6 +53,11 @@ impl EncounterTrait for Encounter {
             comp.start();
         }
 
+        log::debug!(
+            "[Encounters-{}] start complete in {:?}.",
+            self.name,
+            sw.elapsed()
+        );
         log::info!("[Encounters-{}] started.", self.name);
         self.started = true;
     }
@@ -61,15 +68,28 @@ impl EncounterTrait for Encounter {
         }
 
         log::info!("[Encounters-{}] stopping.", self.name);
+        let sw = Instant::now();
 
         for comp in self.components.iter_mut().rev() {
             comp.stop();
         }
 
-        for dep in self.dependencies.iter_mut().rev() {
-            dep.stop().await;
-        }
+        let deps = std::mem::take(&mut self.dependencies);
 
+        let mut stopped = join_all(deps.into_iter().enumerate().map(|(i, mut dep)| async move {
+            dep.stop().await;
+            (i, dep)
+        }))
+        .await;
+
+        stopped.sort_by_key(|(i, _)| *i);
+        self.dependencies = stopped.into_iter().map(|(_, dep)| dep).collect();
+
+        log::debug!(
+            "[Encounters-{}] stop complete in {:?}.",
+            self.name,
+            sw.elapsed()
+        );
         log::info!("[Encounters-{}] stopped.", self.name);
         self.started = false;
     }
