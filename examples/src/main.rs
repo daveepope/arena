@@ -1,6 +1,5 @@
 use arena::{ClosedArena, Encounter, EncounterTrait, Component, ManagedProcessComponent, Dependency};
-use arena_kafka::kafka_dependency::InternalKafkaTestContainerImpl;
-use arena_kafka::KafkaDependency;
+use arena_kafka::{KafkaDependency, KafkaFlavor};
 use arena_postgres::PostgresDependency;
 use env_logger::Env;
 
@@ -8,7 +7,7 @@ use env_logger::Env;
 async fn main() {
     env_logger::Builder::from_env(
         Env::default().default_filter_or(
-            "arena=info,arena_postgres=info,arena_kafka=info,testcontainers=debug,testcontainers_modules=debug",
+            "arena=debug,arena_postgres=debug,arena_kafka=debug,testcontainers=info,testcontainers_modules=info",
         ),
     )
     .init();
@@ -27,10 +26,11 @@ async fn main() {
             .with_startup_sql_scripts(startup_sql_scripts)
             .build());
 
-    let kafka: Dependency = Box::new(KafkaDependency::new(
-        String::from("kafka custom dependency name"),
-        Box::new(InternalKafkaTestContainerImpl::new()),
-    ));
+    let kafka: Dependency = Box::new(
+        KafkaDependency::builder("kafka custom dependency name")
+            .with_flavor(KafkaFlavor::ApacheNative)
+            .build()
+    );
 
     let dependencies: Vec<Dependency> = vec![postgres_db, kafka];
 
