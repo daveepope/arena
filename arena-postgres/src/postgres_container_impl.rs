@@ -12,7 +12,7 @@ pub trait PostgresImpl: Send + Sync {
         database_name: &str,
         database_username: &str,
         database_password: &str,
-        container_name: &str
+        container_tag: &str
     );
     async fn stop(&mut self);
 
@@ -38,7 +38,7 @@ impl PostgresImpl for PostgresContainerImpl {
         database_name: &str,
         database_username: &str,
         database_password: &str,
-        container_name: &str
+        container_tag: &str
     ) {
         if self.container.is_some() {
             return;
@@ -60,7 +60,7 @@ impl PostgresImpl for PostgresContainerImpl {
             .with_password(database_password)
             .with_mapped_port(port, ContainerPort::from(DEFAULT_CONTAINER_PORT))
             .with_health_check(healthcheck)
-            .with_container_name(container_name)
+            .with_container_name(container_tag)
             .start()
             .await
             .expect("start postgres container");

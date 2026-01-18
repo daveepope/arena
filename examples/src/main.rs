@@ -6,7 +6,12 @@ use env_logger::Env;
 
 #[tokio::main]
 async fn main() {
-    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    env_logger::Builder::from_env(
+        Env::default().default_filter_or(
+            "arena=info,arena_postgres=info,arena_kafka=info,testcontainers=debug,testcontainers_modules=debug",
+        ),
+    )
+    .init();
 
     let startup_sql_scripts = vec![
         include_str!("../resources/instrument_reading_db_schema.sql").to_string(),
@@ -14,7 +19,7 @@ async fn main() {
 
     let postgres_db: Dependency = Box::new(
         PostgresDependency::builder("arena example database")
-            .with_container_name("postgres:14.20-trixie")
+            .with_container_tag("14.20-trixie")
             .with_port(4444)
             .with_database_name("my_database")
             .with_database_username("my_user")
