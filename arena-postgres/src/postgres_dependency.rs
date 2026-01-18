@@ -16,7 +16,7 @@ pub struct PostgresDependency {
     startup_sql_scripts: Option<Vec<String>>,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
     running: bool,
-    container_name: String
+    container_tag: String
 }
 
 impl PostgresDependency {
@@ -29,7 +29,7 @@ impl PostgresDependency {
         database_password: String,
         startup_sql_scripts: Option<Vec<String>>,
         dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
-        container_name: String
+        container_tag: String
     ) -> Self {
         Self {
             identifier,
@@ -40,7 +40,7 @@ impl PostgresDependency {
             database_password,
             startup_sql_scripts,
             dependencies,
-            container_name,
+            container_tag,
             running: false,
         }
     }
@@ -218,7 +218,7 @@ impl RunnableDependency for PostgresDependency {
         let database_name = self.database_name.clone();
         let database_username = self.database_username.clone();
         let database_password = self.database_password.clone();
-        let container_name = self.container_name.clone();
+        let container_tag = self.container_tag.clone();
 
         self.postgres_impl
             .start(
@@ -226,7 +226,7 @@ impl RunnableDependency for PostgresDependency {
                 &database_name,
                 &database_username,
                 &database_password,
-                &container_name
+                &container_tag
             )
             .await;
 

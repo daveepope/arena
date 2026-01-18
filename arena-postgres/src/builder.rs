@@ -11,7 +11,7 @@ pub struct PostgresDependencyBuilder {
     database_password: Option<String>,
     startup_sql_scripts: Option<Vec<String>>,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
-    container_name: Option<String>
+    container_tag: Option<String>
 }
 
 impl PostgresDependencyBuilder {
@@ -20,7 +20,7 @@ impl PostgresDependencyBuilder {
     const DEFAULT_DATABASE_NAME: &'static str = "arena_db";
     const DEFAULT_DATABASE_USERNAME: &'static str = "arena_user";
     const DEFAULT_DATABASE_PASSWORD: &'static str = "postgres";
-    const DEFAULT_CONTAINER_NAME: &'static str = "postgres:latest";
+    const DEFAULT_CONTAINER_TAG: &'static str = "latest";
 
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {
@@ -32,7 +32,7 @@ impl PostgresDependencyBuilder {
             database_password: None,
             startup_sql_scripts: None,
             dependencies: None,
-            container_name: None
+            container_tag: None
         }
     }
 
@@ -80,9 +80,9 @@ impl PostgresDependencyBuilder {
         self
     }
 
-    pub fn with_container_name(mut self, container_name: impl Into<String>) -> Self
+    pub fn with_container_tag(mut self, container_tag: impl Into<String>) -> Self
     {
-        self.container_name = Option::from(container_name.into());
+        self.container_tag = Option::from(container_tag.into());
         self
     }
 
@@ -103,9 +103,9 @@ impl PostgresDependencyBuilder {
             .unwrap_or_else(|| Self::DEFAULT_DATABASE_PASSWORD.to_string());
         let startup_sql_scripts = self.startup_sql_scripts;
         let dependencies = self.dependencies;
-        let container_name = self
-            .container_name
-            .unwrap_or_else(|| Self::DEFAULT_CONTAINER_NAME.to_string());
+        let container_tag = self
+            .container_tag
+            .unwrap_or_else(|| Self::DEFAULT_CONTAINER_TAG.to_string());
     
         PostgresDependency::new(
             self.identifier,
@@ -116,7 +116,7 @@ impl PostgresDependencyBuilder {
             database_password,
             startup_sql_scripts,
             dependencies,
-            container_name
+            container_tag
         )
     }
 }
