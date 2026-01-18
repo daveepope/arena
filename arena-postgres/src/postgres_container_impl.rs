@@ -12,6 +12,7 @@ pub trait PostgresImpl: Send + Sync {
         database_name: &str,
         database_username: &str,
         database_password: &str,
+        container_name: &str
     );
     async fn stop(&mut self);
 
@@ -20,12 +21,12 @@ pub trait PostgresImpl: Send + Sync {
 
 pub(crate) struct PostgresContainerImpl {
     container: Option<testcontainers::core::ContainerAsync<postgres::Postgres>>,
-    conn: Option<String>,
+    connection_string: Option<String>,
 }
 
 impl PostgresContainerImpl {
     pub(crate) fn new() -> Self {
-        Self { container: None, conn: None }
+        Self { container: None, connection_string: None }
     }
 }
 
@@ -37,15 +38,16 @@ impl PostgresImpl for PostgresContainerImpl {
         database_name: &str,
         database_username: &str,
         database_password: &str,
+        container_name: &str
     ) {
         if self.container.is_some() {
             return;
         }
 
-        const CONTAINER_PORT: u16 = 5432;
+        const DEFAULT_CONTAINER_PORT: u16 = 5432;
 
         let healthcheck = Healthcheck::cmd_shell(format!(
-            "pg_isready -h 127.0.0.1 -p {CONTAINER_PORT} -U {database_username} -d {database_name}"
+            "pg_isready -h 127.0.0.1 -p {DEFAULT_CONTAINER_PORT} -U {database_username} -d {database_name}"
         ))
         .with_interval(Duration::from_millis(250))
         .with_timeout(Duration::from_secs(1))
@@ -56,8 +58,9 @@ impl PostgresImpl for PostgresContainerImpl {
             .with_db_name(database_name)
             .with_user(database_username)
             .with_password(database_password)
-            .with_mapped_port(port, ContainerPort::from(5432))
+            .with_mapped_port(port, ContainerPort::from(DEFAULT_CONTAINER_PORT))
             .with_health_check(healthcheck)
+            .with_container_name(container_name)
             .start()
             .await
             .expect("start postgres container");
@@ -69,11 +72,11 @@ impl PostgresImpl for PostgresContainerImpl {
             .to_string();
 
         let port = container
-            .get_host_port_ipv4(CONTAINER_PORT)
+            .get_host_port_ipv4(DEFAULT_CONTAINER_PORT)
             .await
             .expect("Failed to get port")
             .to_string();
-        self.conn = Some(format!(
+        self.connection_string = Some(format!(
             "postgres://{database_username}:{database_password}@{host}:{port}/{database_name}"
         ));
         self.container = Some(container);
@@ -83,11 +86,11 @@ impl PostgresImpl for PostgresContainerImpl {
 
     async fn stop(&mut self) {
         self.container.take();
-        self.conn = None;
+        self.connection_string = None;
         log::info!("[PostgresImpl] stopped container.");
     }
 
     fn connection_string(&self) -> Option<&str> {
-        self.conn.as_deref()
+        self.connection_string.as_deref()
     }
 }
