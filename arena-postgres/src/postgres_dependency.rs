@@ -4,7 +4,7 @@ use crate::builder::PostgresDependencyBuilder;
 use crate::postgres_container_impl::PostgresImpl;
 use backon::{BlockingRetryable, ConstantBuilder};
 use futures::channel::oneshot;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub struct PostgresDependency {
     pub identifier: String,
@@ -16,7 +16,8 @@ pub struct PostgresDependency {
     startup_sql_scripts: Option<Vec<String>>,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
     running: bool,
-    container_tag: String
+    image_tag: String,
+    container_name: Option<String>,
 }
 
 impl PostgresDependency {
@@ -29,7 +30,8 @@ impl PostgresDependency {
         database_password: String,
         startup_sql_scripts: Option<Vec<String>>,
         dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
-        container_tag: String
+        image_tag: String,
+        container_name: Option<String>,
     ) -> Self {
         Self {
             identifier,
@@ -40,9 +42,29 @@ impl PostgresDependency {
             database_password,
             startup_sql_scripts,
             dependencies,
-            container_tag,
+            image_tag,
+            container_name,
             running: false,
         }
+    }
+
+    fn default_container_name(&self) -> String {
+        let mut safe = String::with_capacity(self.identifier.len());
+        for c in self.identifier.chars() {
+            let c = c.to_ascii_lowercase();
+            if c.is_ascii_alphanumeric() {
+                safe.push(c);
+            } else {
+                safe.push('-');
+            }
+        }
+
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+
+        format!("arena-postgres-{safe}-{ts}")
     }
 
     pub fn connection_string(&self) -> Option<&str> {
@@ -203,6 +225,18 @@ impl PostgresDependency {
 
 #[async_trait]
 impl RunnableDependency for PostgresDependency {
+    fn identifier(&self) -> &str {
+        &self.identifier
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     async fn start(&mut self) {
         if self.running {
             return;
@@ -219,7 +253,11 @@ impl RunnableDependency for PostgresDependency {
         let database_name = self.database_name.clone();
         let database_username = self.database_username.clone();
         let database_password = self.database_password.clone();
-        let container_tag = self.container_tag.clone();
+        let image_tag = self.image_tag.clone();
+        let container_name = self
+            .container_name
+            .clone()
+            .unwrap_or_else(|| self.default_container_name());
 
         let sw_container = Instant::now();
         self.postgres_impl
@@ -228,7 +266,8 @@ impl RunnableDependency for PostgresDependency {
                 &database_name,
                 &database_username,
                 &database_password,
-                &container_tag
+                &image_tag,
+                &container_name,
             )
             .await;
         log::debug!(

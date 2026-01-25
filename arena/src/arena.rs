@@ -41,6 +41,30 @@ impl ClosedArena {
     }
 }
 impl OpenArena {
+    pub fn dependency(
+        &self,
+        identifier: &str,
+    ) -> Option<&(dyn crate::dependency::RunnableDependency + '_)> {
+        for e in &self.encounters {
+            if let Some(d) = e.dependency(identifier) {
+                return Some(d);
+            }
+        }
+        None
+    }
+
+    pub fn dependency_mut(
+        &mut self,
+        identifier: &str,
+    ) -> Option<&mut (dyn crate::dependency::RunnableDependency + '_)> {
+        for e in &mut self.encounters {
+            if let Some(d) = e.dependency_mut(identifier) {
+                return Some(d);
+            }
+        }
+        None
+    }
+
     pub async fn close(mut self) -> ClosedArena {
         log::info!("[Arena-{}] closing.", self.name);
         let sw = Instant::now();
@@ -58,7 +82,6 @@ impl OpenArena {
 
         self.closed = true;
 
-        // transfer ownership between arenas
         let name = std::mem::take(&mut self.name);
         let encounters = std::mem::take(&mut self.encounters);
 

@@ -11,4 +11,10 @@ arena = { workspace = true }
 async-trait = { workspace = true }
 testcontainers-modules = { workspace = true, features = ["kafka"] }
 log = { workspace = true }
-futures-timer = "3.0.3"
+futures-timer = { workspace = true }
+rdkafka = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+futures = { workspace = true }
+env_logger = { workspace = true }

@@ -11,7 +11,8 @@ pub struct PostgresDependencyBuilder {
     database_password: Option<String>,
     startup_sql_scripts: Option<Vec<String>>,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
-    container_tag: Option<String>
+    image_tag: Option<String>,
+    container_name: Option<String>,
 }
 
 impl PostgresDependencyBuilder {
@@ -20,7 +21,7 @@ impl PostgresDependencyBuilder {
     const DEFAULT_DATABASE_NAME: &'static str = "arena_db";
     const DEFAULT_DATABASE_USERNAME: &'static str = "arena_user";
     const DEFAULT_DATABASE_PASSWORD: &'static str = "postgres";
-    const DEFAULT_CONTAINER_TAG: &'static str = "latest";
+    const DEFAULT_IMAGE_TAG: &'static str = "latest";
 
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {
@@ -32,7 +33,8 @@ impl PostgresDependencyBuilder {
             database_password: None,
             startup_sql_scripts: None,
             dependencies: None,
-            container_tag: None
+            image_tag: None,
+            container_name: None,
         }
     }
 
@@ -80,10 +82,24 @@ impl PostgresDependencyBuilder {
         self
     }
 
-    pub fn with_container_tag(mut self, container_tag: impl Into<String>) -> Self
-    {
-        self.container_tag = Option::from(container_tag.into());
+    pub fn with_image_tag(mut self, image_tag: impl Into<String>) -> Self {
+        self.image_tag = Some(image_tag.into());
         self
+    }
+
+    // Convenience alias.
+    pub fn with_image(self, image_tag: impl Into<String>) -> Self {
+        self.with_image_tag(image_tag)
+    }
+
+    pub fn with_container_name(mut self, container_name: impl Into<String>) -> Self {
+        self.container_name = Some(container_name.into());
+        self
+    }
+
+    // Back-compat: old name was misleading; keep it as an alias for image tag.
+    pub fn with_container_tag(self, image_tag: impl Into<String>) -> Self {
+        self.with_image_tag(image_tag)
     }
 
     pub fn build(self) -> PostgresDependency {
@@ -103,9 +119,10 @@ impl PostgresDependencyBuilder {
             .unwrap_or_else(|| Self::DEFAULT_DATABASE_PASSWORD.to_string());
         let startup_sql_scripts = self.startup_sql_scripts;
         let dependencies = self.dependencies;
-        let container_tag = self
-            .container_tag
-            .unwrap_or_else(|| Self::DEFAULT_CONTAINER_TAG.to_string());
+        let image_tag = self
+            .image_tag
+            .unwrap_or_else(|| Self::DEFAULT_IMAGE_TAG.to_string());
+        let container_name = self.container_name;
     
         PostgresDependency::new(
             self.identifier,
@@ -116,7 +133,8 @@ impl PostgresDependencyBuilder {
             database_password,
             startup_sql_scripts,
             dependencies,
-            container_tag
+            image_tag,
+            container_name,
         )
     }
 }
