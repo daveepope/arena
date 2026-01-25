@@ -3,17 +3,16 @@ use std::time::Duration;
 use testcontainers_modules::{kafka, testcontainers, testcontainers::runners::AsyncRunner};
 use testcontainers_modules::testcontainers::core::{ContainerPort, Healthcheck};
 use testcontainers_modules::testcontainers::ImageExt;
+use crate::kafka_dependency::KafkaImpl;
 
-#[async_trait]
-pub trait KafkaImpl: Send + Sync {
-    async fn start(&mut self, port: u16, container_tag: &str);
-    async fn stop(&mut self);
-
-    fn bootstrap_servers(&self) -> Option<&str>;
+fn tcp_healthcheck(port: u16) -> Healthcheck {
+    Healthcheck::cmd_shell(format!("bash -lc 'echo > /dev/tcp/127.0.0.1/{port}'"))
+        .with_interval(Duration::from_millis(250))
+        .with_timeout(Duration::from_secs(1))
+        .with_retries(40u32)
 }
 
 pub(crate) struct KafkaContainerImpl {
-    // `testcontainers-modules` Apache Kafka defaults to `apache/kafka-native`.
     container: Option<testcontainers::core::ContainerAsync<kafka::apache::Kafka>>,
     bootstrap: Option<String>,
 }
@@ -29,30 +28,20 @@ impl KafkaContainerImpl {
 
 #[async_trait]
 impl KafkaImpl for KafkaContainerImpl {
-    async fn start(&mut self, port: u16, container_tag: &str) {
+    async fn start(&mut self, port: u16, image_tag: &str, container_name: &str) {
         if self.container.is_some() {
             return;
         }
 
         const DEFAULT_CONTAINER_PORT: ContainerPort = kafka::apache::KAFKA_PORT;
 
-        // Internal "good enough" healthcheck for now. We'll make it configurable later.
-        //
-        // This relies on bash's /dev/tcp support. If this ever fails on a future image,
-        // we'll swap to a more explicit Kafka readiness command.
-        let healthcheck = Healthcheck::cmd_shell(format!(
-            "bash -lc 'echo > /dev/tcp/127.0.0.1/{port}'",
-            port = DEFAULT_CONTAINER_PORT.as_u16()
-        ))
-        .with_interval(Duration::from_millis(250))
-        .with_timeout(Duration::from_secs(1))
-        // 10s / 250ms = 40 attempts (ish)
-        .with_retries(40u32);
+        let healthcheck = tcp_healthcheck(DEFAULT_CONTAINER_PORT.as_u16());
 
         let container = kafka::apache::Kafka::default()
-            .with_tag(container_tag)
+            .with_tag(image_tag)
             .with_mapped_port(port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)
+            .with_container_name(container_name)
             .start()
             .await
             .expect("start kafka container");
@@ -102,26 +91,20 @@ impl ConfluentKafkaContainerImpl {
 
 #[async_trait]
 impl KafkaImpl for ConfluentKafkaContainerImpl {
-    async fn start(&mut self, port: u16, container_tag: &str) {
+    async fn start(&mut self, port: u16, image_tag: &str, container_name: &str) {
         if self.container.is_some() {
             return;
         }
 
         const DEFAULT_CONTAINER_PORT: ContainerPort = kafka::confluent::KAFKA_PORT;
 
-        // Internal "good enough" healthcheck for now. We'll make it configurable later.
-        let healthcheck = Healthcheck::cmd_shell(format!(
-            "bash -lc 'echo > /dev/tcp/127.0.0.1/{port}'",
-            port = DEFAULT_CONTAINER_PORT.as_u16()
-        ))
-        .with_interval(Duration::from_millis(250))
-        .with_timeout(Duration::from_secs(1))
-        .with_retries(40u32);
+        let healthcheck = tcp_healthcheck(DEFAULT_CONTAINER_PORT.as_u16());
 
         let container = kafka::confluent::Kafka::default()
-            .with_tag(container_tag)
+            .with_tag(image_tag)
             .with_mapped_port(port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)
+            .with_container_name(container_name)
             .start()
             .await
             .expect("start kafka container");

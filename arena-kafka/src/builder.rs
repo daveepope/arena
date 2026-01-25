@@ -1,6 +1,6 @@
 use arena::dependency::RunnableDependency;
-use crate::kafka_container_impl::{ConfluentKafkaContainerImpl, KafkaContainerImpl, KafkaImpl};
-use crate::kafka_dependency::KafkaDependency;
+use crate::kafka_dependency::container_impl::{ConfluentKafkaContainerImpl, KafkaContainerImpl };
+use crate::kafka_dependency::{KafkaDependency, KafkaImpl};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KafkaFlavor {
@@ -14,7 +14,8 @@ pub struct KafkaDependencyBuilder {
     flavor: KafkaFlavor,
     port: Option<u16>,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
-    container_tag: Option<String>,
+    image_tag: Option<String>,
+    container_name: Option<String>,
 }
 
 impl KafkaDependencyBuilder {
@@ -31,7 +32,8 @@ impl KafkaDependencyBuilder {
             flavor: KafkaFlavor::ApacheNative,
             port: None,
             dependencies: None,
-            container_tag: None,
+            image_tag: None,
+            container_name: None,
         }
     }
 
@@ -61,9 +63,22 @@ impl KafkaDependencyBuilder {
         self
     }
 
-    pub fn with_container_tag(mut self, container_tag: impl Into<String>) -> Self {
-        self.container_tag = Option::from(container_tag.into());
+    pub fn with_image_tag(mut self, image_tag: impl Into<String>) -> Self {
+        self.image_tag = Some(image_tag.into());
         self
+    }
+
+    pub fn with_image(self, image_tag: impl Into<String>) -> Self {
+        self.with_image_tag(image_tag)
+    }
+
+    pub fn with_container_name(mut self, container_name: impl Into<String>) -> Self {
+        self.container_name = Some(container_name.into());
+        self
+    }
+
+    pub fn with_container_tag(self, image_tag: impl Into<String>) -> Self {
+        self.with_image_tag(image_tag)
     }
 
     pub fn build(self) -> KafkaDependency {
@@ -73,7 +88,8 @@ impl KafkaDependencyBuilder {
             flavor,
             port,
             dependencies,
-            container_tag,
+            image_tag,
+            container_name,
         } = self;
 
         let (default_port, default_tag) = match flavor {
@@ -89,9 +105,9 @@ impl KafkaDependencyBuilder {
         });
 
         let port = port.unwrap_or(default_port);
-        let container_tag = container_tag.unwrap_or_else(|| default_tag.to_string());
+        let image_tag = image_tag.unwrap_or_else(|| default_tag.to_string());
 
-        KafkaDependency::new(identifier, kafka_impl, port, dependencies, container_tag)
+        KafkaDependency::new(identifier, kafka_impl, port, dependencies, image_tag, container_name)
     }
 }
 

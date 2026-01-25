@@ -1,5 +1,6 @@
 use super::component::Component;
 use super::dependency::Dependency;
+use super::dependency::RunnableDependency;
 use async_trait::async_trait;
 use futures::future::join_all;
 use std::time::Instant;
@@ -8,6 +9,14 @@ use std::time::Instant;
 pub trait EncounterTrait: Send + Sync {
     async fn start(&mut self);
     async fn stop(&mut self);
+
+    fn dependency(&self, _identifier: &str) -> Option<&(dyn RunnableDependency + '_)> {
+        None
+    }
+
+    fn dependency_mut(&mut self, _identifier: &str) -> Option<&mut (dyn RunnableDependency + '_)> {
+        None
+    }
 }
 
 pub struct Encounter {
@@ -49,8 +58,8 @@ impl EncounterTrait for Encounter {
         started.sort_by_key(|(i, _)| *i);
         self.dependencies = started.into_iter().map(|(_, dep)| dep).collect();
 
-        for comp in self.components.iter() {
-            comp.start();
+        for comp in self.components.iter_mut() {
+            comp.start().await;
         }
 
         log::debug!(
@@ -71,7 +80,7 @@ impl EncounterTrait for Encounter {
         let sw = Instant::now();
 
         for comp in self.components.iter_mut().rev() {
-            comp.stop();
+            comp.stop().await;
         }
 
         let deps = std::mem::take(&mut self.dependencies);
@@ -92,5 +101,21 @@ impl EncounterTrait for Encounter {
         );
         log::info!("[Encounters-{}] stopped.", self.name);
         self.started = false;
+    }
+
+    fn dependency(&self, identifier: &str) -> Option<&(dyn RunnableDependency + '_)> {
+        self.dependencies
+            .iter()
+            .map(|d| d.as_ref())
+            .find(|d| d.identifier() == identifier)
+    }
+
+    fn dependency_mut(&mut self, identifier: &str) -> Option<&mut (dyn RunnableDependency + '_)> {
+        for dep in &mut self.dependencies {
+            if dep.identifier() == identifier {
+                return Some(dep.as_mut());
+            }
+        }
+        None
     }
 }

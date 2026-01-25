@@ -10,6 +10,12 @@ license = "BSD-3-Clause"
 arena = { workspace = true }
 arena-kafka = { workspace = true }
 arena-postgres = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "net", "sync"] }
 env_logger = { workspace = true }
 log = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio-postgres = { workspace = true }
+rdkafka = { workspace = true }
+futures = { workspace = true }

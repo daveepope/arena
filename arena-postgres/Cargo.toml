@@ -11,6 +11,6 @@ arena = { workspace = true }
 async-trait = { workspace = true }
 testcontainers-modules = { workspace = true, features = ["postgres"] }
 log = { workspace = true }
-postgres = "0.19"
+postgres = { workspace = true }
 futures = { workspace = true }
 backon = { workspace = true }
