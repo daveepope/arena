@@ -1,25 +1,122 @@
+mod tests;
+
 use arena::dependency::RunnableDependency;
 use async_trait::async_trait;
 use crate::builder::KafkaDependencyBuilder;
 use crate::kafka_container_impl::KafkaImpl;
 use futures_timer::Delay;
-use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
-use std::time::{Duration, Instant};
+use rdkafka::config::ClientConfig;
+use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
+use rdkafka::consumer::{BaseConsumer, Consumer};
+use rdkafka::message::Message;
+use rdkafka::producer::{FutureProducer, FutureRecord};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-trait ProbeTransport {
-    type Stream: Read + Write;
-    fn connect(&self, bootstrap: &str) -> Result<Self::Stream, String>;
+#[async_trait]
+trait KafkaHealthcheckOps: Send + Sync {
+    async fn create_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String>;
+    async fn delete_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String>;
+    async fn publish(&self, bootstrap: &str, topic: &str, payload: &str) -> Result<(), String>;
+    async fn consume_verify(
+        &self,
+        bootstrap: &str,
+        topic: &str,
+        expected_payload: &str,
+    ) -> Result<bool, String>;
 }
 
-struct TcpProbeTransport;
+struct RdkafkaHealthcheckOps;
 
-impl ProbeTransport for TcpProbeTransport {
-    type Stream = TcpStream;
+#[async_trait]
+impl KafkaHealthcheckOps for RdkafkaHealthcheckOps {
+    async fn create_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String> {
+        let admin: AdminClient<_> = ClientConfig::new()
+            .set("bootstrap.servers", bootstrap)
+            .create()
+            .map_err(|e| format!("create kafka admin client failed: {e}"))?;
 
-    fn connect(&self, bootstrap: &str) -> Result<Self::Stream, String> {
-        let addr = KafkaDependency::resolve_bootstrap_addr(bootstrap)?;
-        KafkaDependency::connect_with_timeout(addr)
+        let new_topic = NewTopic::new(topic, 1, TopicReplication::Fixed(1));
+        let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(2)));
+
+        match admin.create_topics([&new_topic], &opts).await {
+            Ok(results) => {
+                for r in results {
+                    if let Err((_t, e)) = r {
+                        if e.to_string().to_lowercase().contains("already exists") {
+                            return Ok(());
+                        }
+                        return Err(format!("kafka topic create failed: {e}"));
+                    }
+                }
+                Ok(())
+            }
+            Err(err) => Err(format!("kafka topic create request failed: {err}")),
+        }
+    }
+
+    async fn delete_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String> {
+        let admin: AdminClient<_> = ClientConfig::new()
+            .set("bootstrap.servers", bootstrap)
+            .create()
+            .map_err(|e| format!("create kafka admin client failed: {e}"))?;
+
+        let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(2)));
+        admin
+            .delete_topics(&[topic], &opts)
+            .await
+            .map(|_res| ())
+            .map_err(|e| format!("kafka topic delete failed: {e}"))
+    }
+
+    async fn publish(&self, bootstrap: &str, topic: &str, payload: &str) -> Result<(), String> {
+        let producer: FutureProducer = ClientConfig::new()
+            .set("bootstrap.servers", bootstrap)
+            .set("message.timeout.ms", "2000")
+            .create()
+            .map_err(|e| format!("create kafka producer failed: {e}"))?;
+
+        let record = FutureRecord::to(topic).key("healthcheck").payload(payload);
+        producer
+            .send(record, Duration::from_secs(2))
+            .await
+            .map(|_| ())
+            .map_err(|(e, _msg)| format!("kafka publish failed: {e}"))
+    }
+
+    async fn consume_verify(
+        &self,
+        bootstrap: &str,
+        topic: &str,
+        expected_payload: &str,
+    ) -> Result<bool, String> {
+        let consumer: BaseConsumer = ClientConfig::new()
+            .set("bootstrap.servers", bootstrap)
+            .set("group.id", format!("arena-healthcheck-{topic}"))
+            .set("enable.auto.commit", "false")
+            .set("auto.offset.reset", "earliest")
+            .set("session.timeout.ms", "6000")
+            .create()
+            .map_err(|e| format!("create kafka consumer failed: {e}"))?;
+
+        consumer
+            .subscribe(&[topic])
+            .map_err(|e| format!("kafka subscribe failed: {e}"))?;
+
+        let consume_deadline = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < consume_deadline {
+            match consumer.poll(Duration::from_millis(250)) {
+                None => {}
+                Some(Err(err)) => return Err(format!("kafka consume failed: {err}")),
+                Some(Ok(msg)) => {
+                    if let Some(bytes) = msg.payload() {
+                        if bytes == expected_payload.as_bytes() {
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(false)
     }
 }
 
@@ -29,7 +126,9 @@ pub struct KafkaDependency {
     port: u16,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
     running: bool,
-    container_tag: String,
+    image_tag: String,
+    container_name: Option<String>,
+    healthcheck_ops: Box<dyn KafkaHealthcheckOps>,
 }
 
 impl KafkaDependency {
@@ -38,15 +137,18 @@ impl KafkaDependency {
         kafka_impl: Box<dyn KafkaImpl>,
         port: u16,
         dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
-        container_tag: String,
+        image_tag: String,
+        container_name: Option<String>,
     ) -> Self {
         KafkaDependency {
             identifier,
             kafka_impl,
             port,
             dependencies,
-            container_tag,
+            image_tag,
+            container_name,
             running: false,
+            healthcheck_ops: Box::new(RdkafkaHealthcheckOps),
         }
     }
 
@@ -58,113 +160,121 @@ impl KafkaDependency {
         KafkaDependencyBuilder::new(identifier)
     }
 
-    fn readiness_bootstrap_on_host(&self) -> Result<&str, String> {
+    fn sanitize_identifier(input: &str) -> String {
+        let mut safe = String::with_capacity(input.len());
+        for c in input.chars() {
+            let c = c.to_ascii_lowercase();
+            if c.is_ascii_alphanumeric() {
+                safe.push(c);
+            } else {
+                safe.push('-');
+            }
+        }
+        safe
+    }
+
+    fn default_container_name(&self) -> String {
+        let safe = Self::sanitize_identifier(&self.identifier);
+
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+
+        format!("arena-kafka-{safe}-{ts}")
+    }
+
+    fn bootstrap_on_host(&self) -> Result<&str, String> {
         self.bootstrap_servers()
             .ok_or_else(|| "kafka bootstrap servers not available yet".to_string())
     }
 
-    fn resolve_bootstrap_addr(bootstrap: &str) -> Result<SocketAddr, String> {
-        let addr: SocketAddr = bootstrap
-            .to_socket_addrs()
-            .map_err(|e| format!("resolve bootstrap {bootstrap:?} failed: {e}"))?
-            .next()
-            .ok_or_else(|| format!("resolve bootstrap {bootstrap:?} produced no addresses"))?;
-        Ok(addr)
+    fn healthcheck_topic_name(identifier: &str) -> String {
+        let safe = Self::sanitize_identifier(identifier);
+
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+
+        format!("arena_healthcheck_{safe}_{ts}")
     }
 
-    fn connect_with_timeout(addr: SocketAddr) -> Result<TcpStream, String> {
-        let stream = TcpStream::connect_timeout(&addr, Duration::from_millis(250))
-            .map_err(|e| format!("tcp connect to {addr} failed: {e}"))?;
-        stream
-            .set_read_timeout(Some(Duration::from_millis(250)))
-            .ok();
-        stream
-            .set_write_timeout(Some(Duration::from_millis(250)))
-            .ok();
-        Ok(stream)
-    }
-
-    fn build_api_versions_request_v0(correlation_id: i32) -> Result<Vec<u8>, String> {
-        const API_KEY_API_VERSIONS: i16 = 18;
-        const API_VERSION: i16 = 0;
-
-        let mut body: Vec<u8> = Vec::with_capacity(16);
-        body.extend_from_slice(&API_KEY_API_VERSIONS.to_be_bytes());
-        body.extend_from_slice(&API_VERSION.to_be_bytes());
-        body.extend_from_slice(&correlation_id.to_be_bytes());
-        body.extend_from_slice(&(0i16).to_be_bytes()); // client_id length = 0
-
-        let len: i32 = body
-            .len()
-            .try_into()
-            .map_err(|_| "request too large".to_string())?;
-
-        let mut frame: Vec<u8> = Vec::with_capacity(4 + body.len());
-        frame.extend_from_slice(&len.to_be_bytes());
-        frame.extend_from_slice(&body);
-        Ok(frame)
-    }
-
-    fn write_kafka_frame<S: Write>(stream: &mut S, frame: &[u8]) -> Result<(), String> {
-        stream
-            .write_all(frame)
-            .map_err(|e| format!("kafka probe write failed: {e}"))?;
-        stream.flush().ok();
-        Ok(())
-    }
-
-    fn read_kafka_frame<S: Read>(stream: &mut S) -> Result<Vec<u8>, String> {
-        let mut size_buf = [0u8; 4];
-        stream
-            .read_exact(&mut size_buf)
-            .map_err(|e| format!("kafka probe read size failed: {e}"))?;
-        let size = i32::from_be_bytes(size_buf);
-        if size <= 0 || size > 1024 * 1024 {
-            return Err(format!("kafka probe invalid response size: {size}"));
-        }
-
-        let mut resp = vec![0u8; size as usize];
-        stream
-            .read_exact(&mut resp)
-            .map_err(|e| format!("kafka probe read payload failed: {e}"))?;
-        Ok(resp)
-    }
-
-    fn parse_response_correlation_id(resp: &[u8]) -> Result<i32, String> {
-        if resp.len() < 4 {
-            return Err("kafka probe response too short".to_string());
-        }
-        Ok(i32::from_be_bytes([resp[0], resp[1], resp[2], resp[3]]))
-    }
-
-    fn kafka_probe_api_versions_with_transport<T: ProbeTransport>(
-        transport: &T,
+    async fn create_healthcheck_topic_with_retry(
+        ops: &dyn KafkaHealthcheckOps,
         bootstrap: &str,
+        topic: &str,
+        timeout: Duration,
     ) -> Result<(), String> {
-        const CORRELATION_ID: i32 = 1;
-        let mut stream = transport.connect(bootstrap)?;
-        let frame = Self::build_api_versions_request_v0(CORRELATION_ID)?;
-        Self::write_kafka_frame(&mut stream, &frame)?;
-        let resp = Self::read_kafka_frame(&mut stream)?;
-        let corr = Self::parse_response_correlation_id(&resp)?;
-        if corr != CORRELATION_ID {
-            return Err(format!(
-                "kafka probe correlation mismatch: expected {CORRELATION_ID} got {corr}"
-            ));
-        }
-        Ok(())
-    }
-
-    fn kafka_probe_api_versions(bootstrap: &str) -> Result<(), String> {
-        Self::kafka_probe_api_versions_with_transport(&TcpProbeTransport, bootstrap)
-    }
-
-    async fn wait_for_protocol_ready(&self) {
-        let timeout = Duration::from_secs(15);
+        #[cfg(test)]
+        let poll_every = Duration::from_millis(1);
+        #[cfg(not(test))]
         let poll_every = Duration::from_millis(250);
         let start = Instant::now();
 
         loop {
+            if start.elapsed() >= timeout {
+                return Err(format!("kafka healthcheck topic create timed out: {topic}"));
+            }
+
+            match ops.create_topic(bootstrap, topic).await {
+                Ok(()) => return Ok(()),
+                Err(err) => log::debug!("[Kafka] healthcheck topic create failed: {err}"),
+            }
+
+            Delay::new(poll_every).await;
+        }
+    }
+
+    async fn healthcheck_roundtrip(&self, bootstrap: &str) -> Result<(), String> {
+        let topic = Self::healthcheck_topic_name(&self.identifier);
+
+        Self::create_healthcheck_topic_with_retry(
+            self.healthcheck_ops.as_ref(),
+            bootstrap,
+            &topic,
+            Duration::from_secs(10),
+        )
+        .await?;
+
+        let payload = format!("arena-healthcheck-{topic}");
+
+        if let Err(err) = self
+            .healthcheck_ops
+            .publish(bootstrap, &topic, &payload)
+            .await
+        {
+            let _ = self.healthcheck_ops.delete_topic(bootstrap, &topic).await;
+            return Err(err);
+        }
+
+        let saw = match self
+            .healthcheck_ops
+            .consume_verify(bootstrap, &topic, &payload)
+            .await
+        {
+            Ok(v) => v,
+            Err(err) => {
+                let _ = self.healthcheck_ops.delete_topic(bootstrap, &topic).await;
+                return Err(err);
+            }
+        };
+
+        let _ = self.healthcheck_ops.delete_topic(bootstrap, &topic).await;
+
+        if !saw {
+            return Err("kafka healthcheck did not observe published message".to_string());
+        }
+
+        Ok(())
+    }
+
+    async fn wait_until_ready(&self) {
+        let timeout = Duration::from_secs(15);
+        let poll_every = Duration::from_millis(250);
+        let start = Instant::now();
+
+        let bootstrap = loop {
             if start.elapsed() >= timeout {
                 panic!(
                     "[Kafka-{}] kafka did not become ready within {:?}",
@@ -172,36 +282,36 @@ impl KafkaDependency {
                 );
             }
 
-            let bootstrap = match self.readiness_bootstrap_on_host() {
-                Ok(v) => v.to_string(),
+            match self.bootstrap_on_host() {
+                Ok(v) => break v.to_string(),
                 Err(err) => {
                     log::debug!("[Kafka-{}] readiness bootstrap missing: {}", self.identifier, err);
                     Delay::new(poll_every).await;
-                    continue;
-                }
-            };
-
-            match Self::kafka_probe_api_versions(&bootstrap) {
-                Ok(()) => return,
-                Err(err) => {
-                    log::debug!(
-                        "[Kafka-{}] readiness check failed (will retry): {}",
-                        self.identifier,
-                        err
-                    );
-                    Delay::new(poll_every).await;
                 }
             }
-        }
-    }
+        };
 
-    async fn is_ready(&self) {
-        self.wait_for_protocol_ready().await;
+        match self.healthcheck_roundtrip(&bootstrap).await {
+            Ok(()) => {}
+            Err(err) => panic!("[Kafka-{}] readiness check failed: {}", self.identifier, err),
+        }
     }
 }
 
 #[async_trait]
 impl RunnableDependency for KafkaDependency {
+    fn identifier(&self) -> &str {
+        &self.identifier
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     async fn start(&mut self) {
         if self.running {
             return;
@@ -214,10 +324,16 @@ impl RunnableDependency for KafkaDependency {
             dep.start().await;
         }
 
-        let container_tag = self.container_tag.clone();
+        let image_tag = self.image_tag.clone();
+        let container_name = self
+            .container_name
+            .clone()
+            .unwrap_or_else(|| self.default_container_name());
 
         let sw_container = Instant::now();
-        self.kafka_impl.start(self.port, &container_tag).await;
+        self.kafka_impl
+            .start(self.port, &image_tag, &container_name)
+            .await;
         log::debug!(
             "[Kafka-{}] container start in {:?}.",
             self.identifier,
@@ -225,7 +341,7 @@ impl RunnableDependency for KafkaDependency {
         );
 
         let sw_ready = Instant::now();
-        self.is_ready().await;
+        self.wait_until_ready().await;
         log::debug!(
             "[Kafka-{}] readiness in {:?}.",
             self.identifier,
@@ -266,84 +382,5 @@ impl RunnableDependency for KafkaDependency {
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
         self.dependencies.get_or_insert_with(Vec::new).push(dep);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::KafkaDependency;
-    use super::ProbeTransport;
-    use std::io::{Cursor, Read, Write};
-
-    struct FakeStream {
-        read: Cursor<Vec<u8>>,
-        written: Vec<u8>,
-    }
-
-    impl Read for FakeStream {
-        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-            self.read.read(buf)
-        }
-    }
-
-    impl Write for FakeStream {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.written.extend_from_slice(buf);
-            Ok(buf.len())
-        }
-
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-
-    struct FakeTransport {
-        stream: FakeStream,
-    }
-
-    impl ProbeTransport for FakeTransport {
-        type Stream = FakeStream;
-
-        fn connect(&self, _bootstrap: &str) -> Result<Self::Stream, String> {
-            Ok(FakeStream {
-                read: Cursor::new(self.stream.read.get_ref().clone()),
-                written: Vec::new(),
-            })
-        }
-    }
-
-    fn response_frame_with_corr(corr: i32) -> Vec<u8> {
-        let payload = corr.to_be_bytes().to_vec();
-        let mut out = Vec::new();
-        out.extend_from_slice(&(payload.len() as i32).to_be_bytes());
-        out.extend_from_slice(&payload);
-        out
-    }
-
-    #[test]
-    fn probe_api_versions_succeeds_with_matching_correlation_id() {
-        let transport = FakeTransport {
-            stream: FakeStream {
-                read: Cursor::new(response_frame_with_corr(1)),
-                written: Vec::new(),
-            },
-        };
-
-        KafkaDependency::kafka_probe_api_versions_with_transport(&transport, "ignored")
-            .expect("probe should succeed");
-    }
-
-    #[test]
-    fn probe_api_versions_fails_with_mismatched_correlation_id() {
-        let transport = FakeTransport {
-            stream: FakeStream {
-                read: Cursor::new(response_frame_with_corr(2)),
-                written: Vec::new(),
-            },
-        };
-
-        let err = KafkaDependency::kafka_probe_api_versions_with_transport(&transport, "ignored")
-            .expect_err("probe should fail");
-        assert!(err.contains("correlation mismatch"), "err was: {err}");
     }
 }
