@@ -11,7 +11,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 const RDKAFKA_LOG_LEVEL_SILENT: &str = "0";
 
 fn init_test_logging() {
-    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug"))
+    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .is_test(true)
         .try_init();
 }
