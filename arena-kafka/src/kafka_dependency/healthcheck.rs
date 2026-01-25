@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use futures_timer::Delay;
+use arena::healthcheck::ReadinessCheck;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
@@ -8,7 +9,7 @@ use rdkafka::producer::{FutureProducer, FutureRecord};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[async_trait]
-pub(super) trait KafkaHealthcheckOps: Send + Sync {
+pub trait KafkaHealthcheckOps: Send + Sync {
     async fn create_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String>;
     async fn delete_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String>;
     async fn publish(&self, bootstrap: &str, topic: &str, payload: &str) -> Result<(), String>;
@@ -21,6 +22,20 @@ pub(super) trait KafkaHealthcheckOps: Send + Sync {
 }
 
 pub(super) struct RdkafkaHealthcheckOps;
+
+pub(super) struct KafkaDefaultReadinessCheck;
+
+#[async_trait]
+impl ReadinessCheck for KafkaDefaultReadinessCheck {
+    async fn is_ready(
+        &self,
+        identifier: &str,
+        bootstrap_servers: &str,
+        timeout: Duration,
+    ) -> Result<(), String> {
+        run_with_retry(&RdkafkaHealthcheckOps, identifier, bootstrap_servers, timeout).await
+    }
+}
 
 fn healthcheck_topic_name(identifier: &str) -> String {
     let safe = super::sanitize_identifier(identifier);
@@ -36,6 +51,7 @@ impl KafkaHealthcheckOps for RdkafkaHealthcheckOps {
     async fn create_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String> {
         let admin: AdminClient<_> = ClientConfig::new()
             .set("bootstrap.servers", bootstrap)
+            .set("log_level", "0")
             .create()
             .map_err(|e| format!("create kafka admin client failed: {e}"))?;
 
@@ -61,6 +77,7 @@ impl KafkaHealthcheckOps for RdkafkaHealthcheckOps {
     async fn delete_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String> {
         let admin: AdminClient<_> = ClientConfig::new()
             .set("bootstrap.servers", bootstrap)
+            .set("log_level", "0")
             .create()
             .map_err(|e| format!("create kafka admin client failed: {e}"))?;
 
@@ -75,6 +92,7 @@ impl KafkaHealthcheckOps for RdkafkaHealthcheckOps {
     async fn publish(&self, bootstrap: &str, topic: &str, payload: &str) -> Result<(), String> {
         let producer: FutureProducer = ClientConfig::new()
             .set("bootstrap.servers", bootstrap)
+            .set("log_level", "0")
             .set("message.timeout.ms", "2000")
             .create()
             .map_err(|e| format!("create kafka producer failed: {e}"))?;
@@ -95,6 +113,7 @@ impl KafkaHealthcheckOps for RdkafkaHealthcheckOps {
     ) -> Result<bool, String> {
         let consumer: BaseConsumer = ClientConfig::new()
             .set("bootstrap.servers", bootstrap)
+            .set("log_level", "0")
             .set("group.id", format!("arena-healthcheck-{topic}"))
             .set("enable.auto.commit", "false")
             .set("auto.offset.reset", "earliest")
@@ -142,7 +161,7 @@ async fn roundtrip_once(
     Ok(())
 }
 
-pub(super) async fn run_with_retry(
+pub(crate) async fn run_with_retry(
     ops: &dyn KafkaHealthcheckOps,
     identifier: &str,
     bootstrap: &str,

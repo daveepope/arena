@@ -3,11 +3,12 @@ mod unit_tests;
 mod healthcheck;
 pub(crate) mod container_impl;
 
+use arena::healthcheck::ReadinessCheck;
 use arena::dependency::RunnableDependency;
 use async_trait::async_trait;
 use crate::builder::KafkaDependencyBuilder;
 use futures_timer::Delay;
-use crate::kafka_dependency::healthcheck::{KafkaHealthcheckOps, RdkafkaHealthcheckOps};
+use crate::kafka_dependency::healthcheck::KafkaDefaultReadinessCheck;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[async_trait]
@@ -37,8 +38,7 @@ pub struct KafkaDependency {
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
     running: bool,
     image_tag: String,
-    container_name: Option<String>,
-    healthcheck_ops: Box<dyn KafkaHealthcheckOps>,
+    readiness_check: Box<dyn ReadinessCheck>,
 }
 
 impl KafkaDependency {
@@ -47,8 +47,7 @@ impl KafkaDependency {
         kafka_impl: Box<dyn KafkaImpl>,
         port: u16,
         dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
-        image_tag: String,
-        container_name: Option<String>,
+        image_tag: String
     ) -> Self {
         KafkaDependency {
             identifier,
@@ -56,9 +55,8 @@ impl KafkaDependency {
             port,
             dependencies,
             image_tag,
-            container_name,
             running: false,
-            healthcheck_ops: Box::new(RdkafkaHealthcheckOps),
+            readiness_check: Box::new(KafkaDefaultReadinessCheck),
         }
     }
 
@@ -70,7 +68,11 @@ impl KafkaDependency {
         KafkaDependencyBuilder::new(identifier)
     }
 
-    fn default_container_name(&self) -> String {
+    pub(crate) fn set_readiness_check(&mut self, check: Box<dyn ReadinessCheck>) {
+        self.readiness_check = check;
+    }
+
+    fn set_container_name(&self) -> String {
         let safe = sanitize_identifier(&self.identifier);
 
         let ts = SystemTime::now()
@@ -116,17 +118,14 @@ impl KafkaDependency {
             );
         }
 
-        match healthcheck::run_with_retry(
-            self.healthcheck_ops.as_ref(),
-            &self.identifier,
-            &bootstrap,
-            remaining,
-        )
-        .await
+        match self
+            .readiness_check
+            .is_ready(&self.identifier, &bootstrap, remaining)
+            .await
         {
             Ok(()) => {}
             Err(err) => panic!("[Kafka-{}] readiness check failed: {}", self.identifier, err),
-        };
+        }
     }
 }
 
@@ -157,10 +156,7 @@ impl RunnableDependency for KafkaDependency {
         }
 
         let image_tag = self.image_tag.clone();
-        let container_name = self
-            .container_name
-            .clone()
-            .unwrap_or_else(|| self.default_container_name());
+        let container_name = self.set_container_name();
 
         let sw_container = Instant::now();
         self.kafka_impl

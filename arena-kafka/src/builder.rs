@@ -1,6 +1,7 @@
 use arena::dependency::RunnableDependency;
+use arena::healthcheck::ReadinessCheck;
 use crate::kafka_dependency::container_impl::{ConfluentKafkaContainerImpl, KafkaContainerImpl };
-use crate::kafka_dependency::{KafkaDependency, KafkaImpl};
+use crate::kafka_dependency::{KafkaDependency, KafkaImpl };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KafkaFlavor {
@@ -15,7 +16,7 @@ pub struct KafkaDependencyBuilder {
     port: Option<u16>,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
     image_tag: Option<String>,
-    container_name: Option<String>,
+    readiness_check: Option<Box<dyn ReadinessCheck>>
 }
 
 impl KafkaDependencyBuilder {
@@ -33,7 +34,7 @@ impl KafkaDependencyBuilder {
             port: None,
             dependencies: None,
             image_tag: None,
-            container_name: None,
+            readiness_check: None
         }
     }
 
@@ -72,8 +73,11 @@ impl KafkaDependencyBuilder {
         self.with_image_tag(image_tag)
     }
 
-    pub fn with_container_name(mut self, container_name: impl Into<String>) -> Self {
-        self.container_name = Some(container_name.into());
+    pub fn with_readiness_check<W>(mut self, check: W) -> Self
+    where
+        W: ReadinessCheck + 'static,
+    {
+        self.readiness_check = Some(Box::new(check));
         self
     }
 
@@ -89,7 +93,7 @@ impl KafkaDependencyBuilder {
             port,
             dependencies,
             image_tag,
-            container_name,
+            readiness_check
         } = self;
 
         let (default_port, default_tag) = match flavor {
@@ -107,7 +111,14 @@ impl KafkaDependencyBuilder {
         let port = port.unwrap_or(default_port);
         let image_tag = image_tag.unwrap_or_else(|| default_tag.to_string());
 
-        KafkaDependency::new(identifier, kafka_impl, port, dependencies, image_tag, container_name)
+        let mut dep =
+            KafkaDependency::new(identifier, kafka_impl, port, dependencies, image_tag );
+
+        if let Some(check) = readiness_check {
+            dep.set_readiness_check(check);
+        }
+
+        dep
     }
 }
 
