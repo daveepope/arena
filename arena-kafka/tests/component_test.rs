@@ -5,7 +5,7 @@ use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::message::Message;
-use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::producer::{BaseProducer, BaseRecord, Producer};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const RDKAFKA_LOG_LEVEL_SILENT: &str = "0";
@@ -24,7 +24,7 @@ fn new_admin(bootstrap: &str) -> Result<AdminClient<rdkafka::client::DefaultClie
         .map_err(|e| format!("create kafka admin client failed: {e}"))
 }
 
-fn new_producer(bootstrap: &str) -> Result<FutureProducer, String> {
+fn new_producer(bootstrap: &str) -> Result<BaseProducer, String> {
     ClientConfig::new()
         .set("bootstrap.servers", bootstrap)
         .set("log_level", RDKAFKA_LOG_LEVEL_SILENT)
@@ -69,19 +69,20 @@ fn spawn_poll_until_payload_observed(
     })
 }
 
-async fn produce_payload_once(
-    producer: &FutureProducer,
+fn produce_payload_once(
+    producer: &BaseProducer,
     topic: &str,
     payload: &str,
 ) -> Result<(), String> {
-    let record = FutureRecord::to(topic)
+    let record = BaseRecord::to(topic)
         .key("component-test")
-        .payload(payload);
+        .payload(payload.as_bytes());
     producer
-        .send(record, Duration::from_secs(5))
-        .await
-        .map(|_delivery| ())
-        .map_err(|(e, _msg)| format!("produce failed: {e}"))
+        .send(record)
+        .map_err(|(e, _msg)| format!("produce failed: {e}"))?;
+    producer
+        .flush(Duration::from_secs(5))
+        .map_err(|e| format!("produce flush failed: {e}"))
 }
 
 struct TestContext {
@@ -165,7 +166,6 @@ impl TestContext {
     }
 }
 
-/// Assert that a produced payload is observed by a subscribed consumer within a timeout.
 async fn assert_pub_sub_roundtrip(ctx: &TestContext) -> Result<(), String> {
     ctx.create_topic().await?;
 
@@ -185,9 +185,17 @@ async fn assert_pub_sub_roundtrip(ctx: &TestContext) -> Result<(), String> {
         spawn_poll_until_payload_observed(consumer, payload.clone(), Duration::from_secs(10));
 
     let producer = new_producer(&ctx.bootstrap)?;
-    produce_payload_once(&producer, &ctx.topic, &payload).await?;
+    let topic = ctx.topic.clone();
+    let payload_for_produce = payload.clone();
+    tokio::task::spawn_blocking(move || {
+        produce_payload_once(&producer, topic.as_str(), payload_for_produce.as_str())
+    })
+        .await
+        .map_err(|e| format!("produce task join failed: {e}"))??;
 
-    poll_handle.await.unwrap_or_else(|e| Err(format!("poll task join failed: {e}")))
+    poll_handle
+        .await
+        .map_err(|e| format!("poll task join failed: {e}"))?
 }
 
 #[tokio::test]

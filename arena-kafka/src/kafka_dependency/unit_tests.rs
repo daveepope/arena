@@ -46,7 +46,7 @@ impl ReadinessCheck for FakeReadinessCheck {
         &self,
         _identifier: &str,
         _bootstrap_servers: &str,
-        _timeout: std::time::Duration,
+        _timeout_ms: u64,
     ) -> Result<(), String> {
         let mut ev = self.events.lock().unwrap();
         ev.push(Event::HealthcheckCreate);

@@ -1,19 +1,18 @@
 use async_trait::async_trait;
-use futures_timer::Delay;
 use arena::healthcheck::ReadinessCheck;
+use futures::channel::oneshot;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::message::Message;
-use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::producer::{BaseProducer, BaseRecord, Producer};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-#[async_trait]
 pub trait KafkaHealthcheckOps: Send + Sync {
-    async fn create_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String>;
-    async fn delete_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String>;
-    async fn publish(&self, bootstrap: &str, topic: &str, payload: &str) -> Result<(), String>;
-    async fn consume_verify(
+    fn create_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String>;
+    fn delete_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String>;
+    fn publish(&self, bootstrap: &str, topic: &str, payload: &str) -> Result<(), String>;
+    fn consume_verify(
         &self,
         bootstrap: &str,
         topic: &str,
@@ -23,17 +22,28 @@ pub trait KafkaHealthcheckOps: Send + Sync {
 
 pub(super) struct RdkafkaHealthcheckOps;
 
-pub(super) struct KafkaDefaultReadinessCheck;
+pub(super) struct DefaultKafkaReadinessCheck;
 
 #[async_trait]
-impl ReadinessCheck for KafkaDefaultReadinessCheck {
+impl ReadinessCheck for DefaultKafkaReadinessCheck {
     async fn is_ready(
         &self,
         identifier: &str,
         bootstrap_servers: &str,
-        timeout: Duration,
+        timeout_ms: u64,
     ) -> Result<(), String> {
-        run_with_retry(&RdkafkaHealthcheckOps, identifier, bootstrap_servers, timeout).await
+        let identifier = identifier.to_string();
+        let bootstrap = bootstrap_servers.to_string();
+        let timeout = Duration::from_millis(timeout_ms);
+        let (tx, rx) = oneshot::channel::<Result<(), String>>();
+
+        std::thread::spawn(move || {
+            let ops = RdkafkaHealthcheckOps;
+            let res = run_with_retry_blocking(&ops, &identifier, &bootstrap, timeout);
+            let _ = tx.send(res);
+        });
+
+        rx.await.map_err(|_canceled| "kafka healthcheck worker thread unexpectedly stopped".to_string())?
     }
 }
 
@@ -46,9 +56,8 @@ fn healthcheck_topic_name(identifier: &str) -> String {
     format!("arena_healthcheck_{safe}_{ts}")
 }
 
-#[async_trait]
 impl KafkaHealthcheckOps for RdkafkaHealthcheckOps {
-    async fn create_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String> {
+    fn create_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String> {
         let admin: AdminClient<_> = ClientConfig::new()
             .set("bootstrap.servers", bootstrap)
             .set("log_level", "0")
@@ -58,7 +67,7 @@ impl KafkaHealthcheckOps for RdkafkaHealthcheckOps {
         let new_topic = NewTopic::new(topic, 1, TopicReplication::Fixed(1));
         let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(2)));
 
-        match admin.create_topics([&new_topic], &opts).await {
+        match futures::executor::block_on(admin.create_topics([&new_topic], &opts)) {
             Ok(results) => {
                 for r in results {
                     if let Err((_t, e)) = r {
@@ -74,7 +83,7 @@ impl KafkaHealthcheckOps for RdkafkaHealthcheckOps {
         }
     }
 
-    async fn delete_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String> {
+    fn delete_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String> {
         let admin: AdminClient<_> = ClientConfig::new()
             .set("bootstrap.servers", bootstrap)
             .set("log_level", "0")
@@ -82,30 +91,33 @@ impl KafkaHealthcheckOps for RdkafkaHealthcheckOps {
             .map_err(|e| format!("create kafka admin client failed: {e}"))?;
 
         let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(2)));
-        admin
-            .delete_topics(&[topic], &opts)
-            .await
+        futures::executor::block_on(admin.delete_topics(&[topic], &opts))
             .map(|_res| ())
             .map_err(|e| format!("kafka topic delete failed: {e}"))
     }
 
-    async fn publish(&self, bootstrap: &str, topic: &str, payload: &str) -> Result<(), String> {
-        let producer: FutureProducer = ClientConfig::new()
+    fn publish(&self, bootstrap: &str, topic: &str, payload: &str) -> Result<(), String> {
+        let producer: BaseProducer = ClientConfig::new()
             .set("bootstrap.servers", bootstrap)
             .set("log_level", "0")
             .set("message.timeout.ms", "2000")
             .create()
             .map_err(|e| format!("create kafka producer failed: {e}"))?;
 
-        let record = FutureRecord::to(topic).key("healthcheck").payload(payload);
+        let record = BaseRecord::to(topic)
+            .key("healthcheck")
+            .payload(payload.as_bytes());
+
         producer
-            .send(record, Duration::from_secs(2))
-            .await
-            .map(|_| ())
-            .map_err(|(e, _msg)| format!("kafka publish failed: {e}"))
+            .send(record)
+            .map_err(|(e, _msg)| format!("kafka publish failed: {e}"))?;
+
+        producer
+            .flush(Duration::from_secs(2))
+            .map_err(|e| format!("kafka publish flush failed: {e}"))
     }
 
-    async fn consume_verify(
+    fn consume_verify(
         &self,
         bootstrap: &str,
         topic: &str,
@@ -139,21 +151,22 @@ impl KafkaHealthcheckOps for RdkafkaHealthcheckOps {
                 }
             }
         }
+
         Ok(false)
     }
 }
 
-async fn roundtrip_once(
-    ops: &dyn KafkaHealthcheckOps,
+fn roundtrip_once_blocking(
+    ops: &impl KafkaHealthcheckOps,
     bootstrap: &str,
     topic: &str,
 ) -> Result<(), String> {
-    ops.create_topic(bootstrap, topic).await?;
+    ops.create_topic(bootstrap, topic)?;
 
     let payload = format!("arena-healthcheck-{topic}");
-    ops.publish(bootstrap, topic, &payload).await?;
+    ops.publish(bootstrap, topic, &payload)?;
 
-    let saw = ops.consume_verify(bootstrap, topic, &payload).await?;
+    let saw = ops.consume_verify(bootstrap, topic, &payload)?;
     if !saw {
         return Err("kafka healthcheck did not observe published message".to_string());
     }
@@ -161,8 +174,8 @@ async fn roundtrip_once(
     Ok(())
 }
 
-pub(crate) async fn run_with_retry(
-    ops: &dyn KafkaHealthcheckOps,
+fn run_with_retry_blocking(
+    ops: &impl KafkaHealthcheckOps,
     identifier: &str,
     bootstrap: &str,
     timeout: Duration,
@@ -172,7 +185,7 @@ pub(crate) async fn run_with_retry(
     #[cfg(test)]
     let poll_every = Duration::from_millis(1);
     #[cfg(not(test))]
-    let poll_every = Duration::from_millis(250);
+    let poll_every = Duration::from_millis(100);
 
     let start = Instant::now();
     loop {
@@ -180,15 +193,15 @@ pub(crate) async fn run_with_retry(
             return Err(format!("kafka healthcheck timed out (topic={topic})"));
         }
 
-        let res = roundtrip_once(ops, bootstrap, &topic).await;
+        let res = roundtrip_once_blocking(ops, bootstrap, &topic);
 
-        let _ = ops.delete_topic(bootstrap, &topic).await;
+        let _ = ops.delete_topic(bootstrap, &topic);
 
         match res {
             Ok(()) => return Ok(()),
             Err(err) => {
                 log::debug!("[Kafka] healthcheck failed (will retry): {err}");
-                Delay::new(poll_every).await;
+                std::thread::sleep(poll_every);
             }
         }
     }

@@ -1,77 +1,80 @@
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
-use backon::{BlockingRetryable, ConstantBuilder};
 use futures::channel::oneshot;
 use std::time::{Duration, Instant};
 
-pub(super) struct PostgresDefaultReadinessCheck;
+pub trait PostgresHealthcheckOps: Send + Sync {
+    fn ping(&self, conn_str: &str) -> Result<(), String>;
+}
 
-impl PostgresDefaultReadinessCheck {
-    fn is_ready_once(conn_str: &str) -> bool {
-        let mut client = match postgres::Client::connect(conn_str, postgres::NoTls) {
-            Ok(v) => v,
-            Err(_) => return false,
-        };
+pub(super) struct PostgresClientHealthcheckOps;
 
-        client.simple_query("SELECT 1").is_ok()
+impl PostgresHealthcheckOps for PostgresClientHealthcheckOps {
+    fn ping(&self, conn_str: &str) -> Result<(), String> {
+        let mut client = postgres::Client::connect(conn_str, postgres::NoTls)
+            .map_err(|err| format!("postgres connect failed: {err}"))?;
+
+        client
+            .simple_query("SELECT 1")
+            .map(|_res| ())
+            .map_err(|err| format!("postgres ping query failed: {err}"))
     }
 }
 
+fn run_with_retry_blocking(
+    ops: &impl PostgresHealthcheckOps,
+    identifier: &str,
+    connection_string: &str,
+    timeout_ms: u64,
+) -> Result<(), String> {
+    let timeout_duration = Duration::from_millis(timeout_ms);
+
+    #[cfg(test)]
+    let poll_every = Duration::from_millis(1);
+    #[cfg(not(test))]
+    let poll_every = Duration::from_millis(100);
+
+    let start = Instant::now();
+    loop {
+        if start.elapsed() >= timeout_duration {
+            return Err(format!(
+                "[PostgresDependency-{}] postgres did not become ready within {:?}. connection_string={:?}",
+                identifier, timeout_duration, connection_string
+            ));
+        }
+
+        match ops.ping(connection_string) {
+            Ok(()) => return Ok(()),
+            Err(err) => log::debug!("[Postgres] healthcheck failed (will retry): {err}"),
+        };
+
+        std::thread::sleep(poll_every);
+    }
+}
+
+pub(super) struct DefaultPostgresReadinessCheck;
+
 #[async_trait]
-impl ReadinessCheck for PostgresDefaultReadinessCheck {
+impl ReadinessCheck for DefaultPostgresReadinessCheck {
     async fn is_ready(
         &self,
         identifier: &str,
-        target: &str,
-        timeout: Duration,
+        connection_string: &str,
+        timeout_ms: u64,
     ) -> Result<(), String> {
         let identifier = identifier.to_string();
-        let identifier_for_thread = identifier.clone();
-        let conn_str_for_thread = target.to_string();
+        let connection_string = connection_string.to_string();
         let (tx, rx) = oneshot::channel::<Result<(), String>>();
 
         std::thread::spawn(move || {
-            let poll_every = Duration::from_millis(250);
-            let start = Instant::now();
-
-            let policy = ConstantBuilder::default()
-                .with_delay(poll_every)
-                .without_max_times();
-
-            let is_ready_once = || {
-                if PostgresDefaultReadinessCheck::is_ready_once(&conn_str_for_thread) {
-                    Ok(())
-                } else {
-                    Err(())
-                }
-            };
-
-            let result = is_ready_once
-                .retry(policy)
-                .sleep(std::thread::sleep)
-                .when(|_| start.elapsed() < timeout)
-                .call();
-
-            match result {
-                Ok(()) => {
-                    let _ = tx.send(Ok(()));
-                }
-                Err(()) => {
-                    let _ = tx.send(Err(format!(
-                        "[PostgresDependency-{}] postgres did not become ready within {:?}. target={:?}",
-                        identifier_for_thread, timeout, conn_str_for_thread
-                    )));
-                }
-            }
+            let ops = PostgresClientHealthcheckOps;
+            let res = run_with_retry_blocking(&ops, &identifier, &connection_string, timeout_ms);
+            let _ = tx.send(res);
         });
 
-        match rx.await {
-            Ok(v) => v,
-            Err(_canceled) => Err(format!(
-                "[PostgresDependency-{}] readiness/health-check worker thread unexpectedly stopped.",
-                identifier
-            )),
-        }
+        rx.await.map_err(|_canceled| {
+            "[PostgresDependency] readiness/health-check worker thread unexpectedly stopped."
+                .to_string()
+        })?
     }
 }
-

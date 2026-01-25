@@ -1,6 +1,6 @@
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
-use crate::postgres_container_impl::{PostgresContainerImpl, PostgresImpl};
+use crate::postgres_dependency::postgres_container_impl::{PostgresContainerImpl, PostgresImpl};
 use crate::postgres_dependency::{PostgresDependency};
 
 pub struct PostgresDependencyBuilder {

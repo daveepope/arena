@@ -8,7 +8,7 @@ use arena::dependency::RunnableDependency;
 use async_trait::async_trait;
 use crate::builder::KafkaDependencyBuilder;
 use futures_timer::Delay;
-use crate::kafka_dependency::healthcheck::KafkaDefaultReadinessCheck;
+use crate::kafka_dependency::healthcheck::DefaultKafkaReadinessCheck;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[async_trait]
@@ -56,7 +56,7 @@ impl KafkaDependency {
             dependencies,
             image_tag,
             running: false,
-            readiness_check: Box::new(KafkaDefaultReadinessCheck),
+            readiness_check: Box::new(DefaultKafkaReadinessCheck)
         }
     }
 
@@ -120,7 +120,7 @@ impl KafkaDependency {
 
         match self
             .readiness_check
-            .is_ready(&self.identifier, &bootstrap, remaining)
+            .is_ready(&self.identifier, &bootstrap, remaining.as_millis() as u64)
             .await
         {
             Ok(()) => {}

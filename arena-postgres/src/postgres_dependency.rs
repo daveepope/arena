@@ -1,13 +1,14 @@
 mod healthcheck;
+pub mod postgres_container_impl;
 
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
 use crate::builder::PostgresDependencyBuilder;
-use crate::postgres_container_impl::PostgresImpl;
+use postgres_container_impl::PostgresImpl;
 use futures::channel::oneshot;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use crate::postgres_dependency::healthcheck::PostgresDefaultReadinessCheck;
+use crate::postgres_dependency::healthcheck::DefaultPostgresReadinessCheck;
 
 pub struct PostgresDependency {
     pub identifier: String,
@@ -49,7 +50,7 @@ impl PostgresDependency {
             image_tag,
             container_name,
             running: false,
-            readiness_check: Box::new(PostgresDefaultReadinessCheck),
+            readiness_check: Box::new(DefaultPostgresReadinessCheck),
         }
     }
 
@@ -130,7 +131,7 @@ impl PostgresDependency {
 
         match self
             .readiness_check
-            .is_ready(&self.identifier, conn_str, timeout)
+            .is_ready(&self.identifier, conn_str, timeout.as_millis() as u64)
             .await
         {
             Ok(()) => {}
@@ -139,9 +140,6 @@ impl PostgresDependency {
     }
 
     async fn run_startup_sql_scripts_blocking(&self, scripts: Vec<String>) {
-        // `postgres::Client::connect` can spin up a Tokio runtime internally, which will panic
-        // if invoked from within an already-running Tokio runtime thread. To stay runtime-agnostic
-        // and avoid that nested-runtime panic, run startup scripts on a dedicated OS thread.
         let identifier = self.identifier.clone();
         let conn_str = self
             .connection_string()
