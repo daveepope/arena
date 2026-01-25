@@ -9,6 +9,7 @@ use axum::{
 };
 use env_logger::Env;
 use serde::{Deserialize, Serialize};
+use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::Message;
@@ -170,6 +171,53 @@ fn internal_error<E: std::fmt::Display>(e: E) -> (StatusCode, String) {
     (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
 }
 
+async fn create_topic_with_retry(bootstrap: &str, topic: &str, timeout: Duration) {
+    let start = Instant::now();
+    let poll_every = Duration::from_millis(250);
+
+    loop {
+        if start.elapsed() >= timeout {
+            panic!("kafka topic create timed out (topic={topic})");
+        }
+
+        let admin: AdminClient<_> = ClientConfig::new()
+            .set("bootstrap.servers", bootstrap)
+            .create()
+            .expect("create kafka admin client");
+
+        let new_topic = NewTopic::new(topic, 1, TopicReplication::Fixed(1));
+        let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(2)));
+
+        let ok = match admin.create_topics([&new_topic], &opts).await {
+            Ok(results) => {
+                let mut ok = true;
+                for r in results {
+                    if let Err((_t, e)) = r {
+                        if e.to_string().to_lowercase().contains("already exists") {
+                            ok = true;
+                            break;
+                        }
+                        ok = false;
+                        log::debug!("kafka topic create failed: {e}");
+                        break;
+                    }
+                }
+                ok
+            }
+            Err(err) => {
+                log::debug!("kafka topic create request failed: {err}");
+                false
+            }
+        };
+
+        if ok {
+            return;
+        }
+
+        tokio::time::sleep(poll_every).await;
+    }
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::Builder::from_env(
@@ -240,6 +288,7 @@ async fn main() {
     });
 
     let kafka_topic: Arc<str> = Arc::from("readings");
+    create_topic_with_retry(&kafka_bootstrap, kafka_topic.as_ref(), Duration::from_secs(10)).await;
 
     let kafka: FutureProducer = ClientConfig::new()
         .set("bootstrap.servers", &kafka_bootstrap)
@@ -268,7 +317,7 @@ async fn main() {
                         .payload_view::<str>()
                         .and_then(|r| r.ok())
                         .unwrap_or("");
-                    log::debug!("kafka {}: {}", consumer_topic.as_ref(), payload);
+                    log::debug!("kafka received {}: {}", consumer_topic.as_ref(), payload);
                 }
                 Err(err) => {
                     log::debug!("kafka consume error: {err}");
