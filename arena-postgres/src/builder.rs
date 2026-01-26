@@ -1,5 +1,6 @@
 use arena::dependency::RunnableDependency;
-use crate::postgres_container_impl::{PostgresContainerImpl, PostgresImpl};
+use arena::healthcheck::ReadinessCheck;
+use crate::postgres_dependency::postgres_container_impl::{PostgresContainerImpl, PostgresImpl};
 use crate::postgres_dependency::{PostgresDependency};
 
 pub struct PostgresDependencyBuilder {
@@ -13,6 +14,7 @@ pub struct PostgresDependencyBuilder {
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
     image_tag: Option<String>,
     container_name: Option<String>,
+    readiness_check: Option<Box<dyn ReadinessCheck>>,
 }
 
 impl PostgresDependencyBuilder {
@@ -35,6 +37,7 @@ impl PostgresDependencyBuilder {
             dependencies: None,
             image_tag: None,
             container_name: None,
+            readiness_check: None,
         }
     }
 
@@ -46,38 +49,35 @@ impl PostgresDependencyBuilder {
         self
     }
 
-    pub fn with_port(mut self, port: u16) -> Self
-    {
+    pub fn with_port(mut self, port: u16) -> Self {
         self.port = Option::from(port);
         self
     }
 
-    pub fn with_database_name(mut self, database_name: impl Into<String>) -> Self
-    {
+    pub fn with_database_name(mut self, database_name: impl Into<String>) -> Self {
         self.database_name = Option::from(database_name.into());
         self
     }
 
-    pub fn with_database_username(mut self, database_username: impl Into<String>) -> Self
-    {
+    pub fn with_database_username(mut self, database_username: impl Into<String>) -> Self {
         self.database_username = Option::from(database_username.into());
         self
     }
 
-    pub fn with_database_password(mut self, database_password: impl Into<String>) -> Self
-    {
+    pub fn with_database_password(mut self, database_password: impl Into<String>) -> Self {
         self.database_password = Option::from(database_password.into());
         self
     }
 
-    pub fn with_startup_sql_scripts(mut self, scripts: Vec<String>) -> Self
-    {
+    pub fn with_startup_sql_scripts(mut self, scripts: Vec<String>) -> Self {
         self.startup_sql_scripts = Option::from(scripts);
         self
     }
 
-    pub fn with_child_dependencies(mut self, dependencies: Vec<Box<dyn RunnableDependency>>) -> Self
-    {
+    pub fn with_child_dependencies(
+        mut self,
+        dependencies: Vec<Box<dyn RunnableDependency>>,
+    ) -> Self {
         self.dependencies = Option::from(dependencies);
         self
     }
@@ -87,7 +87,6 @@ impl PostgresDependencyBuilder {
         self
     }
 
-    // Convenience alias.
     pub fn with_image(self, image_tag: impl Into<String>) -> Self {
         self.with_image_tag(image_tag)
     }
@@ -97,7 +96,14 @@ impl PostgresDependencyBuilder {
         self
     }
 
-    // Back-compat: old name was misleading; keep it as an alias for image tag.
+    pub fn with_readiness_check<W>(mut self, check: W) -> Self
+    where
+        W: ReadinessCheck + 'static,
+    {
+        self.readiness_check = Some(Box::new(check));
+        self
+    }
+
     pub fn with_container_tag(self, image_tag: impl Into<String>) -> Self {
         self.with_image_tag(image_tag)
     }
@@ -123,8 +129,9 @@ impl PostgresDependencyBuilder {
             .image_tag
             .unwrap_or_else(|| Self::DEFAULT_IMAGE_TAG.to_string());
         let container_name = self.container_name;
+        let readiness_check = self.readiness_check;
     
-        PostgresDependency::new(
+        let mut dep = PostgresDependency::new(
             self.identifier,
             postgres_impl,
             port,
@@ -135,6 +142,12 @@ impl PostgresDependencyBuilder {
             dependencies,
             image_tag,
             container_name,
-        )
+        );
+
+        if let Some(check) = readiness_check {
+            dep.set_readiness_check(check);
+        }
+
+        dep
     }
 }

@@ -11,10 +11,9 @@ use env_logger::Env;
 use serde::{Deserialize, Serialize};
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::config::ClientConfig;
-use rdkafka::consumer::{Consumer, StreamConsumer};
+use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::message::Message;
-use rdkafka::producer::{FutureProducer, FutureRecord};
-use futures::StreamExt;
+use rdkafka::producer::{BaseProducer, BaseRecord, Producer};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -28,7 +27,7 @@ use std::time::Instant;
 #[derive(Clone)]
 struct AppState {
     pg: Arc<Client>,
-    kafka: FutureProducer,
+    kafka: Arc<BaseProducer>,
     kafka_topic: Arc<str>,
 }
 
@@ -157,12 +156,22 @@ async fn create_reading(
     .map_err(internal_error)?;
 
     let key = id.to_string();
-    let record = FutureRecord::to(&st.kafka_topic)
-        .key(&key)
-        .payload(&payload);
-    if let Err((e, _msg)) = st.kafka.send(record, Duration::from_secs(2)).await {
-        log::debug!("kafka publish failed: {e}");
-    }
+    let producer = st.kafka.clone();
+    let topic = st.kafka_topic.to_string();
+    let payload_for_send = payload.clone();
+    let key_for_send = key.clone();
+    tokio::task::spawn_blocking(move || {
+        let record = BaseRecord::to(topic.as_str())
+            .key(key_for_send.as_str())
+            .payload(payload_for_send.as_bytes());
+        if let Err((e, _msg)) = producer.send(record) {
+            log::debug!("kafka publish failed: {e}");
+            return;
+        }
+        if let Err(e) = producer.flush(Duration::from_secs(2)) {
+            log::debug!("kafka flush failed: {e}");
+        }
+    });
 
     Ok((StatusCode::CREATED, Json(CreateReadingResponse { id })))
 }
@@ -290,13 +299,13 @@ async fn main() {
     let kafka_topic: Arc<str> = Arc::from("readings");
     create_topic_with_retry(&kafka_bootstrap, kafka_topic.as_ref(), Duration::from_secs(10)).await;
 
-    let kafka: FutureProducer = ClientConfig::new()
+    let kafka: BaseProducer = ClientConfig::new()
         .set("bootstrap.servers", &kafka_bootstrap)
         .set("message.timeout.ms", "5000")
         .create()
         .expect("create kafka producer");
 
-    let consumer: StreamConsumer = ClientConfig::new()
+    let consumer: BaseConsumer = ClientConfig::new()
         .set("bootstrap.servers", &kafka_bootstrap)
         .set("group.id", "arena-examples")
         .set("enable.partition.eof", "false")
@@ -309,21 +318,21 @@ async fn main() {
 
     let consumer_topic = kafka_topic.clone();
     tokio::spawn(async move {
-        let mut stream = consumer.stream();
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(msg) => {
+        tokio::task::spawn_blocking(move || loop {
+            match consumer.poll(Duration::from_millis(250)) {
+                None => {}
+                Some(Err(err)) => {
+                    log::debug!("kafka consume error: {err}");
+                }
+                Some(Ok(msg)) => {
                     let payload = msg
                         .payload_view::<str>()
                         .and_then(|r| r.ok())
                         .unwrap_or("");
                     log::debug!("kafka received {}: {}", consumer_topic.as_ref(), payload);
                 }
-                Err(err) => {
-                    log::debug!("kafka consume error: {err}");
-                }
             }
-        }
+        });
     });
 
     let app = Router::new()
@@ -332,7 +341,7 @@ async fn main() {
         .layer(axum::middleware::from_fn(log_requests))
         .with_state(AppState {
             pg: Arc::new(pg),
-            kafka,
+            kafka: Arc::new(kafka),
             kafka_topic,
         });
 

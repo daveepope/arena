@@ -1,7 +1,8 @@
-use super::*;
+use arena::dependency::RunnableDependency;
+use arena::healthcheck::ReadinessCheck;
+use arena_kafka::{KafkaDependency, KafkaImpl};
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
-use super::healthcheck::KafkaHealthcheckOps;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Event {
@@ -13,6 +14,7 @@ enum Event {
     HealthcheckPublish,
     HealthcheckConsume,
     HealthcheckDelete,
+    ReadinessCheck,
 }
 
 struct FakeKafkaImpl {
@@ -35,35 +37,25 @@ impl KafkaImpl for FakeKafkaImpl {
     }
 }
 
-struct FakeOps {
+struct FakeReadinessCheck {
     events: Arc<Mutex<Vec<Event>>>,
 }
 
 #[async_trait]
-impl KafkaHealthcheckOps for FakeOps {
-    async fn create_topic(&self, _bootstrap: &str, _topic: &str) -> Result<(), String> {
-        self.events.lock().unwrap().push(Event::HealthcheckCreate);
-        Ok(())
-    }
-
-    async fn delete_topic(&self, _bootstrap: &str, _topic: &str) -> Result<(), String> {
-        self.events.lock().unwrap().push(Event::HealthcheckDelete);
-        Ok(())
-    }
-
-    async fn publish(&self, _bootstrap: &str, _topic: &str, _payload: &str) -> Result<(), String> {
-        self.events.lock().unwrap().push(Event::HealthcheckPublish);
-        Ok(())
-    }
-
-    async fn consume_verify(
+impl ReadinessCheck for FakeReadinessCheck {
+    async fn is_ready(
         &self,
-        _bootstrap: &str,
-        _topic: &str,
-        _expected_payload: &str,
-    ) -> Result<bool, String> {
-        self.events.lock().unwrap().push(Event::HealthcheckConsume);
-        Ok(true)
+        _identifier: &str,
+        _bootstrap_servers: &str,
+        _timeout_ms: u64,
+    ) -> Result<(), String> {
+        let mut ev = self.events.lock().unwrap();
+        ev.push(Event::HealthcheckCreate);
+        ev.push(Event::HealthcheckPublish);
+        ev.push(Event::HealthcheckConsume);
+        ev.push(Event::HealthcheckDelete);
+        ev.push(Event::ReadinessCheck);
+        Ok(())
     }
 }
 
@@ -119,21 +111,18 @@ async fn kafka_dependency_lifecycle() {
         }),
     ];
 
-    let mut kafka = KafkaDependency {
-        identifier: "kafka".to_string(),
-        kafka_impl: Box::new(FakeKafkaImpl {
+    let mut kafka = KafkaDependency::builder("kafka")
+        .with_impl(FakeKafkaImpl {
             bootstrap: Some("127.0.0.1:9092".to_string()),
             events: events.clone(),
-        }),
-        port: 0,
-        dependencies: Some(deps),
-        running: false,
-        image_tag: "x".to_string(),
-        container_name: Some("kafka-test".to_string()),
-        healthcheck_ops: Box::new(FakeOps {
+        })
+        .with_port(0)
+        .with_child_dependencies(deps)
+        .with_image_tag("x")
+        .with_readiness_check(FakeReadinessCheck {
             events: events.clone(),
-        }),
-    };
+        })
+        .build();
 
     kafka.start().await;
     kafka.stop().await;
@@ -149,6 +138,7 @@ async fn kafka_dependency_lifecycle() {
             Event::HealthcheckPublish,
             Event::HealthcheckConsume,
             Event::HealthcheckDelete,
+            Event::ReadinessCheck,
             Event::KafkaStop,
             Event::DepStop("dep-b"),
             Event::DepStop("dep-a"),

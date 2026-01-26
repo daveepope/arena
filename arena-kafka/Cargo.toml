@@ -13,8 +13,8 @@ testcontainers-modules = { workspace = true, features = ["kafka"] }
 log = { workspace = true }
 futures-timer = { workspace = true }
 rdkafka = { workspace = true }
+futures = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-futures = { workspace = true }
 env_logger = { workspace = true }
