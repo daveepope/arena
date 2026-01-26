@@ -1,5 +1,3 @@
-#[cfg(test)]
-mod unit_tests;
 mod healthcheck;
 pub(crate) mod container_impl;
 

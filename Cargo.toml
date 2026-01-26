@@ -10,12 +10,12 @@ members = ["arena-postgres",
 arena = { path = "arena", version = "0.1.0-alpha.1" }
 arena-kafka = { path = "arena-kafka", version = "0.1.0-alpha.1" }
 arena-postgres = { path = "arena-postgres", version = "0.1.0-alpha.1" }
-axum = "0.7"
+axum = "0.8.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio-postgres = "0.7"
 postgres = "0.19"
-rdkafka = { version = "0.36" }
+rdkafka = { version = "0.39.0" }
 backon = "1.5.2"
 async-trait = "0.1"
 env_logger = "0.11"

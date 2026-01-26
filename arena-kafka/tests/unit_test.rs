@@ -1,7 +1,8 @@
-use super::*;
+use arena::dependency::RunnableDependency;
+use arena::healthcheck::ReadinessCheck;
+use arena_kafka::{KafkaDependency, KafkaImpl};
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
-use arena::healthcheck::ReadinessCheck;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Event {
