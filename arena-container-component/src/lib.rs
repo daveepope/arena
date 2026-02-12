@@ -1,2 +1,2 @@
-pub mod executable_component;
+pub mod container_component;
 pub mod builder;

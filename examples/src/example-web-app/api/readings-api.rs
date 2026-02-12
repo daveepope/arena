@@ -9,11 +9,23 @@ use axum::http::Request;
 use axum::middleware::Next;
 use axum::response::Response;
 use rdkafka::producer::{BaseProducer, BaseRecord, Producer};
-use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio_postgres::Client;
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+struct CreateReadingRequest {
+    user_name: String,
+    value: i32,
+    comment: Option<String>,
+}
+
+#[derive(Serialize)]
+struct CreateReadingResponse {
+    id: i64,
+}
 
 #[derive(Clone)]
 struct AppState {

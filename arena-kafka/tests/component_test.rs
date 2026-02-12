@@ -28,7 +28,7 @@ fn new_producer(bootstrap: &str) -> Result<BaseProducer, String> {
     ClientConfig::new()
         .set("bootstrap.servers", bootstrap)
         .set("log_level", RDKAFKA_LOG_LEVEL_SILENT)
-        .set("message.timeout.ms", "5000")
+        .set("message.timeout.ms", "2000")
         .create()
         .map_err(|e| format!("create kafka producer failed: {e}"))
 }
@@ -54,7 +54,9 @@ fn spawn_poll_until_payload_observed(
         let deadline = std::time::Instant::now() + timeout;
         while std::time::Instant::now() < deadline {
             match consumer.poll(Duration::from_millis(10)) {
-                None => {}
+                None => {
+                    std::thread::sleep(Duration::from_millis(10));
+                }
                 Some(Err(e)) => return Err(format!("consume failed: {e}")),
                 Some(Ok(msg)) => {
                     if let Some(bytes) = msg.payload() {
@@ -81,7 +83,7 @@ fn produce_payload_once(
         .send(record)
         .map_err(|(e, _msg)| format!("produce failed: {e}"))?;
     producer
-        .flush(Duration::from_secs(5))
+        .flush(Duration::from_secs(2))
         .map_err(|e| format!("produce flush failed: {e}"))
 }
 
@@ -135,7 +137,7 @@ impl TestContext {
 
     async fn create_topic(&self) -> Result<(), String> {
         let new_topic = NewTopic::new(&self.topic, 1, TopicReplication::Fixed(1));
-        let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(5)));
+        let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(2)));
 
         let results = self
             .admin
@@ -153,7 +155,7 @@ impl TestContext {
     }
 
     async fn delete_topic_best_effort(&self) {
-        let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(5)));
+        let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(2)));
         let _ = self
             .admin
             .delete_topics(&[self.topic.as_str()], &opts)
@@ -167,7 +169,9 @@ impl TestContext {
 }
 
 async fn assert_pub_sub_roundtrip(ctx: &TestContext) -> Result<(), String> {
+    let sw = std::time::Instant::now();
     ctx.create_topic().await?;
+    log::info!("[timing] create_topic took {:?}", sw.elapsed());
 
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -176,26 +180,46 @@ async fn assert_pub_sub_roundtrip(ctx: &TestContext) -> Result<(), String> {
     let payload = format!("hello-from-component-test-{ts}");
     let group_id = format!("arena-component-test-{ts}");
 
+    let sw = std::time::Instant::now();
     let consumer = new_consumer(&ctx.bootstrap, &group_id)?;
+    log::info!("[timing] new_consumer took {:?}", sw.elapsed());
+    
+    let sw = std::time::Instant::now();
     consumer
         .subscribe(&[&ctx.topic])
         .map_err(|e| format!("subscribe failed: {e}"))?;
+    log::info!("[timing] subscribe took {:?}", sw.elapsed());
+
+    let sw = std::time::Instant::now();
+    for _ in 0..30 {
+        consumer.poll(Duration::from_millis(100));
+    }
+    log::info!("[timing] consumer warmup took {:?}", sw.elapsed());
 
     let poll_handle =
-        spawn_poll_until_payload_observed(consumer, payload.clone(), Duration::from_secs(10));
+        spawn_poll_until_payload_observed(consumer, payload.clone(), Duration::from_secs(5));
 
+    let sw = std::time::Instant::now();
     let producer = new_producer(&ctx.bootstrap)?;
+    log::info!("[timing] new_producer took {:?}", sw.elapsed());
+    
     let topic = ctx.topic.clone();
     let payload_for_produce = payload.clone();
+    let sw = std::time::Instant::now();
     tokio::task::spawn_blocking(move || {
         produce_payload_once(&producer, topic.as_str(), payload_for_produce.as_str())
     })
         .await
         .map_err(|e| format!("produce task join failed: {e}"))??;
+    log::info!("[timing] produce took {:?}", sw.elapsed());
 
-    poll_handle
+    let sw = std::time::Instant::now();
+    let result = poll_handle
         .await
-        .map_err(|e| format!("poll task join failed: {e}"))?
+        .map_err(|e| format!("poll task join failed: {e}"))?;
+    log::info!("[timing] consume took {:?}", sw.elapsed());
+    
+    result
 }
 
 #[tokio::test]

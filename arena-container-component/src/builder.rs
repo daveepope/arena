@@ -1,12 +1,12 @@
 use arena::Component;
-use crate::executable_component::ExecutableComponent;
+use crate::container_component::ContainerComponent;
 
-pub struct DockerComponentBuilder {
+pub struct ContainerComponentBuilder {
     endpoint: String,
     children: Option<Vec<Component>>,
 }
 
-impl DockerComponentBuilder {
+impl ContainerComponentBuilder {
     pub(crate) fn new(endpoint: impl Into<String>) -> Self {
         Self {
             endpoint: endpoint.into(),
@@ -19,8 +19,8 @@ impl DockerComponentBuilder {
         self
     }
 
-    pub fn build(self) -> ExecutableComponent {
-        ExecutableComponent {
+    pub fn build(self) -> ContainerComponent {
+        ContainerComponent {
             endpoint: self.endpoint,
             children: self.children,
             stopped: false,

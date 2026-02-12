@@ -89,21 +89,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "arena-container-component"
+version = "0.1.0-alpha.1"
+dependencies = [
+ "arena",
+ "async-trait",
+ "env_logger",
+ "futures",
+ "log",
+ "mockall",
+ "tokio",
+]
+
+[[package]]
 name = "arena-examples"
 version = "0.1.0"
 dependencies = [
  "arena",
+ "arena-executable-component",
  "arena-kafka",
  "arena-postgres",
  "axum",
  "env_logger",
- "futures",
  "log",
  "rdkafka",
  "serde",
  "serde_json",
  "tokio",
  "tokio-postgres",
+]
+
+[[package]]
+name = "arena-executable-component"
+version = "0.1.0-alpha.1"
+dependencies = [
+ "arena",
+ "async-trait",
+ "env_logger",
+ "futures",
+ "log",
+ "mockall",
+ "tokio",
 ]
 
 [[package]]

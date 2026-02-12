@@ -198,6 +198,4 @@ async fn main() {
     let _consumer_handle = create_output_kafka_consumer(&kafka_bootstrap, KAFKA_TOPIC);
 
     tokio::signal::ctrl_c().await.unwrap();
-
-    let _closed = open_arena.close().await;
 }

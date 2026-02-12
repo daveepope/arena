@@ -1,4 +1,5 @@
 use crate::encounter::EncounterTrait;
+use futures::executor::block_on;
 use std::time::Instant;
 
 pub struct ClosedArena {
@@ -6,7 +7,6 @@ pub struct ClosedArena {
     pub encounters: Vec<Box<dyn EncounterTrait>>,
 }
 
-#[must_use = "Arena is open; call .close() before dropping"]
 pub struct OpenArena {
     name: String,
     encounters: Vec<Box<dyn EncounterTrait>>,
@@ -40,6 +40,7 @@ impl ClosedArena {
         }
     }
 }
+
 impl OpenArena {
     pub fn dependency(
         &self,
@@ -66,35 +67,40 @@ impl OpenArena {
     }
 
     pub async fn close(mut self) -> ClosedArena {
-        log::info!("[Arena-{}] closing.", self.name);
-        let sw = Instant::now();
-
-        for e in self.encounters.iter_mut().rev() {
-            e.stop().await;
-        }
-
-        log::debug!(
-            "[Arena-{}] closed in {:?}.",
-            self.name,
-            sw.elapsed()
-        );
-        log::info!("[Arena-{}] closed.", self.name);
-
-        self.closed = true;
+        self.internal_close().await;
 
         let name = std::mem::take(&mut self.name);
         let encounters = std::mem::take(&mut self.encounters);
 
         ClosedArena { name, encounters }
     }
+
+    async fn internal_close(&mut self) {
+        if !self.closed {
+            log::info!("[Arena-{}] closing.", self.name);
+            let sw = Instant::now();
+
+            for e in self.encounters.iter_mut().rev() {
+                e.stop().await;
+            }
+
+            log::debug!(
+                "[Arena-{}] closed in {:?}.",
+                self.name,
+                sw.elapsed()
+            );
+            log::info!("[Arena-{}] closed.", self.name);
+
+            self.closed = true;
+        }
+    }
 }
 
 impl Drop for OpenArena {
     fn drop(&mut self) {
-        assert!(
-            self.closed,
-            "OpenArena dropped without calling close() first"
-        );
+        if !self.closed {
+            block_on(self.internal_close());
+        }
     }
 }
 
@@ -127,8 +133,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn test_open_arena_panics_on_drop_if_not_closed() {
+    fn test_open_arena_auto_closes_on_drop() {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let rt = tokio::runtime::Runtime::new().unwrap();

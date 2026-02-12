@@ -1,29 +1,29 @@
 use async_trait::async_trait;
 use arena::component::RunnableComponent;
-use crate::builder::ExecutableComponentBuilder;
+use crate::builder::ContainerComponentBuilder;
 
-pub struct ExecutableComponent {
+pub struct ContainerComponent {
     pub(crate) endpoint: String,
     pub(crate) children: Option<Vec<Box<dyn RunnableComponent>>>,
     pub(crate) stopped: bool,
 }
 
-impl ExecutableComponent {
+impl ContainerComponent {
     pub fn new(endpoint: String) -> Self {
-        ExecutableComponent {
+        ContainerComponent {
             endpoint,
             children: None,
             stopped: false,
         }
     }
 
-    pub fn builder(endpoint: impl Into<String>) -> ExecutableComponentBuilder {
-        ExecutableComponentBuilder::new(endpoint)
+    pub fn builder(endpoint: impl Into<String>) -> ContainerComponentBuilder {
+        ContainerComponentBuilder::new(endpoint)
     }
 }
 
 #[async_trait]
-impl RunnableComponent for ExecutableComponent {
+impl RunnableComponent for ContainerComponent {
     async fn start(&mut self) {
         for child in self.children.iter_mut().flatten() {
             child.start().await;
