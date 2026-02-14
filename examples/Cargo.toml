@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["David Pope"]
 description = "Examples using the arena framework. Intended as documentation and testing."
-license = "BSD-3-Clause"
+license = "todo"
 
 [lib]
 name = "arena_examples"
@@ -31,3 +31,10 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 tokio-postgres = { workspace = true }
 rdkafka = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+async-trait = { workspace = true }
+futures = { workspace = true }
+futures-timer = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }

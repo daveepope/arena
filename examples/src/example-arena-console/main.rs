@@ -17,12 +17,16 @@ const DB_USER: &str = "my_user";
 const DB_PASS: &str = "my_password";
 const KAFKA_PORT: u16 = 9092;
 const KAFKA_TOPIC: &str = "readings";
+const WEB_APP_PORT: u16 = 3000;
 
 fn setup_arena_components() -> Vec<Component> {
     vec![Box::new(
         ExecutableComponent::builder("arena example web app")
             .with_source_path("examples")
+            .with_build_tool(arena_executable_component::BuildTool::Cargo)
             .with_executable_path("target/release/web-app")
+            .with_env_var("RUST_LOG", "debug")
+            .with_runtime_arg("web_app_port", WEB_APP_PORT.to_string())
             .with_runtime_arg(
                 "postgres_connection_string",
                 format!(

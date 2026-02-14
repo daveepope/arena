@@ -164,7 +164,7 @@ async fn create_reading(
         }
     });
 
-    Ok((StatusCode::CREATED, Json(CreateReadingResponse { id })))
+    Ok((StatusCode::OK, Json(CreateReadingResponse { id })))
 }
 
 fn internal_error<E: std::fmt::Display>(e: E) -> (StatusCode, String) {
@@ -211,6 +211,7 @@ impl ExampleAxumWebApp {
 
     pub async fn serve(
         self,
+        port: u16,
         shutdown_signal: tokio::sync::oneshot::Receiver<()>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let app = Router::new()
@@ -223,7 +224,7 @@ impl ExampleAxumWebApp {
                 kafka_topic: self.kafka_topic,
             });
 
-        let addr: SocketAddr = "127.0.0.1:3000".parse()?;
+        let addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
         let listener = tokio::net::TcpListener::bind(addr).await?;
         log::info!("listening on http://{addr}");
 

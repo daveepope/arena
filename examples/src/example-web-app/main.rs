@@ -9,13 +9,14 @@ async fn main() {
 
     let args: Vec<String> = std::env::args().collect();
     
-    if args.len() != 3 {
-        eprintln!("Usage: {} <postgres_connection_string> <kafka_bootstrap>", args[0]);
+    if args.len() != 4 {
+        eprintln!("Usage: {} <web_app_port> <postgres_connection_string> <kafka_bootstrap>", args[0]);
         std::process::exit(1);
     }
 
-    let postgres_connection_string = &args[1];
-    let kafka_bootstrap = &args[2];
+    let web_app_port: u16 = args[1].parse().expect("web_app_port must be a valid port number");
+    let postgres_connection_string = &args[2];
+    let kafka_bootstrap = &args[3];
     let kafka_topic = "readings";
 
     let web_app = ExampleAxumWebApp::new(postgres_connection_string, kafka_bootstrap, kafka_topic).await;
@@ -23,7 +24,7 @@ async fn main() {
     let (_tx, rx) = tokio::sync::oneshot::channel();
     
     tokio::select! {
-        result = web_app.serve(rx) => {
+        result = web_app.serve(web_app_port, rx) => {
             if let Err(e) = result {
                 log::error!("web app error: {}", e);
             }

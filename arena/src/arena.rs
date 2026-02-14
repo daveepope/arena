@@ -1,5 +1,6 @@
 use crate::encounter::EncounterTrait;
 use futures::executor::block_on;
+use futures::future::join_all;
 use std::time::Instant;
 
 pub struct ClosedArena {
@@ -22,9 +23,16 @@ impl ClosedArena {
         log::info!("[Arena-{}] opening.", self.name);
         let sw = Instant::now();
 
-        for e in self.encounters.iter_mut() {
-            e.start().await;
-        }
+        let encounters = std::mem::take(&mut self.encounters);
+
+        let mut started = join_all(encounters.into_iter().enumerate().map(|(i, mut enc)| async move {
+            enc.start().await;
+            (i, enc)
+        }))
+        .await;
+
+        started.sort_by_key(|(i, _)| *i);
+        let encounters = started.into_iter().map(|(_, enc)| enc).collect();
 
         log::debug!(
             "[Arena-{}] open in {:?}.",
@@ -35,7 +43,7 @@ impl ClosedArena {
 
         OpenArena {
             name: self.name,
-            encounters: self.encounters,
+            encounters,
             closed: false,
         }
     }
@@ -80,9 +88,16 @@ impl OpenArena {
             log::info!("[Arena-{}] closing.", self.name);
             let sw = Instant::now();
 
-            for e in self.encounters.iter_mut().rev() {
-                e.stop().await;
-            }
+            let encounters = std::mem::take(&mut self.encounters);
+
+            let mut stopped = join_all(encounters.into_iter().enumerate().map(|(i, mut enc)| async move {
+                enc.stop().await;
+                (i, enc)
+            }))
+            .await;
+
+            stopped.sort_by_key(|(i, _)| *i);
+            self.encounters = stopped.into_iter().map(|(_, enc)| enc).collect();
 
             log::debug!(
                 "[Arena-{}] closed in {:?}.",
