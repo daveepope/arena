@@ -1,4 +1,6 @@
 use crate::encounter::EncounterTrait;
+use futures::executor::block_on;
+use futures::future::join_all;
 use std::time::Instant;
 
 pub struct ClosedArena {
@@ -6,7 +8,6 @@ pub struct ClosedArena {
     pub encounters: Vec<Box<dyn EncounterTrait>>,
 }
 
-#[must_use = "Arena is open; call .close() before dropping"]
 pub struct OpenArena {
     name: String,
     encounters: Vec<Box<dyn EncounterTrait>>,
@@ -22,9 +23,16 @@ impl ClosedArena {
         log::info!("[Arena-{}] opening.", self.name);
         let sw = Instant::now();
 
-        for e in self.encounters.iter_mut() {
-            e.start().await;
-        }
+        let encounters = std::mem::take(&mut self.encounters);
+
+        let mut started = join_all(encounters.into_iter().enumerate().map(|(i, mut enc)| async move {
+            enc.start().await;
+            (i, enc)
+        }))
+        .await;
+
+        started.sort_by_key(|(i, _)| *i);
+        let encounters = started.into_iter().map(|(_, enc)| enc).collect();
 
         log::debug!(
             "[Arena-{}] open in {:?}.",
@@ -35,11 +43,12 @@ impl ClosedArena {
 
         OpenArena {
             name: self.name,
-            encounters: self.encounters,
+            encounters,
             closed: false,
         }
     }
 }
+
 impl OpenArena {
     pub fn dependency(
         &self,
@@ -66,35 +75,47 @@ impl OpenArena {
     }
 
     pub async fn close(mut self) -> ClosedArena {
-        log::info!("[Arena-{}] closing.", self.name);
-        let sw = Instant::now();
-
-        for e in self.encounters.iter_mut().rev() {
-            e.stop().await;
-        }
-
-        log::debug!(
-            "[Arena-{}] closed in {:?}.",
-            self.name,
-            sw.elapsed()
-        );
-        log::info!("[Arena-{}] closed.", self.name);
-
-        self.closed = true;
+        self.internal_close().await;
 
         let name = std::mem::take(&mut self.name);
         let encounters = std::mem::take(&mut self.encounters);
 
         ClosedArena { name, encounters }
     }
+
+    async fn internal_close(&mut self) {
+        if !self.closed {
+            log::info!("[Arena-{}] closing.", self.name);
+            let sw = Instant::now();
+
+            let encounters = std::mem::take(&mut self.encounters);
+
+            let mut stopped = join_all(encounters.into_iter().enumerate().map(|(i, mut enc)| async move {
+                enc.stop().await;
+                (i, enc)
+            }))
+            .await;
+
+            stopped.sort_by_key(|(i, _)| *i);
+            self.encounters = stopped.into_iter().map(|(_, enc)| enc).collect();
+
+            log::debug!(
+                "[Arena-{}] closed in {:?}.",
+                self.name,
+                sw.elapsed()
+            );
+            log::info!("[Arena-{}] closed.", self.name);
+
+            self.closed = true;
+        }
+    }
 }
 
 impl Drop for OpenArena {
     fn drop(&mut self) {
-        assert!(
-            self.closed,
-            "OpenArena dropped without calling close() first"
-        );
+        if !self.closed {
+            block_on(self.internal_close());
+        }
     }
 }
 
@@ -127,8 +148,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn test_open_arena_panics_on_drop_if_not_closed() {
+    fn test_open_arena_auto_closes_on_drop() {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let rt = tokio::runtime::Runtime::new().unwrap();

@@ -1,19 +1,21 @@
 [package]
-name = "arena-postgres"
+name = "arena-container-component"
 version = "0.1.0-alpha.1"
 edition = "2021"
 authors = ["David Pope"]
-description = "Arena Postgres implementation"
+description = "The Arena Container Component module containing centrally managed component implmentations that manage a build and manage a running container."
 license = "todo"
+
+[lib]
+path = "src/lib.rs"
 
 [dependencies]
 arena = { workspace = true }
 async-trait = { workspace = true }
-testcontainers-modules = { workspace = true, features = ["postgres"] }
-log = { workspace = true }
 futures = { workspace = true }
-postgres = { workspace = true }
+log = { workspace = true }
 
 [dev-dependencies]
+mockall = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 env_logger = { workspace = true }

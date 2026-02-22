@@ -1,8 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["arena-postgres",
+members = [
+    "arena-postgres",
     "arena",
     "arena-kafka",
+    "arena-executable-component",
+    "arena-container-component",
     "examples"
 ]
 
@@ -10,6 +13,7 @@ members = ["arena-postgres",
 arena = { path = "arena", version = "0.1.0-alpha.1" }
 arena-kafka = { path = "arena-kafka", version = "0.1.0-alpha.1" }
 arena-postgres = { path = "arena-postgres", version = "0.1.0-alpha.1" }
+arena-executable-component = { path = "arena-executable-component", version = "0.1.0-alpha.1" }
 axum = "0.8.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -25,3 +29,5 @@ log = "0.4"
 testcontainers-modules = "0.14.0"
 tokio = "1"
 mockall = "0.14.0"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+rstest = "0.22"

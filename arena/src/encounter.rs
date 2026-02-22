@@ -58,9 +58,16 @@ impl EncounterTrait for Encounter {
         started.sort_by_key(|(i, _)| *i);
         self.dependencies = started.into_iter().map(|(_, dep)| dep).collect();
 
-        for comp in self.components.iter_mut() {
+        let comps = std::mem::take(&mut self.components);
+
+        let mut started_comps = join_all(comps.into_iter().enumerate().map(|(i, mut comp)| async move {
             comp.start().await;
-        }
+            (i, comp)
+        }))
+        .await;
+
+        started_comps.sort_by_key(|(i, _)| *i);
+        self.components = started_comps.into_iter().map(|(_, comp)| comp).collect();
 
         log::debug!(
             "[Encounters-{}] start complete in {:?}.",
@@ -79,9 +86,16 @@ impl EncounterTrait for Encounter {
         log::info!("[Encounters-{}] stopping.", self.name);
         let sw = Instant::now();
 
-        for comp in self.components.iter_mut().rev() {
+        let comps = std::mem::take(&mut self.components);
+
+        let mut stopped_comps = join_all(comps.into_iter().enumerate().map(|(i, mut comp)| async move {
             comp.stop().await;
-        }
+            (i, comp)
+        }))
+        .await;
+
+        stopped_comps.sort_by_key(|(i, _)| *i);
+        self.components = stopped_comps.into_iter().map(|(_, comp)| comp).collect();
 
         let deps = std::mem::take(&mut self.dependencies);
 

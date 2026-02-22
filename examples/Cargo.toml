@@ -4,12 +4,25 @@ version = "0.1.0"
 edition = "2021"
 authors = ["David Pope"]
 description = "Examples using the arena framework. Intended as documentation and testing."
-license = "BSD-3-Clause"
+license = "todo"
+
+[lib]
+name = "arena_examples"
+path = "src/lib.rs"
+
+[[bin]]
+name = "arena-examples"
+path = "src/example-arena-console/main.rs"
+
+[[bin]]
+name = "web-app"
+path = "src/example-web-app/main.rs"
 
 [dependencies]
 arena = { workspace = true }
 arena-kafka = { workspace = true }
 arena-postgres = { workspace = true }
+arena-executable-component = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "net", "sync"] }
 env_logger = { workspace = true }
 log = { workspace = true }
@@ -18,4 +31,10 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 tokio-postgres = { workspace = true }
 rdkafka = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+async-trait = { workspace = true }
 futures = { workspace = true }
+futures-timer = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
