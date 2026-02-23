@@ -36,5 +36,10 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 futures-timer = { workspace = true }
 
+[[test]]
+name = "component_test"
+path = "tests/example-arena-component-test/component_test.rs"
+
 [dev-dependencies]
 rstest = { workspace = true }
+ctor = "0.4"
