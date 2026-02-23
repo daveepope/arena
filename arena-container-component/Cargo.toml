@@ -12,8 +12,11 @@ path = "src/lib.rs"
 [dependencies]
 arena = { workspace = true }
 async-trait = { workspace = true }
+bollard = { workspace = true }
 futures = { workspace = true }
 log = { workspace = true }
+tar = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
 mockall = { workspace = true }
