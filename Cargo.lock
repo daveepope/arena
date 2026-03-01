@@ -89,10 +89,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "arena-container"
+version = "0.1.0-alpha.1"
+dependencies = [
+ "bollard",
+ "log",
+]
+
+[[package]]
 name = "arena-container-component"
 version = "0.1.0-alpha.1"
 dependencies = [
  "arena",
+ "arena-container",
  "async-trait",
  "bollard",
  "env_logger",
@@ -108,6 +117,7 @@ name = "arena-examples"
 version = "0.1.0"
 dependencies = [
  "arena",
+ "arena-container-component",
  "arena-executable-component",
  "arena-kafka",
  "arena-postgres",
@@ -145,6 +155,7 @@ name = "arena-kafka"
 version = "0.1.0-alpha.1"
 dependencies = [
  "arena",
+ "arena-container",
  "async-trait",
  "env_logger",
  "futures",
@@ -160,6 +171,7 @@ name = "arena-postgres"
 version = "0.1.0-alpha.1"
 dependencies = [
  "arena",
+ "arena-container",
  "async-trait",
  "env_logger",
  "futures",

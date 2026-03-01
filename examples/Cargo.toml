@@ -23,6 +23,7 @@ arena = { workspace = true }
 arena-kafka = { workspace = true }
 arena-postgres = { workspace = true }
 arena-executable-component = { workspace = true }
+arena-container-component = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "net", "sync"] }
 env_logger = { workspace = true }
 log = { workspace = true }

@@ -14,6 +14,7 @@ pub struct PostgresDependencyBuilder {
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
     image_tag: Option<String>,
     container_name: Option<String>,
+    network: Option<String>,
     readiness_check: Option<Box<dyn ReadinessCheck>>,
 }
 
@@ -37,6 +38,7 @@ impl PostgresDependencyBuilder {
             dependencies: None,
             image_tag: None,
             container_name: None,
+            network: None,
             readiness_check: None,
         }
     }
@@ -96,6 +98,11 @@ impl PostgresDependencyBuilder {
         self
     }
 
+    pub fn with_network(mut self, network: impl Into<String>) -> Self {
+        self.network = Some(network.into());
+        self
+    }
+
     pub fn with_readiness_check<W>(mut self, check: W) -> Self
     where
         W: ReadinessCheck + 'static,
@@ -111,7 +118,7 @@ impl PostgresDependencyBuilder {
     pub fn build(self) -> PostgresDependency {
         let postgres_impl = self
             .postgres_impl
-            .unwrap_or_else(|| Box::new(PostgresContainerImpl::new()));
+            .unwrap_or_else(|| Box::new(PostgresContainerImpl::new(self.network)));
 
         let port = self.port.unwrap_or(Self::DEFAULT_PORT);
         let database_name = self
@@ -130,7 +137,7 @@ impl PostgresDependencyBuilder {
             .unwrap_or_else(|| Self::DEFAULT_IMAGE_TAG.to_string());
         let container_name = self.container_name;
         let readiness_check = self.readiness_check;
-    
+
         let mut dep = PostgresDependency::new(
             self.identifier,
             postgres_impl,

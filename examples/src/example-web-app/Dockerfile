@@ -12,6 +12,7 @@ COPY arena/Cargo.toml arena/Cargo.toml
 COPY arena-kafka/Cargo.toml arena-kafka/Cargo.toml
 COPY arena-postgres/Cargo.toml arena-postgres/Cargo.toml
 COPY arena-executable-component/Cargo.toml arena-executable-component/Cargo.toml
+COPY arena-container/Cargo.toml arena-container/Cargo.toml
 COPY arena-container-component/Cargo.toml arena-container-component/Cargo.toml
 COPY examples/Cargo.toml examples/Cargo.toml
 
@@ -20,6 +21,7 @@ RUN mkdir -p arena/src && echo "" > arena/src/lib.rs && \
     mkdir -p arena-kafka/src && echo "" > arena-kafka/src/lib.rs && \
     mkdir -p arena-postgres/src && echo "" > arena-postgres/src/lib.rs && \
     mkdir -p arena-executable-component/src && echo "" > arena-executable-component/src/lib.rs && \
+    mkdir -p arena-container/src && echo "" > arena-container/src/lib.rs && \
     mkdir -p arena-container-component/src && echo "" > arena-container-component/src/lib.rs && \
     mkdir -p examples/src && echo "" > examples/src/lib.rs && \
     mkdir -p examples/src/example-web-app && echo "fn main() {}" > examples/src/example-web-app/main.rs && \
@@ -32,10 +34,17 @@ COPY arena/ arena/
 COPY arena-kafka/ arena-kafka/
 COPY arena-postgres/ arena-postgres/
 COPY arena-executable-component/ arena-executable-component/
+COPY arena-container/ arena-container/
 COPY arena-container-component/ arena-container-component/
 COPY examples/ examples/
 
-RUN cargo build --release --bin web-app -p arena-examples
+RUN rm -rf target/release/.fingerprint/arena-* \
+           target/release/.fingerprint/arena_* \
+           target/release/deps/arena* \
+           target/release/deps/libarena* \
+           target/release/web-app \
+           target/release/libarena* && \
+    cargo build --release --bin web-app -p arena-examples
 
 # --- Runtime ---
 FROM debian:bookworm-slim

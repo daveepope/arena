@@ -3,7 +3,7 @@ use arena::component::RunnableComponent;
 use arena::healthcheck::ReadinessCheck;
 use crate::builder::ContainerComponentBuilder;
 use bollard::container::LogOutput;
-use bollard::models::{ContainerCreateBody, EndpointSettings, HostConfig, NetworkConnectRequest, PortBinding};
+use bollard::models::{ContainerCreateBody, EndpointSettings, HostConfig, NetworkingConfig, PortBinding};
 use bollard::query_parameters::{
     CreateContainerOptionsBuilder, LogsOptionsBuilder,
     RemoveContainerOptionsBuilder, StopContainerOptionsBuilder,
@@ -33,6 +33,8 @@ impl ContainerComponent {
     }
 
     async fn create_and_start_container(&mut self) {
+        arena_container::container::try_remove_existing_container(&self.identifier).await;
+
         log::info!(
             "[Component-{}] creating container from image '{}'",
             self.identifier, self.image_tag
@@ -75,12 +77,38 @@ impl ContainerComponent {
             host_config.port_bindings = Some(port_bindings);
         }
 
+        // If a network is specified, create the container directly on that
+        // network so Docker's embedded DNS (127.0.0.11) is configured from
+        // the start.  Using connect_network *after* creation leaves the
+        // container's /etc/resolv.conf pointing at the default bridge DNS
+        // which cannot resolve container names.
+        let mut networking_config: Option<NetworkingConfig> = None;
+
+        if let Some(ref network) = self.network {
+            arena_container::network::ensure_network_exists(network).await;
+
+            host_config.network_mode = Some(network.clone());
+
+            let endpoint_config = EndpointSettings {
+                aliases: self.network_alias.as_ref().map(|a| vec![a.clone()]),
+                ..Default::default()
+            };
+
+            let mut endpoints = HashMap::new();
+            endpoints.insert(network.clone(), endpoint_config);
+
+            networking_config = Some(NetworkingConfig {
+                endpoints_config: Some(endpoints),
+            });
+        }
+
         let body = ContainerCreateBody {
             image: Some(self.image_tag.clone()),
             env: if env.is_empty() { None } else { Some(env) },
             cmd: if cmd.is_empty() { None } else { Some(cmd) },
             exposed_ports: if exposed_ports.is_empty() { None } else { Some(exposed_ports) },
             host_config: Some(host_config),
+            networking_config,
             ..Default::default()
         };
 
@@ -98,34 +126,17 @@ impl ContainerComponent {
 
         self.container_id = Some(response.id.clone());
 
-        log::info!(
-            "[Component-{}] container created (id: {})",
-            self.identifier, &response.id[..12.min(response.id.len())]
-        );
-
-        if let Some(ref network) = self.network {
-            let endpoint_config = EndpointSettings {
-                aliases: self.network_alias.as_ref().map(|a| vec![a.clone()]),
-                ..Default::default()
-            };
-
-            let connect_request = NetworkConnectRequest {
-                container: Some(response.id.clone()),
-                endpoint_config: Some(endpoint_config),
-                ..Default::default()
-            };
-
-            self.docker
-                .connect_network(network, connect_request)
-                .await
-                .unwrap_or_else(|e| panic!(
-                    "[Component-{}] failed to connect to network '{}': {}",
-                    self.identifier, network, e
-                ));
-
+        if self.network.is_some() {
             log::info!(
-                "[Component-{}] connected to network '{}'",
-                self.identifier, network
+                "[Component-{}] container created on network '{}' (id: {})",
+                self.identifier,
+                self.network.as_deref().unwrap_or(""),
+                &response.id[..12.min(response.id.len())]
+            );
+        } else {
+            log::info!(
+                "[Component-{}] container created (id: {})",
+                self.identifier, &response.id[..12.min(response.id.len())]
             );
         }
 
@@ -286,6 +297,10 @@ impl RunnableComponent for ContainerComponent {
         log::info!("[Component-{}] stopping.", self.identifier);
 
         self.stop_container().await;
+
+        if let Some(ref network) = self.network {
+            arena_container::network::remove_network(network).await;
+        }
 
         log::info!("[Component-{}] stopped.", self.identifier);
 

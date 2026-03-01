@@ -4,9 +4,9 @@ use crate::container_component::ContainerComponent;
 use bollard::query_parameters::BuildImageOptionsBuilder;
 use bollard::{body_full, Docker};
 use futures::StreamExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-pub struct ContainerComponentBuilder {
+pub struct ContainerComponentBuilder { 
     identifier: String,
     children: Option<Vec<Component>>,
     dockerfile: String,
@@ -106,12 +106,16 @@ impl ContainerComponentBuilder {
         }
     }
 
+    const SKIP_DIRS: &'static [&'static str] = &[
+        ".git", "target", "node_modules", ".idea", ".vscode", ".arena",
+    ];
+
     fn create_build_context_tar(identifier: &str, dockerfile: &str, build_context: &Option<PathBuf>) -> Vec<u8> {
         let buf = Vec::new();
         let mut tar = tar::Builder::new(buf);
 
         let dockerfile_bytes = dockerfile.as_bytes();
-        let mut header = tar::Header::new_gnu();
+        let mut header = tar::Header::new_ustar();
         header.set_size(dockerfile_bytes.len() as u64);
         header.set_mode(0o644);
         header.set_cksum();
@@ -119,14 +123,86 @@ impl ContainerComponentBuilder {
             .expect("add Dockerfile to tar");
 
         if let Some(ref context_path) = build_context {
-            tar.append_dir_all(".", context_path)
-                .unwrap_or_else(|e| panic!(
-                    "[Component-{}] failed to add build context {:?} to tar: {}",
-                    identifier, context_path, e
-                ));
+            Self::append_dir_recursive(&mut tar, context_path, context_path, identifier);
         }
 
         tar.into_inner().expect("finalize tar archive")
+    }
+
+    fn append_dir_recursive(
+        tar: &mut tar::Builder<Vec<u8>>,
+        base_path: &Path,
+        current_path: &Path,
+        identifier: &str,
+    ) {
+        let entries = match std::fs::read_dir(current_path) {
+            Ok(entries) => entries,
+            Err(e) => {
+                log::warn!(
+                    "[Component-{}] skipping unreadable directory {:?}: {}",
+                    identifier, current_path, e
+                );
+                return;
+            }
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+
+            if name_str.starts_with('.') || Self::SKIP_DIRS.contains(&name_str.as_ref()) {
+                continue;
+            }
+
+            let relative = match path.strip_prefix(base_path) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+
+            let metadata = match std::fs::metadata(&path) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+
+            if metadata.is_dir() {
+                let mut header = tar::Header::new_ustar();
+                header.set_entry_type(tar::EntryType::Directory);
+                header.set_size(0);
+                header.set_mode(0o755);
+                header.set_cksum();
+                if let Err(e) = tar.append_data(&mut header, relative, &[] as &[u8]) {
+                    log::warn!(
+                        "[Component-{}] skipping directory {:?}: {}",
+                        identifier, relative, e
+                    );
+                    continue;
+                }
+                Self::append_dir_recursive(tar, base_path, &path, identifier);
+            } else if metadata.is_file() {
+                let content = match std::fs::read(&path) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        log::warn!(
+                            "[Component-{}] skipping file {:?}: {}",
+                            identifier, relative, e
+                        );
+                        continue;
+                    }
+                };
+                let mut header = tar::Header::new_ustar();
+                header.set_size(content.len() as u64);
+                header.set_mode(0o644);
+                header.set_cksum();
+                if let Err(e) = tar.append_data(&mut header, relative, content.as_slice()) {
+                    log::warn!(
+                        "[Component-{}] skipping file {:?}: {}",
+                        identifier, relative, e
+                    );
+                }
+            }
+            // Symlinks and special files are intentionally skipped
+        }
     }
 
     async fn build_image(identifier: &str, dockerfile: &str, image_tag: &str, build_context: &Option<PathBuf>, docker: &Docker) {

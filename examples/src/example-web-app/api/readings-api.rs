@@ -224,7 +224,7 @@ impl ExampleAxumWebApp {
                 kafka_topic: self.kafka_topic,
             });
 
-        let addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+        let addr: SocketAddr = format!("0.0.0.0:{}", port).parse()?;
         let listener = tokio::net::TcpListener::bind(addr).await?;
         log::info!("listening on http://{addr}");
 

@@ -1,0 +1,14 @@
+[package]
+name = "arena-container"
+version = "0.1.0-alpha.1"
+edition = "2021"
+authors = ["David Pope"]
+description = "Shared container utilities for Arena modules that manage containers (networking, lifecycle helpers, etc.)."
+license = "todo"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+bollard = { workspace = true }
+log = { workspace = true }
