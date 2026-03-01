@@ -8,6 +8,7 @@ license = "todo"
 
 [dependencies]
 arena = { workspace = true }
+arena-container = { workspace = true }
 async-trait = { workspace = true }
 testcontainers-modules = { workspace = true, features = ["postgres"] }
 log = { workspace = true }

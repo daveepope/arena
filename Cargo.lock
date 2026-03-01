@@ -89,15 +89,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "arena-container"
+version = "0.1.0-alpha.1"
+dependencies = [
+ "bollard",
+ "log",
+]
+
+[[package]]
 name = "arena-container-component"
 version = "0.1.0-alpha.1"
 dependencies = [
  "arena",
+ "arena-container",
  "async-trait",
+ "bollard",
  "env_logger",
  "futures",
  "log",
  "mockall",
+ "tar",
  "tokio",
 ]
 
@@ -106,11 +117,13 @@ name = "arena-examples"
 version = "0.1.0"
 dependencies = [
  "arena",
+ "arena-container-component",
  "arena-executable-component",
  "arena-kafka",
  "arena-postgres",
  "async-trait",
  "axum",
+ "ctor",
  "env_logger",
  "futures",
  "futures-timer",
@@ -142,6 +155,7 @@ name = "arena-kafka"
 version = "0.1.0-alpha.1"
 dependencies = [
  "arena",
+ "arena-container",
  "async-trait",
  "env_logger",
  "futures",
@@ -157,6 +171,7 @@ name = "arena-postgres"
 version = "0.1.0-alpha.1"
 dependencies = [
  "arena",
+ "arena-container",
  "async-trait",
  "env_logger",
  "futures",
@@ -477,6 +492,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctor"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec09e802f5081de6157da9a75701d6c713d8dc3ba52571fd4bd25f412644e8a6"
+dependencies = [
+ "ctor-proc-macro",
+ "dtor",
+]
+
+[[package]]
+name = "ctor-proc-macro"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2931af7e13dc045d8e9d26afccc6fa115d64e115c9c84b1166288b46f6782c2"
+
+[[package]]
 name = "darling"
 version = "0.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -559,6 +590,21 @@ name = "downcast"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
+
+[[package]]
+name = "dtor"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97cbdf2ad6846025e8e25df05171abfb30e3ababa12ee0a0e44b9bbe570633a8"
+dependencies = [
+ "dtor-proc-macro",
+]
+
+[[package]]
+name = "dtor-proc-macro"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7454e41ff9012c00d53cf7f475c5e3afa3b91b7c90568495495e8d9bf47a1055"
 
 [[package]]
 name = "dyn-clone"
@@ -2456,6 +2502,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "tar"
+version = "0.4.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d863878d212c87a19c1a610eb53bb01fe12951c0501cf5a0d65f724914a667a"
+dependencies = [
+ "filetime",
+ "libc",
+ "xattr",
 ]
 
 [[package]]

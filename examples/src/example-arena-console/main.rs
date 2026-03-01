@@ -1,8 +1,10 @@
 use arena::{ClosedArena, Component, Dependency, Encounter, EncounterTrait};
-use arena_kafka::{KafkaDependency, KafkaFlavor};
+use arena_kafka::{KafkaDependency, KafkaFlavor, KAFKA_INTERNAL_DOCKER_PORT};
 use arena_postgres::PostgresDependency;
-use env_logger::Env;
+use arena_container_component::container_component::ContainerComponent;
 use arena_executable_component::executable_component::ExecutableComponent;
+use arena_examples::http_healthcheck::HttpReadinessCheck;
+use env_logger::Env;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
@@ -17,9 +19,45 @@ const DB_USER: &str = "my_user";
 const DB_PASS: &str = "my_password";
 const KAFKA_PORT: u16 = 9092;
 const KAFKA_TOPIC: &str = "readings";
-const WEB_APP_PORT: u16 = 3000;
+const WEB_APP_PORT: u16 = 3001;
 
-fn setup_arena_components() -> Vec<Component> {
+const NETWORK_NAME: &str = "arena-example-network";
+const POSTGRES_CONTAINER_NAME: &str = "arena-example-postgres";
+const KAFKA_CONTAINER_NAME: &str = "arena-example-kafka";
+
+async fn setup_arena_components() -> Vec<Component> {
+    let dockerfile = include_str!("../example-web-app/Dockerfile");
+
+    let web_app = ContainerComponent::builder("arena-example-web-app", dockerfile)
+        .with_build_context(".")
+        .with_image_tag("arena-example-web-app")
+        .with_port_mapping(WEB_APP_PORT, 3000)
+        .with_env_var("RUST_LOG", "debug")
+        .with_runtime_arg("web_app_port", "3000")
+        .with_runtime_arg(
+            "postgres_connection_string",
+            format!(
+                "host={} port=5432 user={} password={} dbname={}",
+                POSTGRES_CONTAINER_NAME, DB_USER, DB_PASS, DB_NAME
+            ),
+        )
+        .with_runtime_arg(
+            "kafka_bootstrap",
+            format!("{}:{}", KAFKA_CONTAINER_NAME, KAFKA_INTERNAL_DOCKER_PORT),
+        )
+        .with_network(NETWORK_NAME)
+        .with_readiness_check(
+            HttpReadinessCheck::new(),
+            format!("http://localhost:{}/readings", WEB_APP_PORT),
+        )
+        .build()
+        .await;
+
+    vec![Box::new(web_app)]
+}
+
+#[allow(dead_code)]
+fn setup_executable_arena_components() -> Vec<Component> {
     vec![Box::new(
         ExecutableComponent::builder("arena example web app")
             .with_source_path("examples")
@@ -50,6 +88,8 @@ fn setup_arena_dependencies() -> Vec<Dependency> {
             .with_database_name(DB_NAME)
             .with_database_username(DB_USER)
             .with_database_password(DB_PASS)
+            .with_container_name(POSTGRES_CONTAINER_NAME)
+            .with_network(NETWORK_NAME)
             .with_startup_sql_scripts(startup_sql_scripts)
             .build(),
     );
@@ -58,6 +98,8 @@ fn setup_arena_dependencies() -> Vec<Dependency> {
         KafkaDependency::builder("arena example kafka")
             .with_flavor(KafkaFlavor::ApacheNative)
             .with_port(KAFKA_PORT)
+            .with_container_name(KAFKA_CONTAINER_NAME)
+            .with_network(NETWORK_NAME)
             .build(),
     );
 
@@ -185,7 +227,7 @@ async fn main() {
     .init();
 
     let dependencies = setup_arena_dependencies();
-    let components = setup_arena_components();
+    let components = setup_arena_components().await;
     let encounters: Vec<Box<dyn EncounterTrait>> = vec![Box::new( Encounter::new("End to end happy path encounter", dependencies, components))];
     let closed_arena = ClosedArena::new(String::from("Example Arena"), encounters);
     
@@ -202,4 +244,6 @@ async fn main() {
     let _consumer_handle = create_output_kafka_consumer(&kafka_bootstrap, KAFKA_TOPIC);
 
     tokio::signal::ctrl_c().await.unwrap();
+
+    drop(open_arena);
 }

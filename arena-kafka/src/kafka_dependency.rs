@@ -1,6 +1,8 @@
 mod healthcheck;
 pub(crate) mod container_impl;
 
+pub use container_impl::KAFKA_INTERNAL_DOCKER_PORT;
+
 use arena::healthcheck::ReadinessCheck;
 use arena::dependency::RunnableDependency;
 use async_trait::async_trait;
@@ -36,6 +38,7 @@ pub struct KafkaDependency {
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
     running: bool,
     image_tag: String,
+    container_name: Option<String>,
     readiness_check: Box<dyn ReadinessCheck>,
 }
 
@@ -45,7 +48,8 @@ impl KafkaDependency {
         kafka_impl: Box<dyn KafkaImpl>,
         port: u16,
         dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
-        image_tag: String
+        image_tag: String,
+        container_name: Option<String>,
     ) -> Self {
         KafkaDependency {
             identifier,
@@ -53,6 +57,7 @@ impl KafkaDependency {
             port,
             dependencies,
             image_tag,
+            container_name,
             running: false,
             readiness_check: Box::new(DefaultKafkaReadinessCheck)
         }
@@ -154,7 +159,8 @@ impl RunnableDependency for KafkaDependency {
         }
 
         let image_tag = self.image_tag.clone();
-        let container_name = self.set_container_name();
+        let container_name = self.container_name.clone()
+            .unwrap_or_else(|| self.set_container_name());
 
         let sw_container = Instant::now();
         self.kafka_impl

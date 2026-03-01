@@ -23,11 +23,12 @@ pub trait PostgresImpl: Send + Sync {
 pub(crate) struct PostgresContainerImpl {
     container: Option<testcontainers::core::ContainerAsync<postgres::Postgres>>,
     connection_string: Option<String>,
+    network: Option<String>,
 }
 
 impl PostgresContainerImpl {
-    pub(crate) fn new() -> Self {
-        Self { container: None, connection_string: None }
+    pub(crate) fn new(network: Option<String>) -> Self {
+        Self { container: None, connection_string: None, network }
     }
 }
 
@@ -46,6 +47,8 @@ impl PostgresImpl for PostgresContainerImpl {
             return;
         }
 
+        arena_container::container::try_remove_existing_container(container_name).await;
+
         const DEFAULT_CONTAINER_PORT: u16 = 5432;
 
         let healthcheck = Healthcheck::cmd_shell(format!(
@@ -55,14 +58,23 @@ impl PostgresImpl for PostgresContainerImpl {
         .with_timeout(Duration::from_secs(1))
         .with_retries(40u32);
 
-        let container = postgres::Postgres::default()
+        let image = postgres::Postgres::default()
             .with_db_name(database_name)
             .with_user(database_username)
-            .with_password(database_password)
+            .with_password(database_password);
+
+        let mut request = image
             .with_mapped_port(port, ContainerPort::from(DEFAULT_CONTAINER_PORT))
             .with_health_check(healthcheck)
             .with_tag(image_tag)
-            .with_container_name(container_name)
+            .with_container_name(container_name);
+
+        if let Some(ref network) = self.network {
+            arena_container::network::ensure_network_exists(network).await;
+            request = request.with_network(network);
+        }
+
+        let container = request
             .start()
             .await
             .expect("start postgres container");
@@ -90,6 +102,10 @@ impl PostgresImpl for PostgresContainerImpl {
         self.container.take();
         self.connection_string = None;
         log::info!("[PostgresImpl] stopped container.");
+
+        if let Some(ref network) = self.network {
+            arena_container::network::remove_network(network).await;
+        }
     }
 
     fn connection_string(&self) -> Option<&str> {

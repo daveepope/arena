@@ -16,7 +16,9 @@ pub struct KafkaDependencyBuilder {
     port: Option<u16>,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
     image_tag: Option<String>,
-    readiness_check: Option<Box<dyn ReadinessCheck>>
+    container_name: Option<String>,
+    network: Option<String>,
+    readiness_check: Option<Box<dyn ReadinessCheck>>,
 }
 
 impl KafkaDependencyBuilder {
@@ -34,7 +36,9 @@ impl KafkaDependencyBuilder {
             port: None,
             dependencies: None,
             image_tag: None,
-            readiness_check: None
+            container_name: None,
+            network: None,
+            readiness_check: None,
         }
     }
 
@@ -85,6 +89,16 @@ impl KafkaDependencyBuilder {
         self.with_image_tag(image_tag)
     }
 
+    pub fn with_container_name(mut self, container_name: impl Into<String>) -> Self {
+        self.container_name = Some(container_name.into());
+        self
+    }
+
+    pub fn with_network(mut self, network: impl Into<String>) -> Self {
+        self.network = Some(network.into());
+        self
+    }
+
     pub fn build(self) -> KafkaDependency {
         let KafkaDependencyBuilder {
             identifier,
@@ -93,7 +107,9 @@ impl KafkaDependencyBuilder {
             port,
             dependencies,
             image_tag,
-            readiness_check
+            container_name,
+            network,
+            readiness_check,
         } = self;
 
         let (default_port, default_tag) = match flavor {
@@ -102,9 +118,9 @@ impl KafkaDependencyBuilder {
         };
 
         let kafka_impl = kafka_impl.unwrap_or_else(|| match flavor {
-            KafkaFlavor::ApacheNative => Box::new(KafkaContainerImpl::new()) as Box<dyn KafkaImpl>,
+            KafkaFlavor::ApacheNative => Box::new(KafkaContainerImpl::new(network)) as Box<dyn KafkaImpl>,
             KafkaFlavor::Confluent => {
-                Box::new(ConfluentKafkaContainerImpl::new()) as Box<dyn KafkaImpl>
+                Box::new(ConfluentKafkaContainerImpl::new(network)) as Box<dyn KafkaImpl>
             }
         });
 
@@ -112,7 +128,7 @@ impl KafkaDependencyBuilder {
         let image_tag = image_tag.unwrap_or_else(|| default_tag.to_string());
 
         let mut dep =
-            KafkaDependency::new(identifier, kafka_impl, port, dependencies, image_tag );
+            KafkaDependency::new(identifier, kafka_impl, port, dependencies, image_tag, container_name);
 
         if let Some(check) = readiness_check {
             dep.set_readiness_check(check);
