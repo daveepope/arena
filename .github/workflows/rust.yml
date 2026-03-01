@@ -32,10 +32,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Build all crates (debug + release)
-        run: |
-          cargo build --verbose --workspace
-          cargo build --verbose --workspace --release
+      - name: Build all crates (release)
+        run: cargo build --verbose --workspace --release
 
       - name: Run unit tests
         run: cargo test --verbose --workspace --exclude arena-examples
