@@ -19,5 +19,6 @@ crate.from_cargo(
     name = "crates",
     cargo_lockfile = "//:Cargo.lock",
     manifests = ["//:Cargo.toml"],
+    lockfile = "//:Cargo.Bazel.lock",
 )
 use_repo(crate, "crates")
