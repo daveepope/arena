@@ -1,2 +1,7 @@
 /target
 .idea/
+
+/bazel-bin
+/bazel-out
+/bazel-testlogs
+/bazel-arena
