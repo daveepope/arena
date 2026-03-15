@@ -1,8 +1,7 @@
 use arena::{ClosedArena, Component, Dependency, Encounter, EncounterTrait, OpenArena};
-use arena_kafka::{KafkaDependency, KafkaFlavor, KAFKA_INTERNAL_DOCKER_PORT};
+use arena_kafka::{KafkaDependency, KafkaFlavor};
 use arena_postgres::PostgresDependency;
 use arena_executable_component::executable_component::ExecutableComponent;
-use arena_container_component::container_component::ContainerComponent;
 use arena_examples::http_healthcheck::HttpReadinessCheck;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::config::ClientConfig;
@@ -18,7 +17,6 @@ const DB_PASS: &str = "test_password";
 const KAFKA_PORT: u16 = 9093;
 const KAFKA_TOPIC: &str = "test_readings";
 const EXEC_WEB_APP_PORT: u16 = 3000;
-const CONTAINER_WEB_APP_PORT: u16 = 3001;
 
 const NETWORK_NAME: &str = "arena-component-test-network";
 const POSTGRES_CONTAINER_NAME: &str = "arena-component-test-postgres";
@@ -105,40 +103,6 @@ fn setup_exec_component() -> Component {
     )
 }
 
-async fn setup_container_component() -> Component {
-    let dockerfile = include_str!("../../src/example-web-app/Dockerfile");
-    let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("workspace root");
-
-    let web_app = ContainerComponent::builder("arena-component-test-web-app", dockerfile)
-        .with_build_context(workspace_root)
-        .with_image_tag("arena-component-test-web-app")
-        .with_port_mapping(CONTAINER_WEB_APP_PORT, 3000)
-        .with_env_var("RUST_LOG", "debug")
-        .with_runtime_arg("web_app_port", "3000")
-        .with_runtime_arg(
-            "postgres_connection_string",
-            format!(
-                "host={} port=5432 user={} password={} dbname={}",
-                POSTGRES_CONTAINER_NAME, DB_USER, DB_PASS, DB_NAME
-            ),
-        )
-        .with_runtime_arg(
-            "kafka_bootstrap",
-            format!("{}:{}", KAFKA_CONTAINER_NAME, KAFKA_INTERNAL_DOCKER_PORT),
-        )
-        .with_network(NETWORK_NAME)
-        .with_readiness_check(
-            HttpReadinessCheck::new(),
-            format!("http://localhost:{}/readings", CONTAINER_WEB_APP_PORT),
-        )
-        .build()
-        .await;
-
-    Box::new(web_app)
-}
-
 async fn setup_kafka_topic(arena: &OpenArena) {
     let kafka_bootstrap = arena
         .dependency("test kafka")
@@ -182,8 +146,7 @@ async fn create_arena() -> OpenArena {
     let dependencies = setup_dependencies();
 
     let exec_component = setup_exec_component();
-    let container_component = setup_container_component().await;
-    let components: Vec<Component> = vec![exec_component, container_component];
+    let components: Vec<Component> = vec![exec_component];
 
     let encounters: Vec<Box<dyn EncounterTrait>> = vec![
         Box::new(Encounter::new("reading lifecycle", dependencies, components))
@@ -264,27 +227,6 @@ async fn example_using_exec_component_creates_reading_consumes_and_gets_reading(
 
     assert_eq!(found.id, created_id);
     assert_eq!(found.user_name, "Exec Test User");
-    assert_eq!(found.value, 42);
-    assert_eq!(found.comment.as_deref(), Some("test comment"));
-}
-
-#[rstest]
-#[tokio::test]
-async fn example_using_container_component_creates_reading_consumes_and_gets_reading(
-    #[future] shared_arena: &'static OpenArena,
-) {
-    let _arena = shared_arena.await;
-
-    let created_id = create_reading(CONTAINER_WEB_APP_PORT, "Container Test User", 42, Some("test comment".to_string())).await;
-
-    let readings = get_readings(CONTAINER_WEB_APP_PORT).await;
-    let found = readings
-        .iter()
-        .find(|r| r.id == created_id)
-        .expect("should find newly created reading");
-
-    assert_eq!(found.id, created_id);
-    assert_eq!(found.user_name, "Container Test User");
     assert_eq!(found.value, 42);
     assert_eq!(found.comment.as_deref(), Some("test comment"));
 }

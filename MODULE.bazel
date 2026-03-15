@@ -10,6 +10,7 @@ rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2021",
     versions = ["1.92.0"],
+    extra_rustc_flags = ["-Clink-arg=-fuse-ld=bfd"],
 )
 use_repo(rust, "rust_toolchains")
 register_toolchains("@rust_toolchains//:all")
