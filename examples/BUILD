@@ -17,6 +17,20 @@ rust_library(
 )
 
 rust_binary(
+    name = "web-app",
+    srcs = glob(["src/example-web-app/**/*.rs"]),
+    edition = "2021",
+    deps = all_crate_deps(normal = True) + [
+        ":arena_examples",
+        "//arena",
+        "//arena-kafka:arena_kafka",
+        "//arena-postgres:arena_postgres",
+    ],
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    visibility = ["//visibility:public"],
+)
+
+rust_binary(
     name = "arena-examples-bin",
     srcs = ["src/example-arena-console/main.rs"],
     compile_data = [
@@ -43,9 +57,8 @@ rust_test(
     tags = ["local"],
     compile_data = [
         "resources/instrument_reading_db_schema.sql",
-        "src/example-web-app/Dockerfile",
-        "Cargo.toml",
     ],
+    data = [":web-app"],
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,

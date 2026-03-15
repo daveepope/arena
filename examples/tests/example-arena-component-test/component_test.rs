@@ -80,27 +80,39 @@ fn setup_dependencies() -> Vec<Dependency> {
     vec![postgres_db, kafka]
 }
 
+fn resolve_web_app_binary() -> String {
+    if let Ok(runfiles) = std::env::var("RUNFILES_DIR") {
+        return format!("{runfiles}/_main/examples/web-app");
+    }
+    "target/release/web-app".to_string()
+}
+
 fn setup_exec_component() -> Component {
     let healthcheck_url = format!("http://127.0.0.1:{}/readings", EXEC_WEB_APP_PORT);
+    let binary = resolve_web_app_binary();
+    let is_bazel = std::env::var("RUNFILES_DIR").is_ok();
 
-    Box::new(
-        ExecutableComponent::builder("test web app (exec)")
-            .with_source_path("examples")
-            .with_build_tool(arena_executable_component::BuildTool::Cargo)
-            .with_executable_path("target/release/web-app")
-            .with_env_var("RUST_LOG", "info")
-            .with_runtime_arg("web_app_port", EXEC_WEB_APP_PORT.to_string())
-            .with_runtime_arg(
-                "postgres_connection_string",
-                format!(
-                    "host=localhost port={} user={} password={} dbname={}",
-                    POSTGRES_PORT, DB_USER, DB_PASS, DB_NAME
-                )
+    let mut builder = ExecutableComponent::builder("test web app (exec)")
+        .with_executable_path(binary)
+        .with_env_var("RUST_LOG", "info")
+        .with_runtime_arg("web_app_port", EXEC_WEB_APP_PORT.to_string())
+        .with_runtime_arg(
+            "postgres_connection_string",
+            format!(
+                "host=localhost port={} user={} password={} dbname={}",
+                POSTGRES_PORT, DB_USER, DB_PASS, DB_NAME
             )
-            .with_runtime_arg("kafka_bootstrap", format!("localhost:{}", KAFKA_PORT))
-            .with_readiness_check(HttpReadinessCheck::new(), healthcheck_url)
-            .build()
-    )
+        )
+        .with_runtime_arg("kafka_bootstrap", format!("localhost:{}", KAFKA_PORT))
+        .with_readiness_check(HttpReadinessCheck::new(), healthcheck_url);
+
+    if !is_bazel {
+        builder = builder
+            .with_source_path("examples")
+            .with_build_tool(arena_executable_component::BuildTool::Cargo);
+    }
+
+    Box::new(builder.build())
 }
 
 async fn setup_kafka_topic(arena: &OpenArena) {
