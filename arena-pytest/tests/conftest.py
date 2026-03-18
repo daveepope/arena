@@ -18,9 +18,9 @@ DB_USER = "test_user"
 DB_PASS = "test_password"
 KAFKA_PORT = 9093
 EXEC_WEB_APP_PORT = 3000
-NETWORK_NAME = "arena-component-test-network"
-POSTGRES_CONTAINER_NAME = "arena-component-test-postgres"
-KAFKA_CONTAINER_NAME = "arena-component-test-kafka"
+NETWORK_NAME = "arena-pytest-network"
+POSTGRES_CONTAINER_NAME = "arena-pytest-postgres"
+KAFKA_CONTAINER_NAME = "arena-pytest-kafka"
 KAFKA_TOPIC = "readings"
 
 
