@@ -127,6 +127,9 @@ await open_arena.close()
 
 MIT. See [LICENSE](LICENSE).
 
+## Creator and Author
+David Pope
+
 This project may not be used to train AI models. See [AI.md](AI.md).
 
 ## Contributing
