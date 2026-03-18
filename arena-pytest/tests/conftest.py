@@ -12,12 +12,12 @@ from arena_pytest import (
     PostgresDependencyBuilder,
 )
 
-POSTGRES_PORT = 5555
+POSTGRES_PORT = 5556
 DB_NAME = "test_database"
 DB_USER = "test_user"
 DB_PASS = "test_password"
-KAFKA_PORT = 9093
-EXEC_WEB_APP_PORT = 3000
+KAFKA_PORT = 9094
+EXEC_WEB_APP_PORT = 3001
 NETWORK_NAME = "arena-pytest-network"
 POSTGRES_CONTAINER_NAME = "arena-pytest-postgres"
 KAFKA_CONTAINER_NAME = "arena-pytest-kafka"
