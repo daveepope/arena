@@ -2,17 +2,17 @@
 
 ![Arena logo](./arena-logo.png)
 
-Arena is a cross-platform sandboxing framework written in Rust, built for speed. This is a Bazel project first. Arena supports multiple developer use cases but is mainly used for repeatable, deterministic component tests with a fast feedback loop. It can be used to stand up any sandboxed environment. It provides a common FFI layer and top-level clients for Python, Java, Go, and .NET. Use it to spin up isolated test environments with dependencies like Postgres and Kafka, run components against them, and tear down cleanly.
+Arena is a cross-platform sandboxing framework. Arena supports multiple developer focused use cases but is mainly used for creating repeatable, deterministic component tests with a fast feedback loop. It can be used to stand up sandboxed environments outside of testing scenarios. It provides top-level clients for Python, Java, Go, and .NET.
 
 ## Overview
 
-Arena models tests as encounters: a set of dependencies (containers) and components (services under test) that start together, run, and stop together. Dependencies are managed via Docker. Components can be executables or containers.
+Arena models a sandbox ussing the concept of encounters: a set of dependencies and components (applications under test).
 
-The core is implemented in Rust. Language clients call the shared library through the FFI layer. The Python client (arena-pytest) is available; Java, Go, and .NET clients are planned.
+The core framework is implemented in Rust. Clients call the core framework library through a C FFI layer. The Python client (arena-pytest) is available; Java, Go, and .NET clients are planned.
 
 ## Performance
 
-Arena is built for speed. Dependencies and components start and stop in parallel. Within an encounter, all dependencies start concurrently, then all components start concurrently. On teardown, components stop first (in parallel), then dependencies (in parallel). Dependencies can declare child dependencies; the tree is respected so children start before parents and stop after them. This keeps setup and teardown time low even with many services.
+Arena is built for speed. Dependencies and components start and stop in parallel. Within an encounter, all dependencies start concurrently using the simple concept of dependency trees where dependencies can declare child dependencies; the tree is respected so children start before parents and stop after them. This keeps setup and teardown time low even with many services.
 
 Bazel runs tests in parallel and streams logs during execution. For Cargo, use `cargo testv` or `cargo test -- --nocapture` to stream output. For pytest, use `-s` to disable capture.
 
