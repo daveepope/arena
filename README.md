@@ -2,19 +2,19 @@
 
 ![Arena logo](./arena-logo.png)
 
-Arena is a cross-platform sandboxing framework. Arena supports multiple developer focused use cases but is mainly used for creating repeatable, deterministic component tests with a fast feedback loop. It can be used to stand up sandboxed environments outside of testing scenarios. It provides top-level clients for Python, Java, Go, and .NET.
+Arena is a cross-platform sandboxing framework. Arena supports multiple developer focused use cases. While the core Arena framework is not a teating it was designed to streamline the creation used of repeatable, deterministic component tests with a fast feedback loop. It can be used to stand up sandboxed environments outside of testing scenarios also. It provides top-level clients for Python, Java, Go, and .NET. These top level clients include plugins and extenstions for popular unit testing frameworks.
 
 ## Overview
 
-Arena models a sandbox ussing the concept of encounters: a set of dependencies and components (applications under test).
+Arena models a sandbox ussing the concept of encounters to manage the lifecycle of a set of dependencies and components (applications under test).
 
-The core framework is implemented in Rust. Clients call the core framework library through a C FFI layer. The Python client (arena-pytest) is available; Java, Go, and .NET clients are planned.
+The core framework is implemented in Rust. Clients call the core framework library through a C FFI layer which is completly hidden from application developers. The Python client (arena-pytest) is available; Java, Go, and .NET clients are planned.
 
 ## Performance
 
-Arena is built for speed. Dependencies and components start and stop in parallel. Within an encounter, all dependencies start concurrently using the simple concept of dependency trees where dependencies can declare child dependencies; the tree is respected so children start before parents and stop after them. This keeps setup and teardown time low even with many services.
+Arena is built for speed and efficiency. Within an encounter, all dependencies start concurrently using the simple concept of dependency trees where dependencies can declare children; the tree is respected so children start before parents and stop after them. This keeps setup and teardown time low even with many services. The same concept applies to component trees where one component starts before another where a dependency relationship exists.
 
-Bazel runs tests in parallel and streams logs during execution. For Cargo, use `cargo testv` or `cargo test -- --nocapture` to stream output. For pytest, use `-s` to disable capture.
+Bazel build is used to build and runs tests in parallel and streams logs during execution. All runtimes are built and tested together, e.g. rust, python ett. For Cargo, use `cargo testv` or `cargo test -- --nocapture` to stream output. For pytest, use `-s` to disable capture.
 
 ## Prerequisites
 
