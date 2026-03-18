@@ -12,8 +12,8 @@ if _SRC not in sys.path:
 
 import requests
 
-from conftest import EXEC_WEB_APP_PORT, KAFKA_PORT
-
+EXEC_WEB_APP_PORT = 3001
+KAFKA_PORT = 9094
 BASE_URL = f"http://127.0.0.1:{EXEC_WEB_APP_PORT}"
 
 
