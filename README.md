@@ -127,11 +127,11 @@ await open_arena.close()
 
 MIT. See [LICENSE](LICENSE).
 
+This project may not be used to train AI models. See [AI.md](AI.md).
+
 ## Creator and Author
 David Pope
 
-This project may not be used to train AI models. See [AI.md](AI.md).
-
 ## Contributing
 
-Open an issue or pull request. Ensure tests pass before submitting. No AI-generated PRs or slop. Suspected AI-generated PRs will be closed. Abuse of the PR process will result in being blocked from contributing in the future.
+Contributions are welcome and encouraged. Open an issue or pull request. Ensure tests pass before submitting. While its okay to use AI to assist in development, please do not submit PRs completely created by AI as these tend to contain incohernet changes (aka hallucinations/ slop). Thank you kindly!
