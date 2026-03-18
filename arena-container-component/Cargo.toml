@@ -1,0 +1,25 @@
+[package]
+name = "arena-container-component"
+version = "0.1.0-alpha.1"
+edition = "2021"
+authors = ["David Pope"]
+description = "The Arena Container Component module containing centrally managed component implmentations that manage a build and manage a running container."
+license = "todo"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+arena = { workspace = true }
+arena-container = { workspace = true }
+async-trait = { workspace = true }
+bollard = { workspace = true }
+futures = { workspace = true }
+log = { workspace = true }
+tar = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+mockall = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+env_logger = { workspace = true }

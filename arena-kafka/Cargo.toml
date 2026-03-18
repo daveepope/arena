@@ -1,0 +1,21 @@
+[package]
+name = "arena-kafka"
+version = "0.1.0-alpha.1"
+edition = "2021"
+authors = ["David Pope"]
+description = "Arena Kafka implmentation"
+license = "todo"
+
+[dependencies]
+arena = { workspace = true }
+arena-container = { workspace = true }
+async-trait = { workspace = true }
+testcontainers-modules = { workspace = true, features = ["kafka"] }
+log = { workspace = true }
+futures-timer = { workspace = true }
+rdkafka = { workspace = true }
+futures = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+env_logger = { workspace = true }

@@ -1,0 +1,20 @@
+[package]
+name = "arena"
+version = "0.1.0-alpha.1"
+edition = "2021"
+authors = ["David Pope"]
+description = "The base Arena module containing contracts and core Arena behaviour."
+license = "todo"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+async-trait = { workspace = true }
+futures = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+mockall = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+env_logger = { workspace = true }

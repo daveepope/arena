@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+    "arena-postgres",
+    "arena",
+    "arena-kafka",
+    "arena-executable-component",
+    "arena-container",
+    "arena-container-component",
+    "arena-ffi",
+    "examples"
+]
+
+[workspace.dependencies]
+arena = { path = "arena", version = "0.1.0-alpha.1" }
+arena-kafka = { path = "arena-kafka", version = "0.1.0-alpha.1" }
+arena-postgres = { path = "arena-postgres", version = "0.1.0-alpha.1" }
+arena-executable-component = { path = "arena-executable-component", version = "0.1.0-alpha.1" }
+arena-container = { path = "arena-container", version = "0.1.0-alpha.1" }
+arena-container-component = { path = "arena-container-component", version = "0.1.0-alpha.1" }
+axum = "0.8.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio-postgres = "0.7"
+postgres = "0.19"
+rdkafka = { version = "0.39.0" }
+backon = "1.5.2"
+async-trait = "0.1"
+env_logger = "0.11"
+futures = "0.3"
+futures-timer = "3.0.3"
+log = "0.4"
+testcontainers-modules = "0.14.0"
+tokio = "1"
+mockall = "0.14.0"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+rstest = "0.22"
+bollard = "0.19"
+tar = "0.4"

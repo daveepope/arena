@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: arena-pytest
+Version: 0.1.0a1
+Summary: pytest API and fixtures for Arena (via the C FFI)
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: pytest>=7.0.0
+Requires-Dist: pytest-asyncio>=0.21.0
+Requires-Dist: requests>=2.28.0
+Requires-Dist: kafka-python>=2.0.0
+Provides-Extra: dev
