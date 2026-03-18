@@ -151,6 +151,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "arena-ffi"
+version = "0.1.0-alpha.1"
+dependencies = [
+ "arena",
+ "arena-executable-component",
+ "arena-kafka",
+ "arena-postgres",
+ "env_logger",
+ "indexmap 2.12.1",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "arena-kafka"
 version = "0.1.0-alpha.1"
 dependencies = [

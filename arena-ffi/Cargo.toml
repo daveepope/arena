@@ -1,0 +1,19 @@
+[package]
+name = "arena-ffi"
+version = "0.1.0-alpha.1"
+edition = "2021"
+description = "C FFI layer for the Arena framework"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+arena = { workspace = true }
+indexmap = { version = "2", features = ["serde"] }
+arena-executable-component = { workspace = true }
+arena-kafka = { workspace = true }
+arena-postgres = { workspace = true }
+env_logger = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }

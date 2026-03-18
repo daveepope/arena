@@ -208,7 +208,7 @@ impl RunnableDependency for PostgresDependency {
             dep.start().await;
         }
 
-        let scripts = self.startup_sql_scripts.take();
+        let scripts = self.startup_sql_scripts.clone();
         let database_name = self.database_name.clone();
         let database_username = self.database_username.clone();
         let database_password = self.database_password.clone();
@@ -287,5 +287,68 @@ impl RunnableDependency for PostgresDependency {
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
         self.dependencies.get_or_insert_with(Vec::new).push(dep);
+    }
+
+    async fn soft_reset(&self) {
+        if !self.running {
+            return;
+        }
+
+        let Some(scripts) = &self.startup_sql_scripts else {
+            log::warn!("[PostgresDependency-{}] soft reset: no startup scripts", self.identifier);
+            return;
+        };
+
+        let conn_str = self
+            .connection_string()
+            .expect("connection string for soft reset");
+
+        log::info!("[PostgresDependency-{}] soft reset: dropping and recreating schema", self.identifier);
+        let mut client = postgres::Client::connect(conn_str, postgres::NoTls)
+            .expect("connect for soft reset");
+        client.batch_execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
+            .expect("drop/recreate schema");
+        drop(client);
+
+        Self::run_startup_sql_scripts(&self.identifier, conn_str, scripts);
+    }
+
+    async fn hard_reset(&mut self) {
+        if !self.running {
+            return;
+        }
+
+        log::info!("[PostgresDependency-{}] hard reset: restarting container", self.identifier);
+
+        let scripts = self.startup_sql_scripts.clone();
+        let database_name = self.database_name.clone();
+        let database_username = self.database_username.clone();
+        let database_password = self.database_password.clone();
+        let image_tag = self.image_tag.clone();
+        let container_name = self
+            .container_name
+            .clone()
+            .unwrap_or_else(|| self.default_container_name());
+
+        self.postgres_impl.stop().await;
+        self.running = false;
+
+        self.postgres_impl
+            .start(
+                self.port,
+                &database_name,
+                &database_username,
+                &database_password,
+                &image_tag,
+                &container_name,
+            )
+            .await;
+        self.wait_until_ready().await;
+
+        if let Some(scripts) = scripts {
+            self.run_startup_sql_scripts_blocking(scripts).await;
+        }
+
+        self.running = true;
     }
 }

@@ -1,12 +1,14 @@
 use async_trait::async_trait;
 use arena::healthcheck::ReadinessCheck;
 use futures::channel::oneshot;
-use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
+use rdkafka::admin::{AdminClient, AdminOptions};
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::message::Message;
 use rdkafka::producer::{BaseProducer, BaseRecord, Producer};
-use std::time::{Duration, Instant };
+use std::time::{Duration, Instant};
+
+use super::topic_creator::TopicCreator;
 
 pub trait KafkaHealthcheckOps: Send + Sync {
     fn create_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String>;
@@ -54,29 +56,7 @@ fn healthcheck_topic_name(identifier: &str) -> String {
 
 impl KafkaHealthcheckOps for RdkafkaHealthcheckOps {
     fn create_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String> {
-        let admin: AdminClient<_> = ClientConfig::new()
-            .set("bootstrap.servers", bootstrap)
-            .set("log_level", "0")
-            .create()
-            .map_err(|e| format!("create kafka admin client failed: {e}"))?;
-
-        let new_topic = NewTopic::new(topic, 1, TopicReplication::Fixed(1));
-        let opts = AdminOptions::new().operation_timeout(Some(Duration::from_millis(1000)));
-
-        match futures::executor::block_on(admin.create_topics([&new_topic], &opts)) {
-            Ok(results) => {
-                for r in results {
-                    if let Err((_t, e)) = r {
-                        if e.to_string().to_lowercase().contains("already exists") {
-                            return Ok(());
-                        }
-                        return Err(format!("kafka topic create failed: {e}"));
-                    }
-                }
-                Ok(())
-            }
-            Err(err) => Err(format!("kafka topic create request failed: {err}")),
-        }
+        TopicCreator::create_topic(bootstrap, topic)
     }
 
     fn delete_topic(&self, bootstrap: &str, topic: &str) -> Result<(), String> {

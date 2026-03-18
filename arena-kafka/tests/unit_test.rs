@@ -92,6 +92,10 @@ impl RunnableDependency for FakeDep {
     }
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
+
+    async fn soft_reset(&self) {}
+
+    async fn hard_reset(&mut self) {}
 }
 
 #[tokio::test]

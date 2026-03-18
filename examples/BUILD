@@ -1,6 +1,12 @@
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
 load("@crates//:defs.bzl", "all_crate_deps")
 
+filegroup(
+    name = "instrument_reading_db_schema",
+    srcs = ["resources/instrument_reading_db_schema.sql"],
+    visibility = ["//visibility:public"],
+)
+
 rust_library(
     name = "arena_examples",
     srcs = glob(["src/**/*.rs"]),

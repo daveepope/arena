@@ -1,5 +1,6 @@
 mod healthcheck;
 pub(crate) mod container_impl;
+pub(crate) mod topic_creator;
 
 pub use container_impl::KAFKA_INTERNAL_DOCKER_PORT;
 
@@ -9,6 +10,7 @@ use async_trait::async_trait;
 use crate::builder::KafkaDependencyBuilder;
 use futures_timer::Delay;
 use crate::kafka_dependency::healthcheck::DefaultKafkaReadinessCheck;
+use crate::kafka_dependency::topic_creator::TopicCreator;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[async_trait]
@@ -40,6 +42,7 @@ pub struct KafkaDependency {
     image_tag: String,
     container_name: Option<String>,
     readiness_check: Box<dyn ReadinessCheck>,
+    topics: Vec<String>,
 }
 
 impl KafkaDependency {
@@ -50,6 +53,7 @@ impl KafkaDependency {
         dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
         image_tag: String,
         container_name: Option<String>,
+        topics: Vec<String>,
     ) -> Self {
         KafkaDependency {
             identifier,
@@ -59,7 +63,8 @@ impl KafkaDependency {
             image_tag,
             container_name,
             running: false,
-            readiness_check: Box::new(DefaultKafkaReadinessCheck)
+            readiness_check: Box::new(DefaultKafkaReadinessCheck),
+            topics,
         }
     }
 
@@ -130,6 +135,20 @@ impl KafkaDependency {
             Err(err) => panic!("[Kafka-{}] readiness check failed: {}", self.identifier, err),
         }
     }
+
+    async fn create_topics(&self) {
+        if self.topics.is_empty() {
+            return;
+        }
+
+        let bootstrap = self.bootstrap_on_host().expect("bootstrap for topic creation").to_string();
+
+        for topic in &self.topics {
+            TopicCreator::create_topic(&bootstrap, topic)
+                .unwrap_or_else(|e| panic!("[Kafka-{}] topic create failed for {topic}: {e}", self.identifier));
+        }
+        log::info!("[Kafka-{}] created {} topic(s)", self.identifier, self.topics.len());
+    }
 }
 
 #[async_trait]
@@ -180,6 +199,8 @@ impl RunnableDependency for KafkaDependency {
             sw_ready.elapsed()
         );
 
+        self.create_topics().await;
+
         self.running = true;
         log::debug!(
             "[Kafka-{}] start complete in {:?}.",
@@ -214,5 +235,44 @@ impl RunnableDependency for KafkaDependency {
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
         self.dependencies.get_or_insert_with(Vec::new).push(dep);
+    }
+
+    async fn soft_reset(&self) {
+        if !self.running {
+            return;
+        }
+
+        let bootstrap = self.bootstrap_on_host().expect("bootstrap for soft reset").to_string();
+
+        for topic in &self.topics {
+            if let Err(e) = TopicCreator::clear_messages(&bootstrap, topic) {
+                log::warn!("[Kafka-{}] soft reset: clear messages for {topic} failed: {e}", self.identifier);
+            } else {
+                log::info!("[Kafka-{}] soft reset: cleared messages from {topic}", self.identifier);
+            }
+        }
+    }
+
+    async fn hard_reset(&mut self) {
+        if !self.running {
+            return;
+        }
+
+        log::info!("[Kafka-{}] hard reset: restarting container", self.identifier);
+        let image_tag = self.image_tag.clone();
+        let container_name = self
+            .container_name
+            .clone()
+            .unwrap_or_else(|| self.set_container_name());
+
+        self.kafka_impl.stop().await;
+        self.running = false;
+
+        self.kafka_impl
+            .start(self.port, &image_tag, &container_name)
+            .await;
+        self.wait_until_ready().await;
+        self.create_topics().await;
+        self.running = true;
     }
 }

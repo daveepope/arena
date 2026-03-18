@@ -28,7 +28,6 @@ pub async fn ensure_network_exists(name: &str) {
     match docker.create_network(config).await {
         Ok(_) => log::info!("[arena-container] created network '{}'", name),
         Err(e) => {
-            // Another container may have created it concurrently — verify it exists now
             if docker.inspect_network(name, None::<bollard::query_parameters::InspectNetworkOptions>).await.is_ok() {
                 log::debug!("[arena-container] network '{}' was created concurrently", name);
             } else {

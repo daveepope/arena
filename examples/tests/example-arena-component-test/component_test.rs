@@ -3,11 +3,12 @@ use arena_kafka::{KafkaDependency, KafkaFlavor};
 use arena_postgres::PostgresDependency;
 use arena_executable_component::executable_component::ExecutableComponent;
 use arena_examples::http_healthcheck::HttpReadinessCheck;
-use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::config::ClientConfig;
+use rdkafka::consumer::{BaseConsumer, Consumer};
+use rdkafka::message::Message;
 use rstest::*;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::OnceCell;
 
 const POSTGRES_PORT: u16 = 5555;
@@ -15,7 +16,6 @@ const DB_NAME: &str = "test_database";
 const DB_USER: &str = "test_user";
 const DB_PASS: &str = "test_password";
 const KAFKA_PORT: u16 = 9093;
-const KAFKA_TOPIC: &str = "test_readings";
 const EXEC_WEB_APP_PORT: u16 = 3000;
 
 const NETWORK_NAME: &str = "arena-component-test-network";
@@ -37,6 +37,14 @@ struct CreateReadingResponse {
 
 #[derive(Debug, Serialize)]
 struct CreateReadingRequest {
+    user_name: String,
+    value: i32,
+    comment: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ReadingCreatedEvent {
+    id: i64,
     user_name: String,
     value: i32,
     comment: Option<String>,
@@ -74,6 +82,7 @@ fn setup_dependencies() -> Vec<Dependency> {
             .with_port(KAFKA_PORT)
             .with_container_name(KAFKA_CONTAINER_NAME)
             .with_network(NETWORK_NAME)
+            .with_topic("readings")
             .build(),
     );
 
@@ -115,45 +124,6 @@ fn setup_exec_component() -> Component {
     Box::new(builder.build())
 }
 
-async fn setup_kafka_topic(arena: &OpenArena) {
-    let kafka_bootstrap = arena
-        .dependency("test kafka")
-        .and_then(|d| d.as_any().downcast_ref::<KafkaDependency>())
-        .and_then(|k| k.bootstrap_servers())
-        .expect("kafka bootstrap should be available");
-
-    let admin: AdminClient<_> = ClientConfig::new()
-        .set("bootstrap.servers", kafka_bootstrap)
-        .create()
-        .expect("create kafka admin client");
-
-    let new_topic = NewTopic::new(KAFKA_TOPIC, 1, TopicReplication::Fixed(1));
-    let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(5)));
-
-    let start = std::time::Instant::now();
-    loop {
-        if start.elapsed() > Duration::from_secs(30) {
-            panic!("kafka topic create timed out");
-        }
-
-        match admin.create_topics([&new_topic], &opts).await {
-            Ok(results) => {
-                for r in results {
-                    if let Err((_t, e)) = r {
-                        if !e.to_string().to_lowercase().contains("already exists") {
-                            continue;
-                        }
-                    }
-                }
-                return;
-            }
-            Err(_) => {}
-        }
-
-        tokio::time::sleep(Duration::from_millis(250)).await;
-    }
-}
-
 async fn create_arena() -> OpenArena {
     let dependencies = setup_dependencies();
 
@@ -165,9 +135,7 @@ async fn create_arena() -> OpenArena {
     ];
     let closed_arena = ClosedArena::new("Test Arena".to_string(), encounters);
 
-    let arena = closed_arena.open().await;
-    setup_kafka_topic(&arena).await;
-    arena
+    closed_arena.open().await
 }
 
 static SHARED_ARENA: OnceCell<OpenArena> = OnceCell::const_new();
@@ -200,6 +168,46 @@ async fn get_readings(port: u16) -> Vec<Reading> {
         .expect("parse readings response")
 }
 
+fn consume_reading_created_event(
+    bootstrap: String,
+    topic: String,
+    id_rx: std::sync::mpsc::Receiver<i64>,
+    timeout: Duration,
+) -> Result<ReadingCreatedEvent, String> {
+    let consumer: BaseConsumer = ClientConfig::new()
+        .set("bootstrap.servers", &bootstrap)
+        .set("group.id", format!("component-test-{}", std::process::id()))
+        .set("auto.offset.reset", "earliest")
+        .create()
+        .map_err(|e| format!("create kafka consumer failed: {e}"))?;
+
+    consumer
+        .subscribe(&[&topic])
+        .map_err(|e| format!("kafka subscribe failed: {e}"))?;
+
+    let expected_id = id_rx.recv().map_err(|_| "id channel closed")?;
+
+    let deadline = Instant::now() + timeout;
+    while Instant::now() < deadline {
+        match consumer.poll(Duration::from_millis(100)) {
+            None => continue,
+            Some(Err(e)) => return Err(format!("kafka consume error: {e}")),
+            Some(Ok(msg)) => {
+                let payload = match msg.payload() {
+                    Some(bytes) => bytes,
+                    None => continue,
+                };
+                let event: ReadingCreatedEvent = serde_json::from_slice(payload)
+                    .map_err(|e| format!("parse ReadingCreatedEvent failed: {e}"))?;
+                if event.id == expected_id {
+                    return Ok(event);
+                }
+            }
+        }
+    }
+    Err("did not receive expected ReadingCreatedEvent before timeout".to_string())
+}
+
 async fn create_reading(port: u16, user_name: &str, value: i32, comment: Option<String>) -> i32 {
     let url = format!("http://127.0.0.1:{}/readings", port);
     let request = CreateReadingRequest {
@@ -227,9 +235,32 @@ async fn create_reading(port: u16, user_name: &str, value: i32, comment: Option<
 async fn example_using_exec_component_creates_reading_consumes_and_gets_reading(
     #[future] shared_arena: &'static OpenArena,
 ) {
-    let _arena = shared_arena.await;
+    let arena = shared_arena.await;
+
+    let bootstrap = arena
+        .dependency("test kafka")
+        .and_then(|d| d.as_any().downcast_ref::<KafkaDependency>())
+        .and_then(|k| k.bootstrap_servers())
+        .expect("kafka bootstrap should be available")
+        .to_string();
+
+    let (id_tx, id_rx) = std::sync::mpsc::channel();
+    let consume_handle = tokio::task::spawn_blocking({
+        move || consume_reading_created_event(bootstrap, "readings".to_string(), id_rx, Duration::from_secs(5))
+    });
 
     let created_id = create_reading(EXEC_WEB_APP_PORT, "Exec Test User", 42, Some("test comment".to_string())).await;
+    id_tx.send(created_id as i64).expect("send created_id to consumer");
+
+    let consumed = consume_handle
+        .await
+        .expect("consume task join")
+        .expect("should consume ReadingCreatedEvent from Kafka");
+
+    assert_eq!(consumed.id, created_id as i64);
+    assert_eq!(consumed.user_name, "Exec Test User");
+    assert_eq!(consumed.value, 42);
+    assert_eq!(consumed.comment.as_deref(), Some("test comment"));
 
     let readings = get_readings(EXEC_WEB_APP_PORT).await;
     let found = readings

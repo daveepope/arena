@@ -19,6 +19,7 @@ pub struct KafkaDependencyBuilder {
     container_name: Option<String>,
     network: Option<String>,
     readiness_check: Option<Box<dyn ReadinessCheck>>,
+    topics: Vec<String>,
 }
 
 impl KafkaDependencyBuilder {
@@ -39,7 +40,13 @@ impl KafkaDependencyBuilder {
             container_name: None,
             network: None,
             readiness_check: None,
+            topics: Vec::new(),
         }
+    }
+
+    pub fn with_topic(mut self, topic: impl Into<String>) -> Self {
+        self.topics.push(topic.into());
+        self
     }
 
     pub fn with_impl<W>(mut self, wrapper: W) -> Self
@@ -110,6 +117,7 @@ impl KafkaDependencyBuilder {
             container_name,
             network,
             readiness_check,
+            topics,
         } = self;
 
         let (default_port, default_tag) = match flavor {
@@ -128,7 +136,7 @@ impl KafkaDependencyBuilder {
         let image_tag = image_tag.unwrap_or_else(|| default_tag.to_string());
 
         let mut dep =
-            KafkaDependency::new(identifier, kafka_impl, port, dependencies, image_tag, container_name);
+            KafkaDependency::new(identifier, kafka_impl, port, dependencies, image_tag, container_name, topics);
 
         if let Some(check) = readiness_check {
             dep.set_readiness_check(check);

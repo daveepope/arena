@@ -1,5 +1,5 @@
 {
-  "checksum": "47d0972200163d42b8dda53d7ce917cf4806be80629f3c4c83cf3c6941669e0f",
+  "checksum": "ea377138decf3bef1cc055faa454abcf7ae15a542ebeaca6d22d547374ad3096",
   "crates": {
     "aho-corasick 1.1.4": {
       "name": "aho-corasick",
@@ -835,6 +835,62 @@
         "version": "0.1.0-alpha.1"
       },
       "license": "todo",
+      "license_ids": [],
+      "license_file": null
+    },
+    "arena-ffi 0.1.0-alpha.1": {
+      "name": "arena-ffi",
+      "version": "0.1.0-alpha.1",
+      "package_url": null,
+      "repository": null,
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "arena_ffi",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "arena_ffi",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "env_logger 0.11.8",
+              "target": "env_logger"
+            },
+            {
+              "id": "indexmap 2.12.1",
+              "target": "indexmap"
+            },
+            {
+              "id": "serde 1.0.228",
+              "target": "serde"
+            },
+            {
+              "id": "serde_json 1.0.148",
+              "target": "serde_json"
+            },
+            {
+              "id": "tokio 1.48.0",
+              "target": "tokio"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.1.0-alpha.1"
+      },
+      "license": null,
       "license_ids": [],
       "license_file": null
     },
@@ -7443,6 +7499,7 @@
         "crate_features": {
           "common": [
             "default",
+            "serde",
             "std"
           ],
           "selects": {}
@@ -7456,6 +7513,10 @@
             {
               "id": "hashbrown 0.16.1",
               "target": "hashbrown"
+            },
+            {
+              "id": "serde_core 1.0.228",
+              "target": "serde_core"
             }
           ],
           "selects": {}
@@ -22476,6 +22537,7 @@
     "arena-container-component 0.1.0-alpha.1": "arena-container-component",
     "arena-examples 0.1.0": "examples",
     "arena-executable-component 0.1.0-alpha.1": "arena-executable-component",
+    "arena-ffi 0.1.0-alpha.1": "arena-ffi",
     "arena-kafka 0.1.0-alpha.1": "arena-kafka",
     "arena-postgres 0.1.0-alpha.1": "arena-postgres"
   },
@@ -22641,6 +22703,7 @@
     "env_logger 0.11.8",
     "futures 0.3.31",
     "futures-timer 3.0.3",
+    "indexmap 2.12.1",
     "log 0.4.29",
     "postgres 0.19.12",
     "rdkafka 0.39.0",

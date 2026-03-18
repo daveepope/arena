@@ -1,7 +1,7 @@
 use arena::dependency::RunnableDependency;
-use arena_kafka::{KafkaDependency, KafkaFlavor};
+use arena_kafka::{KafkaDependency, KafkaFlavor, TopicCreator};
 use futures::FutureExt;
-use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
+use rdkafka::admin::{AdminClient, AdminOptions};
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::message::Message;
@@ -135,23 +135,8 @@ impl TestContext {
         })
     }
 
-    async fn create_topic(&self) -> Result<(), String> {
-        let new_topic = NewTopic::new(&self.topic, 1, TopicReplication::Fixed(1));
-        let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(2)));
-
-        let results = self
-            .admin
-            .create_topics([&new_topic], &opts)
-            .await
-            .map_err(|e| format!("create topic request failed: {e}"))?;
-
-        for r in results {
-            if let Err((_t, e)) = r {
-                return Err(format!("create topic failed: {e}"));
-            }
-        }
-
-        Ok(())
+    fn create_topic(&self) -> Result<(), String> {
+        TopicCreator::create_topic(&self.bootstrap, &self.topic)
     }
 
     async fn delete_topic_best_effort(&self) {
@@ -170,7 +155,7 @@ impl TestContext {
 
 async fn assert_pub_sub_roundtrip(ctx: &TestContext) -> Result<(), String> {
     let sw = std::time::Instant::now();
-    ctx.create_topic().await?;
+    ctx.create_topic()?;
     log::info!("[timing] create_topic took {:?}", sw.elapsed());
 
     let ts = SystemTime::now()

@@ -9,6 +9,8 @@ pub trait RunnableDependency: Send + Sync {
     async fn start(&mut self);
     async fn stop(&mut self);
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>);
+    async fn soft_reset(&self);
+    async fn hard_reset(&mut self);
 }
 
 pub type Dependency = Box<dyn RunnableDependency>;
