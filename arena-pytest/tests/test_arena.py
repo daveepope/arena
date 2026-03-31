@@ -5,11 +5,6 @@ import sys
 import threading
 import time
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_SRC = os.path.join(_ROOT, "src")
-if _SRC not in sys.path:
-    sys.path.insert(0, _SRC)
-
 import requests
 
 EXEC_WEB_APP_PORT = 3001
@@ -104,8 +99,8 @@ def test_exec_component_creates_reading_consumes_and_gets_reading(arena):
 
 
 def test_multiple_readings(arena):
-    id1 = _create_reading("Bender Bending Rodríguez", 1, "Bite my shiny metal ass")
-    id2 = _create_reading("Turanga Leela", 2, "We're going to need a bigger ship")
+    id1 = _create_reading("Bending", 1, "")
+    id2 = _create_reading("joe", 2, "We're going to need a bigger ship")
     readings = _get_readings()
     ids = {r["id"] for r in readings}
     assert id1 in ids
