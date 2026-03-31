@@ -8,8 +8,12 @@ on:
 
 jobs:
   build:
-    name: Arena CI Build and Test
-    runs-on: ubuntu-latest
+    name: Arena CI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -17,7 +21,7 @@ jobs:
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
           bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}
+          disk-cache: ${{ github.workflow }}-${{ matrix.os }}
           repository-cache: true
 
       - name: Build
@@ -26,6 +30,8 @@ jobs:
       - name: Run unit tests
         run: bazel test //... --test_tag_filters=-local --test_output=all
 
-      - name: Run component tests
+      # GitHub-hosted macOS runners do not provide Docker; component tests need it.
+      - name: Run component tests (Docker)
+        if: runner.os == 'Linux'
         timeout-minutes: 30
         run: bazel test //... --test_tag_filters=local --test_output=all

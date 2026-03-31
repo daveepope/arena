@@ -20,8 +20,10 @@ Bazel build is used to build and runs tests in parallel and streams logs during 
 
 ## Prerequisites
 
-- Bazel
-- Docker
+- Bazel (via [Bazelisk](https://github.com/bazelbuild/bazelisk) is recommended)
+- Docker (only for **component** tests: targets tagged `local`)
+
+**Platforms:** The tree is built and unit-tested on **Linux and macOS** (see CI). Component tests need a working Docker daemon; on **macOS** use Docker Desktop (or another engine) locally. GitHub Actions runs component tests on **Linux only** because hosted macOS runners do not provide Docker.
 
 ## Installation
 
@@ -52,7 +54,8 @@ You can use Cargo and Python on your host machine instead of Bazel. You will nee
 ### Rust
 
 ```rust
-use arena::{ClosedArena, Dependency, Encounter, EncounterTrait};
+use arena::{ClosedArena, Component, Dependency, Encounter, EncounterTrait};
+use arena_executable_component::executable_component::ExecutableComponent;
 use arena_kafka::{KafkaDependency, KafkaFlavor};
 use arena_postgres::PostgresDependency;
 
@@ -71,15 +74,23 @@ let kafka: Dependency = Box::new(
         .build(),
 );
 
-let encounter = Encounter::new("my-test", vec![postgres, kafka], vec![]);
+let web_app: Component = Box::new(
+    ExecutableComponent::builder("my service")
+        .with_executable_path("/path/to/your/binary")
+        .build(),
+);
+
+let encounter = Encounter::new("my-test", vec![postgres, kafka], vec![web_app]);
 let closed = ClosedArena::new("Arena".to_string(), vec![Box::new(encounter)]);
 let open = closed.open().await;
 
-// Run tests against open.dependency("db"), open.dependency("kafka"), etc.
+// Run tests against open areana
 // ...
 
 open.close().await;
 ```
+
+You can also use `with_source_path` / `with_build_tool` on the builder so Arena builds the binary before starting it (see `examples/`).
 
 ### Python (arena-pytest)
 
@@ -87,6 +98,7 @@ open.close().await;
 from arena_pytest import (
     ClosedArena,
     EncounterBuilder,
+    ExecutableComponentBuilder,
     KafkaDependencyBuilder,
     KafkaFlavor,
     PostgresDependencyBuilder,
@@ -107,10 +119,18 @@ kafka = (
     .build()
 )
 
+web_app = (
+    ExecutableComponentBuilder("my service")
+    .with_executable_path("/path/to/your/binary")
+    .with_readiness_check_url("http://127.0.0.1:8080/health")
+    .build()
+)
+
 encounter = (
     EncounterBuilder("my-test")
     .add_dependency(postgres)
     .add_dependency(kafka)
+    .add_component(web_app)
     .build()
 )
 
@@ -122,6 +142,8 @@ open_arena = await closed.open()
 
 await open_arena.close()
 ```
+
+As in Rust, you can point at source plus `with_build_tool(...)` instead of a prebuilt path when you want Arena to compile the component first.
 
 ## License
 
