@@ -6,6 +6,9 @@
 .venv-*/
 venv/
 
+# setuptools / pip local installs (not used by Bazel)
+**/*.egg-info/
+
 /bazel-bin
 /bazel-out
 /bazel-testlogs

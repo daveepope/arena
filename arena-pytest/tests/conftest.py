@@ -121,7 +121,8 @@ def closed_arena() -> ClosedArena:
 @pytest.fixture(scope="session")
 def arena(closed_arena):
     import asyncio
-    from arena_pytest import wait_for_http_ready
+
+    from http_healthcheck import wait_for_http_ready
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

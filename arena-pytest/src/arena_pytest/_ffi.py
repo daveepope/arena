@@ -10,6 +10,16 @@ def find_lib() -> Optional[str]:
     if path and os.path.isfile(path):
         return path
 
+    _pkg_dir = os.path.dirname(os.path.abspath(__file__))
+    for name in (
+        "libarena_ffi_shared.so",
+        "libarena_ffi_shared.dylib",
+        "arena_ffi_shared.dll",
+    ):
+        p = os.path.join(_pkg_dir, name)
+        if os.path.isfile(p):
+            return p
+
     try:
         from bazel_tools.tools.python.runfiles import runfiles
         r = runfiles.Create()

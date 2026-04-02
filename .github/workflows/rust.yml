@@ -27,11 +27,13 @@ jobs:
       - name: Build
         run: bazel build //...
 
-      - name: Run unit tests
-        run: bazel test //... --test_tag_filters=-local --test_output=all
-
-      # GitHub-hosted macOS runners do not provide Docker; component tests need it.
-      - name: Run component tests (Docker)
+      # Linux: full suite including Docker-tagged (`local`) tests.
+      - name: Run all tests
         if: runner.os == 'Linux'
         timeout-minutes: 30
-        run: bazel test //... --test_tag_filters=local --test_output=all
+        run: bazel test //... --test_output=all
+
+      # macOS runners have no Docker; skip targets tagged `local` (same as before).
+      - name: Run tests (excluding Docker)
+        if: runner.os == 'macOS'
+        run: bazel test //... --test_tag_filters=-local --test_output=all

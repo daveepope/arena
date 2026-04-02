@@ -1,2 +1,0 @@
-[pytest11]
-arena_pytest = arena_pytest.arena

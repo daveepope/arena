@@ -1,3 +1,5 @@
+"""Test-only HTTP readiness helper (not part of the arena_pytest public API)."""
+
 import time
 
 import requests

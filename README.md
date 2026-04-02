@@ -23,7 +23,7 @@ Bazel build is used to build and runs tests in parallel and streams logs during 
 - Bazel (via [Bazelisk](https://github.com/bazelbuild/bazelisk) is recommended)
 - Docker (only for **component** tests: targets tagged `local`)
 
-**Platforms:** The tree is built and unit-tested on **Linux and macOS** (see CI). Component tests need a working Docker daemon; on **macOS** use Docker Desktop (or another engine) locally. GitHub Actions runs component tests on **Linux only** because hosted macOS runners do not provide Docker.
+**Platforms:** CI builds on **Linux and macOS**. **All** tests (including Docker-backed targets tagged `local`) run on **Linux** in CI. Hosted **macOS** runners have no Docker, so CI there runs everything **except** `local` tests. Locally on macOS, use Docker Desktop if you want to run the full suite.
 
 ## Installation
 
@@ -33,16 +33,16 @@ Build the project:
 bazel build //...
 ```
 
-Run tests:
+Run **all** tests (requires Docker for targets tagged `local`, e.g. arena-pytest component tests):
+
+```bash
+bazel test //...
+```
+
+Run tests **without** Docker-heavy targets (faster when you have no daemon):
 
 ```bash
 bazel test //... --test_tag_filters=-local
-```
-
-Run component tests (requires Docker):
-
-```bash
-bazel test //... --test_tag_filters=local
 ```
 
 ## Host development (Cargo and Python)
