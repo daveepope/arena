@@ -10,6 +10,9 @@ jobs:
   build_and_test:
     name: Build and test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -36,29 +39,8 @@ jobs:
         if: runner.os == 'macOS'
         run: bazel test //... --test_tag_filters=-local --test_output=all
 
-  publish_testpypi:
-    name: Publish TestPyPI (${{ matrix.os }})
-    needs: build_and_test
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.14.0
-        with:
-          bazelisk-cache: true
-          disk-cache: publish-testpypi-${{ matrix.os }}
-          repository-cache: true
-
       - name: Unique version for TestPyPI
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         env:
           VERSION_SHA: ${{ github.sha }}
         run: |
@@ -90,13 +72,15 @@ jobs:
           print(f"Patched arena-pytest version to {unique} (TestPyPI)")
           PY
 
-      - name: Build wheel
+      - name: Build wheel for TestPyPI
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         run: |
           bazel build //arena-pytest:arena_pytest_wheel
           rm -f bazel-bin/arena-pytest/arena_pytest-*-py3-none-any.whl || true
           ls -la bazel-bin/arena-pytest/*.whl
 
       - name: Publish to TestPyPI
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: bazel-bin/arena-pytest/
