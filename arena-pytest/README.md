@@ -8,7 +8,7 @@ Pytest plugin and helpers for Arena (C FFI). Dependencies are managed with Bazel
 
 Wheels ship a **native** FFI shared library next to the `arena_pytest` package (loaded via ctypes). Install a wheel whose **platform tag** matches your OS and CPU; there is no supported pure-Python fallback.
 
-| Platform | Produced by CI (`build_and_test` job in [build-test-publish-arena.yml](https://github.com/daveepope/arena/blob/master/.github/workflows/build-test-publish-arena.yml), PRs only) | Typical wheel tag |
+| Platform | Produced by CI ([build-test-publish-arena.yml](https://github.com/daveepope/arena/blob/master/.github/workflows/build-test-publish-arena.yml): wheels in `build_and_test`, upload in `publish_testpypi` on PRs) | Typical wheel tag |
 |----------|---------------------------------------------------------------------------------------------|-------------------|
 | Linux x86_64 | Yes (`ubuntu-latest`) | `manylinux2014_x86_64` |
 | macOS arm64 | Yes (`macos-latest`) | `macosx_*_arm64` |
