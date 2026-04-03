@@ -23,7 +23,11 @@ Bazel build is used to build and runs tests in parallel and streams logs during 
 - Bazel (via [Bazelisk](https://github.com/bazelbuild/bazelisk) is recommended)
 - Docker (only for **component** tests: targets tagged `local`)
 
+<<<<<<< HEAD
 **Platforms:** CI builds on **Linux and macOS**. **All** tests (including Docker-backed targets tagged `local`) run on **Linux** in CI. Hosted **macOS** runners have no Docker, so CI there runs everything **except** `local` tests. Locally on macOS, use Docker Desktop if you want to run the full suite.
+=======
+**Platforms:** The tree is built and unit-tested on **Linux and macOS** (see CI). Component tests need a working Docker daemon; on **macOS** use Docker Desktop (or another engine) locally. GitHub Actions runs component tests on **Linux only** because hosted macOS runners do not provide Docker.
+>>>>>>> af03ce3957f7b0e258f2e89b74a0e87be8727009
 
 ## Installation
 
@@ -84,7 +88,11 @@ let encounter = Encounter::new("my-test", vec![postgres, kafka], vec![web_app]);
 let closed = ClosedArena::new("Arena".to_string(), vec![Box::new(encounter)]);
 let open = closed.open().await;
 
+<<<<<<< HEAD
 // Run tests against open arena
+=======
+// Run tests against open areana
+>>>>>>> af03ce3957f7b0e258f2e89b74a0e87be8727009
 // ...
 
 open.close().await;
@@ -99,7 +107,10 @@ from arena_pytest import (
     ClosedArena,
     EncounterBuilder,
     ExecutableComponentBuilder,
+<<<<<<< HEAD
     HttpReadinessCheck,
+=======
+>>>>>>> af03ce3957f7b0e258f2e89b74a0e87be8727009
     KafkaDependencyBuilder,
     KafkaFlavor,
     PostgresDependencyBuilder,
@@ -120,10 +131,17 @@ kafka = (
     .build()
 )
 
+<<<<<<< HEAD
 component = (
     ExecutableComponentBuilder("my service")
     .with_executable_path("/path/to/your/binary")
     .with_readiness_check(HttpReadinessCheck(), "http://127.0.0.1:8080/health")
+=======
+web_app = (
+    ExecutableComponentBuilder("my service")
+    .with_executable_path("/path/to/your/binary")
+    .with_readiness_check_url("http://127.0.0.1:8080/health")
+>>>>>>> af03ce3957f7b0e258f2e89b74a0e87be8727009
     .build()
 )
 
@@ -131,7 +149,11 @@ encounter = (
     EncounterBuilder("my-test")
     .add_dependency(postgres)
     .add_dependency(kafka)
+<<<<<<< HEAD
     .add_component(component)
+=======
+    .add_component(web_app)
+>>>>>>> af03ce3957f7b0e258f2e89b74a0e87be8727009
     .build()
 )
 

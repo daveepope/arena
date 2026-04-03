@@ -1,12 +1,10 @@
 /target
 .idea/
 
-# Local Python venvs (e.g. accidental `python -m venv` under arena-pytest)
 .venv/
 .venv-*/
 venv/
 
-# setuptools / pip local installs (not used by Bazel)
 **/*.egg-info/
 
 /bazel-bin

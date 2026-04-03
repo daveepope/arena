@@ -24,6 +24,10 @@ rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2021",
     versions = ["1.92.0"],
+<<<<<<< HEAD
+=======
+    # bfd is Linux-only; macOS uses the default linker and fails if we pass -fuse-ld=bfd.
+>>>>>>> af03ce3957f7b0e258f2e89b74a0e87be8727009
     extra_rustc_flags_triples = {
         "x86_64-unknown-linux-gnu": ["-Clink-arg=-fuse-ld=bfd"],
         "aarch64-unknown-linux-gnu": ["-Clink-arg=-fuse-ld=bfd"],
