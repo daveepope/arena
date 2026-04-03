@@ -21,7 +21,7 @@ jobs:
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
           bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}-${{ matrix.os }}
+          disk-cache: build-test-publish-arena-${{ matrix.os }}
           repository-cache: true
 
       - name: Build
