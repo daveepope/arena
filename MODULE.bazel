@@ -1,6 +1,6 @@
 module(
     name = "arena",
-    version = "0.1.0-alpha.1",
+    version = "0.1.0-beta.1",
 )
 
 bazel_dep(name = "rules_python", version = "0.34.0")
@@ -24,7 +24,6 @@ rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2021",
     versions = ["1.92.0"],
-    # bfd is Linux-only; macOS uses the default linker and fails if we pass -fuse-ld=bfd.
     extra_rustc_flags_triples = {
         "x86_64-unknown-linux-gnu": ["-Clink-arg=-fuse-ld=bfd"],
         "aarch64-unknown-linux-gnu": ["-Clink-arg=-fuse-ld=bfd"],

@@ -1,6 +1,6 @@
 [package]
 name = "arena-executable-component"
-version = "0.1.0-alpha.1"
+version.workspace = true
 edition = "2021"
 authors = ["David Pope"]
 description = "The Arena Execuable Component module containing centrally managed component implmentations that manage a running executable."

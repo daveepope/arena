@@ -2,7 +2,7 @@
 
 ![Arena logo](./arena-logo.png)
 
-[![Rust](https://github.com/daveepope/arena/actions/workflows/rust.yml/badge.svg)](https://github.com/daveepope/arena/actions/workflows/rust.yml)
+[![Build and test arena](https://github.com/daveepope/arena/actions/workflows/build-and-test-arena.yml/badge.svg)](https://github.com/daveepope/arena/actions/workflows/build-and-test-arena.yml)
 
 Arena is a cross-platform sandboxing framework. Arena supports multiple developer focused use cases. While the core Arena framework is not a testing framework it was designed to streamline the creation of repeatable, deterministic component tests with a fast feedback loop. It can be used to stand up sandboxed environments outside of testing scenarios also. It provides top-level clients for Python, Java, Go, and .NET. These top level clients include plugins and extenstions for popular unit testing frameworks.
 
@@ -84,7 +84,7 @@ let encounter = Encounter::new("my-test", vec![postgres, kafka], vec![web_app]);
 let closed = ClosedArena::new("Arena".to_string(), vec![Box::new(encounter)]);
 let open = closed.open().await;
 
-// Run tests against open areana
+// Run tests against open arena
 // ...
 
 open.close().await;
@@ -99,6 +99,7 @@ from arena_pytest import (
     ClosedArena,
     EncounterBuilder,
     ExecutableComponentBuilder,
+    HttpReadinessCheck,
     KafkaDependencyBuilder,
     KafkaFlavor,
     PostgresDependencyBuilder,
@@ -119,10 +120,10 @@ kafka = (
     .build()
 )
 
-web_app = (
+component = (
     ExecutableComponentBuilder("my service")
     .with_executable_path("/path/to/your/binary")
-    .with_readiness_check_url("http://127.0.0.1:8080/health")
+    .with_readiness_check(HttpReadinessCheck(), "http://127.0.0.1:8080/health")
     .build()
 )
 
@@ -130,7 +131,7 @@ encounter = (
     EncounterBuilder("my-test")
     .add_dependency(postgres)
     .add_dependency(kafka)
-    .add_component(web_app)
+    .add_component(component)
     .build()
 )
 

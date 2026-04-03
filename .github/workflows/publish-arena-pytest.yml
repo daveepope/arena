@@ -1,0 +1,82 @@
+name: Publish arena-pytest
+
+on:
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: publish-arena-pytest-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish-testpypi:
+    name: TestPyPI (${{ matrix.os }})
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-testpypi-${{ matrix.os }}
+          repository-cache: true
+
+      - name: Unique version for TestPyPI
+        env:
+          VERSION_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 <<'PY'
+          import os, pathlib, re, tomllib
+
+          sha = os.environ["VERSION_SHA"][:7]
+          pyproject = pathlib.Path("arena-pytest/pyproject.toml")
+          data = tomllib.loads(pyproject.read_bytes())
+          base = data["project"]["version"]
+          unique = f"{base}+g{sha}"
+          text = pyproject.read_text()
+          text = re.sub(
+              r'^version = "[^"]+"',
+              f'version = "{unique}"',
+              text,
+              count=1,
+              flags=re.MULTILINE,
+          )
+          pyproject.write_text(text)
+          build = pathlib.Path("arena-pytest/BUILD").read_text()
+          build = re.sub(
+              r'ARENA_PYTEST_VERSION = "[^"]+"',
+              f'ARENA_PYTEST_VERSION = "{unique}"',
+              build,
+              count=1,
+          )
+          pathlib.Path("arena-pytest/BUILD").write_text(build)
+          print(f"Patched arena-pytest version to {unique} (TestPyPI)")
+          PY
+
+      - name: Build wheel
+        run: |
+          bazel build //arena-pytest:arena_pytest_wheel
+          rm -f bazel-bin/arena-pytest/arena_pytest-*-py3-none-any.whl || true
+          ls -la bazel-bin/arena-pytest/*.whl
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: bazel-bin/arena-pytest/
+          verbose: true
+          print-hash: true
+          repository-url: https://test.pypi.org/legacy/

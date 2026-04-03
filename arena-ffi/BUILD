@@ -7,6 +7,7 @@ rust_library(
     edition = "2021",
     deps = all_crate_deps(normal = True) + [
         "//arena",
+        "//arena-container-component:arena_container_component",
         "//arena-executable-component:arena_executable_component",
         "//arena-kafka:arena_kafka",
         "//arena-postgres:arena_postgres",
@@ -21,6 +22,7 @@ rust_shared_library(
     edition = "2021",
     deps = all_crate_deps(normal = True) + [
         "//arena",
+        "//arena-container-component:arena_container_component",
         "//arena-executable-component:arena_executable_component",
         "//arena-kafka:arena_kafka",
         "//arena-postgres:arena_postgres",

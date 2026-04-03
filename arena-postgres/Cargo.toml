@@ -1,6 +1,6 @@
 [package]
 name = "arena-postgres"
-version = "0.1.0-alpha.1"
+version.workspace = true
 edition = "2021"
 authors = ["David Pope"]
 description = "Arena Postgres implementation"

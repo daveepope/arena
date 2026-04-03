@@ -2,6 +2,31 @@ load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("@rules_python//python:packaging.bzl", "py_wheel")
 
+ARENA_PYTEST_VERSION = "0.1.0b1"
+
+# Keep in sync with classifiers in arena-pytest/pyproject.toml (Bazel wheel METADATA).
+ARENA_PYTEST_CLASSIFIERS = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Pytest",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Testing",
+]
+
+exports_files(
+    ["README.md", "LICENSE"],
+    visibility = ["//visibility:public"],
+)
+
 config_setting(
     name = "linux_x86_64",
     constraint_values = [
@@ -77,9 +102,9 @@ py_library(
 
 py_test(
     name = "arena_pytest_test",
+    size = "small",
     srcs = [
         "tests/conftest.py",
-        "tests/http_healthcheck.py",
         "tests/test_arena.py",
     ],
     main = "tests/test_arena.py",
@@ -103,7 +128,7 @@ py_test(
 py_wheel(
     name = "arena_pytest_wheel",
     distribution = "arena-pytest",
-    version = "0.1.0-alpha.1",
+    version = ARENA_PYTEST_VERSION,
     python_tag = "py3",
     python_requires = ">=3.9",
     abi = "none",
@@ -116,6 +141,17 @@ py_wheel(
         "//conditions:default": "any",
     }),
     strip_path_prefixes = ["arena-pytest/src"],
+    author = "The Arena Authors",
+    classifiers = ARENA_PYTEST_CLASSIFIERS,
+    description_file = "README.md",
+    description_content_type = "text/markdown",
+    homepage = "https://github.com/daveepope/arena",
+    license = "MIT",
+    project_urls = {
+        "Repository": "https://github.com/daveepope/arena",
+        "Issues": "https://github.com/daveepope/arena/issues",
+        "Changelog": "https://github.com/daveepope/arena/releases",
+    },
     summary = "pytest API and fixtures for Arena (via the C FFI)",
     requires = [
         "pytest>=7.0.0",

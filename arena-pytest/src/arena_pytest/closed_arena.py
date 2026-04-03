@@ -34,4 +34,11 @@ class ClosedArena:
         )
         if handle is None or handle == 0:
             return None
+        from arena_pytest.readiness import DEFAULT_READINESS_TIMEOUT_MS, run_readiness
+
+        for enc in self._encounters:
+            if not hasattr(enc, "readiness_hooks"):
+                continue
+            for identifier, target, check in enc.readiness_hooks():
+                await run_readiness(check, identifier, target, DEFAULT_READINESS_TIMEOUT_MS)
         return OpenArena(lib, handle)

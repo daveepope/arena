@@ -1,19 +1,26 @@
 use arena::{Component, Dependency, Encounter, EncounterTrait};
+use arena_container_component::container_component::ContainerComponent;
 use arena_executable_component::executable_component::ExecutableComponent;
 use arena_executable_component::BuildTool;
 use arena_kafka::{KafkaDependency, KafkaFlavor};
 use arena_postgres::PostgresDependency;
 
-use crate::parse::{BuildToolJson, ComponentJson, DependencyJson, EncounterJson, ExecJson};
+use crate::parse::{
+    BuildToolJson, ComponentJson, ContainerJson, DependencyJson, EncounterJson, ExecJson,
+};
+use crate::readiness_json::{
+    apply_readiness_checks_to_container, apply_readiness_checks_to_exec,
+    collect_container_readiness, collect_exec_readiness,
+};
 
 const DEFAULT_NETWORK: &str = "arena-network";
 const DEFAULT_ENCOUNTER_NAME: &str = "arena-encounter";
 
-pub(super) fn build_encounter(json: &EncounterJson) -> Box<dyn EncounterTrait> {
+pub(super) async fn build_encounter_async(json: &EncounterJson) -> Box<dyn EncounterTrait> {
     let network = json.network.as_deref().unwrap_or(DEFAULT_NETWORK);
     let encounter_name = json.encounter_name.as_deref().unwrap_or(DEFAULT_ENCOUNTER_NAME);
     let dependencies = build_dependencies(json, network);
-    let components = build_components(json);
+    let components = build_components_async(json).await;
     Box::new(Encounter::new(encounter_name, dependencies, components))
 }
 
@@ -66,15 +73,17 @@ fn build_dependency(json: &DependencyJson, network: &str) -> Option<Dependency> 
     }
 }
 
-fn build_components(json: &EncounterJson) -> Vec<Component> {
+async fn build_components_async(json: &EncounterJson) -> Vec<Component> {
     let comps = json.components.as_deref().unwrap_or(&[]);
-    comps.iter().filter_map(build_component).collect()
-}
-
-fn build_component(json: &ComponentJson) -> Option<Component> {
-    match json {
-        ComponentJson::Exec(e) => Some(build_exec_component(e)),
+    let mut out = Vec::with_capacity(comps.len());
+    for c in comps {
+        let comp: Component = match c {
+            ComponentJson::Exec(e) => build_exec_component(e),
+            ComponentJson::Container(ct) => build_container_component(ct).await,
+        };
+        out.push(comp);
     }
+    out
 }
 
 fn build_tool_from_json(json: &BuildToolJson) -> BuildTool {
@@ -93,6 +102,44 @@ fn build_tool_from_json(json: &BuildToolJson) -> BuildTool {
             args: args.clone(),
         },
     }
+}
+
+async fn build_container_component(json: &ContainerJson) -> Component {
+    let mut builder = ContainerComponent::builder(&json.identifier, &json.dockerfile);
+    if let Some(ctx) = &json.build_context {
+        builder = builder.with_build_context(ctx);
+    }
+    if let Some(tag) = &json.image_tag {
+        builder = builder.with_image_tag(tag);
+    }
+    if let Some(n) = &json.network {
+        builder = builder.with_network(n);
+    }
+    if let Some(env_vars) = &json.env_vars {
+        for (k, v) in env_vars {
+            builder = builder.with_env_var(k, v);
+        }
+    }
+    if let Some(runtime_args) = &json.runtime_args {
+        let order = ["web_app_port", "postgres_connection_string", "kafka_bootstrap"];
+        for key in order {
+            if let Some(v) = runtime_args.get(key) {
+                builder = builder.with_runtime_arg(key, v);
+            }
+        }
+        for (k, v) in runtime_args {
+            if !order.contains(&k.as_str()) {
+                builder = builder.with_runtime_arg(k, v);
+            }
+        }
+    }
+    if let Some(mappings) = &json.port_mappings {
+        for m in mappings {
+            builder = builder.with_port_mapping(m.host_port, m.container_port);
+        }
+    }
+    builder = apply_readiness_checks_to_container(builder, &collect_container_readiness(json));
+    Box::new(builder.build().await)
 }
 
 fn build_exec_component(json: &ExecJson) -> Component {
@@ -123,6 +170,7 @@ fn build_exec_component(json: &ExecJson) -> Component {
             }
         }
     }
+    builder = apply_readiness_checks_to_exec(builder, &collect_exec_readiness(json));
 
     Box::new(builder.build())
 }

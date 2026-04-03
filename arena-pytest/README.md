@@ -2,6 +2,22 @@
 
 Pytest plugin and helpers for Arena (C FFI). Dependencies are managed with Bazel (`@pip//`); see the repo root `MODULE.bazel`.
 
+## Support matrix
+
+**Python:** 3.9+
+
+Wheels ship a **native** FFI shared library next to the `arena_pytest` package (loaded via ctypes). Install a wheel whose **platform tag** matches your OS and CPU; there is no supported pure-Python fallback.
+
+| Platform | Produced by CI ([publish workflow](https://github.com/daveepope/arena/blob/master/.github/workflows/publish-arena-pytest.yml)) | Typical wheel tag |
+|----------|---------------------------------------------------------------------------------------------|-------------------|
+| Linux x86_64 | Yes (`ubuntu-latest`) | `manylinux2014_x86_64` |
+| macOS arm64 | Yes (`macos-latest`) | `macosx_*_arm64` |
+| Linux aarch64 | No — build locally | `manylinux2014_aarch64` |
+| macOS x86_64 | No — build on Intel Mac | `macosx_*_x86_64` |
+| Windows x86_64 | No — build on Windows | `win_amd64` |
+
+For each release, upload **all** wheels you intend to support; PyPI stores them side by side and `pip` selects the correct one.
+
 ## Build the installable wheel (for PyPI or local `pip install`)
 
 From the repository root:
@@ -10,7 +26,7 @@ From the repository root:
 bazel build //arena-pytest:arena_pytest_wheel
 ```
 
-The wheel is under `bazel-bin/arena-pytest/`. The filename is **platform-specific** (it includes the Rust FFI shared library next to `arena_pytest/`), e.g. `arena_pytest-0.1.0a1-py3-none-manylinux2014_x86_64.whl` on Linux x86_64. Build on each OS/arch you want to publish and upload **each** wheel to PyPI.
+The wheel is under `bazel-bin/arena-pytest/`. The filename is **platform-specific** (it includes the Rust FFI shared library next to `arena_pytest/`), e.g. `arena_pytest-0.1.0b1-py3-none-manylinux2014_x86_64.whl` on Linux x86_64. Build on each OS/arch you want to publish and upload **each** wheel to PyPI.
 
 Try it in another project:
 
@@ -28,7 +44,7 @@ If `pip` sees two wheels for the same version, remove old files under `bazel-bin
 
 ## Publish to PyPI
 
-Bump **`version`** in both `BUILD` (`py_wheel`) and `pyproject.toml` before a release, then rebuild the wheel.
+Bump **`version`** in both `BUILD` (`ARENA_PYTEST_VERSION` / `py_wheel`) and `pyproject.toml` before a release. Keep `arena-pytest/LICENSE` aligned with the repository root `LICENSE`, then rebuild the wheel.
 
 ### 1. Smoke test (install the wheel locally, no upload)
 

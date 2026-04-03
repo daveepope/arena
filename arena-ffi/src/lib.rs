@@ -1,12 +1,14 @@
 mod builder;
+mod http_readiness;
 mod parse;
+mod readiness_json;
 
 use arena::{ClosedArena, OpenArena};
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::ptr::NonNull;
 
-use builder::build_encounter;
+use builder::build_encounter_async;
 use parse::EncounterJson;
 
 #[repr(C)]
@@ -46,14 +48,15 @@ pub extern "C" fn arena_open(name: *const c_char, config_json: *const c_char) ->
         }
     };
 
-    let encounter = build_encounter(&json);
-    let closed = ClosedArena::new(name_str, vec![encounter]);
-
     let rt = match tokio::runtime::Runtime::new() {
         Ok(r) => r,
         Err(_) => return std::ptr::null_mut(),
     };
-    let open_arena = rt.block_on(closed.open());
+    let open_arena = rt.block_on(async {
+        let encounter = build_encounter_async(&json).await;
+        let closed = ClosedArena::new(name_str, vec![encounter]);
+        closed.open().await
+    });
 
     let boxed = Box::new(open_arena);
     let ptr = Box::into_raw(boxed) as *mut ArenaHandle;

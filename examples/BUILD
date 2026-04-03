@@ -58,7 +58,7 @@ rust_binary(
 rust_test(
     name = "component_test",
     srcs = ["tests/example-arena-component-test/component_test.rs"],
-    size = "medium",
+    size = "small",
     edition = "2021",
     tags = ["local"],
     compile_data = [

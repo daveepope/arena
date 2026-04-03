@@ -1,5 +1,8 @@
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+from arena_pytest._ffi_readiness import readiness_checks_for_ffi
+from arena_pytest.readiness import ReadinessCheck
 
 
 class BuildTool(Enum):
@@ -23,6 +26,7 @@ class ExecutableComponentBuilder:
             "env_vars": {},
             "runtime_args": {},
         }
+        self._readiness_checks: List[Tuple[ReadinessCheck, str]] = []
 
     def with_executable_path(self, path: str) -> "ExecutableComponentBuilder":
         self._config["executable_path"] = path
@@ -48,20 +52,29 @@ class ExecutableComponentBuilder:
         self._config["runtime_args"][key] = value
         return self
 
-    def with_readiness_check_url(self, url: str) -> "ExecutableComponentBuilder":
-        self._config["readiness_check_url"] = url
+    def with_readiness_check(self, check: ReadinessCheck, target: str) -> "ExecutableComponentBuilder":
+        self._readiness_checks.append((check, target))
         return self
 
     def build(self) -> "ExecutableComponent":
-        return ExecutableComponent(dict(self._config))
+        return ExecutableComponent(dict(self._config), readiness_checks=list(self._readiness_checks))
 
     def _for_ffi(self) -> Dict[str, Any]:
         return dict(self._config)
 
 
 class ExecutableComponent:
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        readiness_checks: Optional[List[Tuple[ReadinessCheck, str]]] = None,
+    ):
         self._config = config
+        self._readiness_checks = readiness_checks or []
 
     def _for_ffi(self) -> Dict[str, Any]:
-        return self._config
+        d = dict(self._config)
+        rc = readiness_checks_for_ffi(self._readiness_checks)
+        if rc:
+            d["readiness_checks"] = rc
+        return d
