@@ -41,16 +41,17 @@ jobs:
       - name: Unique version for TestPyPI
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         env:
-          VERSION_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           python3 <<'PY'
           import os, pathlib, re, tomllib
 
-          sha = os.environ["VERSION_SHA"][:7]
+          # PyPI forbids local versions (+gabc123). Use PEP 440 dev release instead.
+          run_id = os.environ.get("GITHUB_RUN_ID", "0")
           pyproject = pathlib.Path("arena-pytest/pyproject.toml")
           data = tomllib.loads(pyproject.read_text())
           base = data["project"]["version"]
-          unique = f"{base}+g{sha}"
+          unique = f"{base}.dev{run_id}"
           text = pyproject.read_text()
           text = re.sub(
               r'^version = "[^"]+"',
@@ -74,6 +75,7 @@ jobs:
       - name: Build wheel for TestPyPI
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         run: |
+          rm -f bazel-bin/arena-pytest/arena_pytest-*.whl
           bazel build //arena-pytest:arena_pytest_wheel
           rm -f bazel-bin/arena-pytest/arena_pytest-*-py3-none-any.whl || true
           ls -la bazel-bin/arena-pytest/*.whl
