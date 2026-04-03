@@ -1,20 +1,45 @@
-name: Publish arena-pytest
+name: Build, test, publish arena
 
 on:
+  push:
+    branches: [ "master" ]
   pull_request:
-    branches: [master]
-
-concurrency:
-  group: publish-arena-pytest-${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
+    branches: [ "master" ]
 
 jobs:
-  publish-testpypi:
-    name: TestPyPI (${{ matrix.os }})
-    if: github.event.pull_request.head.repo.full_name == github.repository
+  build_and_test:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-${{ matrix.os }}
+          repository-cache: true
+
+      - name: Build
+        run: bazel build //...
+
+      - name: Run all tests
+        if: runner.os == 'Linux'
+        timeout-minutes: 30
+        run: bazel test //... --test_output=all
+
+      - name: Run tests (excluding Docker)
+        if: runner.os == 'macOS'
+        run: bazel test //... --test_tag_filters=-local --test_output=all
+
+  publish_testpypi:
+    name: Publish TestPyPI (${{ matrix.os }})
+    needs: build_and_test
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     strategy:
       fail-fast: false
       matrix:
@@ -25,19 +50,17 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
           bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}-testpypi-${{ matrix.os }}
+          disk-cache: publish-testpypi-${{ matrix.os }}
           repository-cache: true
 
       - name: Unique version for TestPyPI
         env:
-          VERSION_SHA: ${{ github.event.pull_request.head.sha }}
+          VERSION_SHA: ${{ github.sha }}
         run: |
           python3 <<'PY'
           import os, pathlib, re, tomllib

@@ -2,7 +2,7 @@
 
 ![Arena logo](./arena-logo.png)
 
-[![Build and test arena](https://github.com/daveepope/arena/actions/workflows/build-and-test-arena.yml/badge.svg)](https://github.com/daveepope/arena/actions/workflows/build-and-test-arena.yml)
+[![Build, test, publish arena](https://github.com/daveepope/arena/actions/workflows/build-test-publish-arena.yml/badge.svg)](https://github.com/daveepope/arena/actions/workflows/build-test-publish-arena.yml)
 
 Arena is a cross-platform sandboxing framework. Arena supports multiple developer focused use cases. While the core Arena framework is not a testing framework it was designed to streamline the creation of repeatable, deterministic component tests with a fast feedback loop. It can be used to stand up sandboxed environments outside of testing scenarios also. It provides top-level clients for Python, Java, Go, and .NET. These top level clients include plugins and extenstions for popular unit testing frameworks.
 
