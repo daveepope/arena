@@ -67,7 +67,7 @@ jobs:
 
           sha = os.environ["VERSION_SHA"][:7]
           pyproject = pathlib.Path("arena-pytest/pyproject.toml")
-          data = tomllib.loads(pyproject.read_bytes())
+          data = tomllib.loads(pyproject.read_text())
           base = data["project"]["version"]
           unique = f"{base}+g{sha}"
           text = pyproject.read_text()
