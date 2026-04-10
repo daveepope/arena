@@ -1,10 +1,11 @@
 /target
 .idea/
 
-# Local Python venvs (e.g. accidental `python -m venv` under arena-pytest)
 .venv/
 .venv-*/
 venv/
+
+**/*.egg-info/
 
 /bazel-bin
 /bazel-out

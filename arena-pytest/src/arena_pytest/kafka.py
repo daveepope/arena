@@ -1,6 +1,9 @@
 from enum import Enum
 from typing import Any, Dict
 
+# Must match arena-kafka KAFKA_INTERNAL_DOCKER_PORT (Docker network listener).
+KAFKA_INTERNAL_DOCKER_PORT = 29092
+
 
 class KafkaFlavor(Enum):
     APACHE_NATIVE = "apache_native"

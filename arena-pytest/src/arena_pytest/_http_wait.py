@@ -1,3 +1,5 @@
+"""Internal HTTP polling helper for tests (not public API)."""
+
 import time
 
 import requests

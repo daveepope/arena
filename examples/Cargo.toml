@@ -1,6 +1,6 @@
 [package]
 name = "arena-examples"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 authors = ["David Pope"]
 description = "Examples using the arena framework. Intended as documentation and testing."

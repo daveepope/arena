@@ -28,9 +28,6 @@ class OpenArena:
             ffi_hard_reset, self._lib, self._handle, dependency_identifier
         )
 
-    def is_valid(self) -> bool:
-        return self._lib is not None and self._handle is not None and self._handle != 0
-
 
 def get_arena_version() -> Optional[str]:
     lib = load_lib()
@@ -62,7 +59,7 @@ async def arena(closed_arena) -> OpenArena:
     if closed_arena is None:
         pytest.skip("closed_arena fixture not overridden (no arena to open)")
     open_arena_obj = await closed_arena.open()
-    if open_arena_obj is None or not open_arena_obj.is_valid():
+    if open_arena_obj is None:
         pytest.skip("arena_open failed (Docker required for dependencies)")
     yield open_arena_obj
     await open_arena_obj.close()

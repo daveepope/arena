@@ -1,5 +1,6 @@
-import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+from arena_pytest.readiness import HttpReadinessCheck, ReadinessCheck
 
 
 class Encounter:
@@ -27,6 +28,21 @@ class Encounter:
         }
         if self._network:
             out["network"] = self._network
+        return out
+
+    def readiness_hooks(self) -> List[Tuple[str, str, ReadinessCheck]]:
+        out: List[Tuple[str, str, ReadinessCheck]] = []
+        for c in self._components:
+            checks = getattr(c, "_readiness_checks", None)
+            if not checks:
+                continue
+            identifier = ""
+            if hasattr(c, "_config") and isinstance(c._config, dict):
+                identifier = str(c._config.get("identifier", ""))
+            for check, target in checks:
+                if isinstance(check, HttpReadinessCheck):
+                    continue
+                out.append((identifier, target, check))
         return out
 
 
