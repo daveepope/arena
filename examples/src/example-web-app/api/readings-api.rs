@@ -24,7 +24,14 @@ struct CreateReadingRequest {
 
 #[derive(Serialize)]
 struct CreateReadingResponse {
-    id: i64,
+    valid: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<i64>,
+}
+
+#[derive(Deserialize)]
+struct CalibrationResponse {
+    valid: bool,
 }
 
 #[derive(Clone)]
@@ -32,6 +39,8 @@ struct AppState {
     pg: Arc<Client>,
     kafka: Arc<BaseProducer>,
     kafka_topic: Arc<str>,
+    http_client: reqwest::Client,
+    calibration_url: Arc<str>,
 }
 
 #[derive(Serialize)]
@@ -100,6 +109,17 @@ async fn create_reading(
     State(st): State<AppState>,
     Json(req): Json<CreateReadingRequest>,
 ) -> Result<(StatusCode, Json<CreateReadingResponse>), (StatusCode, String)> {
+    let validation = st
+        .http_client
+        .post(format!("{}/api/v1/validate", st.calibration_url))
+        .json(&serde_json::json!({ "value": req.value }))
+        .send()
+        .await
+        .map_err(internal_error)?
+        .json::<CalibrationResponse>()
+        .await
+        .map_err(internal_error)?;
+
     let user_id: i64 = match st
         .pg
         .query_opt(
@@ -164,7 +184,13 @@ async fn create_reading(
         }
     });
 
-    Ok((StatusCode::OK, Json(CreateReadingResponse { id })))
+    Ok((
+        StatusCode::OK,
+        Json(CreateReadingResponse {
+            valid: validation.valid,
+            id: Some(id),
+        }),
+    ))
 }
 
 fn internal_error<E: std::fmt::Display>(e: E) -> (StatusCode, String) {
@@ -175,6 +201,8 @@ pub struct ExampleAxumWebApp {
     pg: Arc<Client>,
     kafka: Arc<BaseProducer>,
     kafka_topic: Arc<str>,
+    http_client: reqwest::Client,
+    calibration_url: Arc<str>,
 }
 
 impl ExampleAxumWebApp {
@@ -182,6 +210,7 @@ impl ExampleAxumWebApp {
         postgres_connection_string: &str,
         kafka_bootstrap: &str,
         kafka_topic: &str,
+        calibration_url: &str,
     ) -> Self {
         use rdkafka::config::ClientConfig;
         use tokio_postgres::NoTls;
@@ -206,6 +235,8 @@ impl ExampleAxumWebApp {
             pg: Arc::new(pg),
             kafka: Arc::new(kafka),
             kafka_topic: Arc::from(kafka_topic),
+            http_client: reqwest::Client::new(),
+            calibration_url: Arc::from(calibration_url),
         }
     }
 
@@ -222,6 +253,8 @@ impl ExampleAxumWebApp {
                 pg: self.pg,
                 kafka: self.kafka,
                 kafka_topic: self.kafka_topic,
+                http_client: self.http_client,
+                calibration_url: self.calibration_url,
             });
 
         let addr: SocketAddr = format!("0.0.0.0:{}", port).parse()?;

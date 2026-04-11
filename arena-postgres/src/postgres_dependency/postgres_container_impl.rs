@@ -12,6 +12,7 @@ pub trait PostgresImpl: Send + Sync {
         database_name: &str,
         database_username: &str,
         database_password: &str,
+        image_name: &str,
         image_tag: &str,
         container_name: &str,
     );
@@ -40,6 +41,7 @@ impl PostgresImpl for PostgresContainerImpl {
         database_name: &str,
         database_username: &str,
         database_password: &str,
+        image_name: &str,
         image_tag: &str,
         container_name: &str,
     ) {
@@ -66,6 +68,7 @@ impl PostgresImpl for PostgresContainerImpl {
         let mut request = image
             .with_mapped_port(port, ContainerPort::from(DEFAULT_CONTAINER_PORT))
             .with_health_check(healthcheck)
+            .with_name(image_name)
             .with_tag(image_tag)
             .with_container_name(container_name);
 

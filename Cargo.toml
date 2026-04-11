@@ -4,6 +4,7 @@ members = [
     "arena-postgres",
     "arena",
     "arena-kafka",
+    "arena-http",
     "arena-executable-component",
     "arena-container",
     "arena-container-component",
@@ -19,6 +20,7 @@ arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }
 arena-postgres = { path = "arena-postgres" }
 arena-executable-component = { path = "arena-executable-component" }
+arena-http = { path = "arena-http" }
 arena-container = { path = "arena-container" }
 arena-container-component = { path = "arena-container-component" }
 axum = "0.8.8"

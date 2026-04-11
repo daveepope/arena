@@ -15,7 +15,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[async_trait]
 pub trait KafkaImpl: Send + Sync {
-    async fn start(&mut self, port: u16, image_tag: &str, container_name: &str);
+    async fn start(&mut self, port: u16, image_name: &str, image_tag: &str, container_name: &str);
     async fn stop(&mut self);
     fn bootstrap_servers(&self) -> Option<&str>;
 }
@@ -39,6 +39,7 @@ pub struct KafkaDependency {
     port: u16,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
     running: bool,
+    image_name: String,
     image_tag: String,
     container_name: Option<String>,
     readiness_check: Box<dyn ReadinessCheck>,
@@ -51,6 +52,7 @@ impl KafkaDependency {
         kafka_impl: Box<dyn KafkaImpl>,
         port: u16,
         dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
+        image_name: String,
         image_tag: String,
         container_name: Option<String>,
         topics: Vec<String>,
@@ -60,6 +62,7 @@ impl KafkaDependency {
             kafka_impl,
             port,
             dependencies,
+            image_name,
             image_tag,
             container_name,
             running: false,
@@ -177,13 +180,14 @@ impl RunnableDependency for KafkaDependency {
             dep.start().await;
         }
 
+        let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
         let container_name = self.container_name.clone()
             .unwrap_or_else(|| self.set_container_name());
 
         let sw_container = Instant::now();
         self.kafka_impl
-            .start(self.port, &image_tag, &container_name)
+            .start(self.port, &image_name, &image_tag, &container_name)
             .await;
         log::debug!(
             "[Kafka-{}] container start in {:?}.",
@@ -259,6 +263,7 @@ impl RunnableDependency for KafkaDependency {
         }
 
         log::info!("[Kafka-{}] hard reset: restarting container", self.identifier);
+        let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
         let container_name = self
             .container_name
@@ -269,7 +274,7 @@ impl RunnableDependency for KafkaDependency {
         self.running = false;
 
         self.kafka_impl
-            .start(self.port, &image_tag, &container_name)
+            .start(self.port, &image_name, &image_tag, &container_name)
             .await;
         self.wait_until_ready().await;
         self.create_topics().await;

@@ -32,7 +32,7 @@ impl KafkaContainerImpl {
 
 #[async_trait]
 impl KafkaImpl for KafkaContainerImpl {
-    async fn start(&mut self, port: u16, image_tag: &str, container_name: &str) {
+    async fn start(&mut self, port: u16, image_name: &str, image_tag: &str, container_name: &str) {
         if self.container.is_some() {
             return;
         }
@@ -44,6 +44,7 @@ impl KafkaImpl for KafkaContainerImpl {
         let healthcheck = tcp_healthcheck(DEFAULT_CONTAINER_PORT.as_u16());
 
         let mut request = kafka::apache::Kafka::default()
+            .with_name(image_name)
             .with_tag(image_tag)
             .with_mapped_port(port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)
@@ -143,7 +144,7 @@ impl ConfluentKafkaContainerImpl {
 
 #[async_trait]
 impl KafkaImpl for ConfluentKafkaContainerImpl {
-    async fn start(&mut self, port: u16, image_tag: &str, container_name: &str) {
+    async fn start(&mut self, port: u16, image_name: &str, image_tag: &str, container_name: &str) {
         if self.container.is_some() {
             return;
         }
@@ -156,6 +157,7 @@ impl KafkaImpl for ConfluentKafkaContainerImpl {
         let healthcheck = tcp_healthcheck(DEFAULT_CONTAINER_PORT.as_u16());
 
         let mut request = kafka::confluent::Kafka::default()
+            .with_name(image_name)
             .with_tag(image_tag)
             .with_mapped_port(port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)

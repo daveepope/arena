@@ -34,8 +34,12 @@ fn build_dependencies(json: &EncounterJson, network: &str) -> Vec<Dependency> {
 fn build_dependency(json: &DependencyJson, network: &str) -> Option<Dependency> {
     match json {
         DependencyJson::Postgres(p) => {
-            let dep = PostgresDependency::builder(&p.identifier)
-                .with_image(p.image.as_deref().unwrap_or("14.20-trixie"))
+            let mut builder = PostgresDependency::builder(&p.identifier)
+                .with_image(p.image.as_deref().unwrap_or("14.20-trixie"));
+            if let Some(ref image_name) = p.image_name {
+                builder = builder.with_image_name(image_name);
+            }
+            let dep = builder
                 .with_port(p.port.unwrap_or(5432))
                 .with_database_name(p.database_name.as_deref().unwrap_or("arena_db"))
                 .with_database_username(p.database_username.as_deref().unwrap_or("arena_user"))
@@ -64,6 +68,9 @@ fn build_dependency(json: &DependencyJson, network: &str) -> Option<Dependency> 
                         .unwrap_or(&format!("arena-kafka-{}", k.identifier.replace(' ', "-"))),
                 )
                 .with_network(network);
+            if let Some(ref image_name) = k.image_name {
+                builder = builder.with_image_name(image_name);
+            }
             for topic in k.topics.as_deref().unwrap_or(&[]) {
                 builder = builder.with_topic(topic);
             }

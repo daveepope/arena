@@ -1,0 +1,23 @@
+[package]
+name = "arena-http"
+version.workspace = true
+edition = "2021"
+authors = ["David Pope"]
+description = "Arena HTTP mock (WireMock) implementation"
+license = "todo"
+
+[dependencies]
+arena = { workspace = true }
+arena-container = { workspace = true }
+async-trait = { workspace = true }
+testcontainers-modules = { workspace = true }
+log = { workspace = true }
+futures-timer = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+env_logger = { workspace = true }
+futures = { workspace = true }

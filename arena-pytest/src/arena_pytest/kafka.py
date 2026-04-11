@@ -14,6 +14,10 @@ class KafkaDependencyBuilder:
     def __init__(self, identifier: str):
         self._config: Dict[str, Any] = {"type": "kafka", "identifier": identifier, "topics": []}
 
+    def with_image_name(self, image_name: str) -> "KafkaDependencyBuilder":
+        self._config["image_name"] = image_name
+        return self
+
     def with_topic(self, topic: str) -> "KafkaDependencyBuilder":
         self._config["topics"].append(topic)
         return self

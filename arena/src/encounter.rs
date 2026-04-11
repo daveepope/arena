@@ -19,10 +19,18 @@ pub trait EncounterTrait: Send + Sync {
     }
 }
 
+#[async_trait]
+pub trait SetupHandler: Send + Sync {
+    async fn setup(&self, dependencies: &[Dependency]);
+}
+
+pub type Setup = Box<dyn SetupHandler>;
+
 pub struct Encounter {
     pub name: String,
     dependencies: Vec<Dependency>,
     components: Vec<Component>,
+    setup_handlers: Vec<Setup>,
     started: bool,
 }
 
@@ -32,8 +40,14 @@ impl Encounter {
             name: name.to_string(),
             dependencies,
             components,
+            setup_handlers: Vec::new(),
             started: false,
         }
+    }
+
+    pub fn with_dependency_setup_handler(mut self, handler: Setup) -> Self {
+        self.setup_handlers.push(handler);
+        self
     }
 }
 
@@ -57,6 +71,10 @@ impl EncounterTrait for Encounter {
 
         started.sort_by_key(|(i, _)| *i);
         self.dependencies = started.into_iter().map(|(_, dep)| dep).collect();
+
+        for handler in &self.setup_handlers {
+            handler.setup(&self.dependencies).await;
+        }
 
         let comps = std::mem::take(&mut self.components);
 

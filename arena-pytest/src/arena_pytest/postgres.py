@@ -5,6 +5,10 @@ class PostgresDependencyBuilder:
     def __init__(self, identifier: str):
         self._config: Dict[str, Any] = {"type": "postgres", "identifier": identifier}
 
+    def with_image_name(self, image_name: str) -> "PostgresDependencyBuilder":
+        self._config["image_name"] = image_name
+        return self
+
     def with_image(self, image: str) -> "PostgresDependencyBuilder":
         self._config["image"] = image
         return self

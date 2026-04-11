@@ -20,6 +20,8 @@ pub(super) enum DependencyJson {
 pub(super) struct PostgresJson {
     pub identifier: String,
     #[serde(default)]
+    pub image_name: Option<String>,
+    #[serde(default)]
     pub image: Option<String>,
     #[serde(default)]
     pub port: Option<u16>,
@@ -38,6 +40,8 @@ pub(super) struct PostgresJson {
 #[derive(Debug, Deserialize)]
 pub(super) struct KafkaJson {
     pub identifier: String,
+    #[serde(default)]
+    pub image_name: Option<String>,
     #[serde(default)]
     pub flavor: Option<String>,
     #[serde(default)]

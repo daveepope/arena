@@ -20,6 +20,7 @@ pub struct PostgresDependency {
     startup_sql_scripts: Option<Vec<String>>,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
     running: bool,
+    image_name: String,
     image_tag: String,
     container_name: Option<String>,
     readiness_check: Box<dyn ReadinessCheck>,
@@ -35,6 +36,7 @@ impl PostgresDependency {
         database_password: String,
         startup_sql_scripts: Option<Vec<String>>,
         dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
+        image_name: String,
         image_tag: String,
         container_name: Option<String>,
     ) -> Self {
@@ -47,6 +49,7 @@ impl PostgresDependency {
             database_password,
             startup_sql_scripts,
             dependencies,
+            image_name,
             image_tag,
             container_name,
             running: false,
@@ -212,6 +215,7 @@ impl RunnableDependency for PostgresDependency {
         let database_name = self.database_name.clone();
         let database_username = self.database_username.clone();
         let database_password = self.database_password.clone();
+        let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
         let container_name = self
             .container_name
@@ -225,6 +229,7 @@ impl RunnableDependency for PostgresDependency {
                 &database_name,
                 &database_username,
                 &database_password,
+                &image_name,
                 &image_tag,
                 &container_name,
             )
@@ -324,6 +329,7 @@ impl RunnableDependency for PostgresDependency {
         let database_name = self.database_name.clone();
         let database_username = self.database_username.clone();
         let database_password = self.database_password.clone();
+        let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
         let container_name = self
             .container_name
@@ -339,6 +345,7 @@ impl RunnableDependency for PostgresDependency {
                 &database_name,
                 &database_username,
                 &database_password,
+                &image_name,
                 &image_tag,
                 &container_name,
             )

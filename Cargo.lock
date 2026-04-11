@@ -119,6 +119,7 @@ dependencies = [
  "arena",
  "arena-container-component",
  "arena-executable-component",
+ "arena-http",
  "arena-kafka",
  "arena-postgres",
  "async-trait",
@@ -166,6 +167,24 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "arena-http"
+version = "0.1.0-beta.1"
+dependencies = [
+ "arena",
+ "arena-container",
+ "async-trait",
+ "env_logger",
+ "futures",
+ "futures-timer",
+ "log",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "testcontainers-modules",
  "tokio",
 ]
 
