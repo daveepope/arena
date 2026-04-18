@@ -2,7 +2,7 @@ load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("@rules_python//python:packaging.bzl", "py_wheel")
 
-ARENA_PYTEST_VERSION = "0.1.0b1"
+ARENA_PYTEST_VERSION = "0.2.0b1"
 
 # Keep in sync with classifiers in arena-pytest/pyproject.toml (Bazel wheel METADATA).
 ARENA_PYTEST_CLASSIFIERS = [
@@ -141,9 +141,9 @@ py_wheel(
         "//conditions:default": "any",
     }),
     strip_path_prefixes = ["arena-pytest/src"],
-    author = "The Arena Authors",
+    author = "David Pope",
     classifiers = ARENA_PYTEST_CLASSIFIERS,
-    description_file = "README.md",
+    description_file = "DESCRIPTION.md",
     description_content_type = "text/markdown",
     homepage = "https://github.com/daveepope/arena",
     license = "MIT",

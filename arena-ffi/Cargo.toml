@@ -9,8 +9,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 arena = { workspace = true }
+arena-http = { workspace = true }
 async-trait = { workspace = true }
-indexmap = { version = "2", features = ["serde"] }
 arena-container-component = { workspace = true }
 arena-executable-component = { workspace = true }
 arena-kafka = { workspace = true }

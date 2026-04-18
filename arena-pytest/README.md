@@ -1,6 +1,73 @@
 # arena-pytest
 
-Pytest plugin and helpers for Arena (C FFI). Dependencies are managed with Bazel (`@pip//`); see the repo root `MODULE.bazel`.
+Pytest library for Arena (C FFI). Dependencies are managed with Bazel (`@pip//`); see the repo root `MODULE.bazel`.
+
+## Example
+
+Stand up a match with real dependencies, then use an HTTP playbook to script scenarios against a running dependency. Mappings are scoped to the `with` block and `expect_called` is verified automatically on exit.
+
+```python
+import requests
+from arena_pytest import (
+    ClosedArena,
+    ExecutableComponentBuilder,
+    HttpDependencyBuilder,
+    HttpPlaybookBuilder,
+    HttpReadinessCheck,
+    KafkaDependencyBuilder,
+    KafkaFlavor,
+    MatchBuilder,
+    PostgresDependencyBuilder,
+)
+
+# --- arena setup (usually lives in conftest.py) ---
+
+postgres = PostgresDependencyBuilder("db").with_port(5432).with_database_name("mydb").build()
+kafka = KafkaDependencyBuilder("kafka").with_flavor(KafkaFlavor.APACHE_NATIVE).with_port(9092).with_topic("events").build()
+calibration = HttpDependencyBuilder("calibration service").with_port(3003).build()
+
+web_app = (
+    ExecutableComponentBuilder("my service")
+    .with_executable_path("/path/to/your/binary")
+    .with_readiness_check(HttpReadinessCheck(), "http://127.0.0.1:8080/health")
+    .build()
+)
+
+a_match = (
+    MatchBuilder("my-test")
+    .add_dependency(postgres)
+    .add_dependency(kafka)
+    .add_dependency(calibration)
+    .add_component(web_app)
+    .build()
+)
+
+closed = ClosedArena("Arena", [a_match])
+
+# --- in a test ---
+
+async def test_calibration_outage_returns_500():
+    arena = await closed.open()
+    try:
+        outage = (
+            HttpPlaybookBuilder("calibration service")
+            .with_mapping(
+                method="POST",
+                url_path="/api/v1/validate",
+                status=500,
+                priority=1,
+                expect_called=1,
+            )
+            .build(arena)
+        )
+
+        with outage:
+            r = requests.post("http://127.0.0.1:8080/readings", json={"value": 42})
+            assert r.status_code == 500
+        # outage context exits: mapping removed, expectation verified.
+    finally:
+        await arena.close()
+```
 
 ## Support matrix
 
@@ -26,7 +93,7 @@ From the repository root:
 bazel build //arena-pytest:arena_pytest_wheel
 ```
 
-The wheel is under `bazel-bin/arena-pytest/`. The filename is **platform-specific** (it includes the Rust FFI shared library next to `arena_pytest/`), e.g. `arena_pytest-0.1.0b1-py3-none-manylinux2014_x86_64.whl` on Linux x86_64. Build on each OS/arch you want to publish and upload **each** wheel to PyPI.
+The wheel is under `bazel-bin/arena-pytest/`. The filename is **platform-specific** (it includes the Rust FFI shared library next to `arena_pytest/`), e.g. `arena_pytest-0.2.0b1-py3-none-manylinux2014_x86_64.whl` on Linux x86_64. Build on each OS/arch you want to publish and upload **each** wheel to PyPI.
 
 Try it in another project:
 

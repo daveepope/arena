@@ -9,6 +9,8 @@ pub struct StubMapping {
     request: RequestPattern,
     response: ResponseDefinition,
     #[serde(skip_serializing_if = "Option::is_none")]
+    priority: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     scenario_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     required_scenario_state: Option<String>,
@@ -65,22 +67,37 @@ pub struct MappingBuilder {
     url_path: String,
     headers: Option<HashMap<String, HeaderPattern>>,
     body_patterns: Option<Vec<BodyPattern>>,
+    priority: Option<u32>,
     scenario_name: Option<String>,
     required_scenario_state: Option<String>,
     new_scenario_state: Option<String>,
 }
 
 impl MappingBuilder {
+    pub(crate) fn method(&self) -> &str {
+        &self.method
+    }
+
+    pub(crate) fn url_path(&self) -> &str {
+        &self.url_path
+    }
+
     pub(crate) fn new(method: &str, url_path: impl Into<String>) -> Self {
         Self {
             method: method.to_string(),
             url_path: url_path.into(),
             headers: None,
             body_patterns: None,
+            priority: None,
             scenario_name: None,
             required_scenario_state: None,
             new_scenario_state: None,
         }
+    }
+
+    pub fn with_priority(mut self, priority: u32) -> Self {
+        self.priority = Some(priority);
+        self
     }
 
     pub fn with_header(mut self, name: impl Into<String>, pattern: HeaderPattern) -> Self {
@@ -133,6 +150,7 @@ impl MappingBuilder {
                 body_patterns: self.body_patterns,
             },
             response,
+            priority: self.priority,
             scenario_name: self.scenario_name,
             required_scenario_state,
             new_scenario_state: self.new_scenario_state,
@@ -151,6 +169,7 @@ impl MappingBuilder {
             headers: self.headers,
             body_patterns: self.body_patterns,
         };
+        let priority = self.priority;
 
         let last = responses.len() - 1;
         responses
@@ -170,6 +189,7 @@ impl MappingBuilder {
                 StubMapping {
                     request: request.clone(),
                     response,
+                    priority,
                     scenario_name: Some(scenario_name.clone()),
                     required_scenario_state: Some(required),
                     new_scenario_state: next,

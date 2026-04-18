@@ -15,23 +15,11 @@ EXEC_WEB_APP_PORT = 3001
 DOCKER_WEB_HOST_PORT = 3002
 KAFKA_PORT = 9094
 KAFKA_TOPIC = "readings"
+CALIBRATION_HOST_PORT = 3003
+CALIBRATION_VALIDATE_PATH = "/api/v1/validate"
 
 BASE_URL_EXEC = f"http://127.0.0.1:{EXEC_WEB_APP_PORT}"
 BASE_URL_DOCKER = f"http://127.0.0.1:{DOCKER_WEB_HOST_PORT}"
-
-# Bazel runfiles are sparse: Dockerfile / full build context is not available for docker build.
-_SKIP_DOCKER_WEB_WHEN_RUNFILES = pytest.mark.skipif(
-    bool(os.environ.get("RUNFILES_DIR")),
-    reason="Docker web app build context not in runfiles; run pytest from repo root for full stack.",
-)
-
-
-def test_exec_arena_version():
-    from arena_pytest import get_arena_version
-
-    version = get_arena_version()
-    assert version is not None
-    assert len(version) > 0
 
 
 def test_exec_reading_flow_kafka_and_http(arena):
@@ -76,7 +64,59 @@ def test_exec_multiple_readings(arena):
     assert id2 in ids
 
 
-@_SKIP_DOCKER_WEB_WHEN_RUNFILES
+def test_exec_calibration_outage_returns_error(arena):
+    from arena_pytest import HttpPlaybookBuilder
+
+    outage = (
+        HttpPlaybookBuilder("calibration service")
+            .with_mapping(
+                method="POST",
+                url_path=CALIBRATION_VALIDATE_PATH,
+                status=500,
+                priority=1,
+                expect_called=1,
+            )
+            .build(arena)
+    )
+
+    with outage:
+        r = requests.post(
+            f"{BASE_URL_EXEC}/readings",
+            json={"user_name": "Outage Test User", "value": 99, "comment": None},
+            timeout=10,
+        )
+        assert r.status_code == 500, (
+            f"expected 500 while calibration is in outage playbook, got {r.status_code}: {r.text}"
+        )
+
+    recovered_id = _create_reading(BASE_URL_EXEC, "Recovery Test User", 17, "post-outage")
+    readings = _get_readings(BASE_URL_EXEC)
+    found = next((r for r in readings if r["id"] == recovered_id), None)
+    assert found is not None, "recovered reading should be present"
+    assert found["user_name"] == "Recovery Test User"
+    assert found["value"] == 17
+
+
+def test_exec_calibration_playbook_expectation_failure_is_assertion(arena):
+    from arena_pytest import HttpPlaybookBuilder
+
+    unused = (
+        HttpPlaybookBuilder("calibration service")
+            .with_mapping(
+                method="POST",
+                url_path=CALIBRATION_VALIDATE_PATH,
+                status=500,
+                priority=1,
+                expect_called=1,
+            )
+            .build(arena)
+    )
+
+    with pytest.raises(AssertionError, match="expected POST .* to be called exactly 1"):
+        with unused:
+            pass
+
+
 def test_docker_reading_flow_kafka_and_http(arena_docker):
     bootstrap = f"localhost:{KAFKA_PORT}"
     id_queue: queue.Queue[int] = queue.Queue()

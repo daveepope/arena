@@ -1,4 +1,4 @@
-use arena::{ClosedArena, Component, Dependency, Encounter, EncounterTrait};
+use arena::{ClosedArena, Component, Dependency, Match, MatchTrait};
 use arena_kafka::{KafkaDependency, KafkaFlavor, KAFKA_INTERNAL_DOCKER_PORT};
 use arena_postgres::PostgresDependency;
 use arena_container_component::container_component::ContainerComponent;
@@ -228,8 +228,8 @@ async fn main() {
 
     let dependencies = setup_arena_dependencies();
     let components = setup_arena_components().await;
-    let encounters: Vec<Box<dyn EncounterTrait>> = vec![Box::new( Encounter::new("End to end happy path encounter", dependencies, components))];
-    let closed_arena = ClosedArena::new(String::from("Example Arena"), encounters);
+    let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new( Match::new("End to end happy path match", dependencies, components))];
+    let closed_arena = ClosedArena::new(String::from("Example Arena"), matches);
     
     let open_arena = closed_arena.open().await;
 

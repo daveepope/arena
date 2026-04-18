@@ -1,13 +1,26 @@
+from arena_pytest._ffi import ArenaFfiError, ArenaStatus
 from arena_pytest.arena import (
     OpenArena,
     arena,
+    arena_ffi,
     closed_arena,
-    get_arena_version,
 )
 from arena_pytest.closed_arena import ClosedArena
-from arena_pytest.encounter import Encounter, EncounterBuilder
+from arena_pytest.matches import Match, MatchBuilder
 from arena_pytest.container_component import ContainerComponent, ContainerComponentBuilder
-from arena_pytest.executable_component import BuildTool, ExecutableComponent, ExecutableComponentBuilder
+from arena_pytest.executable_component import (
+    BuildTool,
+    ExecutableComponent,
+    ExecutableComponentBuilder,
+)
+from arena_pytest.http import (
+    HttpDependency,
+    HttpDependencyBuilder,
+    HttpOnDependencyStartup,
+    HttpOnDependencyStartupBuilder,
+    HttpPlaybook,
+    HttpPlaybookBuilder,
+)
 from arena_pytest.kafka import (
     KAFKA_INTERNAL_DOCKER_PORT,
     KafkaDependency,
@@ -23,14 +36,22 @@ from arena_pytest.readiness import (
 )
 
 __all__ = [
+    "ArenaFfiError",
+    "ArenaStatus",
     "ClosedArena",
     "ContainerComponent",
     "ContainerComponentBuilder",
-    "Encounter",
-    "EncounterBuilder",
+    "Match",
+    "MatchBuilder",
     "BuildTool",
     "ExecutableComponent",
     "ExecutableComponentBuilder",
+    "HttpDependency",
+    "HttpDependencyBuilder",
+    "HttpOnDependencyStartup",
+    "HttpOnDependencyStartupBuilder",
+    "HttpPlaybook",
+    "HttpPlaybookBuilder",
     "KAFKA_INTERNAL_DOCKER_PORT",
     "KafkaDependency",
     "KafkaDependencyBuilder",
@@ -42,7 +63,7 @@ __all__ = [
     "ReadinessCheck",
     "run_readiness",
     "arena",
+    "arena_ffi",
     "closed_arena",
-    "get_arena_version",
     "OpenArena",
 ]

@@ -4,14 +4,76 @@ pub mod stub;
 pub mod verify;
 
 use crate::http_dependency::HttpDependency;
+use async_trait::async_trait;
 use header_pattern::HeaderPattern;
 use response::ResponseDefinition;
+use serde::Deserialize;
+use std::collections::HashSet;
 use stub::StubMapping;
-use verify::{RequestCriteria, RecordedRequest, CountResponse, FindResponse, format_request_journal};
+use verify::{
+    RequestCriteria, RecordedRequest, FindResponse,
+    ServeEvent, ServeEventsResponse, event_matches_criteria, event_stub_id,
+    format_request_journal,
+};
+
+#[derive(Debug, Clone)]
+struct RegisteredMapping {
+    id: String,
+    method: String,
+    url_path: String,
+}
+
+#[derive(Deserialize)]
+struct MappingCreated {
+    id: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ExpectedCount {
+    Exactly(u64),
+    AtLeast(u64),
+    Never,
+}
+
+#[derive(Debug, Clone)]
+struct Expectation {
+    method: String,
+    url_path: String,
+    count: ExpectedCount,
+}
+
+impl Expectation {
+    fn describe(&self) -> String {
+        match self.count {
+            ExpectedCount::Exactly(n) => format!("{} {} called exactly {n} time(s)", self.method, self.url_path),
+            ExpectedCount::AtLeast(n) => format!("{} {} called at least {n} time(s)", self.method, self.url_path),
+            ExpectedCount::Never => format!("{} {} never called", self.method, self.url_path),
+        }
+    }
+
+    fn check(&self, actual: u64) -> Result<(), String> {
+        match self.count {
+            ExpectedCount::Exactly(n) if actual != n => Err(format!(
+                "  - expected {} {} to be called exactly {n} time(s), but saw {actual}",
+                self.method, self.url_path
+            )),
+            ExpectedCount::AtLeast(n) if actual < n => Err(format!(
+                "  - expected {} {} to be called at least {n} time(s), but saw {actual}",
+                self.method, self.url_path
+            )),
+            ExpectedCount::Never if actual != 0 => Err(format!(
+                "  - expected {} {} to never be called, but saw {actual} call(s)",
+                self.method, self.url_path
+            )),
+            _ => Ok(()),
+        }
+    }
+}
 
 pub struct Playbook {
     admin_url: String,
     mappings: Vec<StubMapping>,
+    expectations: Vec<Expectation>,
 }
 
 impl Playbook {
@@ -22,6 +84,7 @@ impl Playbook {
         Self {
             admin_url,
             mappings: Vec::new(),
+            expectations: Vec::new(),
         }
     }
 
@@ -45,14 +108,9 @@ impl Playbook {
         let client = reqwest::Client::new();
         let mappings_url = format!("{}/mappings", self.admin_url);
 
-        let mut registered: Vec<(String, String)> = Vec::with_capacity(self.mappings.len());
+        let mut registered: Vec<RegisteredMapping> = Vec::with_capacity(self.mappings.len());
 
         for (idx, mapping) in self.mappings.iter().enumerate() {
-            registered.push((
-                mapping.method().to_string(),
-                mapping.url_path().to_string(),
-            ));
-
             let body = serde_json::to_string(mapping)
                 .unwrap_or_else(|e| panic!("failed to serialize mapping {idx}: {e}"));
 
@@ -69,142 +127,181 @@ impl Playbook {
                 let body = resp.text().await.unwrap_or_default();
                 panic!("mapping {idx} rejected by server (HTTP {status}): {body}");
             }
+
+            let text = resp.text().await
+                .unwrap_or_else(|e| panic!("read mapping {idx} response: {e}"));
+            let created: MappingCreated = serde_json::from_str(&text)
+                .unwrap_or_else(|e| panic!("parse mapping {idx} response: {e}\nbody: {text}"));
+
+            registered.push(RegisteredMapping {
+                id: created.id,
+                method: mapping.method().to_string(),
+                url_path: mapping.url_path().to_string(),
+            });
         }
 
-        log::info!("Playbook applied {} mapping(s).", self.mappings.len());
+        log::info!(
+            "Playbook applied {} mapping(s), {} expectation(s).",
+            self.mappings.len(),
+            self.expectations.len(),
+        );
 
         ActivePlaybook {
             admin_url: self.admin_url,
             registered,
+            expectations: self.expectations,
         }
+    }
+}
+
+#[async_trait]
+impl arena::Playbook for Playbook {
+    type Active = ActivePlaybook;
+
+    async fn run(self) -> Self::Active {
+        Playbook::run(self).await
     }
 }
 
 pub struct ActivePlaybook {
     admin_url: String,
-    registered: Vec<(String, String)>,
+    registered: Vec<RegisteredMapping>,
+    expectations: Vec<Expectation>,
 }
 
 impl ActivePlaybook {
+    pub fn admin_url(&self) -> &str {
+        &self.admin_url
+    }
+
+    pub fn persist(mut self) {
+        self.registered.clear();
+        self.expectations.clear();
+    }
+
     fn owns(&self, criteria: &RequestCriteria) -> bool {
         let (method, path) = criteria.method_and_path();
-        self.registered.iter().any(|(m, p)| {
-            (method.is_none() || method.as_deref() == Some(m.as_str()))
-                && (path.is_none() || path.as_deref() == Some(p.as_str()))
+        self.registered.iter().any(|r| {
+            (method.is_none() || method.as_deref() == Some(r.method.as_str()))
+                && (path.is_none() || path.as_deref() == Some(r.url_path.as_str()))
         })
     }
 
-    pub async fn verify(
-        &self,
-        expected_count: u64,
-        criteria: RequestCriteria,
-    ) {
-        if !self.owns(&criteria) {
-            panic!(
-                "\n\nPlaybook verification failed for: {criteria}\n\
-                 \n  This playbook does not own a mapping for {criteria}.\n\
-                 \n  Registered mappings:\n{}\n",
-                self.format_registered(),
-            );
-        }
+    fn owned_ids(&self) -> HashSet<&str> {
+        self.registered.iter().map(|r| r.id.as_str()).collect()
+    }
 
-        let client = reqwest::Client::new();
-        let body = serde_json::to_string(&criteria).expect("serialize request criteria");
-
-        let resp = client
-            .post(format!("{}/requests/count", self.admin_url))
-            .header("Content-Type", "application/json")
-            .body(body)
-            .send()
-            .await
-            .unwrap_or_else(|e| panic!("verify request failed: {e}"));
-
-        let text = resp.text().await
-            .unwrap_or_else(|e| panic!("verify read failed: {e}"));
-        let count_resp: CountResponse = serde_json::from_str(&text)
-            .unwrap_or_else(|e| panic!("verify parse failed: {e}"));
-
-        if count_resp.count != expected_count {
-            let journal = self.fetch_all_requests(&client).await;
+    pub async fn verify(&self, expected_count: u64, criteria: RequestCriteria) {
+        let actual = self.scoped_count(&criteria).await;
+        if actual != expected_count {
+            let client = reqwest::Client::new();
+            let all = self.fetch_all_requests(&client).await;
             panic!(
                 "\n\nPlaybook verification failed for: {criteria}\n\
                  \n  Expected exactly {expected_count} request(s), but received {actual}.\n\
                  \nAll requests received:\n{journal}\n",
-                actual = count_resp.count,
-                journal = format_request_journal(&journal),
+                journal = format_request_journal(&all),
             );
         }
     }
 
-    pub async fn verify_at_least(
-        &self,
-        minimum: u64,
-        criteria: RequestCriteria,
-    ) {
-        if !self.owns(&criteria) {
-            panic!(
-                "\n\nPlaybook verification failed for: {criteria}\n\
-                 \n  This playbook does not own a mapping for {criteria}.\n\
-                 \n  Registered mappings:\n{}\n",
-                self.format_registered(),
-            );
-        }
-
-        let client = reqwest::Client::new();
-        let body = serde_json::to_string(&criteria).expect("serialize request criteria");
-
-        let resp = client
-            .post(format!("{}/requests/count", self.admin_url))
-            .header("Content-Type", "application/json")
-            .body(body)
-            .send()
-            .await
-            .unwrap_or_else(|e| panic!("verify request failed: {e}"));
-
-        let text = resp.text().await
-            .unwrap_or_else(|e| panic!("verify read failed: {e}"));
-        let count_resp: CountResponse = serde_json::from_str(&text)
-            .unwrap_or_else(|e| panic!("verify parse failed: {e}"));
-
-        if count_resp.count < minimum {
-            let journal = self.fetch_all_requests(&client).await;
+    pub async fn verify_at_least(&self, minimum: u64, criteria: RequestCriteria) {
+        let actual = self.scoped_count(&criteria).await;
+        if actual < minimum {
+            let client = reqwest::Client::new();
+            let all = self.fetch_all_requests(&client).await;
             panic!(
                 "\n\nPlaybook verification failed for: {criteria}\n\
                  \n  Expected at least {minimum} request(s), but received {actual}.\n\
                  \nAll requests received:\n{journal}\n",
-                actual = count_resp.count,
-                journal = format_request_journal(&journal),
+                journal = format_request_journal(&all),
             );
         }
     }
 
-    pub async fn find_requests(
-        &self,
-        criteria: RequestCriteria,
-    ) -> Vec<RecordedRequest> {
+    pub async fn find_requests(&self, criteria: RequestCriteria) -> Vec<RecordedRequest> {
+        if criteria.has_header_criteria() {
+            panic!(
+                "ActivePlaybook::find_requests does not support header criteria in scope-local \
+                 mode (criteria: {criteria}). Match on method + urlPath only."
+            );
+        }
+        if !self.owns(&criteria) {
+            self.panic_not_owned(&criteria);
+        }
+
         let client = reqwest::Client::new();
-        let body = serde_json::to_string(&criteria).expect("serialize request criteria");
+        let events = self.fetch_scope_events(&client).await;
+        let matched: Vec<&ServeEvent> = events
+            .iter()
+            .filter(|ev| event_matches_criteria(ev, &criteria))
+            .collect();
+
+        self.hydrate_recorded(&client, &matched).await
+    }
+
+    async fn scoped_count(&self, criteria: &RequestCriteria) -> u64 {
+        if criteria.has_header_criteria() {
+            panic!(
+                "ActivePlaybook::verify does not support header criteria in scope-local mode \
+                 (criteria: {criteria}). Match on method + urlPath only."
+            );
+        }
+        if !self.owns(criteria) {
+            self.panic_not_owned(criteria);
+        }
+
+        let client = reqwest::Client::new();
+        let events = self.fetch_scope_events(&client).await;
+        events
+            .iter()
+            .filter(|ev| event_matches_criteria(ev, criteria))
+            .count() as u64
+    }
+
+    async fn fetch_scope_events(&self, client: &reqwest::Client) -> Vec<ServeEvent> {
+        fetch_scope_events_for(client, &self.admin_url, &self.owned_ids()).await
+    }
+
+    async fn hydrate_recorded(
+        &self,
+        client: &reqwest::Client,
+        events: &[&ServeEvent],
+    ) -> Vec<RecordedRequest> {
+        if events.is_empty() {
+            return Vec::new();
+        }
 
         let resp = client
             .post(format!("{}/requests/find", self.admin_url))
             .header("Content-Type", "application/json")
-            .body(body)
+            .body("{}")
             .send()
-            .await
-            .unwrap_or_else(|e| panic!("find_requests failed: {e}"));
+            .await;
+        let all: Vec<RecordedRequest> = match resp {
+            Ok(r) => {
+                let text = r.text().await.unwrap_or_default();
+                serde_json::from_str::<FindResponse>(&text)
+                    .map(|f| f.requests)
+                    .unwrap_or_default()
+            }
+            Err(_) => Vec::new(),
+        };
 
-        let text = resp.text().await
-            .unwrap_or_else(|e| panic!("find_requests read failed: {e}"));
-        let find_resp: FindResponse = serde_json::from_str(&text)
-            .unwrap_or_else(|e| panic!("find_requests parse failed: {e}"));
-
-        find_resp.requests
+        let mut out: Vec<RecordedRequest> = Vec::with_capacity(events.len());
+        for ev in events {
+            let logged_path = ev.request.url.split('?').next().unwrap_or(&ev.request.url);
+            if let Some(found) = all.iter().find(|r: &&RecordedRequest| {
+                r.method.eq_ignore_ascii_case(&ev.request.method)
+                    && r.url.split('?').next().unwrap_or(&r.url) == logged_path
+            }) {
+                out.push(found.clone());
+            }
+        }
+        out
     }
 
-    async fn fetch_all_requests(
-        &self,
-        client: &reqwest::Client,
-    ) -> Vec<RecordedRequest> {
+    async fn fetch_all_requests(&self, client: &reqwest::Client) -> Vec<RecordedRequest> {
         let resp = client
             .post(format!("{}/requests/find", self.admin_url))
             .header("Content-Type", "application/json")
@@ -222,6 +319,15 @@ impl ActivePlaybook {
         }
     }
 
+    fn panic_not_owned(&self, criteria: &RequestCriteria) -> ! {
+        panic!(
+            "\n\nPlaybook verification failed for: {criteria}\n\
+             \n  This playbook does not own a mapping for {criteria}.\n\
+             \n  Registered mappings:\n{}\n",
+            self.format_registered(),
+        );
+    }
+
     fn format_registered(&self) -> String {
         if self.registered.is_empty() {
             return "  (none)".to_string();
@@ -229,9 +335,206 @@ impl ActivePlaybook {
         self.registered
             .iter()
             .enumerate()
-            .map(|(i, (m, p))| format!("  {}. {m} {p}", i + 1))
+            .map(|(i, r)| format!("  {}. {} {}", i + 1, r.method, r.url_path))
             .collect::<Vec<_>>()
             .join("\n")
+    }
+}
+
+async fn fetch_scope_events_for(
+    client: &reqwest::Client,
+    admin_url: &str,
+    owned: &HashSet<&str>,
+) -> Vec<ServeEvent> {
+    let resp = client
+        .get(format!("{admin_url}/requests?limit=1000"))
+        .send()
+        .await
+        .unwrap_or_else(|e| panic!("fetch serve events failed: {e}"));
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        panic!("fetch serve events got HTTP {status}: {text}");
+    }
+
+    let text = resp.text().await
+        .unwrap_or_else(|e| panic!("read serve events failed: {e}"));
+    let parsed: ServeEventsResponse = serde_json::from_str(&text)
+        .unwrap_or_else(|e| panic!("parse serve events failed: {e}\nbody: {text}"));
+
+    parsed
+        .requests
+        .into_iter()
+        .filter(|ev| event_stub_id(ev).map(|id| owned.contains(id)).unwrap_or(false))
+        .collect()
+}
+
+impl Drop for ActivePlaybook {
+    fn drop(&mut self) {
+        let already_unwinding = std::thread::panicking();
+        let expectations = std::mem::take(&mut self.expectations);
+        let registered = std::mem::take(&mut self.registered);
+
+        if registered.is_empty() && expectations.is_empty() {
+            return;
+        }
+
+        let admin_url = self.admin_url.clone();
+        let mapping_ids: Vec<String> = registered.iter().map(|r| r.id.clone()).collect();
+
+        let handle = std::thread::spawn(move || -> Result<(), String> {
+            let rt = match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(e) => {
+                    log::warn!("ActivePlaybook::drop: failed to build runtime: {e}");
+                    return Ok(());
+                }
+            };
+            rt.block_on(async move {
+                let client = reqwest::Client::new();
+
+                let verify_result = if already_unwinding || expectations.is_empty() {
+                    Ok(())
+                } else {
+                    verify_expectations(&client, &admin_url, &mapping_ids, &expectations).await
+                };
+
+                delete_owned_journal_entries(&client, &admin_url, &mapping_ids).await;
+
+                for id in &mapping_ids {
+                    let url = format!("{admin_url}/mappings/{id}");
+                    match client.delete(&url).send().await {
+                        Ok(r) if r.status().is_success() => {
+                            log::debug!("ActivePlaybook::drop: deleted mapping {id}");
+                        }
+                        Ok(r) => log::warn!(
+                            "ActivePlaybook::drop: delete mapping {id} got HTTP {}",
+                            r.status()
+                        ),
+                        Err(e) => log::warn!(
+                            "ActivePlaybook::drop: delete mapping {id} failed: {e}"
+                        ),
+                    }
+                }
+
+                verify_result
+            })
+        });
+
+        let outcome = handle.join();
+
+        if already_unwinding {
+            return;
+        }
+
+        match outcome {
+            Ok(Ok(())) => {}
+            Ok(Err(msg)) => panic!("{msg}"),
+            Err(_) => panic!("ActivePlaybook::drop: cleanup thread panicked"),
+        }
+    }
+}
+
+async fn verify_expectations(
+    client: &reqwest::Client,
+    admin_url: &str,
+    mapping_ids: &[String],
+    expectations: &[Expectation],
+) -> Result<(), String> {
+    let owned: HashSet<&str> = mapping_ids.iter().map(|s| s.as_str()).collect();
+    let events = fetch_scope_events_for(client, admin_url, &owned).await;
+
+    let mut errors: Vec<String> = Vec::new();
+
+    for expect in expectations {
+        let actual = events
+            .iter()
+            .filter(|ev| {
+                ev.request.method.eq_ignore_ascii_case(&expect.method)
+                    && {
+                        let p = ev.request.url.split('?').next().unwrap_or(&ev.request.url);
+                        p == expect.url_path
+                    }
+            })
+            .count() as u64;
+
+        if let Err(msg) = expect.check(actual) {
+            errors.push(msg);
+        }
+    }
+
+    if errors.is_empty() {
+        return Ok(());
+    }
+
+    let expectations_desc = expectations
+        .iter()
+        .map(|e| format!("  - {}", e.describe()))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Err(format!(
+        "\n\nPlaybook expectation(s) failed:\n{}\n\nExpectations were:\n{}\n",
+        errors.join("\n"),
+        expectations_desc,
+    ))
+}
+
+async fn delete_owned_journal_entries(
+    client: &reqwest::Client,
+    admin_url: &str,
+    mapping_ids: &[String],
+) {
+    let owned: HashSet<&str> = mapping_ids.iter().map(|s| s.as_str()).collect();
+
+    let resp = client
+        .get(format!("{admin_url}/requests?limit=1000"))
+        .send()
+        .await;
+    let events: Vec<ServeEvent> = match resp {
+        Ok(r) if r.status().is_success() => {
+            let text = r.text().await.unwrap_or_default();
+            serde_json::from_str::<ServeEventsResponse>(&text)
+                .map(|r| r.requests)
+                .unwrap_or_default()
+        }
+        Ok(r) => {
+            log::warn!(
+                "ActivePlaybook::drop: fetch events got HTTP {} — skipping journal cleanup",
+                r.status()
+            );
+            return;
+        }
+        Err(e) => {
+            log::warn!("ActivePlaybook::drop: fetch events failed: {e} — skipping journal cleanup");
+            return;
+        }
+    };
+
+    for ev in events {
+        let matches = event_stub_id(&ev).map(|id| owned.contains(id)).unwrap_or(false);
+        if !matches {
+            continue;
+        }
+        let url = format!("{admin_url}/requests/{id}", id = ev.id);
+        match client.delete(&url).send().await {
+            Ok(r) if r.status().is_success() => {
+                log::debug!("ActivePlaybook::drop: deleted journal entry {}", ev.id);
+            }
+            Ok(r) => log::warn!(
+                "ActivePlaybook::drop: delete journal entry {} got HTTP {}",
+                ev.id,
+                r.status()
+            ),
+            Err(e) => log::warn!(
+                "ActivePlaybook::drop: delete journal entry {} failed: {e}",
+                ev.id
+            ),
+        }
     }
 }
 
@@ -263,6 +566,11 @@ impl PlaybookMappingBuilder {
         self
     }
 
+    pub fn with_priority(mut self, priority: u32) -> Self {
+        self.mapping = self.mapping.with_priority(priority);
+        self
+    }
+
     pub fn in_scenario(mut self, name: impl Into<String>) -> Self {
         self.mapping = self.mapping.in_scenario(name);
         self
@@ -283,6 +591,7 @@ impl PlaybookMappingBuilder {
             playbook: self.playbook,
             mapping: self.mapping,
             responses: vec![response],
+            expectation: None,
         }
     }
 
@@ -298,6 +607,7 @@ pub struct PlaybookSequenceBuilder {
     playbook: Playbook,
     mapping: stub::MappingBuilder,
     responses: Vec<ResponseDefinition>,
+    expectation: Option<ExpectedCount>,
 }
 
 impl PlaybookSequenceBuilder {
@@ -306,9 +616,33 @@ impl PlaybookSequenceBuilder {
         self
     }
 
+    pub fn expect_called(mut self, count: u64) -> Self {
+        self.expectation = Some(ExpectedCount::Exactly(count));
+        self
+    }
+
+    pub fn expect_called_at_least(mut self, count: u64) -> Self {
+        self.expectation = Some(ExpectedCount::AtLeast(count));
+        self
+    }
+
+    pub fn expect_never_called(mut self) -> Self {
+        self.expectation = Some(ExpectedCount::Never);
+        self
+    }
+
     fn finalize(mut self) -> Playbook {
+        let method = self.mapping.method().to_string();
+        let url_path = self.mapping.url_path().to_string();
         let mappings = self.mapping.will_return_sequence(self.responses);
         self.playbook.mappings.extend(mappings);
+        if let Some(count) = self.expectation {
+            self.playbook.expectations.push(Expectation {
+                method,
+                url_path,
+                count,
+            });
+        }
         self.playbook
     }
 

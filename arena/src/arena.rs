@@ -1,38 +1,38 @@
-use crate::encounter::EncounterTrait;
+use crate::matches::MatchTrait;
 use futures::executor::block_on;
 use futures::future::join_all;
 use std::time::Instant;
 
 pub struct ClosedArena {
     pub name: String,
-    pub encounters: Vec<Box<dyn EncounterTrait>>,
+    pub matches: Vec<Box<dyn MatchTrait>>,
 }
 
 pub struct OpenArena {
     name: String,
-    encounters: Vec<Box<dyn EncounterTrait>>,
+    matches: Vec<Box<dyn MatchTrait>>,
     closed: bool,
 }
 
 impl ClosedArena {
-    pub fn new(name: String, encounters: Vec<Box<dyn EncounterTrait>>) -> Self {
-        Self { name, encounters }
+    pub fn new(name: String, matches: Vec<Box<dyn MatchTrait>>) -> Self {
+        Self { name, matches }
     }
 
     pub async fn open(mut self) -> OpenArena {
         log::info!("[Arena-{}] opening.", self.name);
         let sw = Instant::now();
 
-        let encounters = std::mem::take(&mut self.encounters);
+        let matches = std::mem::take(&mut self.matches);
 
-        let mut started = join_all(encounters.into_iter().enumerate().map(|(i, mut enc)| async move {
-            enc.start().await;
-            (i, enc)
+        let mut started = join_all(matches.into_iter().enumerate().map(|(i, mut m)| async move {
+            m.start().await;
+            (i, m)
         }))
         .await;
 
         started.sort_by_key(|(i, _)| *i);
-        let encounters = started.into_iter().map(|(_, enc)| enc).collect();
+        let matches = started.into_iter().map(|(_, m)| m).collect();
 
         log::debug!(
             "[Arena-{}] open in {:?}.",
@@ -43,7 +43,7 @@ impl ClosedArena {
 
         OpenArena {
             name: self.name,
-            encounters,
+            matches,
             closed: false,
         }
     }
@@ -54,8 +54,8 @@ impl OpenArena {
         &self,
         identifier: &str,
     ) -> Option<&(dyn crate::dependency::RunnableDependency + '_)> {
-        for e in &self.encounters {
-            if let Some(d) = e.dependency(identifier) {
+        for m in &self.matches {
+            if let Some(d) = m.dependency(identifier) {
                 return Some(d);
             }
         }
@@ -66,8 +66,8 @@ impl OpenArena {
         &mut self,
         identifier: &str,
     ) -> Option<&mut (dyn crate::dependency::RunnableDependency + '_)> {
-        for e in &mut self.encounters {
-            if let Some(d) = e.dependency_mut(identifier) {
+        for m in &mut self.matches {
+            if let Some(d) = m.dependency_mut(identifier) {
                 return Some(d);
             }
         }
@@ -78,9 +78,9 @@ impl OpenArena {
         self.internal_close().await;
 
         let name = std::mem::take(&mut self.name);
-        let encounters = std::mem::take(&mut self.encounters);
+        let matches = std::mem::take(&mut self.matches);
 
-        ClosedArena { name, encounters }
+        ClosedArena { name, matches }
     }
 
     async fn internal_close(&mut self) {
@@ -88,16 +88,16 @@ impl OpenArena {
             log::info!("[Arena-{}] closing.", self.name);
             let sw = Instant::now();
 
-            let encounters = std::mem::take(&mut self.encounters);
+            let matches = std::mem::take(&mut self.matches);
 
-            let mut stopped = join_all(encounters.into_iter().enumerate().map(|(i, mut enc)| async move {
-                enc.stop().await;
-                (i, enc)
+            let mut stopped = join_all(matches.into_iter().enumerate().map(|(i, mut m)| async move {
+                m.stop().await;
+                (i, m)
             }))
             .await;
 
             stopped.sort_by_key(|(i, _)| *i);
-            self.encounters = stopped.into_iter().map(|(_, enc)| enc).collect();
+            self.matches = stopped.into_iter().map(|(_, m)| m).collect();
 
             log::debug!(
                 "[Arena-{}] closed in {:?}.",
@@ -126,23 +126,23 @@ mod tests {
     use mockall::mock;
 
     mock! {
-        Encounter {}
+        Match {}
         #[async_trait]
-        impl EncounterTrait for Encounter {
+        impl MatchTrait for Match {
             async fn start(&mut self);
             async fn stop(&mut self);
         }
     }
 
     #[tokio::test]
-    async fn test_arena_calls_start_and_stop_on_all_encounters() {
+    async fn test_arena_calls_start_and_stop_on_all_matches() {
         let _ = env_logger::builder().is_test(true).try_init();
-        let encounters: Vec<Box<dyn EncounterTrait>> = vec![
-            Box::new(create_and_setup_stub_encounter()),
-            Box::new(create_and_setup_stub_encounter()),
+        let matches: Vec<Box<dyn MatchTrait>> = vec![
+            Box::new(create_and_setup_stub_match()),
+            Box::new(create_and_setup_stub_match()),
         ];
 
-        let closed = ClosedArena::new("TestArena".to_string(), encounters);
+        let closed = ClosedArena::new("TestArena".to_string(), matches);
         let open = closed.open().await;
         let _closed = open.close().await;
     }
@@ -153,20 +153,20 @@ mod tests {
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let encounters: Vec<Box<dyn EncounterTrait>> =
-                vec![Box::new(create_and_setup_stub_encounter())];
+            let matches: Vec<Box<dyn MatchTrait>> =
+                vec![Box::new(create_and_setup_stub_match())];
 
-            let closed = ClosedArena::new("TestArena".to_string(), encounters);
+            let closed = ClosedArena::new("TestArena".to_string(), matches);
             let open = closed.open().await;
 
             drop(open);
         });
     }
 
-    fn create_and_setup_stub_encounter() -> MockEncounter {
-        let mut mock_encounter = MockEncounter::new();
-        mock_encounter.expect_start().times(1).returning(|| ());
-        mock_encounter.expect_stop().times(1).returning(|| ());
-        mock_encounter
+    fn create_and_setup_stub_match() -> MockMatch {
+        let mut mock_match = MockMatch::new();
+        mock_match.expect_start().times(1).returning(|| ());
+        mock_match.expect_stop().times(1).returning(|| ());
+        mock_match
     }
 }

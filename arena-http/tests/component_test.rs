@@ -689,3 +689,219 @@ async fn http_dependency_sequence_component_test() {
         Err(panic_payload) => std::panic::resume_unwind(panic_payload),
     }
 }
+
+async fn run_scoped_drop_test(ctx: &TestContext) -> Result<(), String> {
+    {
+        let scoped = ctx.http_dependency.playbook()
+            .get("/api/mission/status")
+                .will_return(ok_json(json!({ "status": "nominal" })))
+            .run()
+            .await;
+
+        for _ in 0..2 {
+            let resp = ctx.fire_get("/api/mission/status").await?;
+            assert_eq!(resp.status().as_u16(), 200);
+        }
+        scoped.verify(2, get_requested_for("/api/mission/status")).await;
+        log::info!("[scoped-drop] in-scope: 2 requests recorded and verified");
+    }
+
+    let resp = ctx.fire_get("/api/mission/status").await?;
+    assert_eq!(
+        resp.status().as_u16(),
+        404,
+        "expected 404 after ActivePlaybook was dropped and mapping deleted, got {}",
+        resp.status().as_u16(),
+    );
+    log::info!("[scoped-drop] after drop: mapping is gone (404)");
+
+    {
+        let first = ctx.http_dependency.playbook()
+            .get("/api/mission/heartbeat")
+                .will_return(ok_json(json!({ "ok": true })))
+            .run()
+            .await;
+
+        for _ in 0..3 {
+            let resp = ctx.fire_get("/api/mission/heartbeat").await?;
+            assert_eq!(resp.status().as_u16(), 200);
+        }
+        first.verify(3, get_requested_for("/api/mission/heartbeat")).await;
+
+        let second = ctx.http_dependency.playbook()
+            .get("/api/mission/telemetry")
+                .will_return(ok_json(json!({ "ok": true })))
+            .run()
+            .await;
+
+        let resp = ctx.fire_get("/api/mission/telemetry").await?;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        second.verify(1, get_requested_for("/api/mission/telemetry")).await;
+        first.verify(3, get_requested_for("/api/mission/heartbeat")).await;
+        log::info!("[scoped-drop] concurrent playbooks verify independently (scope-local)");
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn http_dependency_scoped_drop_component_test() {
+    init_test_logging();
+
+    let ctx = match TestContext::new("mission-control").await {
+        Ok(v) => v,
+        Err(e) => panic!("{e}"),
+    };
+
+    let outcome = std::panic::AssertUnwindSafe(run_scoped_drop_test(&ctx))
+        .catch_unwind()
+        .await;
+
+    ctx.stop().await;
+
+    match outcome {
+        Ok(Ok(())) => log::info!("[component-test] mission-control ok"),
+        Ok(Err(e)) => panic!("{e}"),
+        Err(panic_payload) => std::panic::resume_unwind(panic_payload),
+    }
+}
+
+async fn run_expect_called_exact_passes(ctx: &TestContext) -> Result<(), String> {
+    let pb = ctx.http_dependency.playbook()
+        .post("/api/expect/exact")
+            .will_return(created())
+            .expect_called(2)
+        .run()
+        .await;
+
+    for _ in 0..2 {
+        let resp = ctx.fire_post("/api/expect/exact", json!({})).await?;
+        assert_eq!(resp.status().as_u16(), 201);
+    }
+    drop(pb);
+    Ok(())
+}
+
+#[tokio::test]
+async fn http_dependency_expect_called_exact_component_test() {
+    init_test_logging();
+    let ctx = match TestContext::new("expect-exact").await {
+        Ok(v) => v,
+        Err(e) => panic!("{e}"),
+    };
+
+    let outcome = std::panic::AssertUnwindSafe(run_expect_called_exact_passes(&ctx))
+        .catch_unwind()
+        .await;
+    ctx.stop().await;
+    match outcome {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => panic!("{e}"),
+        Err(p) => std::panic::resume_unwind(p),
+    }
+}
+
+async fn run_expect_at_least_passes(ctx: &TestContext) -> Result<(), String> {
+    let pb = ctx.http_dependency.playbook()
+        .get("/api/expect/atleast")
+            .will_return(ok_json(json!({})))
+            .expect_called_at_least(1)
+        .run()
+        .await;
+
+    for _ in 0..3 {
+        let resp = ctx.fire_get("/api/expect/atleast").await?;
+        assert_eq!(resp.status().as_u16(), 200);
+    }
+    drop(pb);
+    Ok(())
+}
+
+#[tokio::test]
+async fn http_dependency_expect_called_at_least_component_test() {
+    init_test_logging();
+    let ctx = match TestContext::new("expect-atleast").await {
+        Ok(v) => v,
+        Err(e) => panic!("{e}"),
+    };
+
+    let outcome = std::panic::AssertUnwindSafe(run_expect_at_least_passes(&ctx))
+        .catch_unwind()
+        .await;
+    ctx.stop().await;
+    match outcome {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => panic!("{e}"),
+        Err(p) => std::panic::resume_unwind(p),
+    }
+}
+
+async fn run_expect_never_called_passes(ctx: &TestContext) -> Result<(), String> {
+    let pb = ctx.http_dependency.playbook()
+        .delete("/api/expect/never")
+            .will_return(no_content())
+            .expect_never_called()
+        .run()
+        .await;
+
+    drop(pb);
+    Ok(())
+}
+
+#[tokio::test]
+async fn http_dependency_expect_never_called_component_test() {
+    init_test_logging();
+    let ctx = match TestContext::new("expect-never").await {
+        Ok(v) => v,
+        Err(e) => panic!("{e}"),
+    };
+
+    let outcome = std::panic::AssertUnwindSafe(run_expect_never_called_passes(&ctx))
+        .catch_unwind()
+        .await;
+    ctx.stop().await;
+    match outcome {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => panic!("{e}"),
+        Err(p) => std::panic::resume_unwind(p),
+    }
+}
+
+async fn run_expect_called_fails_on_mismatch(ctx: &TestContext) -> Result<(), String> {
+    let fire_url = "/api/expect/fail";
+    let pb = ctx.http_dependency.playbook()
+        .post(fire_url)
+            .will_return(created())
+            .expect_called(2)
+        .run()
+        .await;
+
+    let resp = ctx.fire_post(fire_url, json!({})).await?;
+    assert_eq!(resp.status().as_u16(), 201);
+
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(pb)));
+    match outcome {
+        Ok(()) => Err("expected drop to panic because expect_called(2) was only satisfied once".to_string()),
+        Err(_) => Ok(()),
+    }
+}
+
+#[tokio::test]
+async fn http_dependency_expect_called_mismatch_panics_on_drop_component_test() {
+    init_test_logging();
+    let ctx = match TestContext::new("expect-mismatch").await {
+        Ok(v) => v,
+        Err(e) => panic!("{e}"),
+    };
+
+    let outcome = std::panic::AssertUnwindSafe(run_expect_called_fails_on_mismatch(&ctx))
+        .catch_unwind()
+        .await;
+    ctx.stop().await;
+    match outcome {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => panic!("{e}"),
+        Err(p) => std::panic::resume_unwind(p),
+    }
+}

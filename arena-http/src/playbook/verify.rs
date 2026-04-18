@@ -33,6 +33,10 @@ impl RequestCriteria {
     pub fn method_and_path(&self) -> (Option<&str>, Option<&str>) {
         (self.method.as_deref(), self.url_path.as_deref())
     }
+
+    pub(crate) fn has_header_criteria(&self) -> bool {
+        self.headers.as_ref().map(|h| !h.is_empty()).unwrap_or(false)
+    }
 }
 
 impl fmt::Display for RequestCriteria {
@@ -68,6 +72,7 @@ pub fn delete_requested_for(url_path: impl Into<String>) -> RequestCriteria {
 #[serde(rename_all = "camelCase")]
 pub struct RecordedRequest {
     pub url: String,
+    #[serde(default)]
     pub absolute_url: String,
     pub method: String,
     #[serde(default)]
@@ -95,13 +100,37 @@ impl fmt::Display for RecordedRequest {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct CountResponse {
-    pub count: u64,
+pub(crate) struct FindResponse {
+    pub requests: Vec<RecordedRequest>,
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct FindResponse {
-    pub requests: Vec<RecordedRequest>,
+pub(crate) struct ServeEventStubMapping {
+    #[serde(default)]
+    pub id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LoggedRequest {
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub method: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ServeEvent {
+    pub id: String,
+    pub request: LoggedRequest,
+    #[serde(default)]
+    pub stub_mapping: Option<ServeEventStubMapping>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ServeEventsResponse {
+    pub requests: Vec<ServeEvent>,
 }
 
 pub(crate) fn format_request_journal(requests: &[RecordedRequest]) -> String {
@@ -114,4 +143,24 @@ pub(crate) fn format_request_journal(requests: &[RecordedRequest]) -> String {
         .map(|(i, r)| format!("  {}. {r}", i + 1))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+pub(crate) fn event_stub_id(event: &ServeEvent) -> Option<&str> {
+    event.stub_mapping.as_ref().and_then(|s| s.id.as_deref())
+}
+
+pub(crate) fn event_matches_criteria(event: &ServeEvent, criteria: &RequestCriteria) -> bool {
+    let (method, path) = criteria.method_and_path();
+    if let Some(expected_method) = method {
+        if !event.request.method.eq_ignore_ascii_case(expected_method) {
+            return false;
+        }
+    }
+    if let Some(expected_path) = path {
+        let logged_path = event.request.url.split('?').next().unwrap_or(&event.request.url);
+        if logged_path != expected_path {
+            return false;
+        }
+    }
+    true
 }

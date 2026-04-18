@@ -11,7 +11,7 @@ class ContainerComponentBuilder:
             "identifier": identifier,
             "dockerfile": dockerfile,
             "env_vars": {},
-            "runtime_args": {},
+            "runtime_args": [],
             "port_mappings": [],
         }
         self._readiness_checks: List[Tuple[ReadinessCheck, str]] = []
@@ -38,8 +38,8 @@ class ContainerComponentBuilder:
         self._config["env_vars"][key] = value
         return self
 
-    def with_runtime_arg(self, key: str, value: str) -> "ContainerComponentBuilder":
-        self._config["runtime_args"][key] = value
+    def with_runtime_arg(self, name: str, value: str) -> "ContainerComponentBuilder":
+        self._config["runtime_args"].append({"name": name, "value": value})
         return self
 
     def with_readiness_check(self, check: ReadinessCheck, target: str) -> "ContainerComponentBuilder":

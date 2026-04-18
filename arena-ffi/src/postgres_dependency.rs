@@ -1,0 +1,52 @@
+use arena::Dependency;
+use arena_postgres::PostgresDependency;
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct PostgresDependencyConfig {
+    pub identifier: String,
+    #[serde(default)]
+    pub image_name: Option<String>,
+    #[serde(default)]
+    pub image: Option<String>,
+    #[serde(default)]
+    pub port: Option<u16>,
+    #[serde(default)]
+    pub database_name: Option<String>,
+    #[serde(default)]
+    pub database_username: Option<String>,
+    #[serde(default)]
+    pub database_password: Option<String>,
+    #[serde(default)]
+    pub container_name: Option<String>,
+    #[serde(default)]
+    pub startup_sql_scripts: Option<Vec<String>>,
+}
+
+pub(crate) fn build(
+    config: &PostgresDependencyConfig,
+    network: &str,
+) -> Result<Dependency, String> {
+    let mut builder = PostgresDependency::builder(&config.identifier)
+        .with_image(config.image.as_deref().unwrap_or("14.20-trixie"));
+    if let Some(ref image_name) = config.image_name {
+        builder = builder.with_image_name(image_name);
+    }
+    let default_container_name =
+        format!("arena-postgres-{}", config.identifier.replace(' ', "-"));
+    let dep = builder
+        .with_port(config.port.unwrap_or(5432))
+        .with_database_name(config.database_name.as_deref().unwrap_or("arena_db"))
+        .with_database_username(config.database_username.as_deref().unwrap_or("arena_user"))
+        .with_database_password(config.database_password.as_deref().unwrap_or("postgres"))
+        .with_container_name(
+            config
+                .container_name
+                .as_deref()
+                .unwrap_or(&default_container_name),
+        )
+        .with_network(network)
+        .with_startup_sql_scripts(config.startup_sql_scripts.clone().unwrap_or_default())
+        .build();
+    Ok(Box::new(dep))
+}
