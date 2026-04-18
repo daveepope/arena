@@ -78,7 +78,7 @@ checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
 name = "arena"
-version = "0.1.0-beta.1"
+version = "0.2.0-beta.1"
 dependencies = [
  "async-trait",
  "env_logger",
@@ -90,7 +90,7 @@ dependencies = [
 
 [[package]]
 name = "arena-container"
-version = "0.1.0-beta.1"
+version = "0.2.0-beta.1"
 dependencies = [
  "bollard",
  "log",
@@ -98,7 +98,7 @@ dependencies = [
 
 [[package]]
 name = "arena-container-component"
-version = "0.1.0-beta.1"
+version = "0.2.0-beta.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -114,11 +114,12 @@ dependencies = [
 
 [[package]]
 name = "arena-examples"
-version = "0.1.0-beta.1"
+version = "0.2.0-beta.1"
 dependencies = [
  "arena",
  "arena-container-component",
  "arena-executable-component",
+ "arena-http",
  "arena-kafka",
  "arena-postgres",
  "async-trait",
@@ -139,7 +140,7 @@ dependencies = [
 
 [[package]]
 name = "arena-executable-component"
-version = "0.1.0-beta.1"
+version = "0.2.0-beta.1"
 dependencies = [
  "arena",
  "async-trait",
@@ -152,16 +153,16 @@ dependencies = [
 
 [[package]]
 name = "arena-ffi"
-version = "0.1.0-beta.1"
+version = "0.2.0-beta.1"
 dependencies = [
  "arena",
  "arena-container-component",
  "arena-executable-component",
+ "arena-http",
  "arena-kafka",
  "arena-postgres",
  "async-trait",
  "env_logger",
- "indexmap 2.12.1",
  "log",
  "reqwest",
  "serde",
@@ -170,8 +171,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "arena-http"
+version = "0.2.0-beta.1"
+dependencies = [
+ "arena",
+ "arena-container",
+ "async-trait",
+ "env_logger",
+ "futures",
+ "futures-timer",
+ "log",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "testcontainers-modules",
+ "tokio",
+]
+
+[[package]]
 name = "arena-kafka"
-version = "0.1.0-beta.1"
+version = "0.2.0-beta.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -187,7 +206,7 @@ dependencies = [
 
 [[package]]
 name = "arena-postgres"
-version = "0.1.0-beta.1"
+version = "0.2.0-beta.1"
 dependencies = [
  "arena",
  "arena-container",

@@ -1,13 +1,16 @@
-use arena::{ClosedArena, Component, Dependency, Encounter, EncounterTrait, OpenArena};
+use arena::{ClosedArena, Component, Dependency, Match, MatchTrait, OnDependencyStartup, OpenArena};
+use arena_http::{HttpDependency, ok_json, server_error};
 use arena_kafka::{KafkaDependency, KafkaFlavor};
 use arena_postgres::PostgresDependency;
 use arena_executable_component::executable_component::ExecutableComponent;
 use arena_examples::http_healthcheck::HttpReadinessCheck;
+use async_trait::async_trait;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::message::Message;
 use rstest::*;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::time::{Duration, Instant};
 use tokio::sync::OnceCell;
 
@@ -16,11 +19,13 @@ const DB_NAME: &str = "test_database";
 const DB_USER: &str = "test_user";
 const DB_PASS: &str = "test_password";
 const KAFKA_PORT: u16 = 9093;
+const HTTP_MOCK_PORT: u16 = 8888;
 const EXEC_WEB_APP_PORT: u16 = 3000;
 
 const NETWORK_NAME: &str = "arena-component-test-network";
 const POSTGRES_CONTAINER_NAME: &str = "arena-component-test-postgres";
 const KAFKA_CONTAINER_NAME: &str = "arena-component-test-kafka";
+const HTTP_MOCK_CONTAINER_NAME: &str = "arena-component-test-http-mock";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Reading {
@@ -32,7 +37,9 @@ struct Reading {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct CreateReadingResponse {
-    id: i32,
+    valid: bool,
+    #[serde(default)]
+    id: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -86,7 +93,15 @@ fn setup_dependencies() -> Vec<Dependency> {
             .build(),
     );
 
-    vec![postgres_db, kafka]
+    let calibration_service: Dependency = Box::new(
+        HttpDependency::builder("calibration service")
+            .with_port(HTTP_MOCK_PORT)
+            .with_container_name(HTTP_MOCK_CONTAINER_NAME)
+            .with_network(NETWORK_NAME)
+            .build(),
+    );
+
+    vec![postgres_db, kafka, calibration_service]
 }
 
 fn resolve_web_app_binary() -> String {
@@ -113,6 +128,7 @@ fn setup_exec_component() -> Component {
             )
         )
         .with_runtime_arg("kafka_bootstrap", format!("localhost:{}", KAFKA_PORT))
+        .with_runtime_arg("calibration_url", format!("http://127.0.0.1:{}", HTTP_MOCK_PORT))
         .with_readiness_check(HttpReadinessCheck::new(), healthcheck_url);
 
     if !is_bazel {
@@ -124,21 +140,44 @@ fn setup_exec_component() -> Component {
     Box::new(builder.build())
 }
 
+struct ValidationServiceSetup;
+
+#[async_trait]
+impl OnDependencyStartup for ValidationServiceSetup {
+    async fn on_dependency_startup(&self, dependencies: &[Dependency]) {
+        let http = dependencies
+            .iter()
+            .find(|d| d.identifier() == "calibration service")
+            .and_then(|d| d.as_any().downcast_ref::<HttpDependency>())
+            .expect("calibration service should be available");
+
+        http.playbook()
+            .post("/api/v1/validate")
+            .will_return(ok_json(json!({ "valid": true })))
+            .run()
+            .await
+            .persist();
+    }
+}
+
 async fn create_arena() -> OpenArena {
     let dependencies = setup_dependencies();
 
     let exec_component = setup_exec_component();
     let components: Vec<Component> = vec![exec_component];
 
-    let encounters: Vec<Box<dyn EncounterTrait>> = vec![
-        Box::new(Encounter::new("reading lifecycle", dependencies, components))
-    ];
-    let closed_arena = ClosedArena::new("Test Arena".to_string(), encounters);
+    let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new(
+        Match::new("reading lifecycle", dependencies, components)
+            .with_on_dependency_startup_handler(Box::new(ValidationServiceSetup)),
+    )];
+    let closed_arena = ClosedArena::new("Test Arena".to_string(), matches);
 
     closed_arena.open().await
 }
 
 static SHARED_ARENA: OnceCell<OpenArena> = OnceCell::const_new();
+
+static SCENARIO_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[ctor::dtor]
 unsafe fn teardown() {
@@ -152,20 +191,24 @@ unsafe fn teardown() {
 #[fixture]
 async fn shared_arena() -> &'static OpenArena {
     init_logging();
-    SHARED_ARENA.get_or_init(|| async {
-        create_arena().await
-    }).await
+    SHARED_ARENA.get_or_init(|| async { create_arena().await }).await
 }
 
 async fn get_readings(port: u16) -> Vec<Reading> {
     let url = format!("http://127.0.0.1:{}/readings", port);
     let response = reqwest::get(&url)
         .await
-        .expect("get readings request");
-    
+        .expect("GET /readings failed to send");
+
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        panic!("GET /readings failed (HTTP {status}): {body}");
+    }
+
     response.json::<Vec<Reading>>()
         .await
-        .expect("parse readings response")
+        .expect("GET /readings returned invalid JSON")
 }
 
 fn consume_reading_created_event(
@@ -215,19 +258,33 @@ async fn create_reading(port: u16, user_name: &str, value: i32, comment: Option<
         value,
         comment,
     };
-    
+
     let client = reqwest::Client::new();
-    let response = client.post(&url)
+    let response = client
+        .post(&url)
         .json(&request)
         .send()
         .await
-        .expect("create reading request");
-    
-    let create_response = response.json::<CreateReadingResponse>()
-        .await
-        .expect("parse create reading response");
-    
-    create_response.id
+        .expect("POST /readings failed to send");
+
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    if !status.is_success() {
+        panic!("POST /readings failed (HTTP {status}): {body}");
+    }
+
+    let create_response: CreateReadingResponse = serde_json::from_str(&body)
+        .unwrap_or_else(|e| panic!("POST /readings returned invalid JSON: {e}; body: {body}"));
+
+    assert!(
+        create_response.valid,
+        "expected calibration valid=true in response body: {body}"
+    );
+    create_response
+        .id
+        .expect("expected id when calibration accepted reading")
+        .try_into()
+        .expect("reading id fits i32")
 }
 
 #[rstest]
@@ -236,6 +293,7 @@ async fn example_using_exec_component_creates_reading_consumes_and_gets_reading(
     #[future] shared_arena: &'static OpenArena,
 ) {
     let arena = shared_arena.await;
+    let _scenario = SCENARIO_LOCK.lock().await;
 
     let bootstrap = arena
         .dependency("test kafka")
@@ -272,4 +330,61 @@ async fn example_using_exec_component_creates_reading_consumes_and_gets_reading(
     assert_eq!(found.user_name, "Exec Test User");
     assert_eq!(found.value, 42);
     assert_eq!(found.comment.as_deref(), Some("test comment"));
+}
+
+#[rstest]
+#[tokio::test]
+async fn example_using_exec_component_calibration_outage_returns_error(
+    #[future] shared_arena: &'static OpenArena,
+) {
+    let arena = shared_arena.await;
+    let _scenario = SCENARIO_LOCK.lock().await;
+
+    let calibration = arena
+        .dependency("calibration service")
+        .and_then(|d| d.as_any().downcast_ref::<HttpDependency>())
+        .expect("calibration service should be available");
+
+    {
+        let _outage = calibration.playbook()
+            .post("/api/v1/validate")
+                .with_priority(1)
+                .will_return(server_error())
+            .run()
+            .await;
+
+        let url = format!("http://127.0.0.1:{}/readings", EXEC_WEB_APP_PORT);
+        let client = reqwest::Client::new();
+        let response = client
+            .post(&url)
+            .json(&CreateReadingRequest {
+                user_name: "Outage Test User".to_string(),
+                value: 99,
+                comment: None,
+            })
+            .send()
+            .await
+            .expect("POST /readings failed to send");
+
+        assert_eq!(
+            response.status().as_u16(),
+            500,
+            "expected 500 while calibration is in outage playbook",
+        );
+    }
+
+    let recovered_id = create_reading(
+        EXEC_WEB_APP_PORT,
+        "Recovery Test User",
+        17,
+        Some("post-outage".to_string()),
+    ).await;
+
+    let readings = get_readings(EXEC_WEB_APP_PORT).await;
+    let found = readings
+        .iter()
+        .find(|r| r.id == recovered_id)
+        .expect("recovered reading should be present");
+    assert_eq!(found.user_name, "Recovery Test User");
+    assert_eq!(found.value, 17);
 }

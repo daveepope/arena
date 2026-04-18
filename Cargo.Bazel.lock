@@ -1,5 +1,5 @@
 {
-  "checksum": "d0f5cfca05ae7d1844e4a8dae486542ec8bda1f6710150ae50d73b06514faead",
+  "checksum": "d92b522c766b11c6fa61c6f3e6512751175ab588df28ab3297f2a1b6f57b9420",
   "crates": {
     "aho-corasick 1.1.4": {
       "name": "aho-corasick",
@@ -474,9 +474,9 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arena 0.1.0-beta.1": {
+    "arena 0.2.0-beta.1": {
       "name": "arena",
-      "version": "0.1.0-beta.1",
+      "version": "0.2.0-beta.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -538,15 +538,15 @@
           ],
           "selects": {}
         },
-        "version": "0.1.0-beta.1"
+        "version": "0.2.0-beta.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-container 0.1.0-beta.1": {
+    "arena-container 0.2.0-beta.1": {
       "name": "arena-container",
-      "version": "0.1.0-beta.1",
+      "version": "0.2.0-beta.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -582,15 +582,15 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.1.0-beta.1"
+        "version": "0.2.0-beta.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-container-component 0.1.0-beta.1": {
+    "arena-container-component 0.2.0-beta.1": {
       "name": "arena-container-component",
-      "version": "0.1.0-beta.1",
+      "version": "0.2.0-beta.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -660,15 +660,15 @@
           ],
           "selects": {}
         },
-        "version": "0.1.0-beta.1"
+        "version": "0.2.0-beta.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-examples 0.1.0-beta.1": {
+    "arena-examples 0.2.0-beta.1": {
       "name": "arena-examples",
-      "version": "0.1.0-beta.1",
+      "version": "0.2.0-beta.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -762,15 +762,15 @@
           ],
           "selects": {}
         },
-        "version": "0.1.0-beta.1"
+        "version": "0.2.0-beta.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-executable-component 0.1.0-beta.1": {
+    "arena-executable-component 0.2.0-beta.1": {
       "name": "arena-executable-component",
-      "version": "0.1.0-beta.1",
+      "version": "0.2.0-beta.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -832,15 +832,15 @@
           ],
           "selects": {}
         },
-        "version": "0.1.0-beta.1"
+        "version": "0.2.0-beta.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-ffi 0.1.0-beta.1": {
+    "arena-ffi 0.2.0-beta.1": {
       "name": "arena-ffi",
-      "version": "0.1.0-beta.1",
+      "version": "0.2.0-beta.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -867,10 +867,6 @@
             {
               "id": "env_logger 0.11.8",
               "target": "env_logger"
-            },
-            {
-              "id": "indexmap 2.12.1",
-              "target": "indexmap"
             },
             {
               "id": "log 0.4.29",
@@ -905,15 +901,101 @@
           ],
           "selects": {}
         },
-        "version": "0.1.0-beta.1"
+        "version": "0.2.0-beta.1"
       },
       "license": null,
       "license_ids": [],
       "license_file": null
     },
-    "arena-kafka 0.1.0-beta.1": {
+    "arena-http 0.2.0-beta.1": {
+      "name": "arena-http",
+      "version": "0.2.0-beta.1",
+      "package_url": null,
+      "repository": null,
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "arena_http",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "arena_http",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "futures-timer 3.0.3",
+              "target": "futures_timer"
+            },
+            {
+              "id": "log 0.4.29",
+              "target": "log"
+            },
+            {
+              "id": "reqwest 0.12.28",
+              "target": "reqwest"
+            },
+            {
+              "id": "serde 1.0.228",
+              "target": "serde"
+            },
+            {
+              "id": "serde_json 1.0.148",
+              "target": "serde_json"
+            },
+            {
+              "id": "testcontainers-modules 0.14.0",
+              "target": "testcontainers_modules"
+            },
+            {
+              "id": "tokio 1.48.0",
+              "target": "tokio"
+            }
+          ],
+          "selects": {}
+        },
+        "deps_dev": {
+          "common": [
+            {
+              "id": "env_logger 0.11.8",
+              "target": "env_logger"
+            },
+            {
+              "id": "futures 0.3.31",
+              "target": "futures"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "proc_macro_deps": {
+          "common": [
+            {
+              "id": "async-trait 0.1.89",
+              "target": "async_trait"
+            }
+          ],
+          "selects": {}
+        },
+        "version": "0.2.0-beta.1"
+      },
+      "license": "todo",
+      "license_ids": [],
+      "license_file": null
+    },
+    "arena-kafka 0.2.0-beta.1": {
       "name": "arena-kafka",
-      "version": "0.1.0-beta.1",
+      "version": "0.2.0-beta.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -983,15 +1065,15 @@
           ],
           "selects": {}
         },
-        "version": "0.1.0-beta.1"
+        "version": "0.2.0-beta.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-postgres 0.1.0-beta.1": {
+    "arena-postgres 0.2.0-beta.1": {
       "name": "arena-postgres",
-      "version": "0.1.0-beta.1",
+      "version": "0.2.0-beta.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1057,7 +1139,7 @@
           ],
           "selects": {}
         },
-        "version": "0.1.0-beta.1"
+        "version": "0.2.0-beta.1"
       },
       "license": "todo",
       "license_ids": [],
@@ -7516,7 +7598,6 @@
         "crate_features": {
           "common": [
             "default",
-            "serde",
             "std"
           ],
           "selects": {}
@@ -7530,10 +7611,6 @@
             {
               "id": "hashbrown 0.16.1",
               "target": "hashbrown"
-            },
-            {
-              "id": "serde_core 1.0.228",
-              "target": "serde_core"
             }
           ],
           "selects": {}
@@ -22549,14 +22626,15 @@
   },
   "binary_crates": [],
   "workspace_members": {
-    "arena 0.1.0-beta.1": "arena",
-    "arena-container 0.1.0-beta.1": "arena-container",
-    "arena-container-component 0.1.0-beta.1": "arena-container-component",
-    "arena-examples 0.1.0-beta.1": "examples",
-    "arena-executable-component 0.1.0-beta.1": "arena-executable-component",
-    "arena-ffi 0.1.0-beta.1": "arena-ffi",
-    "arena-kafka 0.1.0-beta.1": "arena-kafka",
-    "arena-postgres 0.1.0-beta.1": "arena-postgres"
+    "arena 0.2.0-beta.1": "arena",
+    "arena-container 0.2.0-beta.1": "arena-container",
+    "arena-container-component 0.2.0-beta.1": "arena-container-component",
+    "arena-examples 0.2.0-beta.1": "examples",
+    "arena-executable-component 0.2.0-beta.1": "arena-executable-component",
+    "arena-ffi 0.2.0-beta.1": "arena-ffi",
+    "arena-http 0.2.0-beta.1": "arena-http",
+    "arena-kafka 0.2.0-beta.1": "arena-kafka",
+    "arena-postgres 0.2.0-beta.1": "arena-postgres"
   },
   "conditions": {
     "aarch64-apple-darwin": [
@@ -22720,7 +22798,6 @@
     "env_logger 0.11.8",
     "futures 0.3.31",
     "futures-timer 3.0.3",
-    "indexmap 2.12.1",
     "log 0.4.29",
     "postgres 0.19.12",
     "rdkafka 0.39.0",

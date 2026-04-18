@@ -15,6 +15,7 @@ pub struct KafkaDependencyBuilder {
     flavor: KafkaFlavor,
     port: Option<u16>,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
+    image_name: Option<String>,
     image_tag: Option<String>,
     container_name: Option<String>,
     network: Option<String>,
@@ -24,9 +25,11 @@ pub struct KafkaDependencyBuilder {
 
 impl KafkaDependencyBuilder {
     const APACHE_DEFAULT_PORT: u16 = 9092;
+    const APACHE_DEFAULT_IMAGE_NAME: &'static str = "apache/kafka";
     const APACHE_DEFAULT_TAG: &'static str = "3.8.0";
 
     const CONFLUENT_DEFAULT_PORT: u16 = 9093;
+    const CONFLUENT_DEFAULT_IMAGE_NAME: &'static str = "confluentinc/cp-kafka";
     const CONFLUENT_DEFAULT_TAG: &'static str = "6.1.1";
 
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
@@ -36,6 +39,7 @@ impl KafkaDependencyBuilder {
             flavor: KafkaFlavor::ApacheNative,
             port: None,
             dependencies: None,
+            image_name: None,
             image_tag: None,
             container_name: None,
             network: None,
@@ -72,6 +76,11 @@ impl KafkaDependencyBuilder {
         dependencies: Vec<Box<dyn RunnableDependency>>,
     ) -> Self {
         self.dependencies = Option::from(dependencies);
+        self
+    }
+
+    pub fn with_image_name(mut self, image_name: impl Into<String>) -> Self {
+        self.image_name = Some(image_name.into());
         self
     }
 
@@ -113,6 +122,7 @@ impl KafkaDependencyBuilder {
             flavor,
             port,
             dependencies,
+            image_name,
             image_tag,
             container_name,
             network,
@@ -120,9 +130,9 @@ impl KafkaDependencyBuilder {
             topics,
         } = self;
 
-        let (default_port, default_tag) = match flavor {
-            KafkaFlavor::ApacheNative => (Self::APACHE_DEFAULT_PORT, Self::APACHE_DEFAULT_TAG),
-            KafkaFlavor::Confluent => (Self::CONFLUENT_DEFAULT_PORT, Self::CONFLUENT_DEFAULT_TAG),
+        let (default_port, default_image_name, default_tag) = match flavor {
+            KafkaFlavor::ApacheNative => (Self::APACHE_DEFAULT_PORT, Self::APACHE_DEFAULT_IMAGE_NAME, Self::APACHE_DEFAULT_TAG),
+            KafkaFlavor::Confluent => (Self::CONFLUENT_DEFAULT_PORT, Self::CONFLUENT_DEFAULT_IMAGE_NAME, Self::CONFLUENT_DEFAULT_TAG),
         };
 
         let kafka_impl = kafka_impl.unwrap_or_else(|| match flavor {
@@ -133,10 +143,11 @@ impl KafkaDependencyBuilder {
         });
 
         let port = port.unwrap_or(default_port);
+        let image_name = image_name.unwrap_or_else(|| default_image_name.to_string());
         let image_tag = image_tag.unwrap_or_else(|| default_tag.to_string());
 
         let mut dep =
-            KafkaDependency::new(identifier, kafka_impl, port, dependencies, image_tag, container_name, topics);
+            KafkaDependency::new(identifier, kafka_impl, port, dependencies, image_name, image_tag, container_name, topics);
 
         if let Some(check) = readiness_check {
             dep.set_readiness_check(check);

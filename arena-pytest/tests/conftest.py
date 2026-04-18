@@ -1,14 +1,28 @@
 import os
 
 import pytest
-import pytest_asyncio
+
+
+def _arena_plugin_already_registered_via_entry_point() -> bool:
+    try:
+        from importlib.metadata import entry_points
+        eps = entry_points(group="pytest11")
+    except Exception:
+        return False
+    return any(getattr(ep, "value", "") == "arena_pytest.arena" for ep in eps)
+
+
+if not _arena_plugin_already_registered_via_entry_point():
+    pytest_plugins = ("arena_pytest.arena",)
 
 from arena_pytest import (
     BuildTool,
     ClosedArena,
     ContainerComponentBuilder,
-    EncounterBuilder,
+    MatchBuilder,
     ExecutableComponentBuilder,
+    HttpDependencyBuilder,
+    HttpOnDependencyStartupBuilder,
     HttpReadinessCheck,
     KafkaDependencyBuilder,
     KafkaFlavor,
@@ -26,37 +40,40 @@ DOCKER_WEB_HOST_PORT = 3002
 NETWORK_NAME = "arena-pytest-network"
 POSTGRES_CONTAINER_NAME = "arena-pytest-postgres"
 KAFKA_CONTAINER_NAME = "arena-pytest-kafka"
+CALIBRATION_CONTAINER_NAME = "arena-pytest-calibration"
+CALIBRATION_HOST_PORT = 3003
+CALIBRATION_DEPENDENCY_ID = "calibration service"
+CALIBRATION_VALIDATE_PATH = "/api/v1/validate"
 KAFKA_TOPIC = "readings"
 DOCKER_IMAGE_TAG = "arena-pytest-docker-webapp"
 
 
-def _find_repo_root() -> str:
-    try:
-        from bazel_tools.tools.python.runfiles import runfiles
-
-        r = runfiles.Create()
-        for rel in ("_main", "arena"):
-            p = r.Rlocation(rel)
-            if p and os.path.isdir(p) and os.path.isfile(os.path.join(p, "Cargo.toml")):
-                return p
-    except ImportError:
-        pass
-    runfiles_dir = os.environ.get("RUNFILES_DIR")
-    if runfiles_dir:
-        for base in ("_main", "arena", ""):
-            root = os.path.join(runfiles_dir, base) if base else runfiles_dir
-            if os.path.isfile(os.path.join(root, "Cargo.toml")):
-                return root
-    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    return root if os.path.isfile(os.path.join(root, "Cargo.toml")) else ""
+_RUNTIME_DOCKERFILE = """\
+FROM debian:trixie-slim
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY web-app /usr/local/bin/web-app
+RUN chmod +x /usr/local/bin/web-app
+EXPOSE 3000
+ENTRYPOINT ["/usr/local/bin/web-app"]
+"""
 
 
-def _find_dockerfile_path() -> str:
-    root = _find_repo_root()
-    if not root:
-        return ""
-    p = os.path.join(root, "examples", "src", "example-web-app", "Dockerfile")
-    return p if os.path.isfile(p) else ""
+def _prepare_docker_build_context() -> tuple[str, str]:
+    """Stage a minimal build context: the prebuilt web-app binary + runtime Dockerfile.
+
+    Returns (build_context_dir, dockerfile_text) or ("", "") if the binary isn't found.
+    """
+    import shutil
+    import tempfile
+
+    binary = _find_web_app_binary()
+    if not binary or not os.path.isfile(binary):
+        return "", ""
+    ctx = tempfile.mkdtemp(prefix="arena-pytest-docker-ctx-")
+    dst = os.path.join(ctx, "web-app")
+    shutil.copy2(binary, dst)
+    os.chmod(dst, 0o755)
+    return ctx, _RUNTIME_DOCKERFILE
 
 
 def _find_schema_path() -> str:
@@ -120,6 +137,23 @@ def _build_kafka():
     )
 
 
+def _build_calibration_http():
+    return (
+        HttpDependencyBuilder(CALIBRATION_DEPENDENCY_ID)
+        .with_port(CALIBRATION_HOST_PORT)
+        .with_container_name(CALIBRATION_CONTAINER_NAME)
+        .build()
+    )
+
+
+def _build_calibration_handler():
+    return (
+        HttpOnDependencyStartupBuilder(CALIBRATION_DEPENDENCY_ID)
+        .with_mapping("POST", CALIBRATION_VALIDATE_PATH, 200, {"valid": True})
+        .build()
+    )
+
+
 def _build_exec_component() -> object:
     web_app_binary = _find_web_app_binary()
     healthcheck_url = f"http://127.0.0.1:{EXEC_WEB_APP_PORT}/readings"
@@ -135,6 +169,9 @@ def _build_exec_component() -> object:
             f"host=localhost port={POSTGRES_PORT} user={DB_USER} password={DB_PASS} dbname={DB_NAME}",
         )
         .with_runtime_arg("kafka_bootstrap", f"localhost:{KAFKA_PORT}")
+        .with_runtime_arg(
+            "calibration_url", f"http://127.0.0.1:{CALIBRATION_HOST_PORT}"
+        )
         .with_readiness_check(HttpReadinessCheck(), healthcheck_url)
     )
     if not is_bazel:
@@ -145,7 +182,7 @@ def _build_exec_component() -> object:
 
 def _build_container_component(repo_root: str, dockerfile: str) -> object:
     return (
-        ContainerComponentBuilder("test web app (docker)", dockerfile)
+        ContainerComponentBuilder("test-web-app-docker", dockerfile)
         .with_build_context(repo_root)
         .with_image_tag(DOCKER_IMAGE_TAG)
         .with_network(NETWORK_NAME)
@@ -159,6 +196,9 @@ def _build_container_component(repo_root: str, dockerfile: str) -> object:
         .with_runtime_arg(
             "kafka_bootstrap",
             f"{KAFKA_CONTAINER_NAME}:{KAFKA_INTERNAL_DOCKER_PORT}",
+        )
+        .with_runtime_arg(
+            "calibration_url", f"http://{CALIBRATION_CONTAINER_NAME}:8080"
         )
         .with_readiness_check(
             HttpReadinessCheck(),
@@ -176,31 +216,20 @@ def closed_arena() -> ClosedArena:
 
     components = [_build_exec_component()]
 
-    repo_root = _find_repo_root()
-    dockerfile_path = _find_dockerfile_path()
-    if repo_root and dockerfile_path:
-        dockerfile = open(dockerfile_path).read()
-        components.append(_build_container_component(repo_root, dockerfile))
+    ctx, dockerfile = _prepare_docker_build_context()
+    if ctx and dockerfile:
+        components.append(_build_container_component(ctx, dockerfile))
 
-    encounter = EncounterBuilder("reading lifecycle")
-    encounter = encounter.with_network(NETWORK_NAME)
-    encounter = encounter.add_dependency(_build_postgres(startup_sql))
-    encounter = encounter.add_dependency(_build_kafka())
+    a_match = MatchBuilder("reading lifecycle")
+    a_match = a_match.with_network(NETWORK_NAME)
+    a_match = a_match.add_dependency(_build_postgres(startup_sql))
+    a_match = a_match.add_dependency(_build_kafka())
+    a_match = a_match.add_dependency(_build_calibration_http())
+    a_match = a_match.add_on_dependency_startup_handler(_build_calibration_handler())
     for c in components:
-        encounter = encounter.add_component(c)
+        a_match = a_match.add_component(c)
 
-    return ClosedArena("Test Arena", [encounter.build()])
-
-
-@pytest_asyncio.fixture(scope="session")
-async def arena(closed_arena):
-    open_arena = await closed_arena.open()
-    if open_arena is None:
-        pytest.skip("arena_open failed (Docker required for dependencies)")
-    try:
-        yield open_arena
-    finally:
-        await open_arena.close()
+    return ClosedArena("Test Arena", [a_match.build()])
 
 
 @pytest.fixture(scope="session")

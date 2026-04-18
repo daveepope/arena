@@ -12,6 +12,7 @@ pub struct PostgresDependencyBuilder {
     database_password: Option<String>,
     startup_sql_scripts: Option<Vec<String>>,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
+    image_name: Option<String>,
     image_tag: Option<String>,
     container_name: Option<String>,
     network: Option<String>,
@@ -24,6 +25,7 @@ impl PostgresDependencyBuilder {
     const DEFAULT_DATABASE_NAME: &'static str = "arena_db";
     const DEFAULT_DATABASE_USERNAME: &'static str = "arena_user";
     const DEFAULT_DATABASE_PASSWORD: &'static str = "postgres";
+    const DEFAULT_IMAGE_NAME: &'static str = "postgres";
     const DEFAULT_IMAGE_TAG: &'static str = "latest";
 
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
@@ -36,6 +38,7 @@ impl PostgresDependencyBuilder {
             database_password: None,
             startup_sql_scripts: None,
             dependencies: None,
+            image_name: None,
             image_tag: None,
             container_name: None,
             network: None,
@@ -81,6 +84,11 @@ impl PostgresDependencyBuilder {
         dependencies: Vec<Box<dyn RunnableDependency>>,
     ) -> Self {
         self.dependencies = Option::from(dependencies);
+        self
+    }
+
+    pub fn with_image_name(mut self, image_name: impl Into<String>) -> Self {
+        self.image_name = Some(image_name.into());
         self
     }
 
@@ -132,6 +140,9 @@ impl PostgresDependencyBuilder {
             .unwrap_or_else(|| Self::DEFAULT_DATABASE_PASSWORD.to_string());
         let startup_sql_scripts = self.startup_sql_scripts;
         let dependencies = self.dependencies;
+        let image_name = self
+            .image_name
+            .unwrap_or_else(|| Self::DEFAULT_IMAGE_NAME.to_string());
         let image_tag = self
             .image_tag
             .unwrap_or_else(|| Self::DEFAULT_IMAGE_TAG.to_string());
@@ -147,6 +158,7 @@ impl PostgresDependencyBuilder {
             database_password,
             startup_sql_scripts,
             dependencies,
+            image_name,
             image_tag,
             container_name,
         );

@@ -25,6 +25,7 @@ impl PostgresImpl for FakePostgresImpl {
         _database_name: &str,
         _database_username: &str,
         _database_password: &str,
+        _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
     ) {

@@ -71,6 +71,7 @@ rust_test(
     ) + [
         ":arena_examples",
         "//arena",
+        "//arena-http:arena_http",
         "//arena-kafka:arena_kafka",
         "//arena-postgres:arena_postgres",
         "//arena-executable-component:arena_executable_component",

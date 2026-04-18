@@ -1,22 +1,19 @@
-//! HTTP [`ReadinessCheck`](arena::healthcheck::ReadinessCheck) implementation for the FFI layer.
-//!
-//! Wired from JSON via [`crate::readiness_json`]. Behavior matches `arena_examples::http_healthcheck`.
-
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
+use serde::Deserialize;
 use std::time::Duration;
 
-pub struct HttpReadinessCheck;
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub(crate) enum ReadinessCheckConfig {
+    Http { target: String },
+}
+
+pub(crate) struct HttpReadinessCheck;
 
 impl HttpReadinessCheck {
     pub fn new() -> Self {
         Self
-    }
-}
-
-impl Default for HttpReadinessCheck {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -42,7 +39,6 @@ impl ReadinessCheck for HttpReadinessCheck {
                     log::trace!("[{}] HTTP healthcheck failed: {}", identifier, e);
                 }
             }
-
             tokio::time::sleep(poll_interval).await;
         }
 

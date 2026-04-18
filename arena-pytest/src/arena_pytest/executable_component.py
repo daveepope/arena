@@ -24,7 +24,7 @@ class ExecutableComponentBuilder:
             "type": "exec",
             "identifier": identifier,
             "env_vars": {},
-            "runtime_args": {},
+            "runtime_args": [],
         }
         self._readiness_checks: List[Tuple[ReadinessCheck, str]] = []
 
@@ -48,8 +48,8 @@ class ExecutableComponentBuilder:
         self._config["env_vars"][key] = value
         return self
 
-    def with_runtime_arg(self, key: str, value: str) -> "ExecutableComponentBuilder":
-        self._config["runtime_args"][key] = value
+    def with_runtime_arg(self, name: str, value: str) -> "ExecutableComponentBuilder":
+        self._config["runtime_args"].append({"name": name, "value": value})
         return self
 
     def with_readiness_check(self, check: ReadinessCheck, target: str) -> "ExecutableComponentBuilder":
