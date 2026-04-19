@@ -93,7 +93,7 @@ dependencies = [
 
 [[package]]
 name = "arena"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "async-trait",
  "env_logger",
@@ -106,7 +106,7 @@ dependencies = [
 
 [[package]]
 name = "arena-container"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "bollard",
  "log",
@@ -114,7 +114,7 @@ dependencies = [
 
 [[package]]
 name = "arena-container-component"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -130,7 +130,7 @@ dependencies = [
 
 [[package]]
 name = "arena-examples"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "arena",
  "arena-container-component",
@@ -157,7 +157,7 @@ dependencies = [
 
 [[package]]
 name = "arena-executable-component"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -171,7 +171,7 @@ dependencies = [
 
 [[package]]
 name = "arena-ffi"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "arena",
  "arena-container-component",
@@ -191,7 +191,7 @@ dependencies = [
 
 [[package]]
 name = "arena-http"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -209,7 +209,7 @@ dependencies = [
 
 [[package]]
 name = "arena-kafka"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -225,7 +225,7 @@ dependencies = [
 
 [[package]]
 name = "arena-localstack"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -249,7 +249,7 @@ dependencies = [
 
 [[package]]
 name = "arena-mssql"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -265,7 +265,7 @@ dependencies = [
 
 [[package]]
 name = "arena-postgres"
-version = "0.3.0-beta.1"
+version = "0.4.0-beta.1"
 dependencies = [
  "arena",
  "arena-container",

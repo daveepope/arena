@@ -2,7 +2,7 @@ load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("@rules_python//python:packaging.bzl", "py_wheel")
 
-ARENA_PYTEST_VERSION = "0.3.0b1"
+ARENA_PYTEST_VERSION = "0.4.0b1"
 
 # Keep in sync with classifiers in arena-pytest/pyproject.toml (Bazel wheel METADATA).
 ARENA_PYTEST_CLASSIFIERS = [
