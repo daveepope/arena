@@ -23,6 +23,10 @@ class KafkaDependencyBuilder:
         self._config["image_name"] = image_name
         return self
 
+    def with_image_name(self, image_name: str) -> "KafkaDependencyBuilder":
+        self._config["image_name"] = image_name
+        return self
+
     def with_topic(self, topic: str) -> "KafkaDependencyBuilder":
         self._config["topics"].append(topic)
         return self
