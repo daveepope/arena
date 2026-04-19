@@ -27,6 +27,7 @@ from arena_pytest import (
     KafkaDependencyBuilder,
     KafkaFlavor,
     KAFKA_INTERNAL_DOCKER_PORT,
+    MssqlDependencyBuilder,
     PostgresDependencyBuilder,
 )
 
@@ -35,16 +36,29 @@ POSTGRES_DB_NAME = "readings_db"
 POSTGRES_DB_USER = "readings_user"
 POSTGRES_DB_PASS = "readings_password"
 KAFKA_PORT = 9094
+MSSQL_PORT = 1436
+MSSQL_DB_NAME = "validationDb"
+MSSQL_DB_USER = "sa"
+MSSQL_DB_PASS = "yourStrong(!)Password"
 EXEC_WEB_APP_PORT = 3001
 DOCKER_WEB_HOST_PORT = 3002
 NETWORK_NAME = "arena-pytest-network"
 POSTGRES_CONTAINER_NAME = "arena-pytest-postgres"
 KAFKA_CONTAINER_NAME = "arena-pytest-kafka"
+MSSQL_CONTAINER_NAME = "arena-pytest-mssql"
 CALIBRATION_CONTAINER_NAME = "arena-pytest-calibration"
 CALIBRATION_HOST_PORT = 3003
 CALIBRATION_VALIDATE_PATH = "/api/v1/validate"
 KAFKA_TOPIC = "readings"
 DOCKER_IMAGE_TAG = "arena-pytest-docker-webapp"
+MSSQL_CONNECTION_STRING_LOCAL = (
+    f"Server=tcp:localhost,{MSSQL_PORT};Database={MSSQL_DB_NAME};"
+    f"User Id={MSSQL_DB_USER};Password={MSSQL_DB_PASS};TrustServerCertificate=True;"
+)
+MSSQL_CONNECTION_STRING_DOCKER = (
+    f"Server=tcp:{MSSQL_CONTAINER_NAME},1433;Database={MSSQL_DB_NAME};"
+    f"User Id={MSSQL_DB_USER};Password={MSSQL_DB_PASS};TrustServerCertificate=True;"
+)
 
 
 _RUNTIME_DOCKERFILE = """\
@@ -75,14 +89,14 @@ def _prepare_docker_build_context() -> tuple[str, str]:
     return ctx, _RUNTIME_DOCKERFILE
 
 
-def _find_schema_path() -> str:
+def _find_schema_path(filename: str = "instrument_reading_db_schema.sql") -> str:
     try:
         from bazel_tools.tools.python.runfiles import runfiles
 
         r = runfiles.Create()
         for rel in (
-            "arena/examples/resources/instrument_reading_db_schema.sql",
-            "_main/examples/resources/instrument_reading_db_schema.sql",
+            f"arena/examples/resources/{filename}",
+            f"_main/examples/resources/{filename}",
         ):
             p = r.Rlocation(rel)
             if p and os.path.isfile(p):
@@ -92,11 +106,11 @@ def _find_schema_path() -> str:
     runfiles_dir = os.environ.get("RUNFILES_DIR")
     if runfiles_dir:
         for base in ("_main", "arena", ""):
-            p = os.path.join(runfiles_dir, base, "examples", "resources", "instrument_reading_db_schema.sql")
+            p = os.path.join(runfiles_dir, base, "examples", "resources", filename)
             if os.path.isfile(p):
                 return p
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    p = os.path.join(root, "examples", "resources", "instrument_reading_db_schema.sql")
+    p = os.path.join(root, "examples", "resources", filename)
     return p if os.path.isfile(p) else ""
 
 
@@ -136,6 +150,19 @@ def _build_kafka():
     )
 
 
+def _build_mssql(startup_sql: list[str]):
+    return (
+        MssqlDependencyBuilder("pytest validation")
+        .with_port(MSSQL_PORT)
+        .with_database_name(MSSQL_DB_NAME)
+        .with_database_username(MSSQL_DB_USER)
+        .with_database_password(MSSQL_DB_PASS)
+        .with_container_name(MSSQL_CONTAINER_NAME)
+        .with_startup_sql_scripts(startup_sql)
+        .build()
+    )
+
+
 def _build_calibration_http():
     return (
         HttpDependencyBuilder("pytest calibration")
@@ -171,6 +198,9 @@ def _build_exec_component() -> object:
         .with_runtime_arg(
             "calibration_url", f"http://127.0.0.1:{CALIBRATION_HOST_PORT}"
         )
+        .with_runtime_arg(
+            "mssql_connection_string", MSSQL_CONNECTION_STRING_LOCAL
+        )
         .with_readiness_check(HttpReadinessCheck(), healthcheck_url)
     )
     if not is_bazel:
@@ -199,6 +229,9 @@ def _build_container_component(repo_root: str, dockerfile: str) -> object:
         .with_runtime_arg(
             "calibration_url", f"http://{CALIBRATION_CONTAINER_NAME}:8080"
         )
+        .with_runtime_arg(
+            "mssql_connection_string", MSSQL_CONNECTION_STRING_DOCKER
+        )
         .with_readiness_check(
             HttpReadinessCheck(),
             f"http://127.0.0.1:{DOCKER_WEB_HOST_PORT}/readings",
@@ -225,6 +258,9 @@ def closed_arena() -> ClosedArena:
     schema_path = _find_schema_path()
     startup_sql = [open(schema_path).read()] if schema_path else []
 
+    mssql_schema_path = _find_schema_path("validation_db_schema.sql")
+    mssql_startup_sql = [open(mssql_schema_path).read()] if mssql_schema_path else []
+
     components = [_build_exec_component()]
 
     ctx, dockerfile = _prepare_docker_build_context()
@@ -238,6 +274,7 @@ def closed_arena() -> ClosedArena:
     a_match = a_match.with_network(NETWORK_NAME)
     a_match = a_match.add_dependency(_build_postgres(startup_sql))
     a_match = a_match.add_dependency(_build_kafka())
+    a_match = a_match.add_dependency(_build_mssql(mssql_startup_sql))
     a_match = a_match.add_dependency(calibration_http)
     a_match = a_match.add_on_dependency_startup_handler(
         _build_calibration_handler(calibration_http.identifier)
