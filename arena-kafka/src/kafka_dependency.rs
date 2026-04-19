@@ -11,26 +11,13 @@ use crate::builder::KafkaDependencyBuilder;
 use futures_timer::Delay;
 use crate::kafka_dependency::healthcheck::DefaultKafkaReadinessCheck;
 use crate::kafka_dependency::topic_creator::TopicCreator;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 #[async_trait]
 pub trait KafkaImpl: Send + Sync {
     async fn start(&mut self, port: u16, image_name: &str, image_tag: &str, container_name: &str);
     async fn stop(&mut self);
     fn bootstrap_servers(&self) -> Option<&str>;
-}
-
-fn sanitize_identifier(input: &str) -> String {
-    let mut safe = String::with_capacity(input.len());
-    for c in input.chars() {
-        let c = c.to_ascii_lowercase();
-        if c.is_ascii_alphanumeric() {
-            safe.push(c);
-        } else {
-            safe.push('-');
-        }
-    }
-    safe
 }
 
 pub struct KafkaDependency {
@@ -84,14 +71,7 @@ impl KafkaDependency {
     }
 
     fn set_container_name(&self) -> String {
-        let safe = sanitize_identifier(&self.identifier);
-
-        let ts = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis();
-
-        format!("arena-kafka-{safe}-{ts}")
+        arena_container::identifier::sanitize_for_container(&self.identifier)
     }
 
     fn bootstrap_on_host(&self) -> Result<&str, String> {
@@ -279,5 +259,18 @@ impl RunnableDependency for KafkaDependency {
         self.wait_until_ready().await;
         self.create_topics().await;
         self.running = true;
+    }
+}
+
+impl Drop for KafkaDependency {
+    fn drop(&mut self) {
+        if !self.running {
+            return;
+        }
+        log::warn!(
+            "[Kafka-{}] dropped while still running; stopping container.",
+            self.identifier
+        );
+        futures::executor::block_on(<Self as RunnableDependency>::stop(self));
     }
 }

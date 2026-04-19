@@ -1,6 +1,7 @@
 use arena::{ClosedArena, Component, Dependency, Match, MatchTrait, OnDependencyStartup, OpenArena};
 use arena_http::{HttpDependency, ok_json, server_error};
 use arena_kafka::{KafkaDependency, KafkaFlavor};
+use arena_mssql::MssqlDependency;
 use arena_postgres::PostgresDependency;
 use arena_executable_component::executable_component::ExecutableComponent;
 use arena_examples::http_healthcheck::HttpReadinessCheck;
@@ -11,21 +12,27 @@ use rdkafka::message::Message;
 use rstest::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 use tokio::sync::OnceCell;
 
+static KAFKA_ID: OnceLock<String> = OnceLock::new();
+static CALIBRATION_ID: OnceLock<String> = OnceLock::new();
+static MSSQL_ID: OnceLock<String> = OnceLock::new();
+
 const POSTGRES_PORT: u16 = 5555;
-const DB_NAME: &str = "test_database";
-const DB_USER: &str = "test_user";
-const DB_PASS: &str = "test_password";
+const POSTGRES_DB_NAME: &str = "readings_db";
+const POSTGRES_DB_USER: &str = "readings_user";
+const POSTGRES_DB_PASS: &str = "readings_password";
 const KAFKA_PORT: u16 = 9093;
 const HTTP_MOCK_PORT: u16 = 8888;
 const EXEC_WEB_APP_PORT: u16 = 3000;
+const MSSQL_PORT: u16 = 1435;
+const MSSQL_DB_NAME: &str = "validationDb";
+const MSSQL_DB_USER: &str = "sa";
+const MSSQL_DB_PASS: &str = "yourStrong(!)Password";
 
 const NETWORK_NAME: &str = "arena-component-test-network";
-const POSTGRES_CONTAINER_NAME: &str = "arena-component-test-postgres";
-const KAFKA_CONTAINER_NAME: &str = "arena-component-test-kafka";
-const HTTP_MOCK_CONTAINER_NAME: &str = "arena-component-test-http-mock";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Reading {
@@ -70,38 +77,56 @@ fn setup_dependencies() -> Vec<Dependency> {
         include_str!("../../resources/instrument_reading_db_schema.sql").to_string()
     ];
 
-    let postgres_db: Dependency = Box::new(
-        PostgresDependency::builder("test database")
-            .with_image("14.20-trixie")
-            .with_port(POSTGRES_PORT)
-            .with_database_name(DB_NAME)
-            .with_database_username(DB_USER)
-            .with_database_password(DB_PASS)
-            .with_container_name(POSTGRES_CONTAINER_NAME)
-            .with_network(NETWORK_NAME)
-            .with_startup_sql_scripts(startup_sql_scripts)
-            .build(),
-    );
+    let postgres_db = PostgresDependency::builder("example readings")
+        .with_image("14.20-trixie")
+        .with_port(POSTGRES_PORT)
+        .with_database_name(POSTGRES_DB_NAME)
+        .with_database_username(POSTGRES_DB_USER)
+        .with_database_password(POSTGRES_DB_PASS)
+        .with_network(NETWORK_NAME)
+        .with_startup_sql_scripts(startup_sql_scripts)
+        .build();
 
-    let kafka: Dependency = Box::new(
-        KafkaDependency::builder("test kafka")
-            .with_flavor(KafkaFlavor::ApacheNative)
-            .with_port(KAFKA_PORT)
-            .with_container_name(KAFKA_CONTAINER_NAME)
-            .with_network(NETWORK_NAME)
-            .with_topic("readings")
-            .build(),
-    );
+    let kafka = KafkaDependency::builder("example readings")
+        .with_flavor(KafkaFlavor::ApacheNative)
+        .with_port(KAFKA_PORT)
+        .with_network(NETWORK_NAME)
+        .with_topic("readings")
+        .build();
+    KAFKA_ID
+        .set(kafka.identifier.clone())
+        .expect("kafka id set once");
 
-    let calibration_service: Dependency = Box::new(
-        HttpDependency::builder("calibration service")
-            .with_port(HTTP_MOCK_PORT)
-            .with_container_name(HTTP_MOCK_CONTAINER_NAME)
-            .with_network(NETWORK_NAME)
-            .build(),
-    );
+    let calibration_service = HttpDependency::builder("example calibration")
+        .with_port(HTTP_MOCK_PORT)
+        .with_network(NETWORK_NAME)
+        .build();
+    CALIBRATION_ID
+        .set(calibration_service.identifier.clone())
+        .expect("calibration id set once");
 
-    vec![postgres_db, kafka, calibration_service]
+    let mssql_startup_sql_scripts = vec![
+        include_str!("../../resources/validation_db_schema.sql").to_string()
+    ];
+
+    let validation_db = MssqlDependency::builder("example validation")
+        .with_port(MSSQL_PORT)
+        .with_database_name(MSSQL_DB_NAME)
+        .with_database_username(MSSQL_DB_USER)
+        .with_database_password(MSSQL_DB_PASS)
+        .with_network(NETWORK_NAME)
+        .with_startup_sql_scripts(mssql_startup_sql_scripts)
+        .build();
+    MSSQL_ID
+        .set(validation_db.identifier.clone())
+        .expect("mssql id set once");
+
+    vec![
+        Box::new(postgres_db),
+        Box::new(kafka),
+        Box::new(calibration_service),
+        Box::new(validation_db),
+    ]
 }
 
 fn resolve_web_app_binary() -> String {
@@ -116,7 +141,7 @@ fn setup_exec_component() -> Component {
     let binary = resolve_web_app_binary();
     let is_bazel = std::env::var("RUNFILES_DIR").is_ok();
 
-    let mut builder = ExecutableComponent::builder("test web app (exec)")
+    let mut builder = ExecutableComponent::builder("example web app")
         .with_executable_path(binary)
         .with_env_var("RUST_LOG", "info")
         .with_runtime_arg("web_app_port", EXEC_WEB_APP_PORT.to_string())
@@ -124,11 +149,18 @@ fn setup_exec_component() -> Component {
             "postgres_connection_string",
             format!(
                 "host=localhost port={} user={} password={} dbname={}",
-                POSTGRES_PORT, DB_USER, DB_PASS, DB_NAME
+                POSTGRES_PORT, POSTGRES_DB_USER, POSTGRES_DB_PASS, POSTGRES_DB_NAME
             )
         )
         .with_runtime_arg("kafka_bootstrap", format!("localhost:{}", KAFKA_PORT))
         .with_runtime_arg("calibration_url", format!("http://127.0.0.1:{}", HTTP_MOCK_PORT))
+        .with_runtime_arg(
+            "mssql_connection_string",
+            format!(
+                "Server=tcp:localhost,{};Database={};User Id={};Password={};TrustServerCertificate=True;",
+                MSSQL_PORT, MSSQL_DB_NAME, MSSQL_DB_USER, MSSQL_DB_PASS
+            ),
+        )
         .with_readiness_check(HttpReadinessCheck::new(), healthcheck_url);
 
     if !is_bazel {
@@ -145,9 +177,10 @@ struct ValidationServiceSetup;
 #[async_trait]
 impl OnDependencyStartup for ValidationServiceSetup {
     async fn on_dependency_startup(&self, dependencies: &[Dependency]) {
+        let calibration_id = CALIBRATION_ID.get().expect("calibration id initialized");
         let http = dependencies
             .iter()
-            .find(|d| d.identifier() == "calibration service")
+            .find(|d| d.identifier() == calibration_id)
             .and_then(|d| d.as_any().downcast_ref::<HttpDependency>())
             .expect("calibration service should be available");
 
@@ -296,11 +329,17 @@ async fn example_using_exec_component_creates_reading_consumes_and_gets_reading(
     let _scenario = SCENARIO_LOCK.lock().await;
 
     let bootstrap = arena
-        .dependency("test kafka")
+        .dependency(KAFKA_ID.get().expect("kafka id initialized"))
         .and_then(|d| d.as_any().downcast_ref::<KafkaDependency>())
         .and_then(|k| k.bootstrap_servers())
         .expect("kafka bootstrap should be available")
         .to_string();
+
+    let validation_db = arena
+        .dependency(MSSQL_ID.get().expect("mssql id initialized"))
+        .and_then(|d| d.as_any().downcast_ref::<MssqlDependency>())
+        .expect("validation database should be available");
+    let validation_playbook = validation_db.playbook().run().await;
 
     let (id_tx, id_rx) = std::sync::mpsc::channel();
     let consume_handle = tokio::task::spawn_blocking({
@@ -330,6 +369,14 @@ async fn example_using_exec_component_creates_reading_consumes_and_gets_reading(
     assert_eq!(found.user_name, "Exec Test User");
     assert_eq!(found.value, 42);
     assert_eq!(found.comment.as_deref(), Some("test comment"));
+
+    let validation_count = validation_playbook
+        .verify("SELECT COUNT(*) FROM dbo.validation_results WHERE user_name = N'Exec Test User' AND value = 42 AND valid = 1;")
+        .await;
+    assert_eq!(
+        validation_count, 1,
+        "web app should have written one valid validation row to mssql"
+    );
 }
 
 #[rstest]
@@ -341,7 +388,7 @@ async fn example_using_exec_component_calibration_outage_returns_error(
     let _scenario = SCENARIO_LOCK.lock().await;
 
     let calibration = arena
-        .dependency("calibration service")
+        .dependency(CALIBRATION_ID.get().expect("calibration id initialized"))
         .and_then(|d| d.as_any().downcast_ref::<HttpDependency>())
         .expect("calibration service should be available");
 

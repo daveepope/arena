@@ -1,23 +1,21 @@
 [package]
-name = "arena-http"
+name = "arena-mssql"
 version.workspace = true
 edition = "2021"
 authors = ["David Pope"]
-description = "Arena HTTP mock (WireMock) implementation"
+description = "Arena Microsoft SQL Server implementation"
 license = "todo"
 
 [dependencies]
 arena = { workspace = true }
 arena-container = { workspace = true }
 async-trait = { workspace = true }
-testcontainers-modules = { workspace = true }
+testcontainers-modules = { workspace = true, features = ["mssql_server"] }
 log = { workspace = true }
 futures = { workspace = true }
-futures-timer = { workspace = true }
-reqwest = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-tokio = { workspace = true, features = ["rt"] }
+tiberius = { workspace = true }
+tokio = { workspace = true, features = ["rt", "net", "macros"] }
+tokio-util = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

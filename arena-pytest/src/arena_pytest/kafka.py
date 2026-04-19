@@ -1,7 +1,8 @@
 from enum import Enum
 from typing import Any, Dict
 
-# Must match arena-kafka KAFKA_INTERNAL_DOCKER_PORT (Docker network listener).
+from arena_pytest._identifier import build as _build_identifier
+
 KAFKA_INTERNAL_DOCKER_PORT = 29092
 
 
@@ -11,8 +12,12 @@ class KafkaFlavor(Enum):
 
 
 class KafkaDependencyBuilder:
-    def __init__(self, identifier: str):
-        self._config: Dict[str, Any] = {"type": "kafka", "identifier": identifier, "topics": []}
+    def __init__(self, name: str = ""):
+        self._config: Dict[str, Any] = {
+            "type": "kafka",
+            "identifier": _build_identifier("arena-kafka", name),
+            "topics": [],
+        }
 
     def with_image_name(self, image_name: str) -> "KafkaDependencyBuilder":
         self._config["image_name"] = image_name
@@ -44,6 +49,10 @@ class KafkaDependencyBuilder:
 class KafkaDependency:
     def __init__(self, config: Dict[str, Any]):
         self._config = config
+
+    @property
+    def identifier(self) -> str:
+        return self._config["identifier"]
 
     def _for_ffi(self) -> Dict[str, Any]:
         return self._config

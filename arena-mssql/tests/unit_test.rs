@@ -1,0 +1,128 @@
+use arena::dependency::RunnableDependency;
+use arena::healthcheck::ReadinessCheck;
+use arena_mssql::{MssqlDependency, MssqlImpl};
+use async_trait::async_trait;
+use futures::FutureExt;
+use std::sync::{Arc, Mutex};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Event {
+    MssqlStart,
+    MssqlStop,
+    ReadinessCheck,
+}
+
+struct FakeMssqlImpl {
+    conn_str: Option<String>,
+    admin_conn_str: Option<String>,
+    events: Arc<Mutex<Vec<Event>>>,
+}
+
+#[async_trait]
+impl MssqlImpl for FakeMssqlImpl {
+    async fn start(
+        &mut self,
+        _port: u16,
+        _database_name: &str,
+        _database_username: &str,
+        _database_password: &str,
+        _image_name: &str,
+        _image_tag: &str,
+        _container_name: &str,
+    ) {
+        self.conn_str = Some(
+            "Server=tcp:127.0.0.1,1433;Database=fake;User Id=sa;Password=pw;TrustServerCertificate=True;"
+                .to_string(),
+        );
+        self.admin_conn_str = Some(
+            "Server=tcp:127.0.0.1,1433;Database=master;User Id=sa;Password=pw;TrustServerCertificate=True;"
+                .to_string(),
+        );
+        self.events.lock().unwrap().push(Event::MssqlStart);
+    }
+
+    async fn stop(&mut self) {
+        self.conn_str = None;
+        self.admin_conn_str = None;
+        self.events.lock().unwrap().push(Event::MssqlStop);
+    }
+
+    fn connection_string(&self) -> Option<&str> {
+        self.conn_str.as_deref()
+    }
+
+    fn admin_connection_string(&self) -> Option<&str> {
+        self.admin_conn_str.as_deref()
+    }
+}
+
+struct FakeReadinessCheck {
+    events: Arc<Mutex<Vec<Event>>>,
+    last_identifier: Arc<Mutex<Option<String>>>,
+    last_connection_string: Arc<Mutex<Option<String>>>,
+    last_timeout_ms: Arc<Mutex<Option<u64>>>,
+}
+
+#[async_trait]
+impl ReadinessCheck for FakeReadinessCheck {
+    async fn is_ready(
+        &self,
+        identifier: &str,
+        connection_string: &str,
+        timeout_ms: u64,
+    ) -> Result<(), String> {
+        self.events.lock().unwrap().push(Event::ReadinessCheck);
+        *self.last_identifier.lock().unwrap() = Some(identifier.to_string());
+        *self.last_connection_string.lock().unwrap() = Some(connection_string.to_string());
+        *self.last_timeout_ms.lock().unwrap() = Some(timeout_ms);
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn mssql_dependency_lifecycle() {
+    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
+    let last_identifier = Arc::new(Mutex::new(None::<String>));
+    let last_connection_string = Arc::new(Mutex::new(None::<String>));
+    let last_timeout_ms = Arc::new(Mutex::new(None::<u64>));
+
+    let mut mssql = MssqlDependency::builder("mssql")
+        .with_database_name("master")
+        .with_impl(FakeMssqlImpl {
+            conn_str: None,
+            admin_conn_str: None,
+            events: events.clone(),
+        })
+        .with_readiness_check(FakeReadinessCheck {
+            events: events.clone(),
+            last_identifier: last_identifier.clone(),
+            last_connection_string: last_connection_string.clone(),
+            last_timeout_ms: last_timeout_ms.clone(),
+        })
+        .build();
+
+    let outcome = std::panic::AssertUnwindSafe(async {
+        mssql.start().await;
+        mssql.stop().await;
+    })
+    .catch_unwind()
+    .await;
+
+    assert!(outcome.is_ok(), "expected start/stop not to panic");
+
+    let got = events.lock().unwrap().clone();
+    assert_eq!(
+        got,
+        vec![Event::MssqlStart, Event::ReadinessCheck, Event::MssqlStop]
+    );
+
+    assert_eq!(
+        last_identifier.lock().unwrap().as_deref(),
+        Some(mssql.identifier.as_str())
+    );
+    assert_eq!(
+        last_connection_string.lock().unwrap().as_deref(),
+        Some("Server=tcp:127.0.0.1,1433;Database=master;User Id=sa;Password=pw;TrustServerCertificate=True;")
+    );
+    assert_eq!(*last_timeout_ms.lock().unwrap(), Some(60_000));
+}

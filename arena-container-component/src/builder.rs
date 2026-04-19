@@ -23,7 +23,10 @@ pub struct ContainerComponentBuilder {
 impl ContainerComponentBuilder {
     pub(crate) fn new(identifier: impl Into<String>, dockerfile: impl Into<String>) -> Self {
         Self {
-            identifier: identifier.into(),
+            identifier: arena_container::identifier::build(
+                "arena-container-component",
+                &identifier.into(),
+            ),
             children: None,
             dockerfile: dockerfile.into(),
             build_context: None,

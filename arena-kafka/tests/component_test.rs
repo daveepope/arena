@@ -97,7 +97,7 @@ struct TestContext {
 impl TestContext {
     async fn new() -> Result<Self, String> {
         log::info!("[component-test] starting KafkaDependency");
-        let mut kafka = KafkaDependency::builder("arena-kafka component test")
+        let mut kafka = KafkaDependency::builder("")
             .with_flavor(KafkaFlavor::ApacheNative)
             .build();
 

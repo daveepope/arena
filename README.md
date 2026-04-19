@@ -4,11 +4,11 @@
 
 [![Build, test, publish arena](https://github.com/daveepope/arena/actions/workflows/build-test-publish-arena.yml/badge.svg)](https://github.com/daveepope/arena/actions/workflows/build-test-publish-arena.yml)
 
-Arena is a cross-platform sandboxing framework. Arena supports multiple developer focused use cases. While the core Arena framework is not a testing framework it was designed to streamline the creation of repeatable, deterministic component tests with a fast feedback loop. It can be used to stand up sandboxed environments outside of testing scenarios also. It provides top-level clients for Python, Java, Go, and .NET. These top level clients include plugins and extenstions for popular unit testing frameworks.
+Arena is a cross-platform sandboxing framework. It manages the lifecycle of a set of dependencies (databases, brokers, HTTP services) and components (your applications) as a single sandbox you can open, interact with, and close — giving you repeatable, deterministic, multi-service environments with a fast feedback loop. Arena provides top-level clients for Python, Java, Go, and .NET (the Python client `arena-pytest` ships today; Java, Go, and .NET clients are planned). Component testing is one common use case, but Arena is equally at home as a local development sandbox, a scripted scenario driver, or anywhere else you need a reproducible multi-service environment.
 
 ## Overview
 
-Arena models a sandbox ussing the concept of matches to manage the lifecycle of a set of dependencies and components (applications under test).
+Arena models a sandbox using the concept of matches to manage the lifecycle of a set of dependencies and components (your applications).
 
 The core framework is implemented in Rust. Clients call the core framework library through a C FFI layer which is completly hidden from application developers. The Python client (arena-pytest) is available; Java, Go, and .NET clients are planned.
 
@@ -21,9 +21,9 @@ Bazel build is used to build and runs tests in parallel and streams logs during 
 ## Prerequisites
 
 - Bazel (via [Bazelisk](https://github.com/bazelbuild/bazelisk) is recommended)
-- Docker (only for **component** tests: targets tagged `local`)
+- Docker
 
-**Platforms:** CI builds on **Linux and macOS**. **All** tests (including Docker-backed targets tagged `local`) run on **Linux** in CI. Hosted **macOS** runners have no Docker, so CI there runs everything **except** `local` tests. Locally on macOS, use Docker Desktop if you want to run the full suite.
+> Note: hosted GitHub macOS runners don't provide a Docker daemon, so CI's macOS leg skips the Docker-backed tests by passing `--test_tag_filters=-local`. Linux CI and local development (including macOS with Docker Desktop) run the full suite.
 
 ## Installation
 
@@ -33,16 +33,10 @@ Build the project:
 bazel build //...
 ```
 
-Run **all** tests (requires Docker for targets tagged `local`, e.g. arena-pytest component tests):
+Run the full test suite:
 
 ```bash
 bazel test //...
-```
-
-Run tests **without** Docker-heavy targets (faster when you have no daemon):
-
-```bash
-bazel test //... --test_tag_filters=-local
 ```
 
 ## Host development (Cargo and Python)
@@ -60,14 +54,14 @@ use arena_kafka::{KafkaDependency, KafkaFlavor};
 use arena_postgres::PostgresDependency;
 
 let postgres: Dependency = Box::new(
-    PostgresDependency::builder("db")
+    PostgresDependency::builder("readings")
         .with_port(5432)
         .with_database_name("mydb")
         .build(),
 );
 
 let kafka: Dependency = Box::new(
-    KafkaDependency::builder("kafka")
+    KafkaDependency::builder("readings")
         .with_flavor(KafkaFlavor::ApacheNative)
         .with_port(9092)
         .with_topic("events")
@@ -84,7 +78,7 @@ let a_match = Match::new("my-test", vec![postgres, kafka], vec![web_app]);
 let closed = ClosedArena::new("Arena".to_string(), vec![Box::new(a_match)]);
 let open = closed.open().await;
 
-// Run tests against open arena
+// Interact with the open arena
 // ...
 
 open.close().await;
@@ -94,15 +88,17 @@ You can also use `with_source_path` / `with_build_tool` on the builder so Arena 
 
 #### HTTP playbooks (Rust)
 
-When a test needs a dependency to behave differently for one scenario (e.g. an outage, a bad response), grab the `HttpDependency` from the open arena and run a **playbook**. Mappings registered by the playbook are scoped to its lifetime and automatically removed on drop; expectations declared via `.expect_called(...)` are verified on drop and fail the test if unmet.
+`arena-http` and `arena-mssql` both ship a centralized **playbook** API with a lifetime scope, so per-scenario setup and teardown happen implicitly. Calling `.run().await` returns an `ActivePlaybook`: setup runs eagerly (HTTP mappings registered, MSSQL tables reset), and teardown runs automatically when the value is dropped (HTTP mappings removed and `expect_called(...)` expectations verified; MSSQL tables reset again so the next scenario starts clean). Bind the active playbook to a scoped variable and let scope exit do the cleanup.
+
+When a scenario needs a dependency to behave differently (e.g. an outage, a bad response), grab the `HttpDependency` from the open arena and run a **playbook**. Mappings registered by the playbook are scoped to its lifetime and automatically removed on drop; expectations declared via `.expect_called(...)` are verified on drop and panic if unmet.
 
 ```rust
 use arena_http::{HttpDependency, server_error};
 
 let calibration = open
-    .dependency("calibration service")
+    .dependency("calibration")
     .and_then(|d| d.as_any().downcast_ref::<HttpDependency>())
-    .expect("calibration service available");
+    .expect("calibration available");
 
 {
     let _outage = calibration
@@ -165,7 +161,7 @@ a_match = (
 closed = ClosedArena("Arena", [a_match])
 open_arena = await closed.open()
 
-# Run tests against open_arena
+# Interact with open_arena
 # ...
 
 await open_arena.close()
@@ -175,14 +171,14 @@ As in Rust, you can point at source plus `with_build_tool(...)` instead of a pre
 
 #### HTTP playbooks (Python)
 
-The Python client mirrors the Rust playbook API. Use `HttpPlaybookBuilder` with an `arena` fixture and a `with` block for scoped setup; unmet `expect_called` expectations raise `AssertionError` on exit.
+The Python client mirrors the Rust playbook API. Use `HttpPlaybookBuilder` with an open arena and a `with` block for scoped setup and teardown; unmet `expect_called` expectations raise `AssertionError` on exit. The example below uses an `arena` pytest fixture, which is one convenient way to get an open arena, but any open arena works.
 
 ```python
 from arena_pytest import HttpPlaybookBuilder
 
 def test_calibration_outage_returns_500(arena):
     outage = (
-        HttpPlaybookBuilder("calibration service")
+        HttpPlaybookBuilder("calibration")
         .with_mapping(
             method="POST",
             url_path="/api/v1/validate",

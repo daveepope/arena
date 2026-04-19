@@ -8,11 +8,13 @@ use axum::body::Body;
 use axum::http::Request;
 use axum::middleware::Next;
 use axum::response::Response;
+use arena_mssql::Client as MssqlClient;
 use rdkafka::producer::{BaseProducer, BaseRecord, Producer};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio_postgres::Client;
+use tokio::sync::Mutex;
+use tokio_postgres::Client as PgClient;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -36,11 +38,12 @@ struct CalibrationResponse {
 
 #[derive(Clone)]
 struct AppState {
-    pg: Arc<Client>,
+    pg: Arc<PgClient>,
     kafka: Arc<BaseProducer>,
     kafka_topic: Arc<str>,
     http_client: reqwest::Client,
     calibration_url: Arc<str>,
+    mssql: Arc<Mutex<MssqlClient>>,
 }
 
 #[derive(Serialize)]
@@ -105,6 +108,23 @@ async fn list_readings(
     Ok(Json(out))
 }
 
+async fn write_validation_result(
+    mssql: &Mutex<MssqlClient>,
+    user_name: &str,
+    value: i32,
+    valid: bool,
+) -> Result<(), String> {
+    let mut client = mssql.lock().await;
+    client
+        .execute(
+            "INSERT INTO dbo.validation_results (user_name, value, valid) VALUES (@P1, @P2, @P3);",
+            &[&user_name, &value, &valid],
+        )
+        .await
+        .map_err(|e| format!("mssql insert validation_results failed: {}", e))?;
+    Ok(())
+}
+
 async fn create_reading(
     State(st): State<AppState>,
     Json(req): Json<CreateReadingRequest>,
@@ -119,6 +139,10 @@ async fn create_reading(
         .json::<CalibrationResponse>()
         .await
         .map_err(internal_error)?;
+
+    write_validation_result(&st.mssql, &req.user_name, req.value, validation.valid)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
     let user_id: i64 = match st
         .pg
@@ -198,11 +222,12 @@ fn internal_error<E: std::fmt::Display>(e: E) -> (StatusCode, String) {
 }
 
 pub struct ExampleAxumWebApp {
-    pg: Arc<Client>,
+    pg: Arc<PgClient>,
     kafka: Arc<BaseProducer>,
     kafka_topic: Arc<str>,
     http_client: reqwest::Client,
     calibration_url: Arc<str>,
+    mssql: Arc<Mutex<MssqlClient>>,
 }
 
 impl ExampleAxumWebApp {
@@ -211,6 +236,7 @@ impl ExampleAxumWebApp {
         kafka_bootstrap: &str,
         kafka_topic: &str,
         calibration_url: &str,
+        mssql_connection_string: &str,
     ) -> Self {
         use rdkafka::config::ClientConfig;
         use tokio_postgres::NoTls;
@@ -218,7 +244,7 @@ impl ExampleAxumWebApp {
         let (pg, connection) = tokio_postgres::connect(postgres_connection_string, NoTls)
             .await
             .expect("connect to postgres");
-        
+
         tokio::spawn(async move {
             if let Err(e) = connection.await {
                 log::error!("postgres connection error: {e}");
@@ -231,12 +257,17 @@ impl ExampleAxumWebApp {
             .create()
             .expect("create kafka producer");
 
+        let mssql = arena_mssql::connect(mssql_connection_string)
+            .await
+            .expect("connect to mssql validation db");
+
         Self {
             pg: Arc::new(pg),
             kafka: Arc::new(kafka),
             kafka_topic: Arc::from(kafka_topic),
             http_client: reqwest::Client::new(),
             calibration_url: Arc::from(calibration_url),
+            mssql: Arc::new(Mutex::new(mssql)),
         }
     }
 
@@ -255,6 +286,7 @@ impl ExampleAxumWebApp {
                 kafka_topic: self.kafka_topic,
                 http_client: self.http_client,
                 calibration_url: self.calibration_url,
+                mssql: self.mssql,
             });
 
         let addr: SocketAddr = format!("0.0.0.0:{}", port).parse()?;

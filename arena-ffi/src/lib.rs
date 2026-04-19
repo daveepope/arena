@@ -1,5 +1,6 @@
 pub mod ffi;
 pub mod http;
+pub mod mssql;
 
 mod container_component;
 mod matches;
@@ -7,6 +8,7 @@ mod executable_component;
 mod healthcheck;
 mod http_dependency;
 mod kafka_dependency;
+mod mssql_dependency;
 mod postgres_dependency;
 mod runtime_args;
 
@@ -17,4 +19,8 @@ pub use ffi::{
 pub use http::{
     arena_http_playbook_close, arena_http_playbook_open, arena_http_playbook_verify,
     ArenaHttpPlaybookHandle,
+};
+pub use mssql::{
+    arena_mssql_playbook_close, arena_mssql_playbook_open, arena_mssql_playbook_verify,
+    ArenaMssqlPlaybookHandle,
 };

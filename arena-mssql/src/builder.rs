@@ -1,11 +1,11 @@
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
-use crate::postgres_dependency::postgres_container_impl::{PostgresContainerImpl, PostgresImpl};
-use crate::postgres_dependency::{PostgresDependency};
+use crate::mssql_dependency::mssql_container_impl::{MssqlContainerImpl, MssqlImpl};
+use crate::mssql_dependency::MssqlDependency;
 
-pub struct PostgresDependencyBuilder {
+pub struct MssqlDependencyBuilder {
     identifier: String,
-    postgres_impl: Option<Box<dyn PostgresImpl>>,
+    mssql_impl: Option<Box<dyn MssqlImpl>>,
     port: Option<u16>,
     database_name: Option<String>,
     database_username: Option<String>,
@@ -19,19 +19,19 @@ pub struct PostgresDependencyBuilder {
     readiness_check: Option<Box<dyn ReadinessCheck>>,
 }
 
-impl PostgresDependencyBuilder {
+impl MssqlDependencyBuilder {
 
-    const DEFAULT_PORT: u16 = 5432;
+    const DEFAULT_PORT: u16 = 1433;
     const DEFAULT_DATABASE_NAME: &'static str = "arena_db";
-    const DEFAULT_DATABASE_USERNAME: &'static str = "arena_user";
-    const DEFAULT_DATABASE_PASSWORD: &'static str = "postgres";
-    const DEFAULT_IMAGE_NAME: &'static str = "postgres";
-    const DEFAULT_IMAGE_TAG: &'static str = "latest";
+    const DEFAULT_DATABASE_USERNAME: &'static str = "sa";
+    const DEFAULT_DATABASE_PASSWORD: &'static str = "yourStrong(!)Password";
+    const DEFAULT_IMAGE_NAME: &'static str = "mcr.microsoft.com/mssql/server";
+    const DEFAULT_IMAGE_TAG: &'static str = "2022-CU14-ubuntu-22.04";
 
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {
             identifier: identifier.into(),
-            postgres_impl: None,
+            mssql_impl: None,
             port: None,
             database_name: None,
             database_username: None,
@@ -48,9 +48,9 @@ impl PostgresDependencyBuilder {
 
     pub fn with_impl<W>(mut self, wrapper: W) -> Self
     where
-        W: PostgresImpl + 'static,
+        W: MssqlImpl + 'static,
     {
-        self.postgres_impl = Some(Box::new(wrapper));
+        self.mssql_impl = Some(Box::new(wrapper));
         self
     }
 
@@ -123,10 +123,10 @@ impl PostgresDependencyBuilder {
         self.with_image_tag(image_tag)
     }
 
-    pub fn build(self) -> PostgresDependency {
-        let postgres_impl = self
-            .postgres_impl
-            .unwrap_or_else(|| Box::new(PostgresContainerImpl::new(self.network)));
+    pub fn build(self) -> MssqlDependency {
+        let mssql_impl = self
+            .mssql_impl
+            .unwrap_or_else(|| Box::new(MssqlContainerImpl::new(self.network)));
 
         let port = self.port.unwrap_or(Self::DEFAULT_PORT);
         let database_name = self
@@ -149,9 +149,9 @@ impl PostgresDependencyBuilder {
         let container_name = self.container_name;
         let readiness_check = self.readiness_check;
 
-        let mut dep = PostgresDependency::new(
-            arena_container::identifier::build("arena-postgres", &self.identifier),
-            postgres_impl,
+        let mut dep = MssqlDependency::new(
+            arena_container::identifier::build("arena-mssql", &self.identifier),
+            mssql_impl,
             port,
             database_name,
             database_username,

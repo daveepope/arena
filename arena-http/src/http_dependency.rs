@@ -6,7 +6,7 @@ use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
 use crate::builder::HttpDependencyBuilder;
 use crate::http_dependency::healthcheck::DefaultHttpReadinessCheck;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 #[async_trait]
 pub trait HttpImpl: Send + Sync {
@@ -16,18 +16,6 @@ pub trait HttpImpl: Send + Sync {
     fn admin_url(&self) -> Option<String>;
 }
 
-fn sanitize_identifier(input: &str) -> String {
-    let mut safe = String::with_capacity(input.len());
-    for c in input.chars() {
-        let c = c.to_ascii_lowercase();
-        if c.is_ascii_alphanumeric() {
-            safe.push(c);
-        } else {
-            safe.push('-');
-        }
-    }
-    safe
-}
 
 pub struct HttpDependency {
     pub identifier: String,
@@ -85,14 +73,7 @@ impl HttpDependency {
     }
 
     fn default_container_name(&self) -> String {
-        let safe = sanitize_identifier(&self.identifier);
-
-        let ts = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis();
-
-        format!("arena-http-{safe}-{ts}")
+        arena_container::identifier::sanitize_for_container(&self.identifier)
     }
 
     fn admin_url_or_panic(&self) -> String {
@@ -265,5 +246,18 @@ impl RunnableDependency for HttpDependency {
             .await;
         self.wait_until_ready().await;
         self.running = true;
+    }
+}
+
+impl Drop for HttpDependency {
+    fn drop(&mut self) {
+        if !self.running {
+            return;
+        }
+        log::warn!(
+            "[Http-{}] dropped while still running; stopping container.",
+            self.identifier
+        );
+        futures::executor::block_on(<Self as RunnableDependency>::stop(self));
     }
 }

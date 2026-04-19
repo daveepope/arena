@@ -22,9 +22,9 @@ from arena_pytest import (
 
 # --- arena setup (usually lives in conftest.py) ---
 
-postgres = PostgresDependencyBuilder("db").with_port(5432).with_database_name("mydb").build()
-kafka = KafkaDependencyBuilder("kafka").with_flavor(KafkaFlavor.APACHE_NATIVE).with_port(9092).with_topic("events").build()
-calibration = HttpDependencyBuilder("calibration service").with_port(3003).build()
+postgres = PostgresDependencyBuilder("readings").with_port(5432).with_database_name("mydb").build()
+kafka = KafkaDependencyBuilder("readings").with_flavor(KafkaFlavor.APACHE_NATIVE).with_port(9092).with_topic("events").build()
+calibration = HttpDependencyBuilder("calibration").with_port(3003).build()
 
 web_app = (
     ExecutableComponentBuilder("my service")
@@ -50,7 +50,7 @@ async def test_calibration_outage_returns_500():
     arena = await closed.open()
     try:
         outage = (
-            HttpPlaybookBuilder("calibration service")
+            HttpPlaybookBuilder(calibration.identifier)
             .with_mapping(
                 method="POST",
                 url_path="/api/v1/validate",
@@ -93,7 +93,7 @@ From the repository root:
 bazel build //arena-pytest:arena_pytest_wheel
 ```
 
-The wheel is under `bazel-bin/arena-pytest/`. The filename is **platform-specific** (it includes the Rust FFI shared library next to `arena_pytest/`), e.g. `arena_pytest-0.2.0b1-py3-none-manylinux2014_x86_64.whl` on Linux x86_64. Build on each OS/arch you want to publish and upload **each** wheel to PyPI.
+The wheel is under `bazel-bin/arena-pytest/`. The filename is **platform-specific** (it includes the Rust FFI shared library next to `arena_pytest/`), e.g. `arena_pytest-0.3.0b1-py3-none-manylinux2014_x86_64.whl` on Linux x86_64. Build on each OS/arch you want to publish and upload **each** wheel to PyPI.
 
 Try it in another project:
 

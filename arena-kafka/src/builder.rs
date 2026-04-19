@@ -146,8 +146,16 @@ impl KafkaDependencyBuilder {
         let image_name = image_name.unwrap_or_else(|| default_image_name.to_string());
         let image_tag = image_tag.unwrap_or_else(|| default_tag.to_string());
 
-        let mut dep =
-            KafkaDependency::new(identifier, kafka_impl, port, dependencies, image_name, image_tag, container_name, topics);
+        let mut dep = KafkaDependency::new(
+            arena_container::identifier::build("arena-kafka", &identifier),
+            kafka_impl,
+            port,
+            dependencies,
+            image_name,
+            image_tag,
+            container_name,
+            topics,
+        );
 
         if let Some(check) = readiness_check {
             dep.set_readiness_check(check);

@@ -27,7 +27,7 @@ struct TestContext {
 impl TestContext {
     async fn new() -> Result<Self, String> {
         log::info!("[component-test] starting PostgresDependency");
-        let mut pg = PostgresDependency::builder("arena-postgres component test").build();
+        let mut pg = PostgresDependency::builder("").build();
         pg.start().await;
 
         let conn_str = pg

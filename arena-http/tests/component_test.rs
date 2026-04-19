@@ -20,9 +20,9 @@ struct TestContext {
 }
 
 impl TestContext {
-    async fn new(identifier: &str) -> Result<Self, String> {
-        log::info!("[component-test] starting HttpDependency ({identifier})");
-        let mut http_dependency = HttpDependency::builder(identifier).build();
+    async fn new() -> Result<Self, String> {
+        log::info!("[component-test] starting HttpDependency");
+        let mut http_dependency = HttpDependency::builder("").build();
         http_dependency.start().await;
 
         let base_url = http_dependency
@@ -606,7 +606,7 @@ async fn run_sequence_test(ctx: &TestContext) -> Result<(), String> {
 async fn http_dependency_spacecraft_inventory_component_test() {
     init_test_logging();
 
-    let ctx = match TestContext::new("spacecraft-inventory").await {
+    let ctx = match TestContext::new().await {
         Ok(v) => v,
         Err(e) => panic!("{e}"),
     };
@@ -628,7 +628,7 @@ async fn http_dependency_spacecraft_inventory_component_test() {
 async fn http_dependency_scoped_playbooks_component_test() {
     init_test_logging();
 
-    let ctx = match TestContext::new("spacecraft-systems").await {
+    let ctx = match TestContext::new().await {
         Ok(v) => v,
         Err(e) => panic!("{e}"),
     };
@@ -650,7 +650,7 @@ async fn http_dependency_scoped_playbooks_component_test() {
 async fn http_dependency_scenario_component_test() {
     init_test_logging();
 
-    let ctx = match TestContext::new("launch-sequence").await {
+    let ctx = match TestContext::new().await {
         Ok(v) => v,
         Err(e) => panic!("{e}"),
     };
@@ -672,7 +672,7 @@ async fn http_dependency_scenario_component_test() {
 async fn http_dependency_sequence_component_test() {
     init_test_logging();
 
-    let ctx = match TestContext::new("flaky-telemetry").await {
+    let ctx = match TestContext::new().await {
         Ok(v) => v,
         Err(e) => panic!("{e}"),
     };
@@ -749,7 +749,7 @@ async fn run_scoped_drop_test(ctx: &TestContext) -> Result<(), String> {
 async fn http_dependency_scoped_drop_component_test() {
     init_test_logging();
 
-    let ctx = match TestContext::new("mission-control").await {
+    let ctx = match TestContext::new().await {
         Ok(v) => v,
         Err(e) => panic!("{e}"),
     };
@@ -786,7 +786,7 @@ async fn run_expect_called_exact_passes(ctx: &TestContext) -> Result<(), String>
 #[tokio::test]
 async fn http_dependency_expect_called_exact_component_test() {
     init_test_logging();
-    let ctx = match TestContext::new("expect-exact").await {
+    let ctx = match TestContext::new().await {
         Ok(v) => v,
         Err(e) => panic!("{e}"),
     };
@@ -821,7 +821,7 @@ async fn run_expect_at_least_passes(ctx: &TestContext) -> Result<(), String> {
 #[tokio::test]
 async fn http_dependency_expect_called_at_least_component_test() {
     init_test_logging();
-    let ctx = match TestContext::new("expect-atleast").await {
+    let ctx = match TestContext::new().await {
         Ok(v) => v,
         Err(e) => panic!("{e}"),
     };
@@ -852,7 +852,7 @@ async fn run_expect_never_called_passes(ctx: &TestContext) -> Result<(), String>
 #[tokio::test]
 async fn http_dependency_expect_never_called_component_test() {
     init_test_logging();
-    let ctx = match TestContext::new("expect-never").await {
+    let ctx = match TestContext::new().await {
         Ok(v) => v,
         Err(e) => panic!("{e}"),
     };
@@ -890,7 +890,7 @@ async fn run_expect_called_fails_on_mismatch(ctx: &TestContext) -> Result<(), St
 #[tokio::test]
 async fn http_dependency_expect_called_mismatch_panics_on_drop_component_test() {
     init_test_logging();
-    let ctx = match TestContext::new("expect-mismatch").await {
+    let ctx = match TestContext::new().await {
         Ok(v) => v,
         Err(e) => panic!("{e}"),
     };

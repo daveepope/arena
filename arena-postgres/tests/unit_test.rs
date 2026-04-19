@@ -101,7 +101,10 @@ async fn postgres_dependency_lifecycle() {
         vec![Event::PostgresStart, Event::ReadinessCheck, Event::PostgresStop]
     );
 
-    assert_eq!(last_identifier.lock().unwrap().as_deref(), Some("postgres"));
+    assert_eq!(
+        last_identifier.lock().unwrap().as_deref(),
+        Some(pg.identifier.as_str())
+    );
     assert_eq!(
         last_connection_string.lock().unwrap().as_deref(),
         Some("postgres://127.0.0.1:5432/fake")

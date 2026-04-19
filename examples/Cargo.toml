@@ -22,6 +22,7 @@ path = "src/example-web-app/main.rs"
 arena = { workspace = true }
 arena-kafka = { workspace = true }
 arena-postgres = { workspace = true }
+arena-mssql = { workspace = true }
 arena-http = { workspace = true }
 arena-executable-component = { workspace = true }
 arena-container-component = { workspace = true }
