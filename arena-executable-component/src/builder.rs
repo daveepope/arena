@@ -27,7 +27,10 @@ pub struct ExecutableComponentBuilder {
 impl ExecutableComponentBuilder {
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {
-            identifier: identifier.into(),
+            identifier: arena_container::identifier::build(
+                "arena-executable-component",
+                &identifier.into(),
+            ),
             children: None,
             source_path: None,
             build_tool: None,

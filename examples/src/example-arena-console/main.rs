@@ -1,5 +1,6 @@
 use arena::{ClosedArena, Component, Dependency, Match, MatchTrait};
 use arena_kafka::{KafkaDependency, KafkaFlavor, KAFKA_INTERNAL_DOCKER_PORT};
+use arena_mssql::MssqlDependency;
 use arena_postgres::PostgresDependency;
 use arena_container_component::container_component::ContainerComponent;
 use arena_executable_component::executable_component::ExecutableComponent;
@@ -14,21 +15,26 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 const POSTGRES_PORT: u16 = 4444;
-const DB_NAME: &str = "my_database";
-const DB_USER: &str = "my_user";
-const DB_PASS: &str = "my_password";
+const POSTGRES_DB_NAME: &str = "readings_db";
+const POSTGRES_DB_USER: &str = "readings_user";
+const POSTGRES_DB_PASS: &str = "readings_password";
 const KAFKA_PORT: u16 = 9092;
 const KAFKA_TOPIC: &str = "readings";
 const WEB_APP_PORT: u16 = 3001;
+const MSSQL_PORT: u16 = 1433;
+const MSSQL_DB_NAME: &str = "validationDb";
+const MSSQL_DB_USER: &str = "sa";
+const MSSQL_DB_PASS: &str = "yourStrong(!)Password";
 
 const NETWORK_NAME: &str = "arena-example-network";
 const POSTGRES_CONTAINER_NAME: &str = "arena-example-postgres";
 const KAFKA_CONTAINER_NAME: &str = "arena-example-kafka";
+const MSSQL_CONTAINER_NAME: &str = "arena-example-mssql";
 
 async fn setup_arena_components() -> Vec<Component> {
     let dockerfile = include_str!("../example-web-app/Dockerfile");
 
-    let web_app = ContainerComponent::builder("arena-example-web-app", dockerfile)
+    let web_app = ContainerComponent::builder("example web app", dockerfile)
         .with_build_context(".")
         .with_image_tag("arena-example-web-app")
         .with_port_mapping(WEB_APP_PORT, 3000)
@@ -38,12 +44,23 @@ async fn setup_arena_components() -> Vec<Component> {
             "postgres_connection_string",
             format!(
                 "host={} port=5432 user={} password={} dbname={}",
-                POSTGRES_CONTAINER_NAME, DB_USER, DB_PASS, DB_NAME
+                POSTGRES_CONTAINER_NAME, POSTGRES_DB_USER, POSTGRES_DB_PASS, POSTGRES_DB_NAME
             ),
         )
         .with_runtime_arg(
             "kafka_bootstrap",
             format!("{}:{}", KAFKA_CONTAINER_NAME, KAFKA_INTERNAL_DOCKER_PORT),
+        )
+        .with_runtime_arg(
+            "calibration_url",
+            format!("http://{}:8888", NETWORK_NAME),
+        )
+        .with_runtime_arg(
+            "mssql_connection_string",
+            format!(
+                "Server=tcp:{},1433;Database={};User Id={};Password={};TrustServerCertificate=True;",
+                MSSQL_CONTAINER_NAME, MSSQL_DB_NAME, MSSQL_DB_USER, MSSQL_DB_PASS
+            ),
         )
         .with_network(NETWORK_NAME)
         .with_readiness_check(
@@ -59,7 +76,7 @@ async fn setup_arena_components() -> Vec<Component> {
 #[allow(dead_code)]
 fn setup_executable_arena_components() -> Vec<Component> {
     vec![Box::new(
-        ExecutableComponent::builder("arena example web app")
+        ExecutableComponent::builder("example web app")
             .with_source_path("examples")
             .with_build_tool(arena_executable_component::BuildTool::Cargo)
             .with_executable_path("target/release/web-app")
@@ -69,41 +86,60 @@ fn setup_executable_arena_components() -> Vec<Component> {
                 "postgres_connection_string",
                 format!(
                     "host=localhost port={} user={} password={} dbname={}",
-                    POSTGRES_PORT, DB_USER, DB_PASS, DB_NAME
+                    POSTGRES_PORT, POSTGRES_DB_USER, POSTGRES_DB_PASS, POSTGRES_DB_NAME
                 )
             )
             .with_runtime_arg("kafka_bootstrap", format!("localhost:{}", KAFKA_PORT))
+            .with_runtime_arg("calibration_url", "http://127.0.0.1:8888".to_string())
+            .with_runtime_arg(
+                "mssql_connection_string",
+                format!(
+                    "Server=tcp:localhost,{};Database={};User Id={};Password={};TrustServerCertificate=True;",
+                    MSSQL_PORT, MSSQL_DB_NAME, MSSQL_DB_USER, MSSQL_DB_PASS
+                ),
+            )
             .build()
     )]
 }
 
-fn setup_arena_dependencies() -> Vec<Dependency> {
+fn setup_arena_dependencies() -> (Vec<Dependency>, String) {
     let startup_sql_scripts =
         vec![include_str!("../../resources/instrument_reading_db_schema.sql").to_string()];
 
-    let postgres_db: Dependency = Box::new(
-        PostgresDependency::builder("arena example database")
-            .with_image("14.20-trixie")
-            .with_port(POSTGRES_PORT)
-            .with_database_name(DB_NAME)
-            .with_database_username(DB_USER)
-            .with_database_password(DB_PASS)
-            .with_container_name(POSTGRES_CONTAINER_NAME)
-            .with_network(NETWORK_NAME)
-            .with_startup_sql_scripts(startup_sql_scripts)
-            .build(),
-    );
+    let postgres_db = PostgresDependency::builder("example readings")
+        .with_image("14.20-trixie")
+        .with_port(POSTGRES_PORT)
+        .with_database_name(POSTGRES_DB_NAME)
+        .with_database_username(POSTGRES_DB_USER)
+        .with_database_password(POSTGRES_DB_PASS)
+        .with_container_name(POSTGRES_CONTAINER_NAME)
+        .with_network(NETWORK_NAME)
+        .with_startup_sql_scripts(startup_sql_scripts)
+        .build();
 
-    let kafka: Dependency = Box::new(
-        KafkaDependency::builder("arena example kafka")
-            .with_flavor(KafkaFlavor::ApacheNative)
-            .with_port(KAFKA_PORT)
-            .with_container_name(KAFKA_CONTAINER_NAME)
-            .with_network(NETWORK_NAME)
-            .build(),
-    );
+    let kafka = KafkaDependency::builder("example readings")
+        .with_flavor(KafkaFlavor::ApacheNative)
+        .with_port(KAFKA_PORT)
+        .with_container_name(KAFKA_CONTAINER_NAME)
+        .with_network(NETWORK_NAME)
+        .build();
+    let kafka_id = kafka.identifier.clone();
 
-    vec![postgres_db, kafka]
+    let mssql_startup_sql_scripts =
+        vec![include_str!("../../resources/validation_db_schema.sql").to_string()];
+
+    let mssql = MssqlDependency::builder("example validation")
+        .with_port(MSSQL_PORT)
+        .with_database_name(MSSQL_DB_NAME)
+        .with_database_username(MSSQL_DB_USER)
+        .with_database_password(MSSQL_DB_PASS)
+        .with_container_name(MSSQL_CONTAINER_NAME)
+        .with_network(NETWORK_NAME)
+        .with_startup_sql_scripts(mssql_startup_sql_scripts)
+        .build();
+
+    let deps: Vec<Dependency> = vec![Box::new(postgres_db), Box::new(kafka), Box::new(mssql)];
+    (deps, kafka_id)
 }
 
 async fn create_kafka_topic(bootstrap: &str, topic: &str) {
@@ -226,7 +262,7 @@ async fn main() {
     )
     .init();
 
-    let dependencies = setup_arena_dependencies();
+    let (dependencies, kafka_id) = setup_arena_dependencies();
     let components = setup_arena_components().await;
     let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new( Match::new("End to end happy path match", dependencies, components))];
     let closed_arena = ClosedArena::new(String::from("Example Arena"), matches);
@@ -234,7 +270,7 @@ async fn main() {
     let open_arena = closed_arena.open().await;
 
     let kafka_bootstrap = open_arena
-        .dependency("arena example kafka")
+        .dependency(&kafka_id)
         .and_then(|d| d.as_any().downcast_ref::<KafkaDependency>())
         .and_then(|k| k.bootstrap_servers())
         .expect("kafka dependency bootstrap should be available after open()")

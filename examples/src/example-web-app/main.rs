@@ -8,9 +8,12 @@ async fn main() {
     env_logger::init();
 
     let args: Vec<String> = std::env::args().collect();
-    
-    if args.len() != 5 {
-        eprintln!("Usage: {} <web_app_port> <postgres_connection_string> <kafka_bootstrap> <calibration_url>", args[0]);
+
+    if args.len() != 6 {
+        eprintln!(
+            "Usage: {} <web_app_port> <postgres_connection_string> <kafka_bootstrap> <calibration_url> <mssql_connection_string>",
+            args[0]
+        );
         std::process::exit(1);
     }
 
@@ -18,12 +21,20 @@ async fn main() {
     let postgres_connection_string = &args[2];
     let kafka_bootstrap = &args[3];
     let calibration_url = &args[4];
+    let mssql_connection_string = &args[5];
     let kafka_topic = "readings";
 
-    let web_app = ExampleAxumWebApp::new(postgres_connection_string, kafka_bootstrap, kafka_topic, calibration_url).await;
-    
+    let web_app = ExampleAxumWebApp::new(
+        postgres_connection_string,
+        kafka_bootstrap,
+        kafka_topic,
+        calibration_url,
+        mssql_connection_string,
+    )
+    .await;
+
     let (_tx, rx) = tokio::sync::oneshot::channel();
-    
+
     tokio::select! {
         result = web_app.serve(web_app_port, rx) => {
             if let Err(e) = result {

@@ -8,6 +8,7 @@ _ARENA_FFI_DEPS = all_crate_deps(normal = True) + [
     "//arena-http:arena_http",
     "//arena-kafka:arena_kafka",
     "//arena-postgres:arena_postgres",
+    "//arena-mssql:arena_mssql",
 ]
 
 _ARENA_FFI_PROC_MACRO_DEPS = all_crate_deps(proc_macro = True)

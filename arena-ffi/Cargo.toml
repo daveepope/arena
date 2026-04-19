@@ -15,6 +15,7 @@ arena-container-component = { workspace = true }
 arena-executable-component = { workspace = true }
 arena-kafka = { workspace = true }
 arena-postgres = { workspace = true }
+arena-mssql = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
 reqwest = { workspace = true }

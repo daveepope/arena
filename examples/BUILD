@@ -7,6 +7,12 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+filegroup(
+    name = "validation_db_schema",
+    srcs = ["resources/validation_db_schema.sql"],
+    visibility = ["//visibility:public"],
+)
+
 rust_library(
     name = "arena_examples",
     srcs = glob(["src/**/*.rs"]),
@@ -15,6 +21,7 @@ rust_library(
         "//arena",
         "//arena-kafka:arena_kafka",
         "//arena-postgres:arena_postgres",
+        "//arena-mssql:arena_mssql",
         "//arena-executable-component:arena_executable_component",
         "//arena-container-component:arena_container_component",
     ],
@@ -31,6 +38,7 @@ rust_binary(
         "//arena",
         "//arena-kafka:arena_kafka",
         "//arena-postgres:arena_postgres",
+        "//arena-mssql:arena_mssql",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
@@ -42,6 +50,7 @@ rust_binary(
     compile_data = [
         "src/example-web-app/Dockerfile",
         "resources/instrument_reading_db_schema.sql",
+        "resources/validation_db_schema.sql",
     ],
     edition = "2021",
     deps = all_crate_deps(normal = True) + [
@@ -49,6 +58,7 @@ rust_binary(
         "//arena",
         "//arena-kafka:arena_kafka",
         "//arena-postgres:arena_postgres",
+        "//arena-mssql:arena_mssql",
         "//arena-executable-component:arena_executable_component",
         "//arena-container-component:arena_container_component",
     ],
@@ -63,6 +73,7 @@ rust_test(
     tags = ["local"],
     compile_data = [
         "resources/instrument_reading_db_schema.sql",
+        "resources/validation_db_schema.sql",
     ],
     data = [":web-app"],
     deps = all_crate_deps(
@@ -74,6 +85,7 @@ rust_test(
         "//arena-http:arena_http",
         "//arena-kafka:arena_kafka",
         "//arena-postgres:arena_postgres",
+        "//arena-mssql:arena_mssql",
         "//arena-executable-component:arena_executable_component",
         "//arena-container-component:arena_container_component",
     ],

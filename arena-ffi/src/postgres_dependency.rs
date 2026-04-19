@@ -32,21 +32,15 @@ pub(crate) fn build(
     if let Some(ref image_name) = config.image_name {
         builder = builder.with_image_name(image_name);
     }
-    let default_container_name =
-        format!("arena-postgres-{}", config.identifier.replace(' ', "-"));
-    let dep = builder
+    builder = builder
         .with_port(config.port.unwrap_or(5432))
         .with_database_name(config.database_name.as_deref().unwrap_or("arena_db"))
         .with_database_username(config.database_username.as_deref().unwrap_or("arena_user"))
         .with_database_password(config.database_password.as_deref().unwrap_or("postgres"))
-        .with_container_name(
-            config
-                .container_name
-                .as_deref()
-                .unwrap_or(&default_container_name),
-        )
         .with_network(network)
-        .with_startup_sql_scripts(config.startup_sql_scripts.clone().unwrap_or_default())
-        .build();
-    Ok(Box::new(dep))
+        .with_startup_sql_scripts(config.startup_sql_scripts.clone().unwrap_or_default());
+    if let Some(ref container_name) = config.container_name {
+        builder = builder.with_container_name(container_name);
+    }
+    Ok(Box::new(builder.build()))
 }

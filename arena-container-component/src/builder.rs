@@ -23,7 +23,10 @@ pub struct ContainerComponentBuilder {
 impl ContainerComponentBuilder {
     pub(crate) fn new(identifier: impl Into<String>, dockerfile: impl Into<String>) -> Self {
         Self {
-            identifier: identifier.into(),
+            identifier: arena_container::identifier::build(
+                "arena-container-component",
+                &identifier.into(),
+            ),
             children: None,
             dockerfile: dockerfile.into(),
             build_context: None,
@@ -255,8 +258,9 @@ impl ContainerComponentBuilder {
     pub async fn build(self) -> ContainerComponent {
         let build_context = self.build_context.map(Self::resolve_path);
 
-        let image_tag = self.image_tag
-            .unwrap_or_else(|| format!("arena-{}", self.identifier));
+        let image_tag = self.image_tag.unwrap_or_else(|| {
+            arena_container::identifier::sanitize_for_container(&self.identifier)
+        });
 
         let docker = Docker::connect_with_local_defaults()
             .expect("connect to Docker daemon");

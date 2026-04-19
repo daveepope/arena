@@ -64,11 +64,11 @@ def test_exec_multiple_readings(arena):
     assert id2 in ids
 
 
-def test_exec_calibration_outage_returns_error(arena):
+def test_exec_calibration_outage_returns_error(arena, calibration_identifier):
     from arena_pytest import HttpPlaybookBuilder
 
     outage = (
-        HttpPlaybookBuilder("calibration service")
+        HttpPlaybookBuilder(calibration_identifier)
             .with_mapping(
                 method="POST",
                 url_path=CALIBRATION_VALIDATE_PATH,
@@ -97,11 +97,11 @@ def test_exec_calibration_outage_returns_error(arena):
     assert found["value"] == 17
 
 
-def test_exec_calibration_playbook_expectation_failure_is_assertion(arena):
+def test_exec_calibration_playbook_expectation_failure_is_assertion(arena, calibration_identifier):
     from arena_pytest import HttpPlaybookBuilder
 
     unused = (
-        HttpPlaybookBuilder("calibration service")
+        HttpPlaybookBuilder(calibration_identifier)
             .with_mapping(
                 method="POST",
                 url_path=CALIBRATION_VALIDATE_PATH,

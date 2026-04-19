@@ -7,6 +7,7 @@ rust_library(
     edition = "2021",
     deps = all_crate_deps(normal = True) + [
         "//arena",
+        "//arena-container:arena_container",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],

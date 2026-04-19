@@ -1,14 +1,15 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 from arena_pytest._ffi_readiness import readiness_checks_for_ffi
+from arena_pytest._identifier import build as _build_identifier
 from arena_pytest.readiness import ReadinessCheck
 
 
 class ContainerComponentBuilder:
-    def __init__(self, identifier: str, dockerfile: str):
+    def __init__(self, name: str, dockerfile: str):
         self._config: Dict[str, Any] = {
             "type": "container",
-            "identifier": identifier,
+            "identifier": _build_identifier("arena-container-component", name),
             "dockerfile": dockerfile,
             "env_vars": {},
             "runtime_args": [],

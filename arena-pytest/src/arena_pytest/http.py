@@ -7,9 +7,15 @@ if TYPE_CHECKING:
     from arena_pytest._ffi import ArenaFfi
 
 
+from arena_pytest._identifier import build as _build_identifier
+
+
 class HttpDependencyBuilder:
-    def __init__(self, identifier: str):
-        self._config: Dict[str, Any] = {"type": "http", "identifier": identifier}
+    def __init__(self, name: str = ""):
+        self._config: Dict[str, Any] = {
+            "type": "http",
+            "identifier": _build_identifier("arena-http", name),
+        }
 
     def with_port(self, port: int) -> "HttpDependencyBuilder":
         self._config["port"] = port
@@ -37,6 +43,10 @@ class HttpDependencyBuilder:
 class HttpDependency:
     def __init__(self, config: Dict[str, Any]):
         self._config = config
+
+    @property
+    def identifier(self) -> str:
+        return self._config["identifier"]
 
     def _for_ffi(self) -> Dict[str, Any]:
         return self._config

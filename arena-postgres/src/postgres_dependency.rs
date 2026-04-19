@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use crate::builder::PostgresDependencyBuilder;
 use postgres_container_impl::PostgresImpl;
 use futures::channel::oneshot;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 use crate::postgres_dependency::healthcheck::DefaultPostgresReadinessCheck;
 
 pub struct PostgresDependency {
@@ -58,22 +58,7 @@ impl PostgresDependency {
     }
 
     fn default_container_name(&self) -> String {
-        let mut safe = String::with_capacity(self.identifier.len());
-        for c in self.identifier.chars() {
-            let c = c.to_ascii_lowercase();
-            if c.is_ascii_alphanumeric() {
-                safe.push(c);
-            } else {
-                safe.push('-');
-            }
-        }
-
-        let ts = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis();
-
-        format!("arena-postgres-{safe}-{ts}")
+        arena_container::identifier::sanitize_for_container(&self.identifier)
     }
 
     pub fn connection_string(&self) -> Option<&str> {
@@ -357,5 +342,18 @@ impl RunnableDependency for PostgresDependency {
         }
 
         self.running = true;
+    }
+}
+
+impl Drop for PostgresDependency {
+    fn drop(&mut self) {
+        if !self.running {
+            return;
+        }
+        log::warn!(
+            "[PostgresDependency-{}] dropped while still running; stopping container.",
+            self.identifier
+        );
+        futures::executor::block_on(<Self as RunnableDependency>::stop(self));
     }
 }

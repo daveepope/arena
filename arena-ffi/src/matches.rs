@@ -5,6 +5,7 @@ use crate::container_component;
 use crate::executable_component;
 use crate::http_dependency;
 use crate::kafka_dependency;
+use crate::mssql_dependency;
 use crate::postgres_dependency;
 
 const DEFAULT_NETWORK: &str = "arena-network";
@@ -24,6 +25,7 @@ pub(crate) struct MatchConfig {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub(crate) enum DependencyConfig {
     Postgres(postgres_dependency::PostgresDependencyConfig),
+    Mssql(mssql_dependency::MssqlDependencyConfig),
     Kafka(kafka_dependency::KafkaDependencyConfig),
     Http(http_dependency::HttpDependencyConfig),
 }
@@ -80,6 +82,7 @@ fn build_dependencies(
         .iter()
         .map(|d| match d {
             DependencyConfig::Postgres(p) => postgres_dependency::build(p, network),
+            DependencyConfig::Mssql(m) => mssql_dependency::build(m, network),
             DependencyConfig::Kafka(k) => kafka_dependency::build(k, network),
             DependencyConfig::Http(h) => http_dependency::build(h, network),
         })

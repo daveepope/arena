@@ -150,7 +150,7 @@ impl PostgresDependencyBuilder {
         let readiness_check = self.readiness_check;
 
         let mut dep = PostgresDependency::new(
-            self.identifier,
+            arena_container::identifier::build("arena-postgres", &self.identifier),
             postgres_impl,
             port,
             database_name,

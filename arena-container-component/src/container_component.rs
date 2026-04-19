@@ -113,7 +113,9 @@ impl ContainerComponent {
         };
 
         let options = CreateContainerOptionsBuilder::default()
-            .name(&self.identifier)
+            .name(&arena_container::identifier::sanitize_for_container(
+                &self.identifier,
+            ))
             .build();
 
         let response = self.docker

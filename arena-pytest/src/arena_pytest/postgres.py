@@ -1,9 +1,18 @@
 from typing import Any, Dict, List
 
+from arena_pytest._identifier import build as _build_identifier
+
 
 class PostgresDependencyBuilder:
-    def __init__(self, identifier: str):
-        self._config: Dict[str, Any] = {"type": "postgres", "identifier": identifier}
+    def __init__(self, name: str = ""):
+        self._config: Dict[str, Any] = {
+            "type": "postgres",
+            "identifier": _build_identifier("arena-postgres", name),
+        }
+
+    def with_image_name(self, image_name: str) -> "PostgresDependencyBuilder":
+        self._config["image_name"] = image_name
+        return self
 
     def with_image_name(self, image_name: str) -> "PostgresDependencyBuilder":
         self._config["image_name"] = image_name
@@ -47,6 +56,10 @@ class PostgresDependencyBuilder:
 class PostgresDependency:
     def __init__(self, config: Dict[str, Any]):
         self._config = config
+
+    @property
+    def identifier(self) -> str:
+        return self._config["identifier"]
 
     def _for_ffi(self) -> Dict[str, Any]:
         return self._config

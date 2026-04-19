@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "arena-postgres",
+    "arena-mssql",
     "arena",
     "arena-kafka",
     "arena-http",
@@ -13,12 +14,13 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.0-beta.1"
+version = "0.3.0-beta.1"
 
 [workspace.dependencies]
 arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }
 arena-postgres = { path = "arena-postgres" }
+arena-mssql = { path = "arena-mssql" }
 arena-executable-component = { path = "arena-executable-component" }
 arena-http = { path = "arena-http" }
 arena-container = { path = "arena-container" }
@@ -42,3 +44,5 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 rstest = "0.22"
 bollard = "0.19"
 tar = "0.4"
+tiberius = { version = "0.12", default-features = false, features = ["tds73", "rustls"] }
+tokio-util = { version = "0.7", features = ["compat"] }

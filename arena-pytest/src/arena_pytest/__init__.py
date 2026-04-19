@@ -27,6 +27,7 @@ from arena_pytest.kafka import (
     KafkaDependencyBuilder,
     KafkaFlavor,
 )
+from arena_pytest.mssql import MssqlDependency, MssqlDependencyBuilder
 from arena_pytest.postgres import PostgresDependency, PostgresDependencyBuilder
 from arena_pytest.readiness import (
     DEFAULT_READINESS_TIMEOUT_MS,
@@ -56,6 +57,8 @@ __all__ = [
     "KafkaDependency",
     "KafkaDependencyBuilder",
     "KafkaFlavor",
+    "MssqlDependency",
+    "MssqlDependencyBuilder",
     "PostgresDependency",
     "PostgresDependencyBuilder",
     "DEFAULT_READINESS_TIMEOUT_MS",

@@ -50,7 +50,8 @@ impl ReadinessCheck for DefaultKafkaReadinessCheck {
 }
 
 fn healthcheck_topic_name(identifier: &str) -> String {
-    let safe = super::sanitize_identifier(identifier);
+    let safe = arena_container::identifier::sanitize_for_container(identifier)
+        .replace('-', "_");
     format!("arena_healthcheck_{safe}")
 }
 

@@ -26,17 +26,13 @@ pub(crate) fn build(
         Some("apache_native") | None => KafkaFlavor::ApacheNative,
         Some(other) => return Err(format!("unknown kafka flavor '{other}'")),
     };
-    let default_container_name = format!("arena-kafka-{}", config.identifier.replace(' ', "-"));
     let mut builder = KafkaDependency::builder(&config.identifier)
         .with_flavor(flavor)
         .with_port(config.port.unwrap_or(9092))
-        .with_container_name(
-            config
-                .container_name
-                .as_deref()
-                .unwrap_or(&default_container_name),
-        )
         .with_network(network);
+    if let Some(ref container_name) = config.container_name {
+        builder = builder.with_container_name(container_name);
+    }
     if let Some(ref image_name) = config.image_name {
         builder = builder.with_image_name(image_name);
     }

@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 from arena_pytest._ffi_readiness import readiness_checks_for_ffi
+from arena_pytest._identifier import build as _build_identifier
 from arena_pytest.readiness import ReadinessCheck
 
 
@@ -19,10 +20,10 @@ class BuildTool(Enum):
 
 
 class ExecutableComponentBuilder:
-    def __init__(self, identifier: str):
+    def __init__(self, name: str = ""):
         self._config: Dict[str, Any] = {
             "type": "exec",
-            "identifier": identifier,
+            "identifier": _build_identifier("arena-executable-component", name),
             "env_vars": {},
             "runtime_args": [],
         }

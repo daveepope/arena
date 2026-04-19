@@ -105,7 +105,7 @@ impl HttpDependencyBuilder {
             .unwrap_or_else(|| Self::DEFAULT_IMAGE_TAG.to_string());
 
         let mut dep = HttpDependency::new(
-            self.identifier,
+            arena_container::identifier::build("arena-http", &self.identifier),
             http_impl,
             port,
             self.dependencies,
