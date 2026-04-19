@@ -1,8 +1,14 @@
 use async_trait::async_trait;
 
-#[async_trait]
-pub trait Playbook: Send {
-    type Active: Send;
+use crate::dependency::Dependency;
 
-    async fn run(self) -> Self::Active;
+#[async_trait]
+pub trait Playbook: Send + Sync {
+    fn identifier(&self) -> &str;
+
+    async fn run(&self, dependencies: &[Dependency]) -> Box<dyn ActivePlaybook>;
+}
+
+pub trait ActivePlaybook: Send + Sync {
+    fn identifier(&self) -> &str;
 }

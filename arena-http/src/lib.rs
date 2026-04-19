@@ -1,6 +1,7 @@
 pub mod http_dependency;
 pub mod builder;
 pub mod playbook;
+pub mod managed_playbook;
 
 pub use crate::http_dependency::HttpDependency;
 pub use crate::http_dependency::HttpImpl;
@@ -17,3 +18,4 @@ pub use crate::playbook::verify::{
     get_requested_for, post_requested_for, put_requested_for, delete_requested_for,
     RequestCriteria, RecordedRequest,
 };
+pub use crate::managed_playbook::ManagedHttpPlaybook;

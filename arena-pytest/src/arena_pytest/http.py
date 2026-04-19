@@ -52,8 +52,9 @@ class HttpDependency:
         return self._config
 
 
-class HttpOnDependencyStartupBuilder:
-    def __init__(self, dependency_identifier: str):
+class ManagedHttpPlaybookBuilder:
+    def __init__(self, identifier: str, dependency_identifier: str):
+        self._identifier = identifier
         self._dependency_identifier = dependency_identifier
         self._mappings: List[Dict[str, Any]] = []
 
@@ -63,7 +64,7 @@ class HttpOnDependencyStartupBuilder:
         url_path: str,
         status: int = 200,
         json_body: Optional[Any] = None,
-    ) -> "HttpOnDependencyStartupBuilder":
+    ) -> "ManagedHttpPlaybookBuilder":
         mapping: Dict[str, Any] = {
             "method": method.upper(),
             "url_path": url_path,
@@ -74,21 +75,58 @@ class HttpOnDependencyStartupBuilder:
         self._mappings.append(mapping)
         return self
 
-    def build(self) -> "HttpOnDependencyStartup":
-        return HttpOnDependencyStartup(self._dependency_identifier, list(self._mappings))
+    def build(self) -> "ManagedHttpPlaybook":
+        if not self._mappings:
+            raise ValueError(
+                "ManagedHttpPlaybookBuilder requires at least one mapping"
+            )
+        return ManagedHttpPlaybook(
+            self._identifier,
+            self._dependency_identifier,
+            list(self._mappings),
+        )
 
 
-class HttpOnDependencyStartup:
-    def __init__(self, dependency_identifier: str, mappings: List[Dict[str, Any]]):
+class ManagedHttpPlaybook:
+    def __init__(
+        self,
+        identifier: str,
+        dependency_identifier: str,
+        mappings: List[Dict[str, Any]],
+    ):
+        self._identifier = identifier
         self._dependency_identifier = dependency_identifier
         self._mappings = mappings
 
+    @property
+    def identifier(self) -> str:
+        return self._identifier
+
     def _for_ffi(self) -> Dict[str, Any]:
         return {
+            "identifier": self._identifier,
             "kind": "http",
             "dependency_identifier": self._dependency_identifier,
             "mappings": list(self._mappings),
         }
+
+    def activate(self, arena: "OpenArena") -> "HttpPlaybook":
+        mappings: List[Dict[str, Any]] = []
+        for m in self._mappings:
+            response: Dict[str, Any] = {"status": m.get("status", 200)}
+            if m.get("json_body") is not None:
+                response["json_body"] = m["json_body"]
+            mappings.append({
+                "method": m["method"],
+                "url_path": m["url_path"],
+                "response": response,
+                "priority": 1,
+            })
+        return HttpPlaybook(
+            arena=arena,
+            dependency_identifier=self._dependency_identifier,
+            mappings=mappings,
+        )
 
 
 class HttpPlaybookBuilder:

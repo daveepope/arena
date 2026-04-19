@@ -22,8 +22,9 @@ from arena_pytest import (
     MatchBuilder,
     ExecutableComponentBuilder,
     HttpDependencyBuilder,
-    HttpOnDependencyStartupBuilder,
     HttpReadinessCheck,
+    ManagedHttpPlaybookBuilder,
+    ManagedMssqlPlaybookBuilder,
     KafkaDependencyBuilder,
     KafkaFlavor,
     KAFKA_INTERNAL_DOCKER_PORT,
@@ -172,12 +173,32 @@ def _build_calibration_http():
     )
 
 
-def _build_calibration_handler(dependency_identifier: str):
+def _build_calibration_playbook(dependency_identifier: str):
     return (
-        HttpOnDependencyStartupBuilder(dependency_identifier)
+        ManagedHttpPlaybookBuilder(
+            "calibration-default", dependency_identifier
+        )
         .with_mapping("POST", CALIBRATION_VALIDATE_PATH, 200, {"valid": True})
         .build()
     )
+
+
+@pytest.fixture(scope="session")
+def calibration_outage_playbook(calibration_identifier):
+    return (
+        ManagedHttpPlaybookBuilder(
+            "calibration-outage", calibration_identifier
+        )
+        .with_mapping("POST", CALIBRATION_VALIDATE_PATH, status=500)
+        .build()
+    )
+
+
+@pytest.fixture(scope="session")
+def validation_db_playbook(mssql_identifier):
+    return ManagedMssqlPlaybookBuilder(
+        "validation-db-scoped", mssql_identifier
+    ).build()
 
 
 def _build_exec_component() -> object:
@@ -241,6 +262,7 @@ def _build_container_component(repo_root: str, dockerfile: str) -> object:
 
 
 _CALIBRATION_IDENTIFIER: str | None = None
+_MSSQL_IDENTIFIER: str | None = None
 
 
 @pytest.fixture(scope="session")
@@ -252,8 +274,16 @@ def calibration_identifier() -> str:
 
 
 @pytest.fixture(scope="session")
+def mssql_identifier() -> str:
+    assert _MSSQL_IDENTIFIER is not None, (
+        "mssql_identifier requested before closed_arena fixture built it"
+    )
+    return _MSSQL_IDENTIFIER
+
+
+@pytest.fixture(scope="session")
 def closed_arena() -> ClosedArena:
-    global _CALIBRATION_IDENTIFIER
+    global _CALIBRATION_IDENTIFIER, _MSSQL_IDENTIFIER
 
     schema_path = _find_schema_path()
     startup_sql = [open(schema_path).read()] if schema_path else []
@@ -270,14 +300,18 @@ def closed_arena() -> ClosedArena:
     calibration_http = _build_calibration_http()
     _CALIBRATION_IDENTIFIER = calibration_http.identifier
 
+    mssql = _build_mssql(mssql_startup_sql)
+    _MSSQL_IDENTIFIER = mssql.identifier
+
     a_match = MatchBuilder("reading lifecycle")
     a_match = a_match.with_network(NETWORK_NAME)
     a_match = a_match.add_dependency(_build_postgres(startup_sql))
     a_match = a_match.add_dependency(_build_kafka())
-    a_match = a_match.add_dependency(_build_mssql(mssql_startup_sql))
+    a_match = a_match.add_dependency(mssql)
     a_match = a_match.add_dependency(calibration_http)
-    a_match = a_match.add_on_dependency_startup_handler(
-        _build_calibration_handler(calibration_http.identifier)
+    a_match = a_match.register_playbook(
+        _build_calibration_playbook(calibration_http.identifier),
+        exec_on_dependency_start=True,
     )
     for c in components:
         a_match = a_match.add_component(c)

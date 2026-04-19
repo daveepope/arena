@@ -11,6 +11,8 @@ from typing import Any
 import pytest
 import requests
 
+from arena_pytest import active_playbooks, playbook
+
 EXEC_WEB_APP_PORT = 3001
 DOCKER_WEB_HOST_PORT = 3002
 KAFKA_PORT = 9094
@@ -22,46 +24,54 @@ BASE_URL_EXEC = f"http://127.0.0.1:{EXEC_WEB_APP_PORT}"
 BASE_URL_DOCKER = f"http://127.0.0.1:{DOCKER_WEB_HOST_PORT}"
 
 
-def test_exec_reading_flow_kafka_and_http(arena):
-    bootstrap = f"localhost:{KAFKA_PORT}"
-    id_queue: queue.Queue[int] = queue.Queue()
-    result_holder: list[Any] = []
+def test_exec_reading_flow_kafka_and_http(arena, validation_db_playbook):
+    @playbook(validation_db_playbook)
+    def _body(arena):
+        bootstrap = f"localhost:{KAFKA_PORT}"
+        id_queue: queue.Queue[int] = queue.Queue()
+        result_holder: list[Any] = []
 
-    consumer_thread = threading.Thread(
-        target=_run_reading_created_consumer,
-        args=(bootstrap, KAFKA_TOPIC, id_queue, result_holder, "exec"),
-    )
-    consumer_thread.start()
+        consumer_thread = threading.Thread(
+            target=_run_reading_created_consumer,
+            args=(bootstrap, KAFKA_TOPIC, id_queue, result_holder, "exec"),
+        )
+        consumer_thread.start()
 
-    created_id = _create_reading(BASE_URL_EXEC, "Exec Test User", 42, "test comment")
-    id_queue.put(created_id)
+        created_id = _create_reading(BASE_URL_EXEC, "Exec Test User", 42, "test comment")
+        id_queue.put(created_id)
 
-    consumer_thread.join(timeout=10)
-    assert len(result_holder) == 1, "consumer should have completed"
-    consumed = result_holder[0]
-    if isinstance(consumed, Exception):
-        raise consumed
-    assert consumed["id"] == created_id
-    assert consumed["user_name"] == "Exec Test User"
-    assert consumed["value"] == 42
-    assert consumed.get("comment") == "test comment"
+        consumer_thread.join(timeout=10)
+        assert len(result_holder) == 1, "consumer should have completed"
+        consumed = result_holder[0]
+        if isinstance(consumed, Exception):
+            raise consumed
+        assert consumed["id"] == created_id
+        assert consumed["user_name"] == "Exec Test User"
+        assert consumed["value"] == 42
+        assert consumed.get("comment") == "test comment"
 
-    readings = _get_readings(BASE_URL_EXEC)
-    found = next((r for r in readings if r["id"] == created_id), None)
-    assert found is not None, "should find newly created reading"
-    assert found["id"] == created_id
-    assert found["user_name"] == "Exec Test User"
-    assert found["value"] == 42
-    assert found.get("comment") == "test comment"
+        readings = _get_readings(BASE_URL_EXEC)
+        found = next((r for r in readings if r["id"] == created_id), None)
+        assert found is not None, "should find newly created reading"
+        assert found["id"] == created_id
+        assert found["user_name"] == "Exec Test User"
+        assert found["value"] == 42
+        assert found.get("comment") == "test comment"
+
+    _body(arena)
 
 
-def test_exec_multiple_readings(arena):
-    id1 = _create_reading(BASE_URL_EXEC, "Bending", 1, "")
-    id2 = _create_reading(BASE_URL_EXEC, "joe", 2, "We're going to need a bigger ship")
-    readings = _get_readings(BASE_URL_EXEC)
-    ids = {r["id"] for r in readings}
-    assert id1 in ids
-    assert id2 in ids
+def test_exec_multiple_readings(arena, validation_db_playbook):
+    @playbook(validation_db_playbook)
+    def _body(arena):
+        id1 = _create_reading(BASE_URL_EXEC, "Bending", 1, "")
+        id2 = _create_reading(BASE_URL_EXEC, "joe", 2, "We're going to need a bigger ship")
+        readings = _get_readings(BASE_URL_EXEC)
+        ids = {r["id"] for r in readings}
+        assert id1 in ids
+        assert id2 in ids
+
+    _body(arena)
 
 
 def test_exec_calibration_outage_returns_error(arena, calibration_identifier):
@@ -97,6 +107,60 @@ def test_exec_calibration_outage_returns_error(arena, calibration_identifier):
     assert found["value"] == 17
 
 
+def test_exec_calibration_outage_via_playbook_decorator(
+    arena, calibration_outage_playbook, validation_db_playbook
+):
+    @playbook(calibration_outage_playbook, validation_db_playbook)
+    def _body(arena):
+        r = requests.post(
+            f"{BASE_URL_EXEC}/readings",
+            json={"user_name": "Decorator Outage", "value": 1, "comment": None},
+            timeout=10,
+        )
+        assert r.status_code == 500, (
+            f"expected 500 while decorator-scoped calibration outage is active, "
+            f"got {r.status_code}: {r.text}"
+        )
+
+    _body(arena)
+
+    recovered_id = _create_reading(BASE_URL_EXEC, "Decorator Recovery", 2, None)
+    readings = _get_readings(BASE_URL_EXEC)
+    assert any(r["id"] == recovered_id for r in readings)
+
+
+def test_exec_validation_db_scoped_via_playbook_decorator(
+    arena, validation_db_playbook
+):
+    @playbook(validation_db_playbook)
+    def _body(arena):
+        created_id = _create_reading(
+            BASE_URL_EXEC, "Validation DB Scoped", 7, "mssql scope"
+        )
+        readings = _get_readings(BASE_URL_EXEC)
+        assert any(r["id"] == created_id for r in readings)
+
+    _body(arena)
+
+
+@pytest.fixture
+def outage_and_db_reset(arena, calibration_outage_playbook, validation_db_playbook):
+    with active_playbooks(arena, calibration_outage_playbook, validation_db_playbook):
+        yield
+
+
+def test_exec_fixture_scoped_multi_playbook(arena, outage_and_db_reset):
+    r = requests.post(
+        f"{BASE_URL_EXEC}/readings",
+        json={"user_name": "Fixture Outage", "value": 1, "comment": None},
+        timeout=10,
+    )
+    assert r.status_code == 500, (
+        f"expected 500 while fixture-scoped outage is active, "
+        f"got {r.status_code}: {r.text}"
+    )
+
+
 def test_exec_calibration_playbook_expectation_failure_is_assertion(arena, calibration_identifier):
     from arena_pytest import HttpPlaybookBuilder
 
@@ -117,37 +181,41 @@ def test_exec_calibration_playbook_expectation_failure_is_assertion(arena, calib
             pass
 
 
-def test_docker_reading_flow_kafka_and_http(arena_docker):
-    bootstrap = f"localhost:{KAFKA_PORT}"
-    id_queue: queue.Queue[int] = queue.Queue()
-    result_holder: list[Any] = []
+def test_docker_reading_flow_kafka_and_http(arena_docker, validation_db_playbook):
+    @playbook(validation_db_playbook)
+    def _body(arena):
+        bootstrap = f"localhost:{KAFKA_PORT}"
+        id_queue: queue.Queue[int] = queue.Queue()
+        result_holder: list[Any] = []
 
-    consumer_thread = threading.Thread(
-        target=_run_reading_created_consumer,
-        args=(bootstrap, KAFKA_TOPIC, id_queue, result_holder, "docker"),
-    )
-    consumer_thread.start()
+        consumer_thread = threading.Thread(
+            target=_run_reading_created_consumer,
+            args=(bootstrap, KAFKA_TOPIC, id_queue, result_holder, "docker"),
+        )
+        consumer_thread.start()
 
-    created_id = _create_reading(BASE_URL_DOCKER, "Docker Test User", 42, "test comment")
-    id_queue.put(created_id)
+        created_id = _create_reading(BASE_URL_DOCKER, "Docker Test User", 42, "test comment")
+        id_queue.put(created_id)
 
-    consumer_thread.join(timeout=10)
-    assert len(result_holder) == 1, "consumer should have completed"
-    consumed = result_holder[0]
-    if isinstance(consumed, Exception):
-        raise consumed
-    assert consumed["id"] == created_id
-    assert consumed["user_name"] == "Docker Test User"
-    assert consumed["value"] == 42
-    assert consumed.get("comment") == "test comment"
+        consumer_thread.join(timeout=10)
+        assert len(result_holder) == 1, "consumer should have completed"
+        consumed = result_holder[0]
+        if isinstance(consumed, Exception):
+            raise consumed
+        assert consumed["id"] == created_id
+        assert consumed["user_name"] == "Docker Test User"
+        assert consumed["value"] == 42
+        assert consumed.get("comment") == "test comment"
 
-    readings = _get_readings(BASE_URL_DOCKER)
-    found = next((r for r in readings if r["id"] == created_id), None)
-    assert found is not None, "should find newly created reading"
-    assert found["id"] == created_id
-    assert found["user_name"] == "Docker Test User"
-    assert found["value"] == 42
-    assert found.get("comment") == "test comment"
+        readings = _get_readings(BASE_URL_DOCKER)
+        found = next((r for r in readings if r["id"] == created_id), None)
+        assert found is not None, "should find newly created reading"
+        assert found["id"] == created_id
+        assert found["user_name"] == "Docker Test User"
+        assert found["value"] == 42
+        assert found.get("comment") == "test comment"
+
+    _body(arena_docker)
 
 
 def _get_readings(base_url: str) -> list:

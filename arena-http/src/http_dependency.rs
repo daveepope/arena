@@ -68,6 +68,36 @@ impl HttpDependency {
         crate::playbook::Playbook::with(self)
     }
 
+    pub async fn reset_journal(&self) {
+        if !self.running {
+            return;
+        }
+
+        let admin_url = self.admin_url_or_panic();
+
+        log::info!(
+            "[Http-{}] resetting request journal (mappings preserved)",
+            self.identifier
+        );
+
+        let client = reqwest::Client::new();
+        let response = client
+            .delete(format!("{admin_url}/requests"))
+            .send()
+            .await
+            .unwrap_or_else(|e| {
+                panic!("[Http-{}] reset_journal failed: {e}", self.identifier)
+            });
+
+        if !response.status().is_success() {
+            panic!(
+                "[Http-{}] reset_journal got HTTP {}",
+                self.identifier,
+                response.status()
+            );
+        }
+    }
+
     pub(crate) fn set_readiness_check(&mut self, check: Box<dyn ReadinessCheck>) {
         self.readiness_check = check;
     }

@@ -1,6 +1,5 @@
 use crate::mssql_dependency::MssqlDependency;
 use crate::mssql_dependency::mssql_container_impl::connect;
-use async_trait::async_trait;
 
 pub struct Playbook {
     connection_string: String,
@@ -16,26 +15,39 @@ impl Playbook {
             .to_string();
         Self {
             connection_string,
-            identifier: dependency.identifier.clone(),
+            identifier: format!("mssql-playbook:{}", dependency.identifier),
             managed_tables: dependency.managed_tables().to_vec(),
         }
     }
 
+    pub fn with_identifier(mut self, identifier: impl Into<String>) -> Self {
+        self.identifier = identifier.into();
+        self
+    }
+
     pub async fn run(self) -> ActivePlaybook {
-        reset_tables(&self.identifier, &self.connection_string, &self.managed_tables)
+        let tables = if self.managed_tables.is_empty() {
+            discover_user_tables(&self.identifier, &self.connection_string)
+                .await
+                .unwrap_or_else(|e| panic!("{e}"))
+        } else {
+            self.managed_tables
+        };
+
+        reset_tables(&self.identifier, &self.connection_string, &tables)
             .await
             .unwrap_or_else(|e| panic!("{e}"));
 
         log::info!(
-            "[MssqlPlaybook-{}] reset {} managed table(s); state is now clean.",
+            "[MssqlPlaybook-{}] reset {} table(s); state is now clean.",
             self.identifier,
-            self.managed_tables.len()
+            tables.len()
         );
 
         ActivePlaybook {
             connection_string: self.connection_string,
             identifier: self.identifier,
-            managed_tables: self.managed_tables,
+            managed_tables: tables,
         }
     }
 }
@@ -78,19 +90,16 @@ fn reset_on_drop(
     }
 }
 
-#[async_trait]
-impl arena::Playbook for Playbook {
-    type Active = ActivePlaybook;
-
-    async fn run(self) -> Self::Active {
-        Playbook::run(self).await
-    }
-}
-
 pub struct ActivePlaybook {
     connection_string: String,
     identifier: String,
     managed_tables: Vec<(String, String)>,
+}
+
+impl arena::ActivePlaybook for ActivePlaybook {
+    fn identifier(&self) -> &str {
+        &self.identifier
+    }
 }
 
 impl ActivePlaybook {
@@ -197,6 +206,39 @@ async fn reset_tables(
         .map_err(|e| format!("[MssqlPlaybook-{identifier}] reset: delete failed: {e}"))?;
 
     Ok(())
+}
+
+async fn discover_user_tables(
+    identifier: &str,
+    connection_string: &str,
+) -> Result<Vec<(String, String)>, String> {
+    let mut client = connect(connection_string).await.map_err(|e| {
+        format!("[MssqlPlaybook-{identifier}] discover_user_tables: connect failed: {e}")
+    })?;
+
+    let sql = "SELECT s.name AS schema_name, t.name AS table_name \
+               FROM sys.tables t \
+               INNER JOIN sys.schemas s ON t.schema_id = s.schema_id \
+               WHERE t.is_ms_shipped = 0 \
+               ORDER BY s.name, t.name;";
+
+    let stream = client.simple_query(sql).await.map_err(|e| {
+        format!("[MssqlPlaybook-{identifier}] discover_user_tables: query failed: {e}")
+    })?;
+
+    let rows = stream.into_first_result().await.map_err(|e| {
+        format!("[MssqlPlaybook-{identifier}] discover_user_tables: read failed: {e}")
+    })?;
+
+    let mut tables = Vec::with_capacity(rows.len());
+    for row in rows {
+        let schema: &str = row.get::<&str, _>(0).unwrap_or("");
+        let name: &str = row.get::<&str, _>(1).unwrap_or("");
+        if !schema.is_empty() && !name.is_empty() {
+            tables.push((schema.to_string(), name.to_string()));
+        }
+    }
+    Ok(tables)
 }
 
 fn quote_ident(schema: &str, name: &str) -> String {

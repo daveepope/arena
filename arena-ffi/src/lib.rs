@@ -10,6 +10,7 @@ mod http_dependency;
 mod kafka_dependency;
 mod mssql_dependency;
 mod postgres_dependency;
+mod managed_playbook;
 mod runtime_args;
 
 pub use ffi::{

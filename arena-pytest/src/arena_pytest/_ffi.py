@@ -161,6 +161,26 @@ def load_ffi() -> Optional[ArenaFfi]:
     ]
     lib.arena_http_playbook_verify.restype = ctypes.c_int
 
+    lib.arena_mssql_playbook_open.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    lib.arena_mssql_playbook_open.restype = ctypes.c_void_p
+
+    lib.arena_mssql_playbook_close.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    lib.arena_mssql_playbook_close.restype = ctypes.c_int
+
+    lib.arena_mssql_playbook_verify.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    lib.arena_mssql_playbook_verify.restype = ctypes.c_int
+
     return ArenaFfi(lib=lib)
 
 
@@ -293,6 +313,79 @@ def http_playbook_verify(
     if status is not ArenaStatus.OK:
         raise ArenaFfiError(
             message or f"http_playbook_verify failed with status {status.name}",
+            status,
+        )
+
+
+def mssql_playbook_open(
+    ffi: ArenaFfi,
+    arena_handle: int,
+    spec_json: str,
+) -> int:
+    if not arena_handle:
+        raise ArenaFfiError(
+            "mssql_playbook_open called on closed arena",
+            ArenaStatus.INVALID_ARGUMENT,
+        )
+    err = ctypes.c_void_p()
+    pb_handle = ffi.lib.arena_mssql_playbook_open(
+        arena_handle,
+        spec_json.encode("utf-8"),
+        ctypes.byref(err),
+    )
+    message = _take_err(err, ffi)
+    if not pb_handle:
+        raise ArenaFfiError(message or "arena_mssql_playbook_open returned null")
+    return pb_handle
+
+
+def mssql_playbook_close(ffi: ArenaFfi, pb_handle: int) -> None:
+    if not pb_handle:
+        return
+    err = ctypes.c_void_p()
+    raw = ffi.lib.arena_mssql_playbook_close(pb_handle, ctypes.byref(err))
+    message = _take_err(err, ffi)
+    try:
+        status = ArenaStatus(raw)
+    except ValueError:
+        raise ArenaFfiError(
+            message or f"mssql_playbook_close returned unknown status {raw}",
+            ArenaStatus.FAILED,
+        )
+    if status is not ArenaStatus.OK:
+        raise ArenaFfiError(
+            message or f"mssql_playbook_close failed with status {status.name}",
+            status,
+        )
+
+
+def mssql_playbook_verify(
+    ffi: ArenaFfi,
+    pb_handle: int,
+    verify_spec_json: str,
+) -> None:
+    if not pb_handle:
+        raise ArenaFfiError(
+            "mssql_playbook_verify called on closed playbook",
+            ArenaStatus.INVALID_ARGUMENT,
+        )
+    err = ctypes.c_void_p()
+    raw = ffi.lib.arena_mssql_playbook_verify(
+        pb_handle,
+        verify_spec_json.encode("utf-8"),
+        ctypes.byref(err),
+    )
+    message = _take_err(err, ffi)
+    try:
+        status = ArenaStatus(raw)
+    except ValueError:
+        raise ArenaFfiError(
+            message or f"mssql_playbook_verify returned unknown status {raw}",
+            ArenaStatus.FAILED,
+        )
+    if status is not ArenaStatus.OK:
+        raise ArenaFfiError(
+            message or f"mssql_playbook_verify failed with status {status.name}",
             status,
         )
 

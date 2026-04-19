@@ -98,6 +98,7 @@ dependencies = [
  "async-trait",
  "env_logger",
  "futures",
+ "futures-timer",
  "log",
  "mockall",
  "tokio",

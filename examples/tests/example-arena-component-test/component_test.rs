@@ -1,11 +1,10 @@
-use arena::{ClosedArena, Component, Dependency, Match, MatchTrait, OnDependencyStartup, OpenArena};
-use arena_http::{HttpDependency, ok_json, server_error};
+use arena::{ClosedArena, Component, Dependency, Match, MatchTrait, OpenArena};
+use arena_http::{HttpDependency, ManagedHttpPlaybook, ok_json, server_error};
 use arena_kafka::{KafkaDependency, KafkaFlavor};
 use arena_mssql::MssqlDependency;
 use arena_postgres::PostgresDependency;
 use arena_executable_component::executable_component::ExecutableComponent;
 use arena_examples::http_healthcheck::HttpReadinessCheck;
-use async_trait::async_trait;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::message::Message;
@@ -172,25 +171,16 @@ fn setup_exec_component() -> Component {
     Box::new(builder.build())
 }
 
-struct ValidationServiceSetup;
-
-#[async_trait]
-impl OnDependencyStartup for ValidationServiceSetup {
-    async fn on_dependency_startup(&self, dependencies: &[Dependency]) {
-        let calibration_id = CALIBRATION_ID.get().expect("calibration id initialized");
-        let http = dependencies
-            .iter()
-            .find(|d| d.identifier() == calibration_id)
-            .and_then(|d| d.as_any().downcast_ref::<HttpDependency>())
-            .expect("calibration service should be available");
-
-        http.playbook()
-            .post("/api/v1/validate")
+fn calibration_default_playbook() -> ManagedHttpPlaybook {
+    let calibration_id = CALIBRATION_ID
+        .get()
+        .expect("calibration id initialized")
+        .to_string();
+    ManagedHttpPlaybook::new("calibration-default", calibration_id, |pb| {
+        pb.post("/api/v1/validate")
             .will_return(ok_json(json!({ "valid": true })))
-            .run()
-            .await
-            .persist();
-    }
+            .into_playbook()
+    })
 }
 
 async fn create_arena() -> OpenArena {
@@ -201,7 +191,7 @@ async fn create_arena() -> OpenArena {
 
     let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new(
         Match::new("reading lifecycle", dependencies, components)
-            .with_on_dependency_startup_handler(Box::new(ValidationServiceSetup)),
+            .register_playbook(Box::new(calibration_default_playbook()), true),
     )];
     let closed_arena = ClosedArena::new("Test Arena".to_string(), matches);
 
