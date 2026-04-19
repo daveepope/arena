@@ -5,6 +5,7 @@ members = [
     "arena-mssql",
     "arena",
     "arena-kafka",
+    "arena-localstack",
     "arena-http",
     "arena-executable-component",
     "arena-container",
@@ -19,6 +20,7 @@ version = "0.3.0-beta.1"
 [workspace.dependencies]
 arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }
+arena-localstack = { path = "arena-localstack" }
 arena-postgres = { path = "arena-postgres" }
 arena-mssql = { path = "arena-mssql" }
 arena-executable-component = { path = "arena-executable-component" }
@@ -46,3 +48,10 @@ bollard = "0.19"
 tar = "0.4"
 tiberius = { version = "0.12", default-features = false, features = ["tds73", "rustls"] }
 tokio-util = { version = "0.7", features = ["compat"] }
+aws-config = { version = "1", default-features = false, features = ["behavior-version-latest", "rustls", "rt-tokio"] }
+aws-sdk-sqs = { version = "1", default-features = false, features = ["behavior-version-latest", "rustls", "rt-tokio"] }
+aws-sdk-lambda = { version = "1", default-features = false, features = ["behavior-version-latest", "rustls", "rt-tokio"] }
+aws-sdk-eventbridge = { version = "1", default-features = false, features = ["behavior-version-latest", "rustls", "rt-tokio"] }
+aws-credential-types = { version = "1" }
+aws-smithy-types = { version = "1" }
+zip = { version = "2", default-features = false, features = ["deflate"] }
