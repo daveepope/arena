@@ -5,8 +5,10 @@ use crate::container_component;
 use crate::executable_component;
 use crate::http_dependency;
 use crate::kafka_dependency;
+use crate::localstack_dependency;
 use crate::mssql_dependency;
 use crate::postgres_dependency;
+use crate::managed_playbook;
 
 const DEFAULT_NETWORK: &str = "arena-network";
 const DEFAULT_MATCH_NAME: &str = "arena-match";
@@ -18,7 +20,7 @@ pub(crate) struct MatchConfig {
     pub match_name: Option<String>,
     pub dependencies: Option<Vec<DependencyConfig>>,
     pub components: Option<Vec<ComponentConfig>>,
-    pub on_dependency_startup_handlers: Option<Vec<OnDependencyStartupHandlerConfig>>,
+    pub playbooks: Option<Vec<managed_playbook::ManagedPlaybookConfig>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -28,6 +30,7 @@ pub(crate) enum DependencyConfig {
     Mssql(mssql_dependency::MssqlDependencyConfig),
     Kafka(kafka_dependency::KafkaDependencyConfig),
     Http(http_dependency::HttpDependencyConfig),
+    Localstack(localstack_dependency::LocalstackDependencyConfig),
 }
 
 #[derive(Debug, Deserialize)]
@@ -35,12 +38,6 @@ pub(crate) enum DependencyConfig {
 pub(crate) enum ComponentConfig {
     Exec(executable_component::ExecutableComponentConfig),
     Container(container_component::ContainerComponentConfig),
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub(crate) enum OnDependencyStartupHandlerConfig {
-    Http(http_dependency::on_dependency_startup::OnDependencyStartupConfig),
 }
 
 pub(crate) async fn build_match_async(
@@ -56,17 +53,10 @@ pub(crate) async fn build_match_async(
     let components = build_components_async(config).await?;
 
     let mut a_match = Match::new(match_name, dependencies, components);
-    for handler in config
-        .on_dependency_startup_handlers
-        .as_deref()
-        .unwrap_or(&[])
-    {
-        let boxed = match handler {
-            OnDependencyStartupHandlerConfig::Http(cfg) => {
-                http_dependency::on_dependency_startup::build(cfg.clone())
-            }
-        };
-        a_match = a_match.with_on_dependency_startup_handler(boxed);
+    for playbook_cfg in config.playbooks.as_deref().unwrap_or(&[]) {
+        let exec_on_dependency_start = playbook_cfg.exec_on_dependency_start;
+        let boxed = managed_playbook::build(playbook_cfg.clone());
+        a_match = a_match.register_playbook(boxed, exec_on_dependency_start);
     }
     Ok(Box::new(a_match))
 }
@@ -85,6 +75,7 @@ fn build_dependencies(
             DependencyConfig::Mssql(m) => mssql_dependency::build(m, network),
             DependencyConfig::Kafka(k) => kafka_dependency::build(k, network),
             DependencyConfig::Http(h) => http_dependency::build(h, network),
+            DependencyConfig::Localstack(l) => localstack_dependency::build(l, network),
         })
         .collect()
 }

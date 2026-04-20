@@ -6,8 +6,8 @@ pub mod healthcheck;
 pub mod playbook;
 
 pub use crate::arena::{ClosedArena, OpenArena};
-pub use crate::matches::{Match, MatchTrait, OnDependencyStartup};
+pub use crate::matches::{Match, MatchTrait};
 pub use crate::component::{Component};
 pub use crate::dependency::Dependency;
 pub use crate::healthcheck::ReadinessCheck;
-pub use crate::playbook::Playbook;
+pub use crate::playbook::{ActivePlaybook, Playbook};

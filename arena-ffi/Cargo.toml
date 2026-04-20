@@ -14,6 +14,7 @@ async-trait = { workspace = true }
 arena-container-component = { workspace = true }
 arena-executable-component = { workspace = true }
 arena-kafka = { workspace = true }
+arena-localstack = { workspace = true }
 arena-postgres = { workspace = true }
 arena-mssql = { workspace = true }
 env_logger = { workspace = true }

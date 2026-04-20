@@ -10,13 +10,13 @@ class Match:
         dependencies: List[Any],
         components: List[Any],
         network: Optional[str] = None,
-        on_dependency_startup_handlers: Optional[List[Any]] = None,
+        playbooks: Optional[List[Any]] = None,
     ):
         self._name = name
         self._dependencies = dependencies
         self._components = components
         self._network = network
-        self._on_dependency_startup_handlers = on_dependency_startup_handlers or []
+        self._playbooks = playbooks or []
 
     def _for_ffi(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {
@@ -30,10 +30,9 @@ class Match:
         }
         if self._network:
             out["network"] = self._network
-        if self._on_dependency_startup_handlers:
-            out["on_dependency_startup_handlers"] = [
-                h._for_ffi() if hasattr(h, "_for_ffi") else h
-                for h in self._on_dependency_startup_handlers
+        if self._playbooks:
+            out["playbooks"] = [
+                p._for_ffi() if hasattr(p, "_for_ffi") else p for p in self._playbooks
             ]
         return out
 
@@ -59,7 +58,7 @@ class MatchBuilder:
         self._network: Optional[str] = None
         self._dependencies: List[Any] = []
         self._components: List[Any] = []
-        self._on_dependency_startup_handlers: List[Any] = []
+        self._playbooks: List[Any] = []
 
     def with_network(self, network: str) -> "MatchBuilder":
         self._network = network
@@ -73,8 +72,14 @@ class MatchBuilder:
         self._components.append(comp)
         return self
 
-    def add_on_dependency_startup_handler(self, handler: Any) -> "MatchBuilder":
-        self._on_dependency_startup_handlers.append(handler)
+    def register_playbook(
+        self,
+        playbook: Any,
+        exec_on_dependency_start: bool = True,
+    ) -> "MatchBuilder":
+        self._playbooks.append(
+            _RegisteredPlaybook(playbook, exec_on_dependency_start)
+        )
         return self
 
     def build(self) -> Match:
@@ -83,5 +88,20 @@ class MatchBuilder:
             self._dependencies,
             self._components,
             self._network,
-            self._on_dependency_startup_handlers,
+            self._playbooks,
         )
+
+
+class _RegisteredPlaybook:
+    def __init__(self, playbook: Any, exec_on_dependency_start: bool):
+        self._playbook = playbook
+        self._exec_on_dependency_start = exec_on_dependency_start
+
+    def _for_ffi(self) -> Dict[str, Any]:
+        if not hasattr(self._playbook, "_for_ffi"):
+            raise TypeError(
+                "register_playbook expects an object with a _for_ffi() method"
+            )
+        cfg = dict(self._playbook._for_ffi())
+        cfg["exec_on_dependency_start"] = self._exec_on_dependency_start
+        return cfg

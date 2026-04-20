@@ -1,5 +1,3 @@
-pub(crate) mod on_dependency_startup;
-
 use arena::Dependency;
 use arena_http::HttpDependency;
 use serde::Deserialize;

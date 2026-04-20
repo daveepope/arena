@@ -1,3 +1,4 @@
+load("@rules_python//python:defs.bzl", "py_test")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
 load("@crates//:defs.bzl", "all_crate_deps")
 
@@ -63,6 +64,26 @@ rust_binary(
         "//arena-container-component:arena_container_component",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
+)
+
+py_test(
+    name = "pytest_localstack_component_test",
+    size = "small",
+    srcs = [
+        "tests/example-arena-pytest-localstack-test/test_localstack.py",
+    ],
+    main = "tests/example-arena-pytest-localstack-test/test_localstack.py",
+    data = [
+        "//arena-ffi:arena_ffi_shared",
+    ],
+    deps = [
+        "//arena-pytest:arena_pytest_lib",
+        "@pip//pytest",
+        "@pip//pytest_asyncio",
+    ],
+    tags = ["local"],
+    python_version = "PY3",
+    visibility = ["//visibility:public"],
 )
 
 rust_test(

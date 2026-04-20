@@ -4,7 +4,6 @@ pub mod stub;
 pub mod verify;
 
 use crate::http_dependency::HttpDependency;
-use async_trait::async_trait;
 use header_pattern::HeaderPattern;
 use response::ResponseDefinition;
 use serde::Deserialize;
@@ -71,6 +70,7 @@ impl Expectation {
 }
 
 pub struct Playbook {
+    identifier: String,
     admin_url: String,
     mappings: Vec<StubMapping>,
     expectations: Vec<Expectation>,
@@ -82,10 +82,16 @@ impl Playbook {
             .admin_url()
             .expect("HttpDependency must be started before configuring a Playbook");
         Self {
+            identifier: format!("http-playbook:{}", dependency.identifier),
             admin_url,
             mappings: Vec::new(),
             expectations: Vec::new(),
         }
+    }
+
+    pub fn with_identifier(mut self, identifier: impl Into<String>) -> Self {
+        self.identifier = identifier.into();
+        self
     }
 
     pub fn get(self, url_path: impl Into<String>) -> PlaybookMappingBuilder {
@@ -147,6 +153,7 @@ impl Playbook {
         );
 
         ActivePlaybook {
+            identifier: self.identifier,
             admin_url: self.admin_url,
             registered,
             expectations: self.expectations,
@@ -154,19 +161,17 @@ impl Playbook {
     }
 }
 
-#[async_trait]
-impl arena::Playbook for Playbook {
-    type Active = ActivePlaybook;
-
-    async fn run(self) -> Self::Active {
-        Playbook::run(self).await
-    }
-}
-
 pub struct ActivePlaybook {
+    identifier: String,
     admin_url: String,
     registered: Vec<RegisteredMapping>,
     expectations: Vec<Expectation>,
+}
+
+impl arena::ActivePlaybook for ActivePlaybook {
+    fn identifier(&self) -> &str {
+        &self.identifier
+    }
 }
 
 impl ActivePlaybook {
@@ -631,7 +636,7 @@ impl PlaybookSequenceBuilder {
         self
     }
 
-    fn finalize(mut self) -> Playbook {
+    pub fn into_playbook(mut self) -> Playbook {
         let method = self.mapping.method().to_string();
         let url_path = self.mapping.url_path().to_string();
         let mappings = self.mapping.will_return_sequence(self.responses);
@@ -647,22 +652,22 @@ impl PlaybookSequenceBuilder {
     }
 
     pub fn get(self, url_path: impl Into<String>) -> PlaybookMappingBuilder {
-        self.finalize().get(url_path)
+        self.into_playbook().get(url_path)
     }
 
     pub fn post(self, url_path: impl Into<String>) -> PlaybookMappingBuilder {
-        self.finalize().post(url_path)
+        self.into_playbook().post(url_path)
     }
 
     pub fn put(self, url_path: impl Into<String>) -> PlaybookMappingBuilder {
-        self.finalize().put(url_path)
+        self.into_playbook().put(url_path)
     }
 
     pub fn delete(self, url_path: impl Into<String>) -> PlaybookMappingBuilder {
-        self.finalize().delete(url_path)
+        self.into_playbook().delete(url_path)
     }
 
     pub async fn run(self) -> ActivePlaybook {
-        self.finalize().run().await
+        self.into_playbook().run().await
     }
 }

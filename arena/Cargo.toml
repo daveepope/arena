@@ -16,5 +16,6 @@ log = { workspace = true }
 
 [dev-dependencies]
 mockall = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
 env_logger = { workspace = true }
+futures-timer = { workspace = true }
