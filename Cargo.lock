@@ -178,6 +178,7 @@ dependencies = [
  "arena-executable-component",
  "arena-http",
  "arena-kafka",
+ "arena-localstack",
  "arena-mssql",
  "arena-postgres",
  "async-trait",

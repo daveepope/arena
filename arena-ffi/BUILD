@@ -7,6 +7,7 @@ _ARENA_FFI_DEPS = all_crate_deps(normal = True) + [
     "//arena-executable-component:arena_executable_component",
     "//arena-http:arena_http",
     "//arena-kafka:arena_kafka",
+    "//arena-localstack:arena_localstack",
     "//arena-postgres:arena_postgres",
     "//arena-mssql:arena_mssql",
 ]

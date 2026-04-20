@@ -3,6 +3,7 @@ use arena_http::{
     ManagedHttpPlaybook, Playbook as HttpPlaybook, PlaybookSequenceBuilder,
     ResponseDefinition,
 };
+use arena_localstack::ManagedLocalstackPlaybook;
 use arena_mssql::ManagedMssqlPlaybook;
 use serde::Deserialize;
 
@@ -24,6 +25,7 @@ fn default_exec_on_dependency_start() -> bool {
 pub(crate) enum PlaybookKindConfig {
     Http(HttpPlaybookConfig),
     Mssql(MssqlPlaybookConfig),
+    Localstack(LocalstackPlaybookConfig),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -51,6 +53,11 @@ pub(crate) struct MssqlPlaybookConfig {
     pub dependency_identifier: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct LocalstackPlaybookConfig {
+    pub dependency_identifier: String,
+}
+
 pub(crate) fn build(config: ManagedPlaybookConfig) -> Box<dyn Playbook> {
     match config.kind {
         PlaybookKindConfig::Http(http) => Box::new(ManagedHttpPlaybook::new(
@@ -61,6 +68,10 @@ pub(crate) fn build(config: ManagedPlaybookConfig) -> Box<dyn Playbook> {
         PlaybookKindConfig::Mssql(mssql) => Box::new(ManagedMssqlPlaybook::new(
             config.identifier,
             mssql.dependency_identifier,
+        )),
+        PlaybookKindConfig::Localstack(localstack) => Box::new(ManagedLocalstackPlaybook::new(
+            config.identifier,
+            localstack.dependency_identifier,
         )),
     }
 }

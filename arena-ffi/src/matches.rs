@@ -5,6 +5,7 @@ use crate::container_component;
 use crate::executable_component;
 use crate::http_dependency;
 use crate::kafka_dependency;
+use crate::localstack_dependency;
 use crate::mssql_dependency;
 use crate::postgres_dependency;
 use crate::managed_playbook;
@@ -29,6 +30,7 @@ pub(crate) enum DependencyConfig {
     Mssql(mssql_dependency::MssqlDependencyConfig),
     Kafka(kafka_dependency::KafkaDependencyConfig),
     Http(http_dependency::HttpDependencyConfig),
+    Localstack(localstack_dependency::LocalstackDependencyConfig),
 }
 
 #[derive(Debug, Deserialize)]
@@ -73,6 +75,7 @@ fn build_dependencies(
             DependencyConfig::Mssql(m) => mssql_dependency::build(m, network),
             DependencyConfig::Kafka(k) => kafka_dependency::build(k, network),
             DependencyConfig::Http(h) => http_dependency::build(h, network),
+            DependencyConfig::Localstack(l) => localstack_dependency::build(l, network),
         })
         .collect()
 }

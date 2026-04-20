@@ -105,8 +105,19 @@ impl LocalstackDependency {
         self.lambda_arns.get(name).map(String::as_str)
     }
 
+    pub fn queue_urls_snapshot(&self) -> Vec<(String, String)> {
+        self.queue_urls
+            .iter()
+            .map(|(name, url)| (name.clone(), url.clone()))
+            .collect()
+    }
+
     pub fn builder(identifier: impl Into<String>) -> LocalstackDependencyBuilder {
         LocalstackDependencyBuilder::new(identifier)
+    }
+
+    pub fn playbook(&self) -> crate::playbook::Playbook {
+        crate::playbook::Playbook::with(self)
     }
 
     pub(crate) fn set_readiness_check(&mut self, check: Box<dyn ReadinessCheck>) {
