@@ -1,15 +1,15 @@
 use arena::Component;
 use arena::healthcheck::ReadinessCheck;
-use crate::container_component::ContainerComponent;
+use crate::containerized_component::ContainerizedComponent;
 use bollard::query_parameters::BuildImageOptionsBuilder;
 use bollard::{body_full, Docker};
 use futures::StreamExt;
 use std::path::{Path, PathBuf};
 
-pub struct ContainerComponentBuilder { 
+pub struct ContainerizedComponentBuilder { 
     identifier: String,
     children: Option<Vec<Component>>,
-    dockerfile: String,
+    containerfile: String,
     build_context: Option<PathBuf>,
     image_tag: Option<String>,
     network: Option<String>,
@@ -18,17 +18,18 @@ pub struct ContainerComponentBuilder {
     runtime_args: Vec<(String, String)>,
     port_mappings: Vec<(u16, u16)>,
     readiness_checks: Vec<(Box<dyn ReadinessCheck>, String)>,
+    host_mappings: Vec<String>,
 }
 
-impl ContainerComponentBuilder {
-    pub(crate) fn new(identifier: impl Into<String>, dockerfile: impl Into<String>) -> Self {
+impl ContainerizedComponentBuilder {
+    pub(crate) fn new(identifier: impl Into<String>, containerfile: impl Into<String>) -> Self {
         Self {
             identifier: arena_container::identifier::build(
-                "arena-container-component",
+                "arena-containerized-component",
                 &identifier.into(),
             ),
             children: None,
-            dockerfile: dockerfile.into(),
+            containerfile: containerfile.into(),
             build_context: None,
             image_tag: None,
             network: None,
@@ -37,6 +38,7 @@ impl ContainerComponentBuilder {
             runtime_args: Vec::new(),
             port_mappings: Vec::new(),
             readiness_checks: Vec::new(),
+            host_mappings: Vec::new(),
         }
     }
 
@@ -80,6 +82,11 @@ impl ContainerComponentBuilder {
         self
     }
 
+    pub fn with_host_mapping(mut self, host_mapping: impl Into<String>) -> Self {
+        self.host_mappings.push(host_mapping.into());
+        self
+    }
+
     pub fn with_readiness_check<R>(mut self, check: R, target: impl Into<String>) -> Self
     where
         R: ReadinessCheck + 'static,
@@ -113,17 +120,17 @@ impl ContainerComponentBuilder {
         ".git", "target", "node_modules", ".idea", ".vscode", ".arena",
     ];
 
-    fn create_build_context_tar(identifier: &str, dockerfile: &str, build_context: &Option<PathBuf>) -> Vec<u8> {
+    fn create_build_context_tar(identifier: &str, containerfile: &str, build_context: &Option<PathBuf>) -> Vec<u8> {
         let buf = Vec::new();
         let mut tar = tar::Builder::new(buf);
 
-        let dockerfile_bytes = dockerfile.as_bytes();
+        let containerfile_bytes = containerfile.as_bytes();
         let mut header = tar::Header::new_ustar();
-        header.set_size(dockerfile_bytes.len() as u64);
+        header.set_size(containerfile_bytes.len() as u64);
         header.set_mode(0o644);
         header.set_cksum();
-        tar.append_data(&mut header, ".arena.Dockerfile", dockerfile_bytes)
-            .expect("add Dockerfile to tar");
+        tar.append_data(&mut header, ".arena.Dockerfile", containerfile_bytes)
+            .expect("add containerfile to image build context");
 
         if let Some(ref context_path) = build_context {
             Self::append_dir_recursive(&mut tar, context_path, context_path, identifier);
@@ -204,17 +211,16 @@ impl ContainerComponentBuilder {
                     );
                 }
             }
-            // Symlinks and special files are intentionally skipped
         }
     }
 
-    async fn build_image(identifier: &str, dockerfile: &str, image_tag: &str, build_context: &Option<PathBuf>, docker: &Docker) {
+    async fn build_image(identifier: &str, containerfile: &str, image_tag: &str, build_context: &Option<PathBuf>, runtime_client: &Docker) {
         log::info!(
-            "[Component-{}] building Docker image '{}'",
+            "[Component-{}] building container image '{}'",
             identifier, image_tag
         );
 
-        let tar_body = Self::create_build_context_tar(identifier, dockerfile, build_context);
+        let tar_body = Self::create_build_context_tar(identifier, containerfile, build_context);
 
         let options = BuildImageOptionsBuilder::default()
             .dockerfile(".arena.Dockerfile")
@@ -222,7 +228,7 @@ impl ContainerComponentBuilder {
             .rm(true)
             .build();
 
-        let mut stream = docker.build_image(options, None, Some(body_full(tar_body.into())));
+        let mut stream = runtime_client.build_image(options, None, Some(body_full(tar_body.into())));
 
         while let Some(result) = stream.next().await {
             match result {
@@ -235,14 +241,14 @@ impl ContainerComponentBuilder {
                     }
                     if let Some(ref error) = info.error {
                         panic!(
-                            "[Component-{}] docker build error: {}",
+                            "[Component-{}] image build error: {}",
                             identifier, error
                         );
                     }
                 }
                 Err(e) => {
                     panic!(
-                        "[Component-{}] docker build failed: {}",
+                        "[Component-{}] image build failed: {}",
                         identifier, e
                     );
                 }
@@ -250,24 +256,31 @@ impl ContainerComponentBuilder {
         }
 
         log::info!(
-            "[Component-{}] Docker image '{}' built successfully",
+            "[Component-{}] container image '{}' built successfully",
             identifier, image_tag
         );
     }
 
-    pub async fn build(self) -> ContainerComponent {
+    pub async fn build(self) -> ContainerizedComponent {
         let build_context = self.build_context.map(Self::resolve_path);
 
         let image_tag = self.image_tag.unwrap_or_else(|| {
             arena_container::identifier::sanitize_for_container(&self.identifier)
         });
 
-        let docker = Docker::connect_with_local_defaults()
-            .expect("connect to Docker daemon");
+        let runtime_client = Docker::connect_with_local_defaults()
+            .expect("connect to container runtime");
 
-        Self::build_image(&self.identifier, &self.dockerfile, &image_tag, &build_context, &docker).await;
+        Self::build_image(
+            &self.identifier,
+            &self.containerfile,
+            &image_tag,
+            &build_context,
+            &runtime_client,
+        )
+        .await;
 
-        ContainerComponent {
+        ContainerizedComponent {
             identifier: self.identifier,
             children: self.children,
             image_tag,
@@ -277,7 +290,8 @@ impl ContainerComponentBuilder {
             runtime_args: self.runtime_args,
             port_mappings: self.port_mappings,
             readiness_checks: self.readiness_checks,
-            docker,
+            host_mappings: self.host_mappings,
+            runtime_client,
             container_id: None,
             stopped: false,
         }

@@ -27,7 +27,7 @@ pub struct PostgresDependency {
 }
 
 impl PostgresDependency {
-    pub fn new(
+    pub(crate) fn new(
         identifier: String,
         postgres_impl: Box<dyn PostgresImpl>,
         port: u16,

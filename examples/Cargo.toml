@@ -11,8 +11,8 @@ name = "arena_examples"
 path = "src/lib.rs"
 
 [[bin]]
-name = "arena-examples"
-path = "src/example-arena-console/main.rs"
+name = "example-console"
+path = "src/example-console/main.rs"
 
 [[bin]]
 name = "web-app"
@@ -24,8 +24,9 @@ arena-kafka = { workspace = true }
 arena-postgres = { workspace = true }
 arena-mssql = { workspace = true }
 arena-http = { workspace = true }
+arena-oauth = { workspace = true }
 arena-executable-component = { workspace = true }
-arena-container-component = { workspace = true }
+arena-containerized-component = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "net", "sync"] }
 env_logger = { workspace = true }
 log = { workspace = true }
@@ -38,11 +39,12 @@ reqwest = { workspace = true, features = ["json"] }
 async-trait = { workspace = true }
 futures = { workspace = true }
 futures-timer = { workspace = true }
+jsonwebtoken = { workspace = true }
+oauth2 = { workspace = true }
 
 [[test]]
 name = "component_test"
 path = "tests/example-arena-component-test/component_test.rs"
 
 [dev-dependencies]
-rstest = { workspace = true }
-ctor = "0.4"
+ctor = { workspace = true }

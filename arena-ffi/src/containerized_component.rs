@@ -1,5 +1,5 @@
 use arena::Component;
-use arena_container_component::container_component::ContainerComponent;
+use arena_containerized_component::containerized_component::ContainerizedComponent;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -13,9 +13,10 @@ pub(crate) struct PortMappingConfig {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct ContainerComponentConfig {
+pub(crate) struct ContainerizedComponentConfig {
     pub identifier: String,
-    pub dockerfile: String,
+    #[serde(alias = "dockerfile")]
+    pub containerfile: String,
     #[serde(default)]
     pub build_context: Option<String>,
     #[serde(default)]
@@ -30,10 +31,12 @@ pub(crate) struct ContainerComponentConfig {
     pub port_mappings: Option<Vec<PortMappingConfig>>,
     #[serde(default)]
     pub readiness_checks: Option<Vec<ReadinessCheckConfig>>,
+    #[serde(default)]
+    pub host_mappings: Option<Vec<String>>,
 }
 
-pub(crate) async fn build(config: &ContainerComponentConfig) -> Result<Component, String> {
-    let mut builder = ContainerComponent::builder(&config.identifier, &config.dockerfile);
+pub(crate) async fn build(config: &ContainerizedComponentConfig) -> Result<Component, String> {
+    let mut builder = ContainerizedComponent::builder(&config.identifier, &config.containerfile);
     if let Some(ctx) = &config.build_context {
         builder = builder.with_build_context(ctx);
     }
@@ -56,6 +59,11 @@ pub(crate) async fn build(config: &ContainerComponentConfig) -> Result<Component
     if let Some(mappings) = &config.port_mappings {
         for m in mappings {
             builder = builder.with_port_mapping(m.host_port, m.container_port);
+        }
+    }
+    if let Some(hosts) = &config.host_mappings {
+        for h in hosts {
+            builder = builder.with_host_mapping(h);
         }
     }
     if let Some(checks) = &config.readiness_checks {

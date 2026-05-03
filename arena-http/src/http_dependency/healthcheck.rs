@@ -2,7 +2,20 @@ use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
 use std::time::{Duration, Instant};
 
-pub(super) struct DefaultHttpReadinessCheck;
+use crate::admin_client::admin_api_client;
+
+#[derive(Default)]
+pub(super) struct DefaultHttpReadinessCheck {
+    trusted_tls_certificate_pem: Option<String>,
+}
+
+impl DefaultHttpReadinessCheck {
+    pub(super) fn new(trusted_tls_certificate_pem: Option<String>) -> Self {
+        Self {
+            trusted_tls_certificate_pem,
+        }
+    }
+}
 
 #[async_trait]
 impl ReadinessCheck for DefaultHttpReadinessCheck {
@@ -15,7 +28,10 @@ impl ReadinessCheck for DefaultHttpReadinessCheck {
         let timeout = Duration::from_millis(timeout_ms);
         let poll_every = Duration::from_millis(100);
         let start = Instant::now();
-        let client = reqwest::Client::new();
+        let client = admin_api_client(
+            admin_url,
+            self.trusted_tls_certificate_pem.as_deref(),
+        );
         let mappings_url = format!("{admin_url}/mappings");
 
         loop {

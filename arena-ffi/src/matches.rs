@@ -1,7 +1,8 @@
 use arena::{Component, Dependency, Match, MatchTrait};
+use arena_oauth::{build_oauth_dependency_from_config, OauthFfiDependencyConfig};
 use serde::Deserialize;
 
-use crate::container_component;
+use crate::containerized_component;
 use crate::executable_component;
 use crate::http_dependency;
 use crate::kafka_dependency;
@@ -31,13 +32,15 @@ pub(crate) enum DependencyConfig {
     Kafka(kafka_dependency::KafkaDependencyConfig),
     Http(http_dependency::HttpDependencyConfig),
     Localstack(localstack_dependency::LocalstackDependencyConfig),
+    Oauth(OauthFfiDependencyConfig),
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub(crate) enum ComponentConfig {
     Exec(executable_component::ExecutableComponentConfig),
-    Container(container_component::ContainerComponentConfig),
+    #[serde(rename = "container")]
+    Containerized(containerized_component::ContainerizedComponentConfig),
 }
 
 pub(crate) async fn build_match_async(
@@ -76,6 +79,7 @@ fn build_dependencies(
             DependencyConfig::Kafka(k) => kafka_dependency::build(k, network),
             DependencyConfig::Http(h) => http_dependency::build(h, network),
             DependencyConfig::Localstack(l) => localstack_dependency::build(l, network),
+            DependencyConfig::Oauth(o) => build_oauth_dependency_from_config(o, network),
         })
         .collect()
 }
@@ -88,7 +92,7 @@ async fn build_components_async(
     for c in comps {
         let comp: Component = match c {
             ComponentConfig::Exec(e) => executable_component::build(e)?,
-            ComponentConfig::Container(ct) => container_component::build(ct).await?,
+            ComponentConfig::Containerized(ct) => containerized_component::build(ct).await?,
         };
         out.push(comp);
     }

@@ -1,5 +1,6 @@
 pub mod http_dependency;
 pub mod builder;
+mod admin_client;
 pub mod playbook;
 pub mod managed_playbook;
 

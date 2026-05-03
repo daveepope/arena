@@ -54,7 +54,7 @@ pub struct LocalstackDependency {
 
 impl LocalstackDependency {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub(crate) fn new(
         identifier: String,
         localstack_impl: Box<dyn LocalstackImpl>,
         port: u16,

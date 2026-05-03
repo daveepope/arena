@@ -1,18 +1,26 @@
+use std::net::{IpAddr, Ipv4Addr};
+
 use arena::{ClosedArena, Component, Dependency, Match, MatchTrait};
+use arena_containerized_component::containerized_component::ContainerizedComponent;
+use arena_examples::http_healthcheck::HttpReadinessCheck;
+use arena_executable_component::executable_component::ExecutableComponent;
 use arena_kafka::{KafkaDependency, KafkaFlavor, KAFKA_INTERNAL_DOCKER_PORT};
 use arena_mssql::MssqlDependency;
+use arena_oauth::OauthDependency;
 use arena_postgres::PostgresDependency;
-use arena_container_component::container_component::ContainerComponent;
-use arena_executable_component::executable_component::ExecutableComponent;
-use arena_examples::http_healthcheck::HttpReadinessCheck;
 use env_logger::Env;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::message::Message;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+const OAUTH_TLS_CERT_PEM: &str = include_str!("../../resources/oauth_tls_cert.pem");
+const OAUTH_TLS_KEY_PEM: &str = include_str!("../../resources/oauth_tls_key.pem");
+const OAUTH_PORT: u16 = 9443;
+const OAUTH_ISSUER_FOR_WEB_CONTAINER: &str = "https://host.docker.internal:9443";
 
 const POSTGRES_PORT: u16 = 4444;
 const POSTGRES_DB_NAME: &str = "readings_db";
@@ -32,13 +40,15 @@ const KAFKA_CONTAINER_NAME: &str = "arena-example-kafka";
 const MSSQL_CONTAINER_NAME: &str = "arena-example-mssql";
 
 async fn setup_arena_components() -> Vec<Component> {
-    let dockerfile = include_str!("../example-web-app/Dockerfile");
+    let containerfile = include_str!("../example-web-app/Dockerfile");
 
-    let web_app = ContainerComponent::builder("example web app", dockerfile)
+    let web_app = ContainerizedComponent::builder("example web app", containerfile)
         .with_build_context(".")
         .with_image_tag("arena-example-web-app")
         .with_port_mapping(WEB_APP_PORT, 3000)
+        .with_host_mapping("host.docker.internal:host-gateway")
         .with_env_var("RUST_LOG", "debug")
+        .with_env_var("OAUTH_TLS_CA_PEM", OAUTH_TLS_CERT_PEM)
         .with_runtime_arg("web_app_port", "3000")
         .with_runtime_arg(
             "postgres_connection_string",
@@ -62,10 +72,11 @@ async fn setup_arena_components() -> Vec<Component> {
                 MSSQL_CONTAINER_NAME, MSSQL_DB_NAME, MSSQL_DB_USER, MSSQL_DB_PASS
             ),
         )
+        .with_runtime_arg("oauth_issuer_url", OAUTH_ISSUER_FOR_WEB_CONTAINER)
         .with_network(NETWORK_NAME)
         .with_readiness_check(
             HttpReadinessCheck::new(),
-            format!("http://localhost:{}/readings", WEB_APP_PORT),
+            format!("http://localhost:{}/health", WEB_APP_PORT),
         )
         .build()
         .await;
@@ -81,13 +92,14 @@ fn setup_executable_arena_components() -> Vec<Component> {
             .with_build_tool(arena_executable_component::BuildTool::Cargo)
             .with_executable_path("target/release/web-app")
             .with_env_var("RUST_LOG", "debug")
+            .with_env_var("OAUTH_TLS_CA_PEM", OAUTH_TLS_CERT_PEM)
             .with_runtime_arg("web_app_port", WEB_APP_PORT.to_string())
             .with_runtime_arg(
                 "postgres_connection_string",
                 format!(
                     "host=localhost port={} user={} password={} dbname={}",
                     POSTGRES_PORT, POSTGRES_DB_USER, POSTGRES_DB_PASS, POSTGRES_DB_NAME
-                )
+                ),
             )
             .with_runtime_arg("kafka_bootstrap", format!("localhost:{}", KAFKA_PORT))
             .with_runtime_arg("calibration_url", "http://127.0.0.1:8888".to_string())
@@ -98,7 +110,8 @@ fn setup_executable_arena_components() -> Vec<Component> {
                     MSSQL_PORT, MSSQL_DB_NAME, MSSQL_DB_USER, MSSQL_DB_PASS
                 ),
             )
-            .build()
+            .with_runtime_arg("oauth_issuer_url", format!("https://127.0.0.1:{}", OAUTH_PORT))
+            .build(),
     )]
 }
 
@@ -138,7 +151,18 @@ fn setup_arena_dependencies() -> (Vec<Dependency>, String) {
         .with_startup_sql_scripts(mssql_startup_sql_scripts)
         .build();
 
-    let deps: Vec<Dependency> = vec![Box::new(postgres_db), Box::new(kafka), Box::new(mssql)];
+    let oauth = OauthDependency::builder("example oauth")
+        .with_server_tls_pem(OAUTH_TLS_CERT_PEM, OAUTH_TLS_KEY_PEM)
+        .with_listen_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
+        .with_port(OAUTH_PORT)
+        .build();
+
+    let deps: Vec<Dependency> = vec![
+        Box::new(postgres_db),
+        Box::new(kafka),
+        Box::new(mssql),
+        Box::new(oauth),
+    ];
     (deps, kafka_id)
 }
 
@@ -205,26 +229,21 @@ impl Drop for KafkaConsumerHandle {
     }
 }
 
-fn create_output_kafka_consumer(
-    kafka_bootstrap: &str,
-    topic: &str,
-) -> KafkaConsumerHandle {
+fn create_output_kafka_consumer(kafka_bootstrap: &str, topic: &str) -> KafkaConsumerHandle {
     let consumer: BaseConsumer = ClientConfig::new()
         .set("bootstrap.servers", kafka_bootstrap)
-        .set("group.id", "arena-examples")
+        .set("group.id", "example-console")
         .set("enable.partition.eof", "false")
         .set("auto.offset.reset", "earliest")
         .create()
         .expect("create kafka consumer");
-    
-    consumer
-        .subscribe(&[topic])
-        .expect("subscribe");
+
+    consumer.subscribe(&[topic]).expect("subscribe");
 
     let topic = topic.to_string();
     let should_shutdown = Arc::new(AtomicBool::new(false));
     let should_shutdown_clone = should_shutdown.clone();
-    
+
     tokio::spawn(async move {
         tokio::task::spawn_blocking(move || {
             while !should_shutdown_clone.load(Ordering::Relaxed) {
@@ -234,10 +253,7 @@ fn create_output_kafka_consumer(
                         log::debug!("kafka consume error: {err}");
                     }
                     Some(Ok(msg)) => {
-                        let payload = msg
-                            .payload_view::<str>()
-                            .and_then(|r| r.ok())
-                            .unwrap_or("");
+                        let payload = msg.payload_view::<str>().and_then(|r| r.ok()).unwrap_or("");
                         log::debug!("kafka received {}: {}", topic, payload);
                     }
                 }
@@ -247,7 +263,7 @@ fn create_output_kafka_consumer(
         .await
         .ok();
     });
-    
+
     KafkaConsumerHandle {
         shutdown_signal: should_shutdown,
     }
@@ -257,16 +273,20 @@ fn create_output_kafka_consumer(
 async fn main() {
     env_logger::Builder::from_env(
         Env::default().default_filter_or(
-            "arena=debug,arena_examples=debug,arena_postgres=debug,arena_kafka=debug,testcontainers=info,testcontainers_modules=info",
+            "arena=debug,arena_examples=debug,arena_postgres=debug,arena_kafka=debug,testcontainers=info,testcontainers_modules=info,arena_oauth=debug",
         ),
     )
     .init();
 
     let (dependencies, kafka_id) = setup_arena_dependencies();
     let components = setup_arena_components().await;
-    let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new( Match::new("End to end happy path match", dependencies, components))];
+    let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new(Match::new(
+        "End to end happy path match",
+        dependencies,
+        components,
+    ))];
     let closed_arena = ClosedArena::new(String::from("Example Arena"), matches);
-    
+
     let open_arena = closed_arena.open().await;
 
     let kafka_bootstrap = open_arena

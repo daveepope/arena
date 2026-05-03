@@ -11,12 +11,13 @@ crate-type = ["cdylib", "rlib"]
 arena = { workspace = true }
 arena-http = { workspace = true }
 async-trait = { workspace = true }
-arena-container-component = { workspace = true }
+arena-containerized-component = { workspace = true }
 arena-executable-component = { workspace = true }
 arena-kafka = { workspace = true }
 arena-localstack = { workspace = true }
 arena-postgres = { workspace = true }
 arena-mssql = { workspace = true }
+arena-oauth = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
 reqwest = { workspace = true }

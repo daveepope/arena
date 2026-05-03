@@ -3,7 +3,7 @@ pub mod http;
 pub mod localstack;
 pub mod mssql;
 
-mod container_component;
+mod containerized_component;
 mod matches;
 mod executable_component;
 mod healthcheck;

@@ -1,30 +1,39 @@
 use arena::{ClosedArena, Component, Dependency, Match, MatchTrait, OpenArena};
-use arena_http::{HttpDependency, ManagedHttpPlaybook, ok_json, server_error};
+use arena_examples::example_axum_web_server::state::build_http_client_trusting_oauth_ca;
+use arena_examples::http_healthcheck::HttpReadinessCheck;
+use arena_executable_component::executable_component::ExecutableComponent;
+use arena_http::{ok_json, server_error, HttpDependency, ManagedHttpPlaybook};
 use arena_kafka::{KafkaDependency, KafkaFlavor};
 use arena_mssql::MssqlDependency;
+use arena_oauth::OauthDependency;
 use arena_postgres::PostgresDependency;
-use arena_executable_component::executable_component::ExecutableComponent;
-use arena_examples::http_healthcheck::HttpReadinessCheck;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::message::Message;
-use rstest::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
+use tokio::runtime::Runtime;
 use tokio::sync::OnceCell;
 
 static KAFKA_ID: OnceLock<String> = OnceLock::new();
 static CALIBRATION_ID: OnceLock<String> = OnceLock::new();
 static MSSQL_ID: OnceLock<String> = OnceLock::new();
+static OAUTH_ID: OnceLock<String> = OnceLock::new();
+
+const OAUTH_PORT: u16 = 9443;
+const OAUTH_ISSUER: &str = "https://127.0.0.1:9443";
+const OAUTH_TLS_CERT_PEM: &str = include_str!("../../resources/oauth_tls_cert.pem");
+const OAUTH_TLS_KEY_PEM: &str = include_str!("../../resources/oauth_tls_key.pem");
 
 const POSTGRES_PORT: u16 = 5555;
 const POSTGRES_DB_NAME: &str = "readings_db";
 const POSTGRES_DB_USER: &str = "readings_user";
 const POSTGRES_DB_PASS: &str = "readings_password";
 const KAFKA_PORT: u16 = 9093;
-const HTTP_MOCK_PORT: u16 = 8888;
+const CALIBRATION_HTTP_PORT: u16 = 8888;
 const EXEC_WEB_APP_PORT: u16 = 3000;
 const MSSQL_PORT: u16 = 1435;
 const MSSQL_DB_NAME: &str = "validationDb";
@@ -32,6 +41,17 @@ const MSSQL_DB_USER: &str = "sa";
 const MSSQL_DB_PASS: &str = "yourStrong(!)Password";
 
 const NETWORK_NAME: &str = "arena-component-test-network";
+
+async fn fetch_example_access_token() -> String {
+    let client = build_http_client_trusting_oauth_ca(OAUTH_TLS_CERT_PEM);
+    arena_examples::oauth_client_credentials::fetch_client_credentials_access_token(
+        &client,
+        OAUTH_ISSUER,
+        None,
+    )
+    .await
+    .expect("fetch client_credentials access token")
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Reading {
@@ -65,16 +85,15 @@ struct ReadingCreatedEvent {
 
 fn init_logging() {
     let _ = env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info,arena=debug")
+        env_logger::Env::default().default_filter_or("info,arena=debug"),
     )
     .is_test(true)
     .try_init();
 }
 
 fn setup_dependencies() -> Vec<Dependency> {
-    let startup_sql_scripts = vec![
-        include_str!("../../resources/instrument_reading_db_schema.sql").to_string()
-    ];
+    let startup_sql_scripts =
+        vec![include_str!("../../resources/instrument_reading_db_schema.sql").to_string()];
 
     let postgres_db = PostgresDependency::builder("example readings")
         .with_image("14.20-trixie")
@@ -97,16 +116,15 @@ fn setup_dependencies() -> Vec<Dependency> {
         .expect("kafka id set once");
 
     let calibration_service = HttpDependency::builder("example calibration")
-        .with_port(HTTP_MOCK_PORT)
+        .with_port(CALIBRATION_HTTP_PORT)
         .with_network(NETWORK_NAME)
         .build();
     CALIBRATION_ID
         .set(calibration_service.identifier.clone())
         .expect("calibration id set once");
 
-    let mssql_startup_sql_scripts = vec![
-        include_str!("../../resources/validation_db_schema.sql").to_string()
-    ];
+    let mssql_startup_sql_scripts =
+        vec![include_str!("../../resources/validation_db_schema.sql").to_string()];
 
     let validation_db = MssqlDependency::builder("example validation")
         .with_port(MSSQL_PORT)
@@ -120,11 +138,21 @@ fn setup_dependencies() -> Vec<Dependency> {
         .set(validation_db.identifier.clone())
         .expect("mssql id set once");
 
+    let oauth = OauthDependency::builder("component test oauth")
+        .with_server_tls_pem(OAUTH_TLS_CERT_PEM, OAUTH_TLS_KEY_PEM)
+        .with_listen_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
+        .with_port(OAUTH_PORT)
+        .build();
+    OAUTH_ID
+        .set(oauth.identifier.clone())
+        .expect("oauth id set once");
+
     vec![
         Box::new(postgres_db),
         Box::new(kafka),
         Box::new(calibration_service),
         Box::new(validation_db),
+        Box::new(oauth),
     ]
 }
 
@@ -136,23 +164,24 @@ fn resolve_web_app_binary() -> String {
 }
 
 fn setup_exec_component() -> Component {
-    let healthcheck_url = format!("http://127.0.0.1:{}/readings", EXEC_WEB_APP_PORT);
+    let healthcheck_url = format!("http://127.0.0.1:{}/health", EXEC_WEB_APP_PORT);
     let binary = resolve_web_app_binary();
     let is_bazel = std::env::var("RUNFILES_DIR").is_ok();
 
     let mut builder = ExecutableComponent::builder("example web app")
         .with_executable_path(binary)
         .with_env_var("RUST_LOG", "info")
+        .with_env_var("OAUTH_TLS_CA_PEM", OAUTH_TLS_CERT_PEM)
         .with_runtime_arg("web_app_port", EXEC_WEB_APP_PORT.to_string())
         .with_runtime_arg(
             "postgres_connection_string",
             format!(
                 "host=localhost port={} user={} password={} dbname={}",
                 POSTGRES_PORT, POSTGRES_DB_USER, POSTGRES_DB_PASS, POSTGRES_DB_NAME
-            )
+            ),
         )
         .with_runtime_arg("kafka_bootstrap", format!("localhost:{}", KAFKA_PORT))
-        .with_runtime_arg("calibration_url", format!("http://127.0.0.1:{}", HTTP_MOCK_PORT))
+        .with_runtime_arg("calibration_url", format!("http://127.0.0.1:{}", CALIBRATION_HTTP_PORT))
         .with_runtime_arg(
             "mssql_connection_string",
             format!(
@@ -160,6 +189,7 @@ fn setup_exec_component() -> Component {
                 MSSQL_PORT, MSSQL_DB_NAME, MSSQL_DB_USER, MSSQL_DB_PASS
             ),
         )
+        .with_runtime_arg("oauth_issuer_url", OAUTH_ISSUER)
         .with_readiness_check(HttpReadinessCheck::new(), healthcheck_url);
 
     if !is_bazel {
@@ -202,24 +232,42 @@ static SHARED_ARENA: OnceCell<OpenArena> = OnceCell::const_new();
 
 static SCENARIO_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+/// One Tokio runtime for all component tests: `OpenArena` / OAuth spawn on the first test's
+/// runtime; `#[tokio::test]` drops that runtime between tests and tears down the OAuth server
+/// while `SHARED_ARENA` still holds the arena handle.
+static COMPONENT_TEST_RUNTIME: OnceLock<Runtime> = OnceLock::new();
+
+fn component_test_runtime() -> &'static Runtime {
+    COMPONENT_TEST_RUNTIME.get_or_init(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .expect("component test tokio runtime")
+    })
+}
+
+async fn shared_arena() -> &'static OpenArena {
+    init_logging();
+    SHARED_ARENA
+        .get_or_init(|| async { create_arena().await })
+        .await
+}
+
 #[ctor::dtor]
 unsafe fn teardown() {
     if let Some(arena) = SHARED_ARENA.get() {
-        let rt = tokio::runtime::Runtime::new().expect("create runtime for teardown");
-        let _guard = rt.enter();
+        let _guard = component_test_runtime().enter();
         std::ptr::drop_in_place(arena as *const OpenArena as *mut OpenArena);
     }
 }
 
-#[fixture]
-async fn shared_arena() -> &'static OpenArena {
-    init_logging();
-    SHARED_ARENA.get_or_init(|| async { create_arena().await }).await
-}
-
 async fn get_readings(port: u16) -> Vec<Reading> {
+    let token = fetch_example_access_token().await;
     let url = format!("http://127.0.0.1:{}/readings", port);
-    let response = reqwest::get(&url)
+    let response = build_http_client_trusting_oauth_ca(OAUTH_TLS_CERT_PEM)
+        .get(&url)
+        .bearer_auth(token)
+        .send()
         .await
         .expect("GET /readings failed to send");
 
@@ -229,7 +277,8 @@ async fn get_readings(port: u16) -> Vec<Reading> {
         panic!("GET /readings failed (HTTP {status}): {body}");
     }
 
-    response.json::<Vec<Reading>>()
+    response
+        .json::<Vec<Reading>>()
         .await
         .expect("GET /readings returned invalid JSON")
 }
@@ -275,6 +324,7 @@ fn consume_reading_created_event(
 }
 
 async fn create_reading(port: u16, user_name: &str, value: i32, comment: Option<String>) -> i32 {
+    let token = fetch_example_access_token().await;
     let url = format!("http://127.0.0.1:{}/readings", port);
     let request = CreateReadingRequest {
         user_name: user_name.to_string(),
@@ -282,9 +332,10 @@ async fn create_reading(port: u16, user_name: &str, value: i32, comment: Option<
         comment,
     };
 
-    let client = reqwest::Client::new();
+    let client = build_http_client_trusting_oauth_ca(OAUTH_TLS_CERT_PEM);
     let response = client
         .post(&url)
+        .bearer_auth(token)
         .json(&request)
         .send()
         .await
@@ -310,13 +361,20 @@ async fn create_reading(port: u16, user_name: &str, value: i32, comment: Option<
         .expect("reading id fits i32")
 }
 
-#[rstest]
-#[tokio::test]
-async fn example_using_exec_component_creates_reading_consumes_and_gets_reading(
-    #[future] shared_arena: &'static OpenArena,
-) {
-    let arena = shared_arena.await;
+#[test]
+fn example_using_exec_component_creates_reading_consumes_and_gets_reading() {
+    component_test_runtime().block_on(async {
+    let arena = shared_arena().await;
     let _scenario = SCENARIO_LOCK.lock().await;
+
+    let _oauth = arena
+        .dependency(OAUTH_ID.get().expect("oauth id initialized"))
+        .and_then(|d| d.as_any().downcast_ref::<OauthDependency>())
+        .expect("oauth dependency");
+    assert!(
+        _oauth.base_url().is_some(),
+        "oauth base_url should be set after arena open"
+    );
 
     let bootstrap = arena
         .dependency(KAFKA_ID.get().expect("kafka id initialized"))
@@ -367,61 +425,65 @@ async fn example_using_exec_component_creates_reading_consumes_and_gets_reading(
         validation_count, 1,
         "web app should have written one valid validation row to mssql"
     );
+    });
 }
 
-#[rstest]
-#[tokio::test]
-async fn example_using_exec_component_calibration_outage_returns_error(
-    #[future] shared_arena: &'static OpenArena,
-) {
-    let arena = shared_arena.await;
-    let _scenario = SCENARIO_LOCK.lock().await;
+#[test]
+fn example_using_exec_component_calibration_outage_returns_error() {
+    component_test_runtime().block_on(async {
+        let arena = shared_arena().await;
+        let _scenario = SCENARIO_LOCK.lock().await;
 
-    let calibration = arena
-        .dependency(CALIBRATION_ID.get().expect("calibration id initialized"))
-        .and_then(|d| d.as_any().downcast_ref::<HttpDependency>())
-        .expect("calibration service should be available");
+        let calibration = arena
+            .dependency(CALIBRATION_ID.get().expect("calibration id initialized"))
+            .and_then(|d| d.as_any().downcast_ref::<HttpDependency>())
+            .expect("calibration service should be available");
 
-    {
-        let _outage = calibration.playbook()
-            .post("/api/v1/validate")
+        {
+            let _outage = calibration
+                .playbook()
+                .post("/api/v1/validate")
                 .with_priority(1)
                 .will_return(server_error())
-            .run()
-            .await;
+                .run()
+                .await;
 
-        let url = format!("http://127.0.0.1:{}/readings", EXEC_WEB_APP_PORT);
-        let client = reqwest::Client::new();
-        let response = client
-            .post(&url)
-            .json(&CreateReadingRequest {
-                user_name: "Outage Test User".to_string(),
-                value: 99,
-                comment: None,
-            })
-            .send()
-            .await
-            .expect("POST /readings failed to send");
+            let token = fetch_example_access_token().await;
+            let url = format!("http://127.0.0.1:{}/readings", EXEC_WEB_APP_PORT);
+            let client = build_http_client_trusting_oauth_ca(OAUTH_TLS_CERT_PEM);
+            let response = client
+                .post(&url)
+                .bearer_auth(token)
+                .json(&CreateReadingRequest {
+                    user_name: "Outage Test User".to_string(),
+                    value: 99,
+                    comment: None,
+                })
+                .send()
+                .await
+                .expect("POST /readings failed to send");
 
-        assert_eq!(
-            response.status().as_u16(),
-            500,
-            "expected 500 while calibration is in outage playbook",
-        );
-    }
+            assert_eq!(
+                response.status().as_u16(),
+                500,
+                "expected 500 while calibration is in outage playbook",
+            );
+        }
 
-    let recovered_id = create_reading(
-        EXEC_WEB_APP_PORT,
-        "Recovery Test User",
-        17,
-        Some("post-outage".to_string()),
-    ).await;
+        let recovered_id = create_reading(
+            EXEC_WEB_APP_PORT,
+            "Recovery Test User",
+            17,
+            Some("post-outage".to_string()),
+        )
+        .await;
 
-    let readings = get_readings(EXEC_WEB_APP_PORT).await;
-    let found = readings
-        .iter()
-        .find(|r| r.id == recovered_id)
-        .expect("recovered reading should be present");
-    assert_eq!(found.user_name, "Recovery Test User");
-    assert_eq!(found.value, 17);
+        let readings = get_readings(EXEC_WEB_APP_PORT).await;
+        let found = readings
+            .iter()
+            .find(|r| r.id == recovered_id)
+            .expect("recovered reading should be present");
+        assert_eq!(found.user_name, "Recovery Test User");
+        assert_eq!(found.value, 17);
+    });
 }

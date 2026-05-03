@@ -5,56 +5,61 @@ from arena_pytest._identifier import build as _build_identifier
 from arena_pytest.readiness import ReadinessCheck
 
 
-class ContainerComponentBuilder:
-    def __init__(self, name: str, dockerfile: str):
+class ContainerizedComponentBuilder:
+    def __init__(self, name: str, containerfile: str):
         self._config: Dict[str, Any] = {
             "type": "container",
-            "identifier": _build_identifier("arena-container-component", name),
-            "dockerfile": dockerfile,
+            "identifier": _build_identifier("arena-containerized-component", name),
+            "containerfile": containerfile,
             "env_vars": {},
             "runtime_args": [],
             "port_mappings": [],
+            "host_mappings": [],
         }
         self._readiness_checks: List[Tuple[ReadinessCheck, str]] = []
 
-    def with_build_context(self, path: str) -> "ContainerComponentBuilder":
+    def with_build_context(self, path: str) -> "ContainerizedComponentBuilder":
         self._config["build_context"] = path
         return self
 
-    def with_image_tag(self, tag: str) -> "ContainerComponentBuilder":
+    def with_image_tag(self, tag: str) -> "ContainerizedComponentBuilder":
         self._config["image_tag"] = tag
         return self
 
-    def with_network(self, network: str) -> "ContainerComponentBuilder":
+    def with_network(self, network: str) -> "ContainerizedComponentBuilder":
         self._config["network"] = network
         return self
 
-    def with_port_mapping(self, host_port: int, container_port: int) -> "ContainerComponentBuilder":
+    def with_port_mapping(self, host_port: int, container_port: int) -> "ContainerizedComponentBuilder":
         self._config["port_mappings"].append(
             {"host_port": host_port, "container_port": container_port}
         )
         return self
 
-    def with_env_var(self, key: str, value: str) -> "ContainerComponentBuilder":
+    def with_host_mapping(self, host_mapping: str) -> "ContainerizedComponentBuilder":
+        self._config["host_mappings"].append(host_mapping)
+        return self
+
+    def with_env_var(self, key: str, value: str) -> "ContainerizedComponentBuilder":
         self._config["env_vars"][key] = value
         return self
 
-    def with_runtime_arg(self, name: str, value: str) -> "ContainerComponentBuilder":
+    def with_runtime_arg(self, name: str, value: str) -> "ContainerizedComponentBuilder":
         self._config["runtime_args"].append({"name": name, "value": value})
         return self
 
-    def with_readiness_check(self, check: ReadinessCheck, target: str) -> "ContainerComponentBuilder":
+    def with_readiness_check(self, check: ReadinessCheck, target: str) -> "ContainerizedComponentBuilder":
         self._readiness_checks.append((check, target))
         return self
 
-    def build(self) -> "ContainerComponent":
-        return ContainerComponent(dict(self._config), readiness_checks=list(self._readiness_checks))
+    def build(self) -> "ContainerizedComponent":
+        return ContainerizedComponent(dict(self._config), readiness_checks=list(self._readiness_checks))
 
     def _for_ffi(self) -> Dict[str, Any]:
         return dict(self._config)
 
 
-class ContainerComponent:
+class ContainerizedComponent:
     def __init__(
         self,
         config: Dict[str, Any],

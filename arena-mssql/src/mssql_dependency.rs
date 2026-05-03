@@ -28,7 +28,7 @@ pub struct MssqlDependency {
 }
 
 impl MssqlDependency {
-    pub fn new(
+    pub(crate) fn new(
         identifier: String,
         mssql_impl: Box<dyn MssqlImpl>,
         port: u16,

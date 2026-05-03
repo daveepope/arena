@@ -34,7 +34,7 @@ pub struct KafkaDependency {
 }
 
 impl KafkaDependency {
-    pub fn new(
+    pub(crate) fn new(
         identifier: String,
         kafka_impl: Box<dyn KafkaImpl>,
         port: u16,

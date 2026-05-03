@@ -3,13 +3,14 @@ load("@crates//:defs.bzl", "all_crate_deps")
 
 _ARENA_FFI_DEPS = all_crate_deps(normal = True) + [
     "//arena",
-    "//arena-container-component:arena_container_component",
+    "//arena-containerized-component:arena_containerized_component",
     "//arena-executable-component:arena_executable_component",
     "//arena-http:arena_http",
     "//arena-kafka:arena_kafka",
     "//arena-localstack:arena_localstack",
-    "//arena-postgres:arena_postgres",
     "//arena-mssql:arena_mssql",
+    "//arena-oauth:arena_oauth",
+    "//arena-postgres:arena_postgres",
 ]
 
 _ARENA_FFI_PROC_MACRO_DEPS = all_crate_deps(proc_macro = True)

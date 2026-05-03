@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use arena::component::RunnableComponent;
 use arena::healthcheck::ReadinessCheck;
-use crate::builder::ContainerComponentBuilder;
+use crate::builder::ContainerizedComponentBuilder;
 use bollard::container::LogOutput;
 use bollard::models::{ContainerCreateBody, EndpointSettings, HostConfig, NetworkingConfig, PortBinding};
 use bollard::query_parameters::{
@@ -12,7 +12,7 @@ use bollard::Docker;
 use futures::StreamExt;
 use std::collections::HashMap;
 
-pub struct ContainerComponent {
+pub struct ContainerizedComponent {
     pub(crate) identifier: String,
     pub(crate) children: Option<Vec<Box<dyn RunnableComponent>>>,
     pub(crate) image_tag: String,
@@ -22,14 +22,15 @@ pub struct ContainerComponent {
     pub(crate) runtime_args: Vec<(String, String)>,
     pub(crate) port_mappings: Vec<(u16, u16)>,
     pub(crate) readiness_checks: Vec<(Box<dyn ReadinessCheck>, String)>,
-    pub(crate) docker: Docker,
+    pub(crate) host_mappings: Vec<String>,
+    pub(crate) runtime_client: Docker,
     pub(crate) container_id: Option<String>,
     pub(crate) stopped: bool,
 }
 
-impl ContainerComponent {
-    pub fn builder(identifier: impl Into<String>, dockerfile: impl Into<String>) -> ContainerComponentBuilder {
-        ContainerComponentBuilder::new(identifier, dockerfile)
+impl ContainerizedComponent {
+    pub fn builder(identifier: impl Into<String>, containerfile: impl Into<String>) -> ContainerizedComponentBuilder {
+        ContainerizedComponentBuilder::new(identifier, containerfile)
     }
 
     async fn create_and_start_container(&mut self) {
@@ -77,11 +78,10 @@ impl ContainerComponent {
             host_config.port_bindings = Some(port_bindings);
         }
 
-        // If a network is specified, create the container directly on that
-        // network so Docker's embedded DNS (127.0.0.11) is configured from
-        // the start.  Using connect_network *after* creation leaves the
-        // container's /etc/resolv.conf pointing at the default bridge DNS
-        // which cannot resolve container names.
+        if !self.host_mappings.is_empty() {
+            host_config.extra_hosts = Some(self.host_mappings.clone());
+        }
+
         let mut networking_config: Option<NetworkingConfig> = None;
 
         if let Some(ref network) = self.network {
@@ -118,7 +118,7 @@ impl ContainerComponent {
             ))
             .build();
 
-        let response = self.docker
+        let response = self.runtime_client
             .create_container(Some(options), body)
             .await
             .unwrap_or_else(|e| panic!(
@@ -142,7 +142,7 @@ impl ContainerComponent {
             );
         }
 
-        self.docker
+        self.runtime_client
             .start_container(&response.id, None::<bollard::query_parameters::StartContainerOptions>)
             .await
             .unwrap_or_else(|e| panic!(
@@ -162,7 +162,7 @@ impl ContainerComponent {
             None => return,
         };
         let identifier = self.identifier.clone();
-        let docker = self.docker.clone();
+        let runtime_client = self.runtime_client.clone();
 
         tokio::spawn(async move {
             let options = LogsOptionsBuilder::default()
@@ -171,7 +171,7 @@ impl ContainerComponent {
                 .stderr(true)
                 .build();
 
-            let mut stream = docker.logs(&container_id, Some(options));
+            let mut stream = runtime_client.logs(&container_id, Some(options));
 
             while let Some(result) = stream.next().await {
                 match result {
@@ -254,7 +254,7 @@ impl ContainerComponent {
         let stop_options = StopContainerOptionsBuilder::default()
             .t(10)
             .build();
-        if let Err(e) = self.docker.stop_container(container_id, Some(stop_options)).await {
+        if let Err(e) = self.runtime_client.stop_container(container_id, Some(stop_options)).await {
             log::warn!(
                 "[Component-{}] error stopping container: {}",
                 self.identifier, e
@@ -264,7 +264,7 @@ impl ContainerComponent {
         let remove_options = RemoveContainerOptionsBuilder::default()
             .force(true)
             .build();
-        if let Err(e) = self.docker.remove_container(container_id, Some(remove_options)).await {
+        if let Err(e) = self.runtime_client.remove_container(container_id, Some(remove_options)).await {
             log::warn!(
                 "[Component-{}] error removing container: {}",
                 self.identifier, e
@@ -276,7 +276,7 @@ impl ContainerComponent {
 }
 
 #[async_trait]
-impl RunnableComponent for ContainerComponent {
+impl RunnableComponent for ContainerizedComponent {
     async fn start(&mut self) {
         for child in self.children.iter_mut().flatten() {
             child.start().await;

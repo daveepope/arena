@@ -25,6 +25,12 @@ Bazel build is used to build and runs tests in parallel and streams logs during 
 
 > Note: hosted GitHub macOS runners don't provide a Docker daemon, so CI's macOS leg skips the Docker-backed tests by passing `--test_tag_filters=-local`. Linux CI and local development (including macOS with Docker Desktop) run the full suite.
 
+## Agent instructions (AI / editors)
+
+- **`AGENTS.md` is the source of truth** for project agent rules (coding assistants, CI context, etc.).
+- **`CLAUDE.md`** and **`.cursor/rules/arena-agent.mdc`** are **generated** from it — do not edit them by hand.
+- After you change **`AGENTS.md`**, run **`bazel run //scripts:sync_agent_rules`**, then commit **`AGENTS.md`**, **`CLAUDE.md`**, and **`.cursor/rules/arena-agent.mdc`** together.
+
 ## Installation
 
 Build the project:

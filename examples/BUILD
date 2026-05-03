@@ -14,6 +14,15 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+filegroup(
+    name = "oauth_tls_resources",
+    srcs = [
+        "resources/oauth_tls_cert.pem",
+        "resources/oauth_tls_key.pem",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 rust_library(
     name = "arena_examples",
     srcs = glob(["src/**/*.rs"]),
@@ -23,8 +32,10 @@ rust_library(
         "//arena-kafka:arena_kafka",
         "//arena-postgres:arena_postgres",
         "//arena-mssql:arena_mssql",
+        "//arena-http:arena_http",
+        "//arena-oauth:arena_oauth",
         "//arena-executable-component:arena_executable_component",
-        "//arena-container-component:arena_container_component",
+        "//arena-containerized-component:arena_containerized_component",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
@@ -40,18 +51,21 @@ rust_binary(
         "//arena-kafka:arena_kafka",
         "//arena-postgres:arena_postgres",
         "//arena-mssql:arena_mssql",
+        "//arena-oauth:arena_oauth",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
 )
 
 rust_binary(
-    name = "arena-examples-bin",
-    srcs = ["src/example-arena-console/main.rs"],
+    name = "example-console",
+    srcs = ["src/example-console/main.rs"],
     compile_data = [
         "src/example-web-app/Dockerfile",
         "resources/instrument_reading_db_schema.sql",
         "resources/validation_db_schema.sql",
+        "resources/oauth_tls_cert.pem",
+        "resources/oauth_tls_key.pem",
     ],
     edition = "2021",
     deps = all_crate_deps(normal = True) + [
@@ -60,8 +74,9 @@ rust_binary(
         "//arena-kafka:arena_kafka",
         "//arena-postgres:arena_postgres",
         "//arena-mssql:arena_mssql",
+        "//arena-oauth:arena_oauth",
         "//arena-executable-component:arena_executable_component",
-        "//arena-container-component:arena_container_component",
+        "//arena-containerized-component:arena_containerized_component",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
 )
@@ -95,6 +110,8 @@ rust_test(
     compile_data = [
         "resources/instrument_reading_db_schema.sql",
         "resources/validation_db_schema.sql",
+        "resources/oauth_tls_cert.pem",
+        "resources/oauth_tls_key.pem",
     ],
     data = [":web-app"],
     deps = all_crate_deps(
@@ -107,8 +124,9 @@ rust_test(
         "//arena-kafka:arena_kafka",
         "//arena-postgres:arena_postgres",
         "//arena-mssql:arena_mssql",
+        "//arena-oauth:arena_oauth",
         "//arena-executable-component:arena_executable_component",
-        "//arena-container-component:arena_container_component",
+        "//arena-containerized-component:arena_containerized_component",
     ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,

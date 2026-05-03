@@ -7,7 +7,10 @@ from arena_pytest.arena import (
 )
 from arena_pytest.closed_arena import ClosedArena
 from arena_pytest.matches import Match, MatchBuilder
-from arena_pytest.container_component import ContainerComponent, ContainerComponentBuilder
+from arena_pytest.containerized_component import (
+    ContainerizedComponent,
+    ContainerizedComponentBuilder,
+)
 from arena_pytest.executable_component import (
     BuildTool,
     ExecutableComponent,
@@ -52,6 +55,12 @@ from arena_pytest.mssql import (
     MssqlDependencyBuilder,
     MssqlPlaybook,
 )
+from arena_pytest.oauth import (
+    DEFAULT_OAUTH_PORT,
+    OAUTH_ISSUER,
+    OauthDependency,
+    OauthDependencyBuilder,
+)
 from arena_pytest.playbook import active_playbooks, playbook
 from arena_pytest.postgres import PostgresDependency, PostgresDependencyBuilder
 from arena_pytest.readiness import (
@@ -65,8 +74,8 @@ __all__ = [
     "ArenaFfiError",
     "ArenaStatus",
     "ClosedArena",
-    "ContainerComponent",
-    "ContainerComponentBuilder",
+    "ContainerizedComponent",
+    "ContainerizedComponentBuilder",
     "Match",
     "MatchBuilder",
     "BuildTool",
@@ -103,6 +112,10 @@ __all__ = [
     "MssqlDependency",
     "MssqlDependencyBuilder",
     "MssqlPlaybook",
+    "DEFAULT_OAUTH_PORT",
+    "OAUTH_ISSUER",
+    "OauthDependency",
+    "OauthDependencyBuilder",
     "PostgresDependency",
     "PostgresDependencyBuilder",
     "DEFAULT_READINESS_TIMEOUT_MS",
