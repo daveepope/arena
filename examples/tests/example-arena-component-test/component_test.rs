@@ -42,15 +42,20 @@ const MSSQL_DB_PASS: &str = "yourStrong(!)Password";
 
 const NETWORK_NAME: &str = "arena-component-test-network";
 
-async fn fetch_example_access_token() -> String {
+async fn fetch_example_access_token_with_scope(scope: Option<&str>) -> String {
     let client = build_http_client_trusting_oauth_ca(OAUTH_TLS_CERT_PEM);
     arena_examples::oauth_client_credentials::fetch_client_credentials_access_token(
         &client,
         OAUTH_ISSUER,
-        None,
+        scope,
     )
     .await
     .expect("fetch client_credentials access token")
+}
+
+async fn fetch_example_access_token() -> String {
+    fetch_example_access_token_with_scope(Some("openid profile readings"))
+        .await
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -172,6 +177,7 @@ fn setup_exec_component() -> Component {
         .with_executable_path(binary)
         .with_env_var("RUST_LOG", "info")
         .with_env_var("OAUTH_TLS_CA_PEM", OAUTH_TLS_CERT_PEM)
+        .with_env_var("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
         .with_runtime_arg("web_app_port", EXEC_WEB_APP_PORT.to_string())
         .with_runtime_arg(
             "postgres_connection_string",
@@ -232,9 +238,6 @@ static SHARED_ARENA: OnceCell<OpenArena> = OnceCell::const_new();
 
 static SCENARIO_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
-/// One Tokio runtime for all component tests: `OpenArena` / OAuth spawn on the first test's
-/// runtime; `#[tokio::test]` drops that runtime between tests and tears down the OAuth server
-/// while `SHARED_ARENA` still holds the arena handle.
 static COMPONENT_TEST_RUNTIME: OnceLock<Runtime> = OnceLock::new();
 
 fn component_test_runtime() -> &'static Runtime {
@@ -485,5 +488,56 @@ fn example_using_exec_component_calibration_outage_returns_error() {
             .expect("recovered reading should be present");
         assert_eq!(found.user_name, "Recovery Test User");
         assert_eq!(found.value, 17);
+    });
+}
+
+#[test]
+fn example_using_exec_component_readings_returns_401_when_access_token_scopes_insufficient() {
+    component_test_runtime().block_on(async {
+        let _arena = shared_arena().await;
+        let _scenario = SCENARIO_LOCK.lock().await;
+
+        let token = fetch_example_access_token_with_scope(Some("openid profile"))
+            .await;
+        let url = format!("http://127.0.0.1:{}/readings", EXEC_WEB_APP_PORT);
+        let client = build_http_client_trusting_oauth_ca(OAUTH_TLS_CERT_PEM);
+        let response = client
+            .get(&url)
+            .bearer_auth(token)
+            .send()
+            .await
+            .expect("GET /readings send");
+
+        assert_eq!(
+            response.status().as_u16(),
+            401,
+            "GET /readings without required scope should be rejected"
+        );
+    });
+}
+
+#[test]
+fn example_using_exec_component_readings_returns_401_when_bearer_token_invalid() {
+    component_test_runtime().block_on(async {
+        let _arena = shared_arena().await;
+        let _scenario = SCENARIO_LOCK.lock().await;
+
+        let url = format!("http://127.0.0.1:{}/readings", EXEC_WEB_APP_PORT);
+        let client = build_http_client_trusting_oauth_ca(OAUTH_TLS_CERT_PEM);
+        let response = client
+            .get(&url)
+            .header(
+                reqwest::header::AUTHORIZATION,
+                "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature_not_from_issuer",
+            )
+            .send()
+            .await
+            .expect("GET /readings send");
+
+        assert_eq!(
+            response.status().as_u16(),
+            401,
+            "GET /readings with invalid JWT should be rejected"
+        );
     });
 }

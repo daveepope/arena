@@ -16,6 +16,7 @@ pub struct AppState {
     pub calibration_url: Arc<str>,
     pub mssql: Arc<Mutex<MssqlClient>>,
     pub jwt: Arc<JwksValidator>,
+    pub required_access_token_scopes: Arc<Vec<String>>,
 }
 
 pub fn build_http_client_trusting_oauth_ca(oauth_tls_ca_pem: &str) -> reqwest::Client {

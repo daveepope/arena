@@ -77,6 +77,19 @@ impl ExampleAxumWebApp {
                 .map_err(|e| format!("load JWKS from issuer {}: {e}", self.oauth_issuer_url))?,
         );
 
+        let required_access_token_scopes: Arc<Vec<String>> = std::env::var(
+            "OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES",
+        )
+        .ok()
+        .map(|raw| {
+            raw.split_whitespace()
+                .map(String::from)
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<String>>()
+        })
+        .unwrap_or_default()
+        .into();
+
         let state = AppState {
             pg: self.pg,
             kafka: self.kafka,
@@ -85,6 +98,7 @@ impl ExampleAxumWebApp {
             calibration_url: self.calibration_url,
             mssql: self.mssql,
             jwt,
+            required_access_token_scopes,
         };
 
         let app = build_router(state);

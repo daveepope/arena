@@ -122,7 +122,7 @@ py_test(
         "@pip//pytest_asyncio",
         "@pip//requests",
     ],
-    tags = ["local"],
+    tags = ["requires_docker"],
     python_version = "PY3",
     visibility = ["//visibility:public"],
 )

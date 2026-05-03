@@ -905,3 +905,85 @@ async fn http_dependency_expect_called_mismatch_panics_on_drop_component_test() 
         Err(p) => std::panic::resume_unwind(p),
     }
 }
+
+fn ephemeral_host_tcp_port() -> u16 {
+    std::net::TcpListener::bind("127.0.0.1:0")
+        .expect("bind ephemeral tcp port")
+        .local_addr()
+        .expect("local_addr")
+        .port()
+}
+
+fn stub_https_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .expect("reqwest client for https stub")
+}
+
+#[tokio::test]
+async fn http_dependency_https_listener_stub_roundtrip_component_test() {
+    init_test_logging();
+
+    let http_host_port = ephemeral_host_tcp_port();
+    let https_host_port = ephemeral_host_tcp_port();
+
+    let mut dep = HttpDependency::builder("https listener stub")
+        .with_port(http_host_port)
+        .https()
+        .listener_container_port(8443)
+        .host_port(https_host_port)
+        .done()
+        .build();
+
+    dep.start().await;
+
+    let https_origin = dep
+        .https_base_url()
+        .expect("https_base_url after start")
+        .to_string();
+    assert!(
+        https_origin.starts_with("https://"),
+        "expected https origin, got {https_origin}"
+    );
+
+    let http_origin = dep.base_url().expect("http base_url");
+    assert!(
+        http_origin.starts_with("http://"),
+        "expected http origin alongside https, got {http_origin}"
+    );
+
+    let admin_url = dep.admin_url().expect("admin_url");
+    assert!(
+        admin_url.starts_with("http://"),
+        "expected admin on http when http listener is enabled, got {admin_url}"
+    );
+
+    let pb = dep
+        .playbook()
+        .get("/api/https-stub-check")
+        .will_return(ok_json(json!({ "via_tls": true })))
+        .run()
+        .await;
+
+    let client = stub_https_client();
+    let resp = client
+        .get(format!("{https_origin}/api/https-stub-check"))
+        .send()
+        .await
+        .expect("GET over https");
+    assert!(
+        resp.status().is_success(),
+        "GET https status {}",
+        resp.status()
+    );
+    let text = resp.text().await.expect("response body");
+    let body: serde_json::Value =
+        serde_json::from_str(&text).unwrap_or_else(|e| panic!("response json: {e}; body: {text}"));
+    assert_eq!(body["via_tls"], true);
+
+    pb.verify(1, get_requested_for("/api/https-stub-check"))
+        .await;
+    drop(pb);
+    dep.stop().await;
+}

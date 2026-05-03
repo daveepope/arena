@@ -18,7 +18,7 @@ rust_test(
     srcs = ["tests/component_test.rs"],
     size = "small",
     edition = "2021",
-    tags = ["local"],
+    tags = ["requires_docker"],
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,

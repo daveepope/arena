@@ -96,7 +96,7 @@ py_test(
         "@pip//pytest",
         "@pip//pytest_asyncio",
     ],
-    tags = ["local"],
+    tags = ["requires_docker"],
     python_version = "PY3",
     visibility = ["//visibility:public"],
 )
@@ -106,7 +106,7 @@ rust_test(
     srcs = ["tests/example-arena-component-test/component_test.rs"],
     size = "small",
     edition = "2021",
-    tags = ["local"],
+    tags = ["requires_docker"],
     compile_data = [
         "resources/instrument_reading_db_schema.sql",
         "resources/validation_db_schema.sql",

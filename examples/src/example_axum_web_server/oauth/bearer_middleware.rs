@@ -4,6 +4,8 @@ use axum::http::{header, Request, StatusCode};
 use axum::middleware::Next;
 use axum::response::Response;
 
+use arena_oauth::ensure_scopes;
+
 use super::super::state::AppState;
 
 fn bearer_token(header_value: &str) -> Option<&str> {
@@ -44,6 +46,16 @@ pub async fn oauth_bearer_middleware(
         .jwt
         .verify_access_token(token)
         .map_err(|e| (StatusCode::UNAUTHORIZED, e))?;
+
+    if !state.required_access_token_scopes.is_empty() {
+        let need: Vec<&str> = state
+            .required_access_token_scopes
+            .iter()
+            .map(|s| s.as_str())
+            .collect();
+        ensure_scopes(&claims, &need)
+            .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
+    }
 
     req.extensions_mut().insert(claims.clone());
     Ok(next.run(req).await)
