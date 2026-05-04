@@ -1,4 +1,5 @@
 import os
+import tempfile
 
 import pytest
 
@@ -96,6 +97,25 @@ def _prepare_container_image_context() -> tuple[str, str]:
     return ctx, _RUNTIME_CONTAINERFILE
 
 
+_OAUTH_TLS_CERT_PEM: str | None = None
+_OAUTH_TLS_KEY_PEM: str | None = None
+_OAUTH_TLS_CA_FILE: str | None = None
+
+
+def _arena_oauth_tls_session() -> tuple[str, str, str]:
+    global _OAUTH_TLS_CERT_PEM, _OAUTH_TLS_KEY_PEM, _OAUTH_TLS_CA_FILE
+    if _OAUTH_TLS_CERT_PEM is None:
+        from arena_pytest import oauth_loopback_tls_pem_pair
+
+        cert, key = oauth_loopback_tls_pem_pair()
+        fd, path = tempfile.mkstemp(prefix="arena-pytest-oauth-ca-", suffix=".pem")
+        os.close(fd)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(cert)
+        _OAUTH_TLS_CERT_PEM, _OAUTH_TLS_KEY_PEM, _OAUTH_TLS_CA_FILE = cert, key, path
+    return _OAUTH_TLS_CERT_PEM, _OAUTH_TLS_KEY_PEM, _OAUTH_TLS_CA_FILE
+
+
 def _find_schema_path(filename: str = "instrument_reading_db_schema.sql") -> str:
     try:
         from bazel_tools.tools.python.runfiles import runfiles
@@ -132,37 +152,8 @@ def _find_web_app_binary() -> str:
     return os.path.join(root, "target", "release", "example-readings-axum-web-app")
 
 
-def _read_oauth_tls_pem_pair() -> tuple[str, str]:
-    anchor = _find_schema_path("instrument_reading_db_schema.sql")
-    if not anchor:
-        return "", ""
-    d = os.path.dirname(anchor)
-    cert_p = os.path.join(d, "oauth_tls_cert.pem")
-    key_p = os.path.join(d, "oauth_tls_key.pem")
-    if not (os.path.isfile(cert_p) and os.path.isfile(key_p)):
-        return "", ""
-    with open(cert_p, encoding="utf-8") as f:
-        cert = f.read()
-    with open(key_p, encoding="utf-8") as f:
-        key = f.read()
-    return cert, key
-
-
-def _oauth_tls_ca_path() -> str:
-    anchor = _find_schema_path("instrument_reading_db_schema.sql")
-    if not anchor:
-        return ""
-    p = os.path.join(os.path.dirname(anchor), "oauth_tls_cert.pem")
-    return p if os.path.isfile(p) else ""
-
-
 def _build_oauth():
-    cert, key = _read_oauth_tls_pem_pair()
-    if not cert or not key:
-        raise FileNotFoundError(
-            "examples/resources/oauth_tls_cert.pem and oauth_tls_key.pem are required "
-            "for arena-pytest (readings axum sample validates JWTs against JWKS)."
-        )
+    cert, key, _ = _arena_oauth_tls_session()
     return (
         OauthDependencyBuilder("pytest oauth")
         .with_port(DEFAULT_OAUTH_PORT)
@@ -344,12 +335,8 @@ def mssql_identifier() -> str:
 def closed_arena() -> ClosedArena:
     global _CALIBRATION_IDENTIFIER, _MSSQL_IDENTIFIER, _DOCKER_WEB_ENABLED
 
-    oauth_ca_pem, _oauth_key_pem = _read_oauth_tls_pem_pair()
-    if not oauth_ca_pem:
-        pytest.fail(
-            "Missing examples/resources/oauth_tls_cert.pem (and oauth_tls_key.pem). "
-            "They are required for the readings axum sample OAuth stack when running pytest with Arena fixtures."
-        )
+    oauth_ca_pem, _, _ = _arena_oauth_tls_session()
+
     oauth = _build_oauth()
 
     schema_path = _find_schema_path()
@@ -393,9 +380,7 @@ def closed_arena() -> ClosedArena:
 def oauth_access_token(arena) -> str:
     import requests
 
-    ca = _oauth_tls_ca_path()
-    if not ca:
-        pytest.fail("oauth TLS CA file missing (examples/resources/oauth_tls_cert.pem)")
+    _, _, ca = _arena_oauth_tls_session()
     s = requests.Session()
     s.verify = ca
     issuer = OAUTH_ISSUER

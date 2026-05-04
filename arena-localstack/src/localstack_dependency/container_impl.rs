@@ -100,7 +100,10 @@ impl LocalstackImpl for LocalstackContainerImpl {
             .with_tag(image_tag)
             .with_mapped_port(port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)
-            .with_container_name(container_name);
+            .with_container_name(container_name)
+            .with_env_var("LS_LOG", "error")
+            .with_env_var("DEBUG", "0")
+            .with_env_var("PERSISTENCE", "0");
 
         if !services.is_empty() {
             request = request.with_env_var("SERVICES", services.join(","));

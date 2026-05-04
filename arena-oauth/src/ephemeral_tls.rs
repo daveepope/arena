@@ -1,6 +1,6 @@
 use rcgen::{CertificateParams, KeyPair};
 
-pub(crate) fn localhost_self_signed_certificate_and_key() -> Result<(String, String), String> {
+pub fn localhost_self_signed_pem_pair() -> Result<(String, String), String> {
     let key_pair = KeyPair::generate_for(&rcgen::PKCS_ECDSA_P256_SHA256)
         .map_err(|e: rcgen::Error| e.to_string())?;
     let params = CertificateParams::new(vec![

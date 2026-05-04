@@ -17,8 +17,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-const OAUTH_TLS_CERT_PEM: &str = include_str!("../../resources/oauth_tls_cert.pem");
-const OAUTH_TLS_KEY_PEM: &str = include_str!("../../resources/oauth_tls_key.pem");
 const OAUTH_PORT: u16 = 9443;
 const OAUTH_ISSUER_FOR_WEB_CONTAINER: &str = "https://host.docker.internal:9443";
 
@@ -39,7 +37,7 @@ const POSTGRES_CONTAINER_NAME: &str = "arena-example-postgres";
 const KAFKA_CONTAINER_NAME: &str = "arena-example-kafka";
 const MSSQL_CONTAINER_NAME: &str = "arena-example-mssql";
 
-async fn setup_arena_components() -> Vec<Component> {
+async fn setup_arena_components(oauth_ca_pem: &str) -> Vec<Component> {
     let containerfile = include_str!("../example_readings_axum_web_app/web_server/Dockerfile");
 
     let web_app = ContainerizedComponent::builder("example web app", containerfile)
@@ -48,7 +46,7 @@ async fn setup_arena_components() -> Vec<Component> {
         .with_port_mapping(WEB_APP_PORT, 3000)
         .with_host_mapping("host.docker.internal:host-gateway")
         .with_env_var("RUST_LOG", "debug")
-        .with_env_var("OAUTH_TLS_CA_PEM", OAUTH_TLS_CERT_PEM)
+        .with_env_var("OAUTH_TLS_CA_PEM", oauth_ca_pem)
         .with_runtime_arg("web_app_port", "3000")
         .with_runtime_arg(
             "postgres_connection_string",
@@ -84,15 +82,26 @@ async fn setup_arena_components() -> Vec<Component> {
     vec![Box::new(web_app)]
 }
 
+fn console_executable_oauth_tls_ca_pem() -> String {
+    OauthDependency::builder("example console executable tls snapshot")
+        .with_ephemeral_server_tls()
+        .with_port(0)
+        .build()
+        .server_tls_certificate_pem()
+        .expect("oauth server tls cert")
+        .to_string()
+}
+
 #[allow(dead_code)]
 fn setup_executable_arena_components() -> Vec<Component> {
+    let oauth_ca_pem = console_executable_oauth_tls_ca_pem();
     vec![Box::new(
         ExecutableComponent::builder("example web app")
             .with_source_path("examples")
             .with_build_tool(arena_executable_component::BuildTool::Cargo)
             .with_executable_path("target/release/example-readings-axum-web-app")
             .with_env_var("RUST_LOG", "debug")
-            .with_env_var("OAUTH_TLS_CA_PEM", OAUTH_TLS_CERT_PEM)
+            .with_env_var("OAUTH_TLS_CA_PEM", oauth_ca_pem)
             .with_runtime_arg("web_app_port", WEB_APP_PORT.to_string())
             .with_runtime_arg(
                 "postgres_connection_string",
@@ -115,7 +124,7 @@ fn setup_executable_arena_components() -> Vec<Component> {
     )]
 }
 
-fn setup_arena_dependencies() -> (Vec<Dependency>, String) {
+fn setup_arena_dependencies() -> (Vec<Dependency>, String, String) {
     let startup_sql_scripts =
         vec![include_str!("../../resources/instrument_reading_db_schema.sql").to_string()];
 
@@ -152,10 +161,14 @@ fn setup_arena_dependencies() -> (Vec<Dependency>, String) {
         .build();
 
     let oauth = OauthDependency::builder("example oauth")
-        .with_server_tls_pem(OAUTH_TLS_CERT_PEM, OAUTH_TLS_KEY_PEM)
+        .with_ephemeral_server_tls()
         .with_listen_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
         .with_port(OAUTH_PORT)
         .build();
+    let oauth_ca_pem = oauth
+        .server_tls_certificate_pem()
+        .expect("oauth server tls cert")
+        .to_string();
 
     let deps: Vec<Dependency> = vec![
         Box::new(postgres_db),
@@ -163,7 +176,7 @@ fn setup_arena_dependencies() -> (Vec<Dependency>, String) {
         Box::new(mssql),
         Box::new(oauth),
     ];
-    (deps, kafka_id)
+    (deps, kafka_id, oauth_ca_pem)
 }
 
 async fn create_kafka_topic(bootstrap: &str, topic: &str) {
@@ -278,8 +291,8 @@ async fn main() {
     )
     .init();
 
-    let (dependencies, kafka_id) = setup_arena_dependencies();
-    let components = setup_arena_components().await;
+    let (dependencies, kafka_id, oauth_ca_pem) = setup_arena_dependencies();
+    let components = setup_arena_components(&oauth_ca_pem).await;
     let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new(Match::new(
         "End to end happy path match",
         dependencies,

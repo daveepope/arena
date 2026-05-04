@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use crate::arena::{
     readings_axum_component_runtime, shared_arena, CALIBRATION_ID, EXEC_WEB_APP_PORT, KAFKA_ID,
-    MSSQL_ID, OAUTH_ID, OAUTH_TLS_CERT_PEM, SCENARIO_LOCK,
+    MSSQL_ID, OAUTH_ID, SCENARIO_LOCK, oauth_server_tls_cert_pem,
 };
 use crate::http::{
     consume_reading_created_event, create_reading, fetch_example_access_token,
@@ -121,7 +121,7 @@ fn readings_axum_exec_calibration_outage_returns_error() {
 
             let token = fetch_example_access_token().await;
             let url = format!("http://127.0.0.1:{}/readings", EXEC_WEB_APP_PORT);
-            let client = build_http_client_trusting_oauth_ca(OAUTH_TLS_CERT_PEM);
+            let client = build_http_client_trusting_oauth_ca(oauth_server_tls_cert_pem());
             let response = client
                 .post(&url)
                 .bearer_auth(token)
@@ -168,7 +168,7 @@ fn readings_axum_exec_readings_returns_401_when_access_token_scopes_insufficient
         let token = fetch_example_access_token_with_scope(Some("openid profile"))
             .await;
         let url = format!("http://127.0.0.1:{}/readings", EXEC_WEB_APP_PORT);
-        let client = build_http_client_trusting_oauth_ca(OAUTH_TLS_CERT_PEM);
+        let client = build_http_client_trusting_oauth_ca(oauth_server_tls_cert_pem());
         let response = client
             .get(&url)
             .bearer_auth(token)
@@ -191,7 +191,7 @@ fn readings_axum_exec_readings_returns_401_when_bearer_token_invalid() {
         let _scenario = SCENARIO_LOCK.lock().await;
 
         let url = format!("http://127.0.0.1:{}/readings", EXEC_WEB_APP_PORT);
-        let client = build_http_client_trusting_oauth_ca(OAUTH_TLS_CERT_PEM);
+        let client = build_http_client_trusting_oauth_ca(oauth_server_tls_cert_pem());
         let response = client
             .get(&url)
             .header(

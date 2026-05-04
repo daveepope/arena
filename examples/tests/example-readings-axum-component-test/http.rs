@@ -5,7 +5,7 @@ use rdkafka::message::Message;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
-use crate::arena::{OAUTH_ISSUER, OAUTH_TLS_CERT_PEM};
+use crate::arena::{oauth_server_tls_cert_pem, OAUTH_ISSUER};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Reading {
@@ -38,7 +38,7 @@ pub struct ReadingCreatedEvent {
 }
 
 pub async fn fetch_example_access_token_with_scope(scope: Option<&str>) -> String {
-    let client = build_http_client_trusting_oauth_ca(OAUTH_TLS_CERT_PEM);
+    let client = build_http_client_trusting_oauth_ca(oauth_server_tls_cert_pem());
     arena_examples::oauth_client_credentials::fetch_client_credentials_access_token(
         &client,
         OAUTH_ISSUER,
@@ -56,7 +56,7 @@ pub async fn fetch_example_access_token() -> String {
 pub async fn get_readings(port: u16) -> Vec<Reading> {
     let token = fetch_example_access_token().await;
     let url = format!("http://127.0.0.1:{}/readings", port);
-    let response = build_http_client_trusting_oauth_ca(OAUTH_TLS_CERT_PEM)
+    let response = build_http_client_trusting_oauth_ca(oauth_server_tls_cert_pem())
         .get(&url)
         .bearer_auth(token)
         .send()
@@ -124,7 +124,7 @@ pub async fn create_reading(port: u16, user_name: &str, value: i32, comment: Opt
         comment,
     };
 
-    let client = build_http_client_trusting_oauth_ca(OAUTH_TLS_CERT_PEM);
+    let client = build_http_client_trusting_oauth_ca(oauth_server_tls_cert_pem());
     let response = client
         .post(&url)
         .bearer_auth(token)

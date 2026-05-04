@@ -15,15 +15,6 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-filegroup(
-    name = "oauth_tls_resources",
-    srcs = [
-        "resources/oauth_tls_cert.pem",
-        "resources/oauth_tls_key.pem",
-    ],
-    visibility = ["//visibility:public"],
-)
-
 exports_files(
     ["requirements.txt", "requirements_lock.txt"],
     visibility = ["//visibility:public"],
@@ -114,8 +105,6 @@ rust_binary(
         "src/example_readings_axum_web_app/web_server/Dockerfile",
         "resources/instrument_reading_db_schema.sql",
         "resources/validation_db_schema.sql",
-        "resources/oauth_tls_cert.pem",
-        "resources/oauth_tls_key.pem",
     ],
     edition = "2021",
     deps = all_crate_deps(normal = True) + [
@@ -164,7 +153,6 @@ py_test(
         "//arena-ffi:arena_ffi_shared",
         "//examples:example-readings-fastapi-web-app",
         "//examples:instrument_reading_db_schema",
-        "//examples:oauth_tls_resources",
         "//examples:validation_db_schema",
     ],
     deps = [
@@ -189,8 +177,6 @@ rust_test(
     compile_data = [
         "resources/instrument_reading_db_schema.sql",
         "resources/validation_db_schema.sql",
-        "resources/oauth_tls_cert.pem",
-        "resources/oauth_tls_key.pem",
     ],
     data = [":example-readings-axum-web-app"],
     deps = all_crate_deps(

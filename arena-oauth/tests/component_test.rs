@@ -9,7 +9,12 @@ fn init_test_logging() {
 }
 
 async fn start_oauth_https_default() -> OauthDependency {
-    let mut dep = OauthDependency::builder("oauth https flow").build();
+    let dep = OauthDependency::builder("oauth https flow").build();
+    assert!(
+        dep.server_tls_certificate_pem().is_some(),
+        "ephemeral oauth should expose server TLS certificate PEM before start"
+    );
+    let mut dep = dep;
     dep.start().await;
     dep
 }

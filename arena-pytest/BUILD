@@ -119,7 +119,6 @@ py_test(
     data = [
         "//arena-ffi:arena_ffi_shared",
         "//examples:instrument_reading_db_schema",
-        "//examples:oauth_tls_resources",
         "//examples:validation_db_schema",
         "//examples:example-readings-axum-web-app",
     ],

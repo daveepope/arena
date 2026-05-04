@@ -141,6 +141,9 @@ def load_ffi() -> Optional[ArenaFfi]:
     lib.arena_free_string.argtypes = [ctypes.c_void_p]
     lib.arena_free_string.restype = None
 
+    lib.arena_oauth_loopback_tls_pem_json.argtypes = [ctypes.POINTER(ctypes.c_void_p)]
+    lib.arena_oauth_loopback_tls_pem_json.restype = ctypes.c_void_p
+
     lib.arena_http_playbook_open.argtypes = [
         ctypes.c_void_p,
         ctypes.c_char_p,

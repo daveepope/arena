@@ -1,6 +1,9 @@
 mod builder;
 mod discovery;
 mod ephemeral_tls;
+pub use crate::ephemeral_tls::localhost_self_signed_pem_pair;
+mod loopback_tls_json;
+pub use crate::loopback_tls_json::loopback_tls_pem_json_document;
 mod keys;
 mod oauth_common;
 mod oauth_dependency;

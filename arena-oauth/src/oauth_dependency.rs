@@ -23,7 +23,6 @@ pub struct OauthDependency {
     keys: RsaKeyPair,
     scopes_supported: Vec<String>,
     token_ttl_secs: u64,
-    tls_plan: OauthTlsPlan,
     active_server_tls: Option<(String, String)>,
     metadata_base_url: Option<String>,
     oauth_server: OauthServer,
@@ -44,7 +43,14 @@ impl OauthDependency {
             OauthTlsPlan::CustomPem { cert_pem, key_pem } => {
                 Some((cert_pem.clone(), key_pem.clone()))
             }
-            _ => None,
+            OauthTlsPlan::EphemeralOnStart => Some(
+                ephemeral_tls::localhost_self_signed_pem_pair().unwrap_or_else(|e| {
+                    panic!(
+                        "[Oauth-{}] ephemeral TLS certificate generation failed: {e}",
+                        identifier
+                    )
+                }),
+            ),
         };
         Self {
             identifier,
@@ -54,7 +60,6 @@ impl OauthDependency {
             keys,
             scopes_supported,
             token_ttl_secs,
-            tls_plan,
             active_server_tls,
             metadata_base_url,
             oauth_server: OauthServer::default(),
@@ -83,26 +88,9 @@ impl OauthDependency {
     }
 
     fn tls_pair_for_listen(&mut self) -> (String, String) {
-        match &self.tls_plan {
-            OauthTlsPlan::EphemeralOnStart => {
-                if self.active_server_tls.is_none() {
-                    self.active_server_tls = Some(
-                        ephemeral_tls::localhost_self_signed_certificate_and_key()
-                            .unwrap_or_else(|e| {
-                                panic!(
-                                    "[Oauth-{}] ephemeral TLS certificate generation failed: {e}",
-                                    self.identifier
-                                )
-                            }),
-                    );
-                }
-                self.active_server_tls.clone().expect("ephemeral tls material")
-            }
-            OauthTlsPlan::CustomPem { .. } => self
-                .active_server_tls
-                .clone()
-                .expect("custom TLS material set in new()"),
-        }
+        self.active_server_tls
+            .clone()
+            .expect("server TLS material")
     }
 }
 

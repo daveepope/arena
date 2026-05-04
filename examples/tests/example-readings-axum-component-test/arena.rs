@@ -17,10 +17,17 @@ pub static CALIBRATION_ID: OnceLock<String> = OnceLock::new();
 pub static MSSQL_ID: OnceLock<String> = OnceLock::new();
 pub static OAUTH_ID: OnceLock<String> = OnceLock::new();
 
+static OAUTH_SERVER_TLS_CERT_PEM: OnceLock<String> = OnceLock::new();
+
 pub const OAUTH_PORT: u16 = 9443;
 pub const OAUTH_ISSUER: &str = "https://127.0.0.1:9443";
-pub const OAUTH_TLS_CERT_PEM: &str = include_str!("../../resources/oauth_tls_cert.pem");
-const OAUTH_TLS_KEY_PEM: &str = include_str!("../../resources/oauth_tls_key.pem");
+
+pub fn oauth_server_tls_cert_pem() -> &'static str {
+    OAUTH_SERVER_TLS_CERT_PEM
+        .get()
+        .map(|s| s.as_str())
+        .expect("oauth_server_tls_cert_pem: arena dependencies not initialized")
+}
 
 pub const POSTGRES_PORT: u16 = 5555;
 pub const POSTGRES_DB_NAME: &str = "readings_db";
@@ -92,10 +99,18 @@ pub fn setup_dependencies() -> Vec<Dependency> {
         .expect("mssql id set once");
 
     let oauth = OauthDependency::builder("component test oauth")
-        .with_server_tls_pem(OAUTH_TLS_CERT_PEM, OAUTH_TLS_KEY_PEM)
+        .with_ephemeral_server_tls()
         .with_listen_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
         .with_port(OAUTH_PORT)
         .build();
+    OAUTH_SERVER_TLS_CERT_PEM
+        .set(
+            oauth
+                .server_tls_certificate_pem()
+                .expect("oauth server tls cert")
+                .to_string(),
+        )
+        .expect("oauth server tls cert set once");
     OAUTH_ID
         .set(oauth.identifier.clone())
         .expect("oauth id set once");
@@ -124,7 +139,7 @@ pub fn setup_exec_component() -> Component {
     let mut builder = ExecutableComponent::builder("example web app")
         .with_executable_path(binary)
         .with_env_var("RUST_LOG", "info")
-        .with_env_var("OAUTH_TLS_CA_PEM", OAUTH_TLS_CERT_PEM)
+        .with_env_var("OAUTH_TLS_CA_PEM", oauth_server_tls_cert_pem())
         .with_env_var("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
         .with_runtime_arg("web_app_port", EXEC_WEB_APP_PORT.to_string())
         .with_runtime_arg(

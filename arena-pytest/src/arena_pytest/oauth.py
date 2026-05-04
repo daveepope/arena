@@ -1,3 +1,5 @@
+import ctypes
+import json
 import os
 from typing import Any, Dict
 from urllib.parse import urlparse
@@ -57,3 +59,29 @@ class OauthDependency:
 
     def _for_ffi(self) -> Dict[str, Any]:
         return dict(self._config)
+
+
+def oauth_loopback_tls_pem_pair() -> tuple[str, str]:
+    from arena_pytest._ffi import ArenaFfiError, load_ffi, _take_err
+
+    ffi = load_ffi()
+    if ffi is None:
+        raise RuntimeError(
+            "arena_ffi shared library not found (required for oauth_loopback_tls_pem_pair)"
+        )
+    err = ctypes.c_void_p()
+    raw = ffi.lib.arena_oauth_loopback_tls_pem_json(ctypes.byref(err))
+    if not raw:
+        msg = _take_err(err, ffi) or "arena_oauth_loopback_tls_pem_json returned null"
+        raise ArenaFfiError(msg)
+    try:
+        payload = json.loads(ctypes.string_at(raw).decode("utf-8"))
+    finally:
+        ffi.lib.arena_free_string(raw)
+    cert = payload.get("certificate_pem")
+    key = payload.get("private_key_pem")
+    if not isinstance(cert, str) or not isinstance(key, str):
+        raise ArenaFfiError(
+            "arena_oauth_loopback_tls_pem_json: missing certificate_pem or private_key_pem"
+        )
+    return cert, key

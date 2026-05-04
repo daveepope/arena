@@ -27,6 +27,7 @@ from arena_pytest import (
     OauthDependencyBuilder,
     PostgresDependencyBuilder,
     SqsQueueTarget,
+    oauth_loopback_tls_pem_pair,
 )
 
 WEB_APP_PORT = 3010
@@ -77,30 +78,6 @@ def _find_resource_file(filename: str) -> str:
         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     )
     p = os.path.join(root, "resources", filename)
-    return p if os.path.isfile(p) else ""
-
-
-def _read_oauth_tls_pem_pair() -> tuple[str, str]:
-    anchor = _find_resource_file("instrument_reading_db_schema.sql")
-    if not anchor:
-        return "", ""
-    d = os.path.dirname(anchor)
-    cert_p = os.path.join(d, "oauth_tls_cert.pem")
-    key_p = os.path.join(d, "oauth_tls_key.pem")
-    if not (os.path.isfile(cert_p) and os.path.isfile(key_p)):
-        return "", ""
-    with open(cert_p, encoding="utf-8") as f:
-        cert = f.read()
-    with open(key_p, encoding="utf-8") as f:
-        key = f.read()
-    return cert, key
-
-
-def _oauth_tls_ca_path() -> str:
-    anchor = _find_resource_file("instrument_reading_db_schema.sql")
-    if not anchor:
-        return ""
-    p = os.path.join(os.path.dirname(anchor), "oauth_tls_cert.pem")
     return p if os.path.isfile(p) else ""
 
 
@@ -189,14 +166,7 @@ class ReadingsFastapiCtx:
 @pytest_asyncio.fixture(scope="session")
 async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
     pytest.importorskip("boto3")
-    cert, key = _read_oauth_tls_pem_pair()
-    if not cert or not key:
-        pytest.fail(
-            "examples/resources/oauth_tls_cert.pem and oauth_tls_key.pem are required"
-        )
-    ca_path = _oauth_tls_ca_path()
-    if not ca_path:
-        pytest.fail("examples/resources/oauth_tls_cert.pem missing")
+    cert, key = oauth_loopback_tls_pem_pair()
 
     fd, oauth_ca_file = tempfile.mkstemp(prefix="fastapi-oauth-", suffix=".pem")
     os.close(fd)
@@ -339,10 +309,10 @@ async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
     closed = ClosedArena("FastAPI readings component arena", [a_match])
     arena = await closed.open()
     try:
-        token = _fetch_access_token(ca_path, OAUTH_ISSUER)
+        token = _fetch_access_token(oauth_ca_file, OAUTH_ISSUER)
         yield ReadingsFastapiCtx(
             arena=arena,
-            oauth_ca_path=ca_path,
+            oauth_ca_path=oauth_ca_file,
             access_token=token,
             web_base=f"http://127.0.0.1:{WEB_APP_PORT}",
             localstack_endpoint=ls_ep,

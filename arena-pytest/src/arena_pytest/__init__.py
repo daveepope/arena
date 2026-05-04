@@ -60,6 +60,7 @@ from arena_pytest.oauth import (
     OAUTH_ISSUER,
     OauthDependency,
     OauthDependencyBuilder,
+    oauth_loopback_tls_pem_pair,
 )
 from arena_pytest.playbook import active_playbooks, playbook
 from arena_pytest.postgres import PostgresDependency, PostgresDependencyBuilder
@@ -116,6 +117,7 @@ __all__ = [
     "OAUTH_ISSUER",
     "OauthDependency",
     "OauthDependencyBuilder",
+    "oauth_loopback_tls_pem_pair",
     "PostgresDependency",
     "PostgresDependencyBuilder",
     "DEFAULT_READINESS_TIMEOUT_MS",
