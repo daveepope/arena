@@ -164,9 +164,9 @@ mod tests {
     }
 
     fn create_and_setup_stub_match() -> MockMatch {
-        let mut mock_match = MockMatch::new();
-        mock_match.expect_start().times(1).returning(|| ());
-        mock_match.expect_stop().times(1).returning(|| ());
-        mock_match
+        let mut stub_match = MockMatch::new();
+        stub_match.expect_start().times(1).returning(|| ());
+        stub_match.expect_stop().times(1).returning(|| ());
+        stub_match
     }
 }

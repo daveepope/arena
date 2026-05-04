@@ -3,7 +3,7 @@ name = "arena-http"
 version.workspace = true
 edition = "2021"
 authors = ["David Pope"]
-description = "Arena HTTP mock (WireMock) implementation"
+description = "Arena HTTP dependency for sandboxed environments"
 license = "todo"
 
 [dependencies]

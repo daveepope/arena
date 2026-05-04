@@ -1,6 +1,7 @@
 mod healthcheck;
 pub(crate) mod container_impl;
 
+use crate::admin_client::admin_api_client;
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
@@ -14,6 +15,9 @@ pub trait HttpImpl: Send + Sync {
     async fn stop(&mut self);
     fn base_url(&self) -> Option<&str>;
     fn admin_url(&self) -> Option<String>;
+    fn https_base_url(&self) -> Option<&str> {
+        None
+    }
 }
 
 
@@ -26,11 +30,13 @@ pub struct HttpDependency {
     image_name: String,
     image_tag: String,
     container_name: Option<String>,
+    trusted_tls_certificate_pem: Option<String>,
     readiness_check: Box<dyn ReadinessCheck>,
 }
 
 impl HttpDependency {
-    pub fn new(
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new(
         identifier: String,
         http_impl: Box<dyn HttpImpl>,
         port: u16,
@@ -38,7 +44,11 @@ impl HttpDependency {
         image_name: String,
         image_tag: String,
         container_name: Option<String>,
+        trusted_tls_certificate_pem: Option<String>,
     ) -> Self {
+        let readiness_check: Box<dyn ReadinessCheck> = Box::new(
+            DefaultHttpReadinessCheck::new(trusted_tls_certificate_pem.clone()),
+        );
         Self {
             identifier,
             http_impl,
@@ -47,8 +57,9 @@ impl HttpDependency {
             image_name,
             image_tag,
             container_name,
+            trusted_tls_certificate_pem,
             running: false,
-            readiness_check: Box::new(DefaultHttpReadinessCheck),
+            readiness_check,
         }
     }
 
@@ -58,6 +69,14 @@ impl HttpDependency {
 
     pub fn admin_url(&self) -> Option<String> {
         self.http_impl.admin_url()
+    }
+
+    pub fn https_base_url(&self) -> Option<&str> {
+        self.http_impl.https_base_url()
+    }
+
+    pub fn trusted_certificate_pem(&self) -> Option<&str> {
+        self.trusted_tls_certificate_pem.as_deref()
     }
 
     pub fn builder(identifier: impl Into<String>) -> HttpDependencyBuilder {
@@ -80,7 +99,10 @@ impl HttpDependency {
             self.identifier
         );
 
-        let client = reqwest::Client::new();
+        let client = admin_api_client(
+            &admin_url,
+            self.trusted_tls_certificate_pem.as_deref(),
+        );
         let response = client
             .delete(format!("{admin_url}/requests"))
             .send()
@@ -246,7 +268,10 @@ impl RunnableDependency for HttpDependency {
 
         log::info!("[Http-{}] soft reset: resetting mappings and request journal", self.identifier);
 
-        let client = reqwest::Client::new();
+        let client = admin_api_client(
+            &admin_url,
+            self.trusted_tls_certificate_pem.as_deref(),
+        );
         client
             .post(format!("{admin_url}/reset"))
             .send()

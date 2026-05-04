@@ -4,6 +4,7 @@ pub mod stub;
 pub mod verify;
 
 use crate::http_dependency::HttpDependency;
+use crate::admin_client::admin_api_client;
 use header_pattern::HeaderPattern;
 use response::ResponseDefinition;
 use serde::Deserialize;
@@ -72,6 +73,7 @@ impl Expectation {
 pub struct Playbook {
     identifier: String,
     admin_url: String,
+    trusted_tls_certificate_pem: Option<String>,
     mappings: Vec<StubMapping>,
     expectations: Vec<Expectation>,
 }
@@ -84,6 +86,9 @@ impl Playbook {
         Self {
             identifier: format!("http-playbook:{}", dependency.identifier),
             admin_url,
+            trusted_tls_certificate_pem: dependency
+                .trusted_certificate_pem()
+                .map(str::to_string),
             mappings: Vec::new(),
             expectations: Vec::new(),
         }
@@ -111,7 +116,10 @@ impl Playbook {
     }
 
     pub async fn run(self) -> ActivePlaybook {
-        let client = reqwest::Client::new();
+        let client = admin_api_client(
+            &self.admin_url,
+            self.trusted_tls_certificate_pem.as_deref(),
+        );
         let mappings_url = format!("{}/mappings", self.admin_url);
 
         let mut registered: Vec<RegisteredMapping> = Vec::with_capacity(self.mappings.len());
@@ -155,6 +163,7 @@ impl Playbook {
         ActivePlaybook {
             identifier: self.identifier,
             admin_url: self.admin_url,
+            trusted_tls_certificate_pem: self.trusted_tls_certificate_pem,
             registered,
             expectations: self.expectations,
         }
@@ -164,6 +173,7 @@ impl Playbook {
 pub struct ActivePlaybook {
     identifier: String,
     admin_url: String,
+    trusted_tls_certificate_pem: Option<String>,
     registered: Vec<RegisteredMapping>,
     expectations: Vec<Expectation>,
 }
@@ -187,8 +197,8 @@ impl ActivePlaybook {
     fn owns(&self, criteria: &RequestCriteria) -> bool {
         let (method, path) = criteria.method_and_path();
         self.registered.iter().any(|r| {
-            (method.is_none() || method.as_deref() == Some(r.method.as_str()))
-                && (path.is_none() || path.as_deref() == Some(r.url_path.as_str()))
+            (method.is_none() || method == Some(r.method.as_str()))
+                && (path.is_none() || path == Some(r.url_path.as_str()))
         })
     }
 
@@ -199,7 +209,10 @@ impl ActivePlaybook {
     pub async fn verify(&self, expected_count: u64, criteria: RequestCriteria) {
         let actual = self.scoped_count(&criteria).await;
         if actual != expected_count {
-            let client = reqwest::Client::new();
+            let client = admin_api_client(
+                &self.admin_url,
+                self.trusted_tls_certificate_pem.as_deref(),
+            );
             let all = self.fetch_all_requests(&client).await;
             panic!(
                 "\n\nPlaybook verification failed for: {criteria}\n\
@@ -213,7 +226,10 @@ impl ActivePlaybook {
     pub async fn verify_at_least(&self, minimum: u64, criteria: RequestCriteria) {
         let actual = self.scoped_count(&criteria).await;
         if actual < minimum {
-            let client = reqwest::Client::new();
+            let client = admin_api_client(
+                &self.admin_url,
+                self.trusted_tls_certificate_pem.as_deref(),
+            );
             let all = self.fetch_all_requests(&client).await;
             panic!(
                 "\n\nPlaybook verification failed for: {criteria}\n\
@@ -235,7 +251,10 @@ impl ActivePlaybook {
             self.panic_not_owned(&criteria);
         }
 
-        let client = reqwest::Client::new();
+        let client = admin_api_client(
+            &self.admin_url,
+            self.trusted_tls_certificate_pem.as_deref(),
+        );
         let events = self.fetch_scope_events(&client).await;
         let matched: Vec<&ServeEvent> = events
             .iter()
@@ -256,7 +275,10 @@ impl ActivePlaybook {
             self.panic_not_owned(criteria);
         }
 
-        let client = reqwest::Client::new();
+        let client = admin_api_client(
+            &self.admin_url,
+            self.trusted_tls_certificate_pem.as_deref(),
+        );
         let events = self.fetch_scope_events(&client).await;
         events
             .iter()
@@ -386,6 +408,7 @@ impl Drop for ActivePlaybook {
         }
 
         let admin_url = self.admin_url.clone();
+        let trusted_tls_certificate_pem = self.trusted_tls_certificate_pem.clone();
         let mapping_ids: Vec<String> = registered.iter().map(|r| r.id.clone()).collect();
 
         let handle = std::thread::spawn(move || -> Result<(), String> {
@@ -400,7 +423,10 @@ impl Drop for ActivePlaybook {
                 }
             };
             rt.block_on(async move {
-                let client = reqwest::Client::new();
+                let client = admin_api_client(
+                    &admin_url,
+                    trusted_tls_certificate_pem.as_deref(),
+                );
 
                 let verify_result = if already_unwinding || expectations.is_empty() {
                     Ok(())

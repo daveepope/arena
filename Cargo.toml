@@ -7,9 +7,10 @@ members = [
     "arena-kafka",
     "arena-localstack",
     "arena-http",
+    "arena-oauth",
     "arena-executable-component",
     "arena-container",
-    "arena-container-component",
+    "arena-containerized-component",
     "arena-ffi",
     "examples"
 ]
@@ -25,11 +26,13 @@ arena-postgres = { path = "arena-postgres" }
 arena-mssql = { path = "arena-mssql" }
 arena-executable-component = { path = "arena-executable-component" }
 arena-http = { path = "arena-http" }
+arena-oauth = { path = "arena-oauth" }
 arena-container = { path = "arena-container" }
-arena-container-component = { path = "arena-container-component" }
+arena-containerized-component = { path = "arena-containerized-component" }
 axum = "0.8.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+serde_urlencoded = "0.7.1"
 tokio-postgres = "0.7"
 postgres = "0.19"
 rdkafka = { version = "0.39.0" }
@@ -45,6 +48,7 @@ mockall = "0.14.0"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 rstest = "0.22"
 bollard = "0.19"
+ctor = "0.4"
 tar = "0.4"
 tiberius = { version = "0.12", default-features = false, features = ["tds73", "rustls"] }
 tokio-util = { version = "0.7", features = ["compat"] }
@@ -54,4 +58,13 @@ aws-sdk-lambda = { version = "1", default-features = false, features = ["behavio
 aws-sdk-eventbridge = { version = "1", default-features = false, features = ["behavior-version-latest", "rustls", "rt-tokio"] }
 aws-credential-types = { version = "1" }
 aws-smithy-types = { version = "1" }
+base64 = "0.22.1"
+jsonwebtoken = { version = "9.3.1", default-features = false, features = ["use_pem"] }
+rand = "0.8.6"
+rsa = { version = "0.9.10", features = ["pem", "sha2"] }
+rcgen = "0.14"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+oauth2 = { version = "5", default-features = false, features = ["reqwest"] }
+wiremock = "0.6.5"
+axum-server = { version = "0.8", default-features = false, features = ["tls-rustls"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }

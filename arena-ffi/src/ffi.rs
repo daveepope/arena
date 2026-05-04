@@ -3,6 +3,8 @@ pub(crate) mod handle;
 mod logging;
 pub(crate) mod strings;
 
+mod loopback_tls;
+
 use std::os::raw::c_char;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 

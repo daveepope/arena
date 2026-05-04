@@ -19,8 +19,8 @@ from arena_pytest import (
     ManagedLocalstackPlaybook,
     MatchBuilder,
     SqsQueueTarget,
-    playbook,
 )
+from arena_pytest.playbook import active_playbooks
 
 LOCALSTACK_HOST_PORT = 4567
 LOCALSTACK_NETWORK = "arena-pytest-localstack-network"
@@ -34,11 +34,6 @@ DUMMY_CREDS = {"aws_access_key_id": "test", "aws_secret_access_key": "test"}
 
 LOCALSTACK_ID = f"ls-{uuid.uuid4().hex[:8]}"
 MANAGED_LOCALSTACK_PLAYBOOK_ID = "localstack-session-purge"
-
-managed_localstack_playbook = ManagedLocalstackPlaybook(
-    identifier=MANAGED_LOCALSTACK_PLAYBOOK_ID,
-    dependency_identifier=LOCALSTACK_ID,
-)
 
 
 def _write_lambda_source(base_dir) -> str:
@@ -127,18 +122,23 @@ async def _localstack_session(tmp_path_factory):
         .build()
     )
 
+    session_purge_playbook = ManagedLocalstackPlaybook(
+        MANAGED_LOCALSTACK_PLAYBOOK_ID,
+        localstack.identifier,
+    )
+
     a_match = (
         MatchBuilder("localstack-e2e")
         .with_network(LOCALSTACK_NETWORK)
         .add_dependency(localstack)
-        .register_playbook(managed_localstack_playbook)
+        .register_playbook(session_purge_playbook)
         .build()
     )
 
     closed = ClosedArena("Localstack E2E Arena", [a_match])
     arena = await closed.open()
     try:
-        yield arena, localstack
+        yield arena, localstack, session_purge_playbook
     finally:
         await arena.close()
 
@@ -151,6 +151,11 @@ def arena(_localstack_session):
 @pytest.fixture(scope="module")
 def localstack_dep(_localstack_session):
     return _localstack_session[1]
+
+
+@pytest.fixture(scope="module")
+def session_purge_playbook(_localstack_session):
+    return _localstack_session[2]
 
 
 @pytest.mark.asyncio
@@ -215,28 +220,32 @@ async def test_localstack_full_stack_end_to_end(arena, localstack_dep):
 
 
 @pytest.mark.asyncio
-@playbook(managed_localstack_playbook)
-async def test_localstack_playbook_purges_queue(arena, localstack_dep):
-    boto3 = pytest.importorskip("boto3")
-    localstack = localstack_dep
-    endpoint = localstack.endpoint_url("127.0.0.1")
+async def test_localstack_playbook_purges_queue(
+    arena, localstack_dep, session_purge_playbook
+):
+    with active_playbooks(arena, session_purge_playbook):
+        boto3 = pytest.importorskip("boto3")
+        localstack = localstack_dep
+        endpoint = localstack.endpoint_url("127.0.0.1")
 
-    sqs = boto3.client(
-        "sqs", region_name=REGION, endpoint_url=endpoint, **DUMMY_CREDS
-    )
-    queue_url = sqs.get_queue_url(QueueName=QUEUE_NAME)["QueueUrl"]
+        sqs = boto3.client(
+            "sqs", region_name=REGION, endpoint_url=endpoint, **DUMMY_CREDS
+        )
+        queue_url = sqs.get_queue_url(QueueName=QUEUE_NAME)["QueueUrl"]
 
-    sqs.send_message(QueueUrl=queue_url, MessageBody=json.dumps({"n": 1}))
-    sqs.send_message(QueueUrl=queue_url, MessageBody=json.dumps({"n": 2}))
+        sqs.send_message(QueueUrl=queue_url, MessageBody=json.dumps({"n": 1}))
+        sqs.send_message(QueueUrl=queue_url, MessageBody=json.dumps({"n": 2}))
 
-    deadline = time.time() + 5
-    depth = 0
-    while time.time() < deadline:
-        depth = _approximate_queue_depth(sqs, queue_url)
-        if depth >= 2:
-            break
-        time.sleep(0.2)
-    assert depth >= 1, f"expected messages visible before playbook exit, got {depth}"
+        deadline = time.time() + 5
+        depth = 0
+        while time.time() < deadline:
+            depth = _approximate_queue_depth(sqs, queue_url)
+            if depth >= 2:
+                break
+            time.sleep(0.2)
+        assert depth >= 1, (
+            f"expected messages visible before playbook exit, got {depth}"
+        )
 
 
 @pytest.mark.asyncio

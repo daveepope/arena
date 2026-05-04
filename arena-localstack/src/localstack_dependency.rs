@@ -15,7 +15,7 @@ use futures_timer::Delay;
 use crate::builder::{
     EventBusSpec, EventRuleSpec, EventTargetKind, LambdaSpec, LocalstackDependencyBuilder, QueueSpec,
 };
-use crate::localstack_dependency::healthcheck::DefaultLocalstackReadinessCheck;
+use crate::localstack_dependency::healthcheck::LocalstackHealthReadinessCheck;
 use crate::localstack_dependency::resource_creator::ResourceCreator;
 
 #[async_trait]
@@ -54,7 +54,7 @@ pub struct LocalstackDependency {
 
 impl LocalstackDependency {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub(crate) fn new(
         identifier: String,
         localstack_impl: Box<dyn LocalstackImpl>,
         port: u16,
@@ -77,7 +77,7 @@ impl LocalstackDependency {
             image_tag,
             container_name,
             running: false,
-            readiness_check: Box::new(DefaultLocalstackReadinessCheck),
+            readiness_check: Box::new(LocalstackHealthReadinessCheck::new(services.clone())),
             services,
             queues,
             lambdas,

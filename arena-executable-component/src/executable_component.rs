@@ -19,7 +19,7 @@ pub struct ExecutableComponent {
 }
 
 impl ExecutableComponent {
-    pub fn new(identifier: String) -> Self {
+    pub(crate) fn new(identifier: String) -> Self {
         ExecutableComponent {
             identifier,
             children: None,

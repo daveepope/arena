@@ -1,6 +1,7 @@
 load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("@rules_python//python:packaging.bzl", "py_wheel")
+load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 
 ARENA_PYTEST_VERSION = "0.4.0b1"
 
@@ -23,8 +24,15 @@ ARENA_PYTEST_CLASSIFIERS = [
 ]
 
 exports_files(
-    ["README.md", "LICENSE"],
+    ["README.md", "LICENSE", "requirements.txt", "requirements_lock.txt"],
     visibility = ["//visibility:public"],
+)
+
+compile_pip_requirements(
+    name = "pip_requirements",
+    src = "requirements.txt",
+    requirements_txt = "requirements_lock.txt",
+    generate_hashes = False,
 )
 
 config_setting(
@@ -112,7 +120,7 @@ py_test(
         "//arena-ffi:arena_ffi_shared",
         "//examples:instrument_reading_db_schema",
         "//examples:validation_db_schema",
-        "//examples:web-app",
+        "//examples:example-readings-axum-web-app",
     ],
     deps = [
         ":arena_pytest_lib",
@@ -121,7 +129,7 @@ py_test(
         "@pip//pytest_asyncio",
         "@pip//requests",
     ],
-    tags = ["local"],
+    tags = ["requires_docker"],
     python_version = "PY3",
     visibility = ["//visibility:public"],
 )

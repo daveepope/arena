@@ -1,4 +1,5 @@
 import os
+import tempfile
 
 import pytest
 
@@ -18,19 +19,23 @@ if not _arena_plugin_already_registered_via_entry_point():
 from arena_pytest import (
     BuildTool,
     ClosedArena,
-    ContainerComponentBuilder,
-    MatchBuilder,
+    ContainerizedComponentBuilder,
+    DEFAULT_OAUTH_PORT,
     ExecutableComponentBuilder,
     HttpDependencyBuilder,
     HttpReadinessCheck,
-    ManagedHttpPlaybookBuilder,
-    ManagedMssqlPlaybookBuilder,
     KafkaDependencyBuilder,
     KafkaFlavor,
     KAFKA_INTERNAL_DOCKER_PORT,
+    ManagedHttpPlaybookBuilder,
+    ManagedMssqlPlaybookBuilder,
+    MatchBuilder,
     MssqlDependencyBuilder,
+    OAUTH_ISSUER,
+    OauthDependencyBuilder,
     PostgresDependencyBuilder,
 )
+from arena_pytest.oauth import oauth_issuer_host_is_non_loopback
 
 POSTGRES_PORT = 5556
 POSTGRES_DB_NAME = "readings_db"
@@ -61,21 +66,23 @@ MSSQL_CONNECTION_STRING_DOCKER = (
     f"User Id={MSSQL_DB_USER};Password={MSSQL_DB_PASS};TrustServerCertificate=True;"
 )
 
+_DOCKER_WEB_ENABLED = False
 
-_RUNTIME_DOCKERFILE = """\
+
+_RUNTIME_CONTAINERFILE = """\
 FROM debian:trixie-slim
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY web-app /usr/local/bin/web-app
-RUN chmod +x /usr/local/bin/web-app
+COPY example-readings-axum-web-app /usr/local/bin/example-readings-axum-web-app
+RUN chmod +x /usr/local/bin/example-readings-axum-web-app
 EXPOSE 3000
-ENTRYPOINT ["/usr/local/bin/web-app"]
+ENTRYPOINT ["/usr/local/bin/example-readings-axum-web-app"]
 """
 
 
-def _prepare_docker_build_context() -> tuple[str, str]:
-    """Stage a minimal build context: the prebuilt web-app binary + runtime Dockerfile.
+def _prepare_container_image_context() -> tuple[str, str]:
+    """Stage a minimal build context: the prebuilt readings axum binary + runtime containerfile.
 
-    Returns (build_context_dir, dockerfile_text) or ("", "") if the binary isn't found.
+    Returns (build_context_dir, containerfile_text) or ("", "") if the binary isn't found.
     """
     import shutil
     import tempfile
@@ -83,11 +90,30 @@ def _prepare_docker_build_context() -> tuple[str, str]:
     binary = _find_web_app_binary()
     if not binary or not os.path.isfile(binary):
         return "", ""
-    ctx = tempfile.mkdtemp(prefix="arena-pytest-docker-ctx-")
-    dst = os.path.join(ctx, "web-app")
+    ctx = tempfile.mkdtemp(prefix="arena-pytest-image-ctx-")
+    dst = os.path.join(ctx, "example-readings-axum-web-app")
     shutil.copy2(binary, dst)
     os.chmod(dst, 0o755)
-    return ctx, _RUNTIME_DOCKERFILE
+    return ctx, _RUNTIME_CONTAINERFILE
+
+
+_OAUTH_TLS_CERT_PEM: str | None = None
+_OAUTH_TLS_KEY_PEM: str | None = None
+_OAUTH_TLS_CA_FILE: str | None = None
+
+
+def _arena_oauth_tls_session() -> tuple[str, str, str]:
+    global _OAUTH_TLS_CERT_PEM, _OAUTH_TLS_KEY_PEM, _OAUTH_TLS_CA_FILE
+    if _OAUTH_TLS_CERT_PEM is None:
+        from arena_pytest import oauth_loopback_tls_pem_pair
+
+        cert, key = oauth_loopback_tls_pem_pair()
+        fd, path = tempfile.mkstemp(prefix="arena-pytest-oauth-ca-", suffix=".pem")
+        os.close(fd)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(cert)
+        _OAUTH_TLS_CERT_PEM, _OAUTH_TLS_KEY_PEM, _OAUTH_TLS_CA_FILE = cert, key, path
+    return _OAUTH_TLS_CERT_PEM, _OAUTH_TLS_KEY_PEM, _OAUTH_TLS_CA_FILE
 
 
 def _find_schema_path(filename: str = "instrument_reading_db_schema.sql") -> str:
@@ -119,11 +145,22 @@ def _find_web_app_binary() -> str:
     runfiles_dir = os.environ.get("RUNFILES_DIR")
     if runfiles_dir:
         for base in ("_main", "arena", ""):
-            p = os.path.join(runfiles_dir, base, "examples", "web-app")
+            p = os.path.join(runfiles_dir, base, "examples", "example-readings-axum-web-app")
             if os.path.isfile(p):
                 return p
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    return os.path.join(root, "target", "release", "web-app")
+    return os.path.join(root, "target", "release", "example-readings-axum-web-app")
+
+
+def _build_oauth():
+    cert, key, _ = _arena_oauth_tls_session()
+    return (
+        OauthDependencyBuilder("pytest oauth")
+        .with_port(DEFAULT_OAUTH_PORT)
+        .with_listen_ip("0.0.0.0")
+        .with_server_tls_pem(cert, key)
+        .build()
+    )
 
 
 def _build_postgres(startup_sql: list[str]):
@@ -201,15 +238,16 @@ def validation_db_playbook(mssql_identifier):
     ).build()
 
 
-def _build_exec_component() -> object:
+def _build_exec_component(oauth_ca_pem: str) -> object:
     web_app_binary = _find_web_app_binary()
-    healthcheck_url = f"http://127.0.0.1:{EXEC_WEB_APP_PORT}/readings"
+    healthcheck_url = f"http://127.0.0.1:{EXEC_WEB_APP_PORT}/health"
     is_bazel = bool(os.environ.get("RUNFILES_DIR"))
 
     exec_builder = (
         ExecutableComponentBuilder("pytest web app")
         .with_executable_path(web_app_binary)
         .with_env_var("RUST_LOG", "info")
+        .with_env_var("OAUTH_TLS_CA_PEM", oauth_ca_pem)
         .with_runtime_arg("web_app_port", str(EXEC_WEB_APP_PORT))
         .with_runtime_arg(
             "postgres_connection_string",
@@ -222,6 +260,7 @@ def _build_exec_component() -> object:
         .with_runtime_arg(
             "mssql_connection_string", MSSQL_CONNECTION_STRING_LOCAL
         )
+        .with_runtime_arg("oauth_issuer_url", OAUTH_ISSUER)
         .with_readiness_check(HttpReadinessCheck(), healthcheck_url)
     )
     if not is_bazel:
@@ -230,14 +269,18 @@ def _build_exec_component() -> object:
     return exec_builder.build()
 
 
-def _build_container_component(repo_root: str, dockerfile: str) -> object:
+def _build_containerized_component(
+    repo_root: str, containerfile: str, oauth_ca_pem: str
+) -> object:
     return (
-        ContainerComponentBuilder("pytest web app docker", dockerfile)
+        ContainerizedComponentBuilder("pytest web app container", containerfile)
         .with_build_context(repo_root)
         .with_image_tag(DOCKER_IMAGE_TAG)
         .with_network(NETWORK_NAME)
         .with_port_mapping(DOCKER_WEB_HOST_PORT, 3000)
+        .with_host_mapping("host.docker.internal:host-gateway")
         .with_env_var("RUST_LOG", "info")
+        .with_env_var("OAUTH_TLS_CA_PEM", oauth_ca_pem)
         .with_runtime_arg("web_app_port", "3000")
         .with_runtime_arg(
             "postgres_connection_string",
@@ -253,9 +296,10 @@ def _build_container_component(repo_root: str, dockerfile: str) -> object:
         .with_runtime_arg(
             "mssql_connection_string", MSSQL_CONNECTION_STRING_DOCKER
         )
+        .with_runtime_arg("oauth_issuer_url", OAUTH_ISSUER)
         .with_readiness_check(
             HttpReadinessCheck(),
-            f"http://127.0.0.1:{DOCKER_WEB_HOST_PORT}/readings",
+            f"http://127.0.0.1:{DOCKER_WEB_HOST_PORT}/health",
         )
         .build()
     )
@@ -263,6 +307,12 @@ def _build_container_component(repo_root: str, dockerfile: str) -> object:
 
 _CALIBRATION_IDENTIFIER: str | None = None
 _MSSQL_IDENTIFIER: str | None = None
+
+
+@pytest.fixture(scope="session")
+def docker_web_enabled(closed_arena) -> bool:
+    _ = closed_arena
+    return _DOCKER_WEB_ENABLED
 
 
 @pytest.fixture(scope="session")
@@ -283,7 +333,11 @@ def mssql_identifier() -> str:
 
 @pytest.fixture(scope="session")
 def closed_arena() -> ClosedArena:
-    global _CALIBRATION_IDENTIFIER, _MSSQL_IDENTIFIER
+    global _CALIBRATION_IDENTIFIER, _MSSQL_IDENTIFIER, _DOCKER_WEB_ENABLED
+
+    oauth_ca_pem, _, _ = _arena_oauth_tls_session()
+
+    oauth = _build_oauth()
 
     schema_path = _find_schema_path()
     startup_sql = [open(schema_path).read()] if schema_path else []
@@ -291,11 +345,13 @@ def closed_arena() -> ClosedArena:
     mssql_schema_path = _find_schema_path("validation_db_schema.sql")
     mssql_startup_sql = [open(mssql_schema_path).read()] if mssql_schema_path else []
 
-    components = [_build_exec_component()]
+    components = [_build_exec_component(oauth_ca_pem)]
 
-    ctx, dockerfile = _prepare_docker_build_context()
-    if ctx and dockerfile:
-        components.append(_build_container_component(ctx, dockerfile))
+    _DOCKER_WEB_ENABLED = False
+    ctx, containerfile = _prepare_container_image_context()
+    if ctx and containerfile and oauth_issuer_host_is_non_loopback:
+        components.append(_build_containerized_component(ctx, containerfile, oauth_ca_pem))
+        _DOCKER_WEB_ENABLED = True
 
     calibration_http = _build_calibration_http()
     _CALIBRATION_IDENTIFIER = calibration_http.identifier
@@ -305,6 +361,7 @@ def closed_arena() -> ClosedArena:
 
     a_match = MatchBuilder("reading lifecycle")
     a_match = a_match.with_network(NETWORK_NAME)
+    a_match = a_match.add_dependency(oauth)
     a_match = a_match.add_dependency(_build_postgres(startup_sql))
     a_match = a_match.add_dependency(_build_kafka())
     a_match = a_match.add_dependency(mssql)
@@ -317,6 +374,29 @@ def closed_arena() -> ClosedArena:
         a_match = a_match.add_component(c)
 
     return ClosedArena("Test Arena", [a_match.build()])
+
+
+@pytest.fixture(scope="session")
+def oauth_access_token(arena) -> str:
+    import requests
+
+    _, _, ca = _arena_oauth_tls_session()
+    s = requests.Session()
+    s.verify = ca
+    issuer = OAUTH_ISSUER
+    disc = s.get(f"{issuer}/.well-known/oauth-authorization-server", timeout=30)
+    disc.raise_for_status()
+    token_url = disc.json()["token_endpoint"]
+    tok = s.post(
+        token_url,
+        data={
+            "grant_type": "client_credentials",
+            "client_id": "arena-examples",
+        },
+        timeout=30,
+    )
+    tok.raise_for_status()
+    return str(tok.json()["access_token"])
 
 
 @pytest.fixture(scope="session")

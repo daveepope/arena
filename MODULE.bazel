@@ -18,7 +18,12 @@ pip.parse(
     python_version = "3.12",
     requirements_lock = "//arena-pytest:requirements_lock.txt",
 )
-use_repo(pip, "pip")
+pip.parse(
+    hub_name = "pip_examples",
+    python_version = "3.12",
+    requirements_lock = "//examples:requirements_lock.txt",
+)
+use_repo(pip, "pip", "pip_examples")
 
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(

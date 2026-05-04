@@ -217,7 +217,13 @@ async fn wait_until_lambda_active(client: &lambda::Client, name: &str) -> Result
                 match state {
                     Some(lambda::types::State::Active) => return Ok(()),
                     Some(lambda::types::State::Failed) => {
-                        return Err(format!("lambda {name} entered Failed state"));
+                        let detail = out
+                            .configuration()
+                            .and_then(|c| c.state_reason())
+                            .unwrap_or("no state_reason from get_function");
+                        return Err(format!(
+                            "lambda {name} entered Failed state: {detail}"
+                        ));
                     }
                     _ => {}
                 }

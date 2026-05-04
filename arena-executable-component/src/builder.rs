@@ -136,16 +136,13 @@ impl ExecutableComponentBuilder {
             }
         });
 
-        ExecutableComponent {
-            identifier: self.identifier,
-            children: self.children,
-            executable_path,
-            env_vars: self.env_vars,
-            runtime_args: self.runtime_args,
-            process_handle: None,
-            stopped: false,
-            readiness_checks: self.readiness_checks,
-        }
+        let mut component = ExecutableComponent::new(self.identifier);
+        component.children = self.children;
+        component.executable_path = executable_path;
+        component.env_vars = self.env_vars;
+        component.runtime_args = self.runtime_args;
+        component.readiness_checks = self.readiness_checks;
+        component
     }
 
     fn execute_build(build_tool: &BuildTool, source_dir: &PathBuf) -> std::process::Output {

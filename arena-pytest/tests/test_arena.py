@@ -1,5 +1,3 @@
-"""Integration tests: shared Postgres + Kafka + arena with exec binary and Docker web app (see conftest)."""
-
 import json
 import os
 import queue
@@ -24,7 +22,13 @@ BASE_URL_EXEC = f"http://127.0.0.1:{EXEC_WEB_APP_PORT}"
 BASE_URL_DOCKER = f"http://127.0.0.1:{DOCKER_WEB_HOST_PORT}"
 
 
-def test_exec_reading_flow_kafka_and_http(arena, validation_db_playbook):
+def _auth_headers(access_token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {access_token}"}
+
+
+def test_exec_reading_flow_kafka_and_http(
+    arena, validation_db_playbook, oauth_access_token
+):
     @playbook(validation_db_playbook)
     def _body(arena):
         bootstrap = f"localhost:{KAFKA_PORT}"
@@ -37,7 +41,13 @@ def test_exec_reading_flow_kafka_and_http(arena, validation_db_playbook):
         )
         consumer_thread.start()
 
-        created_id = _create_reading(BASE_URL_EXEC, "Exec Test User", 42, "test comment")
+        created_id = _create_reading(
+            BASE_URL_EXEC,
+            "Exec Test User",
+            42,
+            "test comment",
+            oauth_access_token,
+        )
         id_queue.put(created_id)
 
         consumer_thread.join(timeout=10)
@@ -50,7 +60,7 @@ def test_exec_reading_flow_kafka_and_http(arena, validation_db_playbook):
         assert consumed["value"] == 42
         assert consumed.get("comment") == "test comment"
 
-        readings = _get_readings(BASE_URL_EXEC)
+        readings = _get_readings(BASE_URL_EXEC, oauth_access_token)
         found = next((r for r in readings if r["id"] == created_id), None)
         assert found is not None, "should find newly created reading"
         assert found["id"] == created_id
@@ -61,12 +71,18 @@ def test_exec_reading_flow_kafka_and_http(arena, validation_db_playbook):
     _body(arena)
 
 
-def test_exec_multiple_readings(arena, validation_db_playbook):
+def test_exec_multiple_readings(arena, validation_db_playbook, oauth_access_token):
     @playbook(validation_db_playbook)
     def _body(arena):
-        id1 = _create_reading(BASE_URL_EXEC, "Bending", 1, "")
-        id2 = _create_reading(BASE_URL_EXEC, "joe", 2, "We're going to need a bigger ship")
-        readings = _get_readings(BASE_URL_EXEC)
+        id1 = _create_reading(BASE_URL_EXEC, "Bending", 1, "", oauth_access_token)
+        id2 = _create_reading(
+            BASE_URL_EXEC,
+            "joe",
+            2,
+            "We're going to need a bigger ship",
+            oauth_access_token,
+        )
+        readings = _get_readings(BASE_URL_EXEC, oauth_access_token)
         ids = {r["id"] for r in readings}
         assert id1 in ids
         assert id2 in ids
@@ -74,7 +90,9 @@ def test_exec_multiple_readings(arena, validation_db_playbook):
     _body(arena)
 
 
-def test_exec_calibration_outage_returns_error(arena, calibration_identifier):
+def test_exec_calibration_outage_returns_error(
+    arena, calibration_identifier, oauth_access_token
+):
     from arena_pytest import HttpPlaybookBuilder
 
     outage = (
@@ -93,14 +111,17 @@ def test_exec_calibration_outage_returns_error(arena, calibration_identifier):
         r = requests.post(
             f"{BASE_URL_EXEC}/readings",
             json={"user_name": "Outage Test User", "value": 99, "comment": None},
+            headers=_auth_headers(oauth_access_token),
             timeout=10,
         )
         assert r.status_code == 500, (
             f"expected 500 while calibration is in outage playbook, got {r.status_code}: {r.text}"
         )
 
-    recovered_id = _create_reading(BASE_URL_EXEC, "Recovery Test User", 17, "post-outage")
-    readings = _get_readings(BASE_URL_EXEC)
+    recovered_id = _create_reading(
+        BASE_URL_EXEC, "Recovery Test User", 17, "post-outage", oauth_access_token
+    )
+    readings = _get_readings(BASE_URL_EXEC, oauth_access_token)
     found = next((r for r in readings if r["id"] == recovered_id), None)
     assert found is not None, "recovered reading should be present"
     assert found["user_name"] == "Recovery Test User"
@@ -108,13 +129,14 @@ def test_exec_calibration_outage_returns_error(arena, calibration_identifier):
 
 
 def test_exec_calibration_outage_via_playbook_decorator(
-    arena, calibration_outage_playbook, validation_db_playbook
+    arena, calibration_outage_playbook, validation_db_playbook, oauth_access_token
 ):
     @playbook(calibration_outage_playbook, validation_db_playbook)
     def _body(arena):
         r = requests.post(
             f"{BASE_URL_EXEC}/readings",
             json={"user_name": "Decorator Outage", "value": 1, "comment": None},
+            headers=_auth_headers(oauth_access_token),
             timeout=10,
         )
         assert r.status_code == 500, (
@@ -124,20 +146,26 @@ def test_exec_calibration_outage_via_playbook_decorator(
 
     _body(arena)
 
-    recovered_id = _create_reading(BASE_URL_EXEC, "Decorator Recovery", 2, None)
-    readings = _get_readings(BASE_URL_EXEC)
+    recovered_id = _create_reading(
+        BASE_URL_EXEC, "Decorator Recovery", 2, None, oauth_access_token
+    )
+    readings = _get_readings(BASE_URL_EXEC, oauth_access_token)
     assert any(r["id"] == recovered_id for r in readings)
 
 
 def test_exec_validation_db_scoped_via_playbook_decorator(
-    arena, validation_db_playbook
+    arena, validation_db_playbook, oauth_access_token
 ):
     @playbook(validation_db_playbook)
     def _body(arena):
         created_id = _create_reading(
-            BASE_URL_EXEC, "Validation DB Scoped", 7, "mssql scope"
+            BASE_URL_EXEC,
+            "Validation DB Scoped",
+            7,
+            "mssql scope",
+            oauth_access_token,
         )
-        readings = _get_readings(BASE_URL_EXEC)
+        readings = _get_readings(BASE_URL_EXEC, oauth_access_token)
         assert any(r["id"] == created_id for r in readings)
 
     _body(arena)
@@ -149,10 +177,11 @@ def outage_and_db_reset(arena, calibration_outage_playbook, validation_db_playbo
         yield
 
 
-def test_exec_fixture_scoped_multi_playbook(arena, outage_and_db_reset):
+def test_exec_fixture_scoped_multi_playbook(arena, outage_and_db_reset, oauth_access_token):
     r = requests.post(
         f"{BASE_URL_EXEC}/readings",
         json={"user_name": "Fixture Outage", "value": 1, "comment": None},
+        headers=_auth_headers(oauth_access_token),
         timeout=10,
     )
     assert r.status_code == 500, (
@@ -181,7 +210,18 @@ def test_exec_calibration_playbook_expectation_failure_is_assertion(arena, calib
             pass
 
 
-def test_docker_reading_flow_kafka_and_http(arena_docker, validation_db_playbook):
+def test_docker_reading_flow_kafka_and_http(
+    docker_web_enabled,
+    arena_docker,
+    validation_db_playbook,
+    oauth_access_token,
+):
+    if not docker_web_enabled:
+        pytest.skip(
+            "No containerized web app: OAuth issuer is loopback-only "
+            "(JWT issuer cannot be reached from a bridge-network container)."
+        )
+
     @playbook(validation_db_playbook)
     def _body(arena):
         bootstrap = f"localhost:{KAFKA_PORT}"
@@ -194,7 +234,13 @@ def test_docker_reading_flow_kafka_and_http(arena_docker, validation_db_playbook
         )
         consumer_thread.start()
 
-        created_id = _create_reading(BASE_URL_DOCKER, "Docker Test User", 42, "test comment")
+        created_id = _create_reading(
+            BASE_URL_DOCKER,
+            "Docker Test User",
+            42,
+            "test comment",
+            oauth_access_token,
+        )
         id_queue.put(created_id)
 
         consumer_thread.join(timeout=10)
@@ -207,7 +253,7 @@ def test_docker_reading_flow_kafka_and_http(arena_docker, validation_db_playbook
         assert consumed["value"] == 42
         assert consumed.get("comment") == "test comment"
 
-        readings = _get_readings(BASE_URL_DOCKER)
+        readings = _get_readings(BASE_URL_DOCKER, oauth_access_token)
         found = next((r for r in readings if r["id"] == created_id), None)
         assert found is not None, "should find newly created reading"
         assert found["id"] == created_id
@@ -218,8 +264,12 @@ def test_docker_reading_flow_kafka_and_http(arena_docker, validation_db_playbook
     _body(arena_docker)
 
 
-def _get_readings(base_url: str) -> list:
-    r = requests.get(f"{base_url}/readings", timeout=10)
+def _get_readings(base_url: str, access_token: str) -> list:
+    r = requests.get(
+        f"{base_url}/readings",
+        headers=_auth_headers(access_token),
+        timeout=10,
+    )
     r.raise_for_status()
     return r.json()
 
@@ -228,11 +278,13 @@ def _create_reading(
     base_url: str,
     user_name: str,
     value: int,
-    comment: str | None = None,
+    comment: str | None,
+    access_token: str,
 ) -> int:
     r = requests.post(
         f"{base_url}/readings",
         json={"user_name": user_name, "value": value, "comment": comment},
+        headers=_auth_headers(access_token),
         timeout=10,
     )
     r.raise_for_status()
