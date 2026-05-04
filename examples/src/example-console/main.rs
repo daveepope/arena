@@ -40,11 +40,11 @@ const KAFKA_CONTAINER_NAME: &str = "arena-example-kafka";
 const MSSQL_CONTAINER_NAME: &str = "arena-example-mssql";
 
 async fn setup_arena_components() -> Vec<Component> {
-    let containerfile = include_str!("../example-web-app/Dockerfile");
+    let containerfile = include_str!("../example_readings_axum_web_app/web_server/Dockerfile");
 
     let web_app = ContainerizedComponent::builder("example web app", containerfile)
         .with_build_context(".")
-        .with_image_tag("arena-example-web-app")
+        .with_image_tag("arena-example-readings-axum-web-app")
         .with_port_mapping(WEB_APP_PORT, 3000)
         .with_host_mapping("host.docker.internal:host-gateway")
         .with_env_var("RUST_LOG", "debug")
@@ -90,7 +90,7 @@ fn setup_executable_arena_components() -> Vec<Component> {
         ExecutableComponent::builder("example web app")
             .with_source_path("examples")
             .with_build_tool(arena_executable_component::BuildTool::Cargo)
-            .with_executable_path("target/release/web-app")
+            .with_executable_path("target/release/example-readings-axum-web-app")
             .with_env_var("RUST_LOG", "debug")
             .with_env_var("OAUTH_TLS_CA_PEM", OAUTH_TLS_CERT_PEM)
             .with_runtime_arg("web_app_port", WEB_APP_PORT.to_string())

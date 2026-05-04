@@ -8,7 +8,7 @@ use axum::Json;
 use rdkafka::producer::{BaseRecord, Producer};
 use tokio::sync::Mutex;
 
-use crate::example_axum_web_server::state::AppState;
+use crate::example_readings_axum_web_app::state::AppState;
 
 use super::requests::CreateReadingRequest;
 use super::responses::{

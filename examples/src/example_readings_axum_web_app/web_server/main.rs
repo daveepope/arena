@@ -1,4 +1,4 @@
-use arena_examples::example_axum_web_server::ExampleAxumWebApp;
+use arena_examples::example_readings_axum_web_app::ExampleAxumWebApp;
 
 #[tokio::main]
 async fn main() {

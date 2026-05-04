@@ -15,8 +15,8 @@ name = "example-console"
 path = "src/example-console/main.rs"
 
 [[bin]]
-name = "web-app"
-path = "src/example-web-app/main.rs"
+name = "example-readings-axum-web-app"
+path = "src/example_readings_axum_web_app/web_server/main.rs"
 
 [dependencies]
 arena = { workspace = true }
@@ -43,8 +43,8 @@ jsonwebtoken = { workspace = true }
 oauth2 = { workspace = true }
 
 [[test]]
-name = "component_test"
-path = "tests/example-arena-component-test/component_test.rs"
+name = "example-readings-axum-component-test"
+path = "tests/example-readings-axum-component-test/readings_axum_component_test.rs"
 
 [dev-dependencies]
 ctor = { workspace = true }

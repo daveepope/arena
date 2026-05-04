@@ -71,15 +71,15 @@ _DOCKER_WEB_ENABLED = False
 _RUNTIME_CONTAINERFILE = """\
 FROM debian:trixie-slim
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY web-app /usr/local/bin/web-app
-RUN chmod +x /usr/local/bin/web-app
+COPY example-readings-axum-web-app /usr/local/bin/example-readings-axum-web-app
+RUN chmod +x /usr/local/bin/example-readings-axum-web-app
 EXPOSE 3000
-ENTRYPOINT ["/usr/local/bin/web-app"]
+ENTRYPOINT ["/usr/local/bin/example-readings-axum-web-app"]
 """
 
 
 def _prepare_container_image_context() -> tuple[str, str]:
-    """Stage a minimal build context: the prebuilt web-app binary + runtime containerfile.
+    """Stage a minimal build context: the prebuilt readings axum binary + runtime containerfile.
 
     Returns (build_context_dir, containerfile_text) or ("", "") if the binary isn't found.
     """
@@ -90,7 +90,7 @@ def _prepare_container_image_context() -> tuple[str, str]:
     if not binary or not os.path.isfile(binary):
         return "", ""
     ctx = tempfile.mkdtemp(prefix="arena-pytest-image-ctx-")
-    dst = os.path.join(ctx, "web-app")
+    dst = os.path.join(ctx, "example-readings-axum-web-app")
     shutil.copy2(binary, dst)
     os.chmod(dst, 0o755)
     return ctx, _RUNTIME_CONTAINERFILE
@@ -125,11 +125,11 @@ def _find_web_app_binary() -> str:
     runfiles_dir = os.environ.get("RUNFILES_DIR")
     if runfiles_dir:
         for base in ("_main", "arena", ""):
-            p = os.path.join(runfiles_dir, base, "examples", "web-app")
+            p = os.path.join(runfiles_dir, base, "examples", "example-readings-axum-web-app")
             if os.path.isfile(p):
                 return p
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    return os.path.join(root, "target", "release", "web-app")
+    return os.path.join(root, "target", "release", "example-readings-axum-web-app")
 
 
 def _read_oauth_tls_pem_pair() -> tuple[str, str]:
@@ -161,7 +161,7 @@ def _build_oauth():
     if not cert or not key:
         raise FileNotFoundError(
             "examples/resources/oauth_tls_cert.pem and oauth_tls_key.pem are required "
-            "for arena-pytest integration (example web-app validates JWTs against JWKS)."
+            "for arena-pytest (readings axum sample validates JWTs against JWKS)."
         )
     return (
         OauthDependencyBuilder("pytest oauth")
@@ -348,7 +348,7 @@ def closed_arena() -> ClosedArena:
     if not oauth_ca_pem:
         pytest.fail(
             "Missing examples/resources/oauth_tls_cert.pem (and oauth_tls_key.pem). "
-            "They are required for the example web-app OAuth stack in integration tests."
+            "They are required for the readings axum sample OAuth stack when running pytest with Arena fixtures."
         )
     oauth = _build_oauth()
 

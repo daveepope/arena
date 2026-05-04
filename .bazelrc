@@ -1,4 +1,4 @@
 test --test_output=streamed
 test --test_verbose_timeout_warnings
 test --test_env=RUST_LOG=info
-test --test_arg=--nocapture
+common:rust_libtest_nocapture --test_arg=--nocapture

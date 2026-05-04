@@ -53,6 +53,7 @@ alwaysApply: true
 - This is a **Bazel-first** repo: **prefer Bazel** over Cargo or other build tools for authoritative checks.
 - When a **feature is complete**, run **`bazel build`** and **`bazel test`** (workspace- or target-appropriate scope).
 - After **`cargo check`** (or during iteration), still validate with **Bazel** before considering work done. Do not run pip, nuget, maven, nvm commands directly on the host, everything should be built via Bazel.
+- For **Python lockfiles**: edit **`arena-pytest/requirements.txt`** then run **`bazel run //arena-pytest:pip_requirements.update`** and **`bazel test //arena-pytest:pip_requirements_test`**. For **example apps** under `examples/`, edit **`examples/requirements.txt`** then run **`bazel run //examples:pip_requirements.update`** and **`bazel test //examples:pip_requirements_test`**. Do not run pip or pip-compile on the host for those workflows.
 - Tests that **need a Docker daemon** (Testcontainers, etc.) must declare **`tags = ["requires_docker"]`** on their **`rust_test`** / **`py_test`** target. CI on **macOS** skips those with **`--test_tag_filters=-requires_docker`** because hosted runners have no Docker; **Linux** runs them. If you have no Docker locally, use the same filter.
 
 ## FFI layer
