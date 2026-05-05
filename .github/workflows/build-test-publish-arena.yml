@@ -7,15 +7,15 @@ on:
     branches: [ "master" ]
 
 jobs:
-  test_linux:
-    name: Test Linux (shard ${{ matrix.shard }}/2)
-    runs-on: ubuntu-latest
+  build_and_test:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1]
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -23,81 +23,30 @@ jobs:
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
           bazelisk-cache: true
-          disk-cache: build-test-publish-arena-ubuntu-latest
+          disk-cache: build-test-publish-arena-${{ matrix.os }}
           repository-cache: true
 
       - name: Build
         run: CARGO_BAZEL_REPIN=true bazel build //...
 
-      - name: Run test shard
+      - name: Run all tests
+        if: runner.os == 'Linux'
         timeout-minutes: 30
-        run: |
-          set -euo pipefail
-          mapfile -t labels < <(bazel query 'tests(//...)' | sort -u)
-          n=${#labels[@]}
-          if [[ "$n" -eq 0 ]]; then
-            echo "no test targets"
-            exit 0
-          fi
-          sel=()
-          i=0
-          for t in "${labels[@]}"; do
-            if (( i % 2 == ${{ matrix.shard }} )); then
-              sel+=("$t")
-            fi
-            i=$((i + 1))
-          done
-          if [[ ${#sel[@]} -eq 0 ]]; then
-            echo "no tests in this shard"
-            exit 0
-          fi
-          bazel test "${sel[@]}" --test_output=errors --jobs=8 --local_test_jobs=8
-
-  test_macos:
-    name: Test macOS (no Docker)
-    runs-on: macos-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.14.0
-        with:
-          bazelisk-cache: true
-          disk-cache: build-test-publish-arena-macos-latest
-          repository-cache: true
-
-      - name: Build
-        run: CARGO_BAZEL_REPIN=true bazel build //...
+        run: bazel test //... --test_output=streamed
 
       - name: Run tests (excluding Docker)
-        run: bazel test //... --test_tag_filters=-requires_docker --test_output=errors --jobs=8 --local_test_jobs=8
-
-  package_pr_linux:
-    name: Package wheel (Linux / PR)
-    needs: test_linux
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.14.0
-        with:
-          bazelisk-cache: true
-          disk-cache: build-test-publish-arena-ubuntu-latest
-          repository-cache: true
+        if: runner.os == 'macOS'
+        run: bazel test //... --test_tag_filters=-requires_docker --test_output=streamed
 
       - name: Unique version for TestPyPI
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         env:
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           python3 <<'PY'
           import os, pathlib, re, tomllib
 
+          # PyPI forbids local versions (+gabc123). Use PEP 440 dev release instead.
           run_id = os.environ.get("GITHUB_RUN_ID", "0")
           pyproject = pathlib.Path("arena-pytest/pyproject.toml")
           data = tomllib.loads(pyproject.read_text())
@@ -124,6 +73,7 @@ jobs:
           PY
 
       - name: Build wheel for TestPyPI
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         run: |
           rm -f bazel-bin/arena-pytest/arena_pytest-*.whl
           bazel build //arena-pytest:arena_pytest_wheel
@@ -131,78 +81,16 @@ jobs:
           ls -la bazel-bin/arena-pytest/*.whl
 
       - name: Upload wheel artifact
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/upload-artifact@v4
         with:
-          name: arena-pytest-wheel-ubuntu-latest
-          path: bazel-bin/arena-pytest/*.whl
-          if-no-files-found: error
-
-  package_pr_macos:
-    name: Package wheel (macOS / PR)
-    needs: test_macos
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: macos-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.14.0
-        with:
-          bazelisk-cache: true
-          disk-cache: build-test-publish-arena-macos-latest
-          repository-cache: true
-
-      - name: Unique version for TestPyPI
-        env:
-          GITHUB_RUN_ID: ${{ github.run_id }}
-        run: |
-          python3 <<'PY'
-          import os, pathlib, re, tomllib
-
-          run_id = os.environ.get("GITHUB_RUN_ID", "0")
-          pyproject = pathlib.Path("arena-pytest/pyproject.toml")
-          data = tomllib.loads(pyproject.read_text())
-          base = data["project"]["version"]
-          unique = f"{base}.dev{run_id}"
-          text = pyproject.read_text()
-          text = re.sub(
-              r'^version = "[^"]+"',
-              f'version = "{unique}"',
-              text,
-              count=1,
-              flags=re.MULTILINE,
-          )
-          pyproject.write_text(text)
-          build = pathlib.Path("arena-pytest/BUILD").read_text()
-          build = re.sub(
-              r'ARENA_PYTEST_VERSION = "[^"]+"',
-              f'ARENA_PYTEST_VERSION = "{unique}"',
-              build,
-              count=1,
-          )
-          pathlib.Path("arena-pytest/BUILD").write_text(build)
-          print(f"Patched arena-pytest version to {unique} (TestPyPI)")
-          PY
-
-      - name: Build wheel for TestPyPI
-        run: |
-          rm -f bazel-bin/arena-pytest/arena_pytest-*.whl
-          bazel build //arena-pytest:arena_pytest_wheel
-          rm -f bazel-bin/arena-pytest/arena_pytest-*-py3-none-any.whl || true
-          ls -la bazel-bin/arena-pytest/*.whl
-
-      - name: Upload wheel artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: arena-pytest-wheel-macos-latest
+          name: arena-pytest-wheel-${{ matrix.os }}
           path: bazel-bin/arena-pytest/*.whl
           if-no-files-found: error
 
   publish_testpypi:
     name: Publish TestPyPI
-    needs: [package_pr_linux, package_pr_macos]
+    needs: build_and_test
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:

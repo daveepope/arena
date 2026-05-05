@@ -4,9 +4,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-final class ReadingsSpringBootRunfiles {
+final class ReadingsRunfiles {
 
-  private ReadingsSpringBootRunfiles() {}
+  private ReadingsRunfiles() {}
 
   static String findRunfile(String... candidates) throws Exception {
     try {
@@ -49,7 +49,7 @@ final class ReadingsSpringBootRunfiles {
         "examples/resources/" + filename);
   }
 
-  static String findSpringBootLauncher() throws Exception {
+  static String findReadingsWebAppLauncher() throws Exception {
     return findRunfile(
         "arena/examples/example-readings-spring-boot-web-app",
         "_main/examples/example-readings-spring-boot-web-app",

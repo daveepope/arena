@@ -7,9 +7,9 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 
-final class ReadingsSpringBootSqsWait {
+final class ReadingsSqsWait {
 
-  private ReadingsSpringBootSqsWait() {}
+  private ReadingsSqsWait() {}
 
   static JsonNode waitReadingCreatedDetail(
       ObjectMapper mapper, SqsClient sqs, String queueUrl, int expectedId) throws Exception {

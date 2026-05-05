@@ -49,7 +49,7 @@ import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
-public final class ReadingsSpringBootArenaFixture implements BeforeAllCallback, AfterAllCallback, ArenaSession {
+public final class ReadingsArenaFixture implements BeforeAllCallback, AfterAllCallback, ArenaSession {
 
   static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -69,7 +69,7 @@ public final class ReadingsSpringBootArenaFixture implements BeforeAllCallback, 
   private static final String NETWORK_NAME = "arena-spring-junit-readings-network";
   private static final String CALIBRATION_VALIDATE_PATH = "/api/v1/validate";
   private static final String EVENT_BUS_NAME = "readings-spring-events";
-  private static final String EVENT_SOURCE = "arena.readings.springboot";
+  private static final String EVENT_SOURCE = "arena.readings.web";
   private static final String QUEUE_NAME = "readings-spring-events-q";
   private static final String EVENT_RULE_NAME = "readings-spring-rule";
   private static final String REGION = "us-east-1";
@@ -135,8 +135,8 @@ public final class ReadingsSpringBootArenaFixture implements BeforeAllCallback, 
             .withMetadataBaseUrl(OAUTH_ISSUER)
             .build();
 
-    String schemaPath = ReadingsSpringBootRunfiles.findSchema("instrument_reading_db_schema.sql");
-    String mssqlSchemaPath = ReadingsSpringBootRunfiles.findSchema("validation_db_schema.sql");
+    String schemaPath = ReadingsRunfiles.findSchema("instrument_reading_db_schema.sql");
+    String mssqlSchemaPath = ReadingsRunfiles.findSchema("validation_db_schema.sql");
     assertTrue(!schemaPath.isEmpty(), "instrument_reading_db_schema.sql");
     assertTrue(!mssqlSchemaPath.isEmpty(), "validation_db_schema.sql");
     List<String> pgSql = List.of(Files.readString(Path.of(schemaPath), StandardCharsets.UTF_8));
@@ -193,11 +193,11 @@ public final class ReadingsSpringBootArenaFixture implements BeforeAllCallback, 
 
     localstackEndpoint = "http://127.0.0.1:" + LOCALSTACK_HOST_PORT;
 
-    String springLauncher = ReadingsSpringBootRunfiles.findSpringBootLauncher();
-    assertTrue(!springLauncher.isEmpty(), "spring boot app launcher must be present under Bazel runfiles");
+    String appLauncher = ReadingsRunfiles.findReadingsWebAppLauncher();
+    assertTrue(!appLauncher.isEmpty(), "readings web app launcher must be present under Bazel runfiles");
     ExecutableComponentBuilder exec =
         new ExecutableComponentBuilder("spring readings web")
-            .withExecutablePath(springLauncher)
+            .withExecutablePath(appLauncher)
             .withEnvVar("WEB_APP_PORT", String.valueOf(WEB_APP_PORT))
             .withEnvVar(
                 "POSTGRES_CONNECTION_STRING",

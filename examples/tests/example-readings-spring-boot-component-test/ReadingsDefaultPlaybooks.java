@@ -7,14 +7,14 @@ import dev.arena.junit.playbook.ManagedMssqlPlaybookBuilder;
 import java.lang.reflect.Field;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
-public final class SpringReadingsDefaultPlaybooks implements ArenaPlaybookSupplier {
+public final class ReadingsDefaultPlaybooks implements ArenaPlaybookSupplier {
 
   @Override
   public ActivePlaybook[] supply(ExtensionContext context) {
     try {
-      Field f = context.getRequiredTestClass().getDeclaredField("springReadings");
+      Field f = context.getRequiredTestClass().getDeclaredField("readings");
       f.setAccessible(true);
-      ReadingsSpringBootArenaFixture fx = (ReadingsSpringBootArenaFixture) f.get(null);
+      ReadingsArenaFixture fx = (ReadingsArenaFixture) f.get(null);
       ManagedMssqlPlaybook validationDb =
           new ManagedMssqlPlaybookBuilder("spring-validation-db-scoped", fx.mssqlIdentifier())
               .build();
