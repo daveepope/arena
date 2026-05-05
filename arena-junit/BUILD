@@ -18,7 +18,7 @@ java_library(
 java_test(
     name = "arena_junit_readings_unit_test",
     size = "small",
-    srcs = ["src/test/java/dev/arena/junit/readings/ReadingsHttpPlaybookRegistrationTest.java"],
+    srcs = ["src/test/java/arena/junit/readings/ReadingsHttpPlaybookRegistrationTest.java"],
     javacopts = [
         "--release",
         "21",
@@ -27,7 +27,7 @@ java_test(
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
         "--include-engine=junit-jupiter",
-        "--select-class=dev.arena.junit.readings.ReadingsHttpPlaybookRegistrationTest",
+        "--select-class=arena.junit.readings.ReadingsHttpPlaybookRegistrationTest",
     ],
     runtime_deps = [
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
@@ -45,8 +45,8 @@ java_test(
     name = "arena_junit_readings_test",
     size = "small",
     srcs = glob(
-        ["src/test/java/dev/arena/junit/readings/*.java"],
-        exclude = ["src/test/java/dev/arena/junit/readings/ReadingsHttpPlaybookRegistrationTest.java"],
+        ["src/test/java/arena/junit/readings/*.java"],
+        exclude = ["src/test/java/arena/junit/readings/ReadingsHttpPlaybookRegistrationTest.java"],
     ),
     javacopts = [
         "--release",
@@ -56,7 +56,7 @@ java_test(
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
         "--include-engine=junit-jupiter",
-        "--select-package=dev.arena.junit.readings",
+        "--select-package=arena.junit.readings",
     ],
     tags = ["requires_docker"],
     runtime_deps = [

@@ -254,7 +254,7 @@ java_binary(
         "--release",
         "21",
     ],
-    main_class = "dev.arena.examples.readings.springboot.ReadingsApplication",
+    main_class = "arena.examples.readings.springboot.ReadingsApplication",
     visibility = ["//visibility:public"],
     runtime_deps = [":example_readings_spring_boot_lib"],
 )
@@ -272,7 +272,7 @@ java_test(
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
         "--include-engine=junit-jupiter",
-        "--select-package=dev.arena.examples.readings.component",
+        "--select-package=arena.examples.readings.component",
     ],
     data = [
         ":example-readings-spring-boot-web-app",
