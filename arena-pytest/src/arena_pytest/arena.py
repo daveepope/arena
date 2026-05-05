@@ -6,7 +6,7 @@ from typing import Any, Optional
 import pytest
 import pytest_asyncio
 
-from arena_pytest._ffi import (
+from arena_pytest.ffi._ffi import (
     ArenaFfi,
     ArenaFfiError,
     ArenaStatus,

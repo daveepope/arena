@@ -2,6 +2,11 @@ import json
 import os
 import queue
 import sys
+
+_TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _TESTS_DIR not in sys.path:
+    sys.path.insert(0, _TESTS_DIR)
+
 import threading
 import time
 from typing import Any
@@ -11,12 +16,14 @@ import requests
 
 from arena_pytest import active_playbooks, playbook
 
-EXEC_WEB_APP_PORT = 3001
-DOCKER_WEB_HOST_PORT = 3002
-KAFKA_PORT = 9094
-KAFKA_TOPIC = "readings"
-CALIBRATION_HOST_PORT = 3003
-CALIBRATION_VALIDATE_PATH = "/api/v1/validate"
+from readings_arena_config import (
+    CALIBRATION_VALIDATE_PATH,
+    DOCKER_WEB_HOST_PORT,
+    EXEC_WEB_APP_PORT,
+    KAFKA_CONSUMER_GROUP_LABEL,
+    KAFKA_PORT,
+    KAFKA_TOPIC,
+)
 
 BASE_URL_EXEC = f"http://127.0.0.1:{EXEC_WEB_APP_PORT}"
 BASE_URL_DOCKER = f"http://127.0.0.1:{DOCKER_WEB_HOST_PORT}"
@@ -26,7 +33,7 @@ def _auth_headers(access_token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {access_token}"}
 
 
-def test_exec_reading_flow_kafka_and_http(
+def test_create_reading_publishes_kafka_event_and_lists_via_http(
     arena, validation_db_playbook, oauth_access_token
 ):
     @playbook(validation_db_playbook)
@@ -71,7 +78,7 @@ def test_exec_reading_flow_kafka_and_http(
     _body(arena)
 
 
-def test_exec_multiple_readings(arena, validation_db_playbook, oauth_access_token):
+def test_create_multiple_readings_are_listed(arena, validation_db_playbook, oauth_access_token):
     @playbook(validation_db_playbook)
     def _body(arena):
         id1 = _create_reading(BASE_URL_EXEC, "Bending", 1, "", oauth_access_token)
@@ -90,7 +97,7 @@ def test_exec_multiple_readings(arena, validation_db_playbook, oauth_access_toke
     _body(arena)
 
 
-def test_exec_calibration_outage_returns_error(
+def test_post_reading_returns_500_when_calibration_api_returns_500(
     arena, calibration_identifier, oauth_access_token
 ):
     from arena_pytest import HttpPlaybookBuilder
@@ -128,7 +135,7 @@ def test_exec_calibration_outage_returns_error(
     assert found["value"] == 17
 
 
-def test_exec_calibration_outage_via_playbook_decorator(
+def test_post_reading_returns_500_when_calibration_api_overridden_by_playbook(
     arena, calibration_outage_playbook, validation_db_playbook, oauth_access_token
 ):
     @playbook(calibration_outage_playbook, validation_db_playbook)
@@ -153,7 +160,7 @@ def test_exec_calibration_outage_via_playbook_decorator(
     assert any(r["id"] == recovered_id for r in readings)
 
 
-def test_exec_validation_db_scoped_via_playbook_decorator(
+def test_create_reading_with_validation_db_scoped_playbook(
     arena, validation_db_playbook, oauth_access_token
 ):
     @playbook(validation_db_playbook)
@@ -177,7 +184,7 @@ def outage_and_db_reset(arena, calibration_outage_playbook, validation_db_playbo
         yield
 
 
-def test_exec_fixture_scoped_multi_playbook(arena, outage_and_db_reset, oauth_access_token):
+def test_post_reading_returns_500_under_scoped_playbook_stack(arena, outage_and_db_reset, oauth_access_token):
     r = requests.post(
         f"{BASE_URL_EXEC}/readings",
         json={"user_name": "Fixture Outage", "value": 1, "comment": None},
@@ -190,7 +197,7 @@ def test_exec_fixture_scoped_multi_playbook(arena, outage_and_db_reset, oauth_ac
     )
 
 
-def test_exec_calibration_playbook_expectation_failure_is_assertion(arena, calibration_identifier):
+def test_http_playbook_close_fails_when_call_expectation_unmet(arena, calibration_identifier):
     from arena_pytest import HttpPlaybookBuilder
 
     unused = (
@@ -210,7 +217,7 @@ def test_exec_calibration_playbook_expectation_failure_is_assertion(arena, calib
             pass
 
 
-def test_docker_reading_flow_kafka_and_http(
+def test_containerized_app_create_reading_publishes_kafka_event(
     docker_web_enabled,
     arena_docker,
     validation_db_playbook,
@@ -298,7 +305,7 @@ def _new_readings_kafka_consumer(bootstrap: str, topic: str, group_prefix: str) 
     return KafkaConsumer(
         topic,
         bootstrap_servers=bootstrap,
-        group_id=f"{group_prefix}-component-test-{os.getpid()}",
+        group_id=f"{KAFKA_CONSUMER_GROUP_LABEL}-{group_prefix}-{os.getpid()}",
         auto_offset_reset="earliest",
     )
 

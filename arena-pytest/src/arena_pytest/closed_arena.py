@@ -5,7 +5,7 @@ import json
 from typing import List
 
 from arena_pytest.arena import OpenArena
-from arena_pytest._ffi import (
+from arena_pytest.ffi._ffi import (
     ArenaFfiError,
     load_ffi,
     open_arena as ffi_open_arena,

@@ -113,11 +113,13 @@ py_test(
     size = "small",
     srcs = [
         "tests/conftest.py",
+        "tests/readings_arena_config.py",
         "tests/test_arena.py",
     ],
     main = "tests/test_arena.py",
     data = [
         "//arena-ffi:arena_ffi_shared",
+        "//examples:readings_arena_config",
         "//examples:instrument_reading_db_schema",
         "//examples:validation_db_schema",
         "//examples:example-readings-axum-web-app",

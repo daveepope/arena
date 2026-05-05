@@ -1,4 +1,7 @@
 test --test_output=streamed
 test --test_verbose_timeout_warnings
 test --test_env=RUST_LOG=info
+common --java_runtime_version=remotejdk_21
+common --tool_java_runtime_version=remotejdk_21
+common --java_header_compilation=false
 common:rust_libtest_nocapture --test_arg=--nocapture

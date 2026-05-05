@@ -1,4 +1,10 @@
 import os
+import sys
+
+_TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _TESTS_DIR not in sys.path:
+    sys.path.insert(0, _TESTS_DIR)
+
 import tempfile
 
 import pytest
@@ -34,36 +40,48 @@ from arena_pytest import (
     OAUTH_ISSUER,
     OauthDependencyBuilder,
     PostgresDependencyBuilder,
+    active_playbooks,
 )
 from arena_pytest.oauth import oauth_issuer_host_is_non_loopback
 
-POSTGRES_PORT = 5556
-POSTGRES_DB_NAME = "readings_db"
-POSTGRES_DB_USER = "readings_user"
-POSTGRES_DB_PASS = "readings_password"
-KAFKA_PORT = 9094
-MSSQL_PORT = 1436
-MSSQL_DB_NAME = "validationDb"
-MSSQL_DB_USER = "sa"
-MSSQL_DB_PASS = "yourStrong(!)Password"
-EXEC_WEB_APP_PORT = 3001
-DOCKER_WEB_HOST_PORT = 3002
-NETWORK_NAME = "arena-pytest-network"
-POSTGRES_CONTAINER_NAME = "arena-pytest-postgres"
-KAFKA_CONTAINER_NAME = "arena-pytest-kafka"
-MSSQL_CONTAINER_NAME = "arena-pytest-mssql"
-CALIBRATION_CONTAINER_NAME = "arena-pytest-calibration"
-CALIBRATION_HOST_PORT = 3003
-CALIBRATION_VALIDATE_PATH = "/api/v1/validate"
-KAFKA_TOPIC = "readings"
-DOCKER_IMAGE_TAG = "arena-pytest-docker-webapp"
-MSSQL_CONNECTION_STRING_LOCAL = (
-    f"Server=tcp:localhost,{MSSQL_PORT};Database={MSSQL_DB_NAME};"
-    f"User Id={MSSQL_DB_USER};Password={MSSQL_DB_PASS};TrustServerCertificate=True;"
-)
-MSSQL_CONNECTION_STRING_DOCKER = (
-    f"Server=tcp:{MSSQL_CONTAINER_NAME},1433;Database={MSSQL_DB_NAME};"
-    f"User Id={MSSQL_DB_USER};Password={MSSQL_DB_PASS};TrustServerCertificate=True;"
+from readings_arena_config import (
+    CALIBRATION_CONTAINER_NAME,
+    CALIBRATION_HOST_PORT,
+    CALIBRATION_VALIDATE_PATH,
+    CLOSED_ARENA_NAME,
+    COMPONENT_NAME_CONTAINERIZED,
+    COMPONENT_NAME_EXECUTABLE,
+    DEP_NAME_CALIBRATION_HTTP,
+    DEP_NAME_KAFKA,
+    DEP_NAME_MSSQL,
+    DEP_NAME_OAUTH,
+    DEP_NAME_POSTGRES,
+    DOCKER_IMAGE_TAG,
+    DOCKER_WEB_HOST_PORT,
+    EXEC_WEB_APP_PORT,
+    KAFKA_CONTAINER_NAME,
+    KAFKA_PORT,
+    KAFKA_TOPIC,
+    MATCH_NAME,
+    MSSQL_CONNECTION_STRING_DOCKER,
+    MSSQL_CONNECTION_STRING_LOCAL,
+    MSSQL_CONTAINER_NAME,
+    MSSQL_DB_NAME,
+    MSSQL_DB_PASS,
+    MSSQL_DB_USER,
+    MSSQL_PORT,
+    NETWORK_NAME,
+    PLAYBOOK_CALIBRATION_DEFAULT,
+    PLAYBOOK_CALIBRATION_OUTAGE_FIXTURE_SCOPE,
+    PLAYBOOK_CALIBRATION_OUTAGE_MANAGED,
+    PLAYBOOK_VALIDATION_DB_SCOPED,
+    POSTGRES_CONTAINER_NAME,
+    POSTGRES_DB_NAME,
+    POSTGRES_DB_PASS,
+    POSTGRES_DB_USER,
+    POSTGRES_IMAGE,
+    POSTGRES_PORT,
+    TEMP_DIRECTORY_PREFIX,
 )
 
 _DOCKER_WEB_ENABLED = False
@@ -90,7 +108,7 @@ def _prepare_container_image_context() -> tuple[str, str]:
     binary = _find_web_app_binary()
     if not binary or not os.path.isfile(binary):
         return "", ""
-    ctx = tempfile.mkdtemp(prefix="arena-pytest-image-ctx-")
+    ctx = tempfile.mkdtemp(prefix=TEMP_DIRECTORY_PREFIX)
     dst = os.path.join(ctx, "example-readings-axum-web-app")
     shutil.copy2(binary, dst)
     os.chmod(dst, 0o755)
@@ -155,7 +173,7 @@ def _find_web_app_binary() -> str:
 def _build_oauth():
     cert, key, _ = _arena_oauth_tls_session()
     return (
-        OauthDependencyBuilder("pytest oauth")
+        OauthDependencyBuilder(DEP_NAME_OAUTH)
         .with_port(DEFAULT_OAUTH_PORT)
         .with_listen_ip("0.0.0.0")
         .with_server_tls_pem(cert, key)
@@ -165,8 +183,8 @@ def _build_oauth():
 
 def _build_postgres(startup_sql: list[str]):
     return (
-        PostgresDependencyBuilder("pytest readings")
-        .with_image("14.20-trixie")
+        PostgresDependencyBuilder(DEP_NAME_POSTGRES)
+            .with_image(POSTGRES_IMAGE)
         .with_port(POSTGRES_PORT)
         .with_database_name(POSTGRES_DB_NAME)
         .with_database_username(POSTGRES_DB_USER)
@@ -179,7 +197,7 @@ def _build_postgres(startup_sql: list[str]):
 
 def _build_kafka():
     return (
-        KafkaDependencyBuilder("pytest readings")
+        KafkaDependencyBuilder(DEP_NAME_KAFKA)
         .with_flavor(KafkaFlavor.APACHE_NATIVE)
         .with_port(KAFKA_PORT)
         .with_container_name(KAFKA_CONTAINER_NAME)
@@ -190,7 +208,7 @@ def _build_kafka():
 
 def _build_mssql(startup_sql: list[str]):
     return (
-        MssqlDependencyBuilder("pytest validation")
+        MssqlDependencyBuilder(DEP_NAME_MSSQL)
         .with_port(MSSQL_PORT)
         .with_database_name(MSSQL_DB_NAME)
         .with_database_username(MSSQL_DB_USER)
@@ -203,7 +221,7 @@ def _build_mssql(startup_sql: list[str]):
 
 def _build_calibration_http():
     return (
-        HttpDependencyBuilder("pytest calibration")
+        HttpDependencyBuilder(DEP_NAME_CALIBRATION_HTTP)
         .with_port(CALIBRATION_HOST_PORT)
         .with_container_name(CALIBRATION_CONTAINER_NAME)
         .build()
@@ -213,7 +231,7 @@ def _build_calibration_http():
 def _build_calibration_playbook(dependency_identifier: str):
     return (
         ManagedHttpPlaybookBuilder(
-            "calibration-default", dependency_identifier
+            PLAYBOOK_CALIBRATION_DEFAULT, dependency_identifier
         )
         .with_mapping("POST", CALIBRATION_VALIDATE_PATH, 200, {"valid": True})
         .build()
@@ -224,7 +242,7 @@ def _build_calibration_playbook(dependency_identifier: str):
 def calibration_outage_playbook(calibration_identifier):
     return (
         ManagedHttpPlaybookBuilder(
-            "calibration-outage", calibration_identifier
+            PLAYBOOK_CALIBRATION_OUTAGE_MANAGED, calibration_identifier
         )
         .with_mapping("POST", CALIBRATION_VALIDATE_PATH, status=500)
         .build()
@@ -234,8 +252,29 @@ def calibration_outage_playbook(calibration_identifier):
 @pytest.fixture(scope="session")
 def validation_db_playbook(mssql_identifier):
     return ManagedMssqlPlaybookBuilder(
-        "validation-db-scoped", mssql_identifier
+        PLAYBOOK_VALIDATION_DB_SCOPED, mssql_identifier
     ).build()
+
+
+@pytest.fixture(scope="session")
+def calibration_outage_fixture_scope_playbook(calibration_identifier):
+    return (
+        ManagedHttpPlaybookBuilder(
+            PLAYBOOK_CALIBRATION_OUTAGE_FIXTURE_SCOPE, calibration_identifier
+        )
+        .with_mapping("POST", CALIBRATION_VALIDATE_PATH, status=500)
+        .build()
+    )
+
+
+@pytest.fixture
+def outage_and_db_reset(
+    arena, calibration_outage_fixture_scope_playbook, validation_db_playbook
+):
+    with active_playbooks(
+        arena, calibration_outage_fixture_scope_playbook, validation_db_playbook
+    ):
+        yield
 
 
 def _build_exec_component(oauth_ca_pem: str) -> object:
@@ -244,7 +283,7 @@ def _build_exec_component(oauth_ca_pem: str) -> object:
     is_bazel = bool(os.environ.get("RUNFILES_DIR"))
 
     exec_builder = (
-        ExecutableComponentBuilder("pytest web app")
+        ExecutableComponentBuilder(COMPONENT_NAME_EXECUTABLE)
         .with_executable_path(web_app_binary)
         .with_env_var("RUST_LOG", "info")
         .with_env_var("OAUTH_TLS_CA_PEM", oauth_ca_pem)
@@ -273,7 +312,7 @@ def _build_containerized_component(
     repo_root: str, containerfile: str, oauth_ca_pem: str
 ) -> object:
     return (
-        ContainerizedComponentBuilder("pytest web app container", containerfile)
+        ContainerizedComponentBuilder(COMPONENT_NAME_CONTAINERIZED, containerfile)
         .with_build_context(repo_root)
         .with_image_tag(DOCKER_IMAGE_TAG)
         .with_network(NETWORK_NAME)
@@ -359,7 +398,7 @@ def closed_arena() -> ClosedArena:
     mssql = _build_mssql(mssql_startup_sql)
     _MSSQL_IDENTIFIER = mssql.identifier
 
-    a_match = MatchBuilder("reading lifecycle")
+    a_match = MatchBuilder(MATCH_NAME)
     a_match = a_match.with_network(NETWORK_NAME)
     a_match = a_match.add_dependency(oauth)
     a_match = a_match.add_dependency(_build_postgres(startup_sql))
@@ -373,7 +412,7 @@ def closed_arena() -> ClosedArena:
     for c in components:
         a_match = a_match.add_component(c)
 
-    return ClosedArena("Test Arena", [a_match.build()])
+    return ClosedArena(CLOSED_ARENA_NAME, [a_match.build()])
 
 
 @pytest.fixture(scope="session")

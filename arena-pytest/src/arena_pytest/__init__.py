@@ -1,4 +1,4 @@
-from arena_pytest._ffi import ArenaFfiError, ArenaStatus
+from arena_pytest.ffi._ffi import ArenaFfiError, ArenaStatus
 from arena_pytest.arena import (
     OpenArena,
     arena,
@@ -6,17 +6,17 @@ from arena_pytest.arena import (
     closed_arena,
 )
 from arena_pytest.closed_arena import ClosedArena
-from arena_pytest.matches import Match, MatchBuilder
-from arena_pytest.containerized_component import (
+from arena_pytest.match import Match, MatchBuilder
+from arena_pytest.exec.containerized_component import (
     ContainerizedComponent,
     ContainerizedComponentBuilder,
 )
-from arena_pytest.executable_component import (
+from arena_pytest.exec.executable_component import (
     BuildTool,
     ExecutableComponent,
     ExecutableComponentBuilder,
 )
-from arena_pytest.http import (
+from arena_pytest.dep.http import (
     HttpDependency,
     HttpDependencyBuilder,
     HttpPlaybook,
@@ -24,13 +24,13 @@ from arena_pytest.http import (
     ManagedHttpPlaybook,
     ManagedHttpPlaybookBuilder,
 )
-from arena_pytest.kafka import (
+from arena_pytest.dep.kafka import (
     KAFKA_INTERNAL_DOCKER_PORT,
     KafkaDependency,
     KafkaDependencyBuilder,
     KafkaFlavor,
 )
-from arena_pytest.localstack import (
+from arena_pytest.dep.localstack import (
     LOCALSTACK_DEFAULT_ACCOUNT_ID,
     LOCALSTACK_DEFAULT_REGION,
     LOCALSTACK_INTERNAL_DOCKER_PORT,
@@ -48,7 +48,7 @@ from arena_pytest.localstack import (
     QueueSpec,
     SqsQueueTarget,
 )
-from arena_pytest.mssql import (
+from arena_pytest.dep.mssql import (
     ManagedMssqlPlaybook,
     ManagedMssqlPlaybookBuilder,
     MssqlDependency,
@@ -63,7 +63,7 @@ from arena_pytest.oauth import (
     oauth_loopback_tls_pem_pair,
 )
 from arena_pytest.playbook import active_playbooks, playbook
-from arena_pytest.postgres import PostgresDependency, PostgresDependencyBuilder
+from arena_pytest.dep.postgres import PostgresDependency, PostgresDependencyBuilder
 from arena_pytest.readiness import (
     DEFAULT_READINESS_TIMEOUT_MS,
     HttpReadinessCheck,

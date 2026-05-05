@@ -1,6 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
+load("@rules_java//java:defs.bzl", "java_binary", "java_library", "java_test")
 load("@crates//:defs.bzl", "all_crate_deps")
 
 filegroup(
@@ -15,8 +16,17 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+filegroup(
+    name = "readings_arena_config",
+    srcs = ["resources/readings_arena_config.json"],
+    visibility = ["//visibility:public"],
+)
+
 exports_files(
-    ["requirements.txt", "requirements_lock.txt"],
+    [
+        "requirements.txt",
+        "requirements_lock.txt",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -197,4 +207,93 @@ rust_test(
         proc_macro = True,
         proc_macro_dev = True,
     ),
+)
+
+java_library(
+    name = "example_readings_spring_boot_lib",
+    srcs = glob(["src/example_readings_spring_boot_web_app/src/main/java/**/*.java"]),
+    resources = glob(["src/example_readings_spring_boot_web_app/src/main/resources/**"]),
+    javacopts = [
+        "--release",
+        "21",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_core",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:com_microsoft_sqlserver_mssql_jdbc",
+        "@arena_java_maven//:jakarta_validation_jakarta_validation_api",
+        "@arena_java_maven//:org_postgresql_postgresql",
+        "@arena_java_maven//:org_springframework_boot_spring_boot",
+        "@arena_java_maven//:org_springframework_boot_spring_boot_autoconfigure",
+        "@arena_java_maven//:org_springframework_boot_spring_boot_starter_jdbc",
+        "@arena_java_maven//:org_springframework_boot_spring_boot_starter_oauth2_resource_server",
+        "@arena_java_maven//:org_springframework_boot_spring_boot_starter_validation",
+        "@arena_java_maven//:org_springframework_boot_spring_boot_starter_web",
+        "@arena_java_maven//:org_springframework_security_spring_security_config",
+        "@arena_java_maven//:org_springframework_security_spring_security_core",
+        "@arena_java_maven//:org_springframework_security_spring_security_oauth2_core",
+        "@arena_java_maven//:org_springframework_security_spring_security_oauth2_jose",
+        "@arena_java_maven//:org_springframework_security_spring_security_oauth2_resource_server",
+        "@arena_java_maven//:org_springframework_security_spring_security_web",
+        "@arena_java_maven//:org_springframework_spring_beans",
+        "@arena_java_maven//:org_springframework_spring_context",
+        "@arena_java_maven//:org_springframework_spring_jdbc",
+        "@arena_java_maven//:org_springframework_spring_web",
+        "@arena_java_maven//:software_amazon_awssdk_auth",
+        "@arena_java_maven//:software_amazon_awssdk_eventbridge",
+        "@arena_java_maven//:software_amazon_awssdk_regions",
+        "@arena_java_maven//:software_amazon_awssdk_url_connection_client",
+    ],
+)
+
+java_binary(
+    name = "example-readings-spring-boot-web-app",
+    javacopts = [
+        "--release",
+        "21",
+    ],
+    main_class = "dev.arena.examples.readings.springboot.ReadingsApplication",
+    visibility = ["//visibility:public"],
+    runtime_deps = [":example_readings_spring_boot_lib"],
+)
+
+java_test(
+    name = "example-readings-spring-boot-component-test",
+    size = "small",
+    srcs = glob(["tests/example-readings-spring-boot-component-test/**/*.java"]),
+    javacopts = [
+        "--release",
+        "21",
+    ],
+    tags = ["requires_docker"],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-package=dev.arena.examples.readings.component",
+    ],
+    data = [
+        ":example-readings-spring-boot-web-app",
+        "//arena-ffi:arena_ffi_shared",
+        ":instrument_reading_db_schema",
+        ":validation_db_schema",
+    ],
+    jvm_flags = ["-Djna.nosys=true"],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        "//arena-junit:arena_junit_lib",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:org_apache_kafka_kafka_clients",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:software_amazon_awssdk_auth",
+        "@arena_java_maven//:software_amazon_awssdk_regions",
+        "@arena_java_maven//:software_amazon_awssdk_sqs",
+        "@arena_java_maven//:software_amazon_awssdk_url_connection_client",
+    ],
 )
