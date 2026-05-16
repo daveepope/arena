@@ -16,30 +16,50 @@ pub struct OpenArena {
 
 impl ClosedArena {
     pub fn new(name: String, matches: Vec<Box<dyn MatchTrait>>) -> Self {
-        Self { name, matches }
+        Self {
+            name,
+            matches,
+        }
     }
 
     pub async fn open(mut self) -> OpenArena {
-        log::info!("[Arena-{}] opening.", self.name);
+        tracing::info!(arena = %self.name, phase = "open_begin", "opening");
         let sw = Instant::now();
 
         let matches = std::mem::take(&mut self.matches);
+        let arena_name = self.name.clone();
 
-        let mut started = join_all(matches.into_iter().enumerate().map(|(i, mut m)| async move {
-            m.start().await;
-            (i, m)
-        }))
+        let mut started = join_all(
+            matches
+                .into_iter()
+                .enumerate()
+                .map(|(i, mut m)| {
+                    let arena_name = arena_name.clone();
+                    async move {
+                        let sw_one = Instant::now();
+                        m.start().await;
+                        tracing::info!(
+                            arena = %arena_name,
+                            match_index = i,
+                            elapsed = ?sw_one.elapsed(),
+                            phase = "match_open_complete",
+                            "match opened"
+                        );
+                        (i, m)
+                    }
+                }),
+        )
         .await;
 
         started.sort_by_key(|(i, _)| *i);
         let matches = started.into_iter().map(|(_, m)| m).collect();
 
-        log::debug!(
-            "[Arena-{}] open in {:?}.",
-            self.name,
-            sw.elapsed()
+        tracing::info!(
+            arena = %self.name,
+            elapsed = ?sw.elapsed(),
+            phase = "open_end",
+            "open complete"
         );
-        log::info!("[Arena-{}] opened.", self.name);
 
         OpenArena {
             name: self.name,
@@ -80,31 +100,48 @@ impl OpenArena {
         let name = std::mem::take(&mut self.name);
         let matches = std::mem::take(&mut self.matches);
 
-        ClosedArena { name, matches }
+        ClosedArena {
+            name,
+            matches,
+        }
     }
 
     async fn internal_close(&mut self) {
         if !self.closed {
-            log::info!("[Arena-{}] closing.", self.name);
+            tracing::info!(arena = %self.name, phase = "close_begin", "closing");
             let sw = Instant::now();
 
+            let arena_name = self.name.clone();
             let matches = std::mem::take(&mut self.matches);
 
-            let mut stopped = join_all(matches.into_iter().enumerate().map(|(i, mut m)| async move {
-                m.stop().await;
-                (i, m)
-            }))
+            let mut stopped = join_all(matches.into_iter().enumerate().map(
+                |(i, mut m)| {
+                    let arena_name = arena_name.clone();
+                    async move {
+                        let sw_one = Instant::now();
+                        m.stop().await;
+                        tracing::info!(
+                            arena = %arena_name,
+                            match_index = i,
+                            elapsed = ?sw_one.elapsed(),
+                            phase = "match_close_complete",
+                            "match closed"
+                        );
+                        (i, m)
+                    }
+                },
+            ))
             .await;
 
             stopped.sort_by_key(|(i, _)| *i);
             self.matches = stopped.into_iter().map(|(_, m)| m).collect();
 
-            log::debug!(
-                "[Arena-{}] closed in {:?}.",
-                self.name,
-                sw.elapsed()
+            tracing::info!(
+                arena = %self.name,
+                elapsed = ?sw.elapsed(),
+                phase = "close_end",
+                "close complete"
             );
-            log::info!("[Arena-{}] closed.", self.name);
 
             self.closed = true;
         }
@@ -136,7 +173,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_arena_calls_start_and_stop_on_all_matches() {
-        let _ = env_logger::builder().is_test(true).try_init();
         let matches: Vec<Box<dyn MatchTrait>> = vec![
             Box::new(create_and_setup_stub_match()),
             Box::new(create_and_setup_stub_match()),
@@ -149,12 +185,9 @@ mod tests {
 
     #[test]
     fn test_open_arena_auto_closes_on_drop() {
-        let _ = env_logger::builder().is_test(true).try_init();
-
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let matches: Vec<Box<dyn MatchTrait>> =
-                vec![Box::new(create_and_setup_stub_match())];
+            let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new(create_and_setup_stub_match())];
 
             let closed = ClosedArena::new("TestArena".to_string(), matches);
             let open = closed.open().await;

@@ -136,6 +136,19 @@ py_test(
     visibility = ["//visibility:public"],
 )
 
+py_test(
+    name = "arena_pytest_dispatcher_host_logging_test",
+    size = "small",
+    srcs = ["tests/test_dispatcher_logging_bindings.py"],
+    main = "tests/test_dispatcher_logging_bindings.py",
+    data = ["//arena-ffi:arena_ffi_shared"],
+    deps = [
+        ":arena_pytest_lib",
+        "@pip//pytest",
+    ],
+    python_version = "PY3",
+    visibility = ["//visibility:public"],
+)
 py_wheel(
     name = "arena_pytest_wheel",
     distribution = "arena-pytest",

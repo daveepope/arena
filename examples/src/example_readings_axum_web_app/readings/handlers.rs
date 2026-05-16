@@ -19,7 +19,11 @@ pub async fn list_readings(
     State(st): State<AppState>,
     Extension(claims): Extension<AccessTokenClaims>,
 ) -> Result<Json<Vec<ReadingRow>>, (StatusCode, String)> {
-    log::debug!("list_readings for subject {}", claims.sub);
+    tracing::debug!(
+        subject = %claims.sub,
+        phase = "list_readings",
+        "handling list readings",
+    );
     let rows = st
         .pg
         .query(
@@ -70,7 +74,11 @@ pub async fn create_reading(
     Extension(claims): Extension<AccessTokenClaims>,
     Json(req): Json<CreateReadingRequest>,
 ) -> Result<(StatusCode, Json<CreateReadingResponse>), (StatusCode, String)> {
-    log::debug!("create_reading for subject {}", claims.sub);
+    tracing::debug!(
+        subject = %claims.sub,
+        phase = "create_reading",
+        "handling create reading",
+    );
     let validation = st
         .http_client
         .post(format!("{}/api/v1/validate", st.calibration_url))
@@ -142,11 +150,11 @@ pub async fn create_reading(
             .key(key_for_send.as_str())
             .payload(payload_for_send.as_bytes());
         if let Err((e, _msg)) = producer.send(record) {
-            log::debug!("kafka publish failed: {e}");
+            tracing::debug!(error = %e, phase = "kafka_publish", "kafka publish failed");
             return;
         }
         if let Err(e) = producer.flush(Duration::from_secs(2)) {
-            log::debug!("kafka flush failed: {e}");
+            tracing::debug!(error = %e, phase = "kafka_flush", "kafka flush failed");
         }
     });
 

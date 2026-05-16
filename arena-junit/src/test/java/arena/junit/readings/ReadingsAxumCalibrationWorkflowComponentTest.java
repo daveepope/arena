@@ -12,8 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import arena.junit.playbook.ActivePlaybooks;
-import arena.junit.playbook.HttpPlaybook;
-import arena.junit.playbook.HttpPlaybookBuilder;
+import arena.junit.playbook.ActiveHttpPlaybook;
+import arena.junit.playbook.ActiveHttpPlaybookBuilder;
 import arena.junit.playbook.ManagedHttpPlaybook;
 import arena.junit.playbook.ManagedHttpPlaybookBuilder;
 import arena.junit.playbook.ManagedMssqlPlaybook;
@@ -36,11 +36,11 @@ final class ReadingsAxumCalibrationWorkflowComponentTest {
   void postReadingReturns500WhenCalibrationApiReturns500() throws Exception {
     HttpClient c = readingsClient();
     String token = readingsArena.accessToken();
-    HttpPlaybook outage =
-        new HttpPlaybookBuilder(readingsArena.calibrationIdentifier())
+    ActiveHttpPlaybook outage =
+        new ActiveHttpPlaybookBuilder(readingsArena.calibrationIdentifier())
             .withMapping("POST", CALIBRATION_VALIDATE_PATH, 500, null, 1, 1, null, false)
             .build(readingsArena.arena());
-    outage.open();
+    outage.begin();
     try {
       HttpResponse<String> r =
           c.send(
@@ -133,11 +133,11 @@ final class ReadingsAxumCalibrationWorkflowComponentTest {
 
   @Test
   void httpPlaybookCloseFailsWhenCallExpectationUnmet() {
-    HttpPlaybook unused =
-        new HttpPlaybookBuilder(readingsArena.calibrationIdentifier())
+    ActiveHttpPlaybook unused =
+        new ActiveHttpPlaybookBuilder(readingsArena.calibrationIdentifier())
             .withMapping("POST", CALIBRATION_VALIDATE_PATH, 500, null, 1, 1, null, false)
             .build(readingsArena.arena());
-    unused.open();
+    unused.begin();
     assertThrows(AssertionError.class, unused::close);
   }
 }

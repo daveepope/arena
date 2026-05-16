@@ -1,9 +1,9 @@
+use crate::http_dependency::HttpImpl;
 use async_trait::async_trait;
 use testcontainers_modules::testcontainers;
 use testcontainers_modules::testcontainers::core::{ContainerPort, IntoContainerPort, WaitFor};
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 use testcontainers_modules::testcontainers::{GenericImage, ImageExt};
-use crate::http_dependency::HttpImpl;
 
 const DEFAULT_CONTAINER_HTTP_PORT: u16 = 8080;
 
@@ -82,10 +82,7 @@ impl HttpImpl for HttpContainerImpl {
             request = request.with_cmd(self.container_cli.cli_args.iter().cloned());
         }
 
-        let container = request
-            .start()
-            .await
-            .expect("start http dependency");
+        let container = request.start().await.expect("start http dependency");
 
         let host = container
             .get_host()
@@ -115,14 +112,14 @@ impl HttpImpl for HttpContainerImpl {
 
         self.container = Some(container);
 
-        log::info!("[HttpImpl] started dependency.");
+        tracing::debug!(layer = "http_stub_container", phase = "dependency_started");
     }
 
     async fn stop(&mut self) {
         self.container.take();
         self.base_url = None;
         self.https_base_url = None;
-        log::info!("[HttpImpl] stopped dependency.");
+        tracing::debug!(layer = "http_stub_container", phase = "dependency_stopped");
 
         if let Some(ref network) = self.network {
             arena_container::network::remove_network(network).await;

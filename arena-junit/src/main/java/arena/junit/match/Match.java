@@ -1,9 +1,5 @@
 package arena.junit.match;
-import arena.junit.exec.ContainerizedComponent;
-import arena.junit.exec.ExecutableComponent;
-import arena.junit.readiness.HttpReadinessCheck;
-import arena.junit.readiness.ReadinessChecksFfi;
-import arena.junit.readiness.ReadinessHooks;
+
 import arena.junit.support.ArenaJson;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -53,31 +49,6 @@ public final class Match {
         pbs.add(p.forFfi());
       }
       out.set("playbooks", pbs);
-    }
-    return out;
-  }
-
-  public List<ReadinessHooks.Hook> readinessHooks() {
-    List<ReadinessHooks.Hook> out = new ArrayList<>();
-    for (ArenaMatchPiece c : components) {
-      List<ReadinessChecksFfi.ReadinessEntry> entries = List.of();
-      if (c instanceof ExecutableComponent ec) {
-        entries = ec.readinessEntries();
-      } else if (c instanceof ContainerizedComponent cc) {
-        entries = cc.readinessEntries();
-      }
-      String identifier = "";
-      if (c instanceof ExecutableComponent ec) {
-        identifier = ec.identifier();
-      } else if (c instanceof ContainerizedComponent cc) {
-        identifier = cc.identifier();
-      }
-      for (ReadinessChecksFfi.ReadinessEntry e : entries) {
-        if (e.check() instanceof HttpReadinessCheck) {
-          continue;
-        }
-        out.add(new ReadinessHooks.Hook(identifier, e.target(), e.check()));
-      }
     }
     return out;
   }

@@ -23,12 +23,13 @@ async fn log_requests(req: Request<Body>, next: Next) -> Response {
 
     let res = next.run(req).await;
 
-    log::debug!(
-        "{} {} -> {} in {:?}",
-        method,
-        uri,
-        res.status(),
-        sw.elapsed()
+    tracing::debug!(
+        http_method = %method,
+        http_uri = %uri,
+        status = %res.status(),
+        elapsed = ?sw.elapsed(),
+        phase = "http_request_finished",
+        "request completed",
     );
     res
 }

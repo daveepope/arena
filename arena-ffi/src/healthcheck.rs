@@ -32,11 +32,20 @@ impl ReadinessCheck for HttpReadinessCheck {
         while start.elapsed() < timeout {
             match reqwest::get(target).await {
                 Ok(_) => {
-                    log::debug!("[{}] HTTP healthcheck passed", identifier);
+                    tracing::info!(
+                        identifier = %identifier,
+                        target = %target,
+                        "http readiness passed"
+                    );
                     return Ok(());
                 }
                 Err(e) => {
-                    log::trace!("[{}] HTTP healthcheck failed: {}", identifier, e);
+                    tracing::trace!(
+                        identifier = %identifier,
+                        target = %target,
+                        error = %e,
+                        "http readiness poll failed"
+                    );
                 }
             }
             tokio::time::sleep(poll_interval).await;

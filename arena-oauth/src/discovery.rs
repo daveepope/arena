@@ -30,10 +30,7 @@ impl OAuthAuthorizationServerMetadata {
             scopes_supported,
             response_types_supported: vec!["token".into()],
             grant_types_supported: vec!["client_credentials".into()],
-            token_endpoint_auth_methods_supported: vec![
-                "client_secret_post".into(),
-                "none".into(),
-            ],
+            token_endpoint_auth_methods_supported: vec!["client_secret_post".into(), "none".into()],
             introspection_endpoint: Some(format!("{base}/oauth/introspect")),
         }
     }

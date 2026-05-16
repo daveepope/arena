@@ -1,31 +1,322 @@
 from __future__ import annotations
 
 import ctypes
+import logging
 import os
+import sys
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Optional
+from typing import Any, Optional
 
-ArenaLib = ctypes.CDLL
-
-
-class ArenaStatus(IntEnum):
-    OK = 0
-    INVALID_ARGUMENT = 1
-    FAILED = 2
-    PANIC = 3
-    NOT_FOUND = 4
+class ArenaLogLevel(IntEnum):
+    ERROR = 1
+    WARN = 2
+    INFO = 3
+    DEBUG = 4
+    TRACE = 5
 
 
-class ArenaFfiError(RuntimeError):
-    def __init__(self, message: str, status: Optional[ArenaStatus] = None) -> None:
-        super().__init__(message)
-        self.status = status
+_LOG_DISPATCHER_TRACE_NUM = logging.DEBUG - 2
+logging.addLevelName(_LOG_DISPATCHER_TRACE_NUM, "TRACE")
+
+
+class ArenaBindingError(RuntimeError):
+    pass
+
+
+def _ffi_expect_ok(raw: int, message: Optional[str], what_failed: str) -> None:
+    if raw != 0:
+        raise ArenaBindingError(message or f"{what_failed} (status_code={raw})")
 
 
 @dataclass(frozen=True)
-class ArenaFfi:
-    lib: ArenaLib
+class ArenaNativeLib:
+    lib: ctypes.CDLL
+
+
+_ARENA_LOG_TARGET_CALLBACK_ABI = ctypes.CFUNCTYPE(
+    None,
+    ctypes.c_int,
+    ctypes.c_void_p,
+    ctypes.c_int64,
+    ctypes.c_void_p,
+    ctypes.c_void_p,
+    ctypes.c_uint32,
+    ctypes.c_void_p,
+)
+
+_ARENA_PY_GIL_ENSURE = ctypes.pythonapi.PyGILState_Ensure
+_ARENA_PY_GIL_ENSURE.argtypes = []
+_ARENA_PY_GIL_ENSURE.restype = ctypes.c_int
+
+_ARENA_PY_GIL_RELEASE = ctypes.pythonapi.PyGILState_Release
+_ARENA_PY_GIL_RELEASE.argtypes = [ctypes.c_int]
+_ARENA_PY_GIL_RELEASE.restype = None
+
+_default_dispatcher_logging_target_callback: Any = None
+
+_DISPATCHER_DEFAULT_LOGGING_TARGET_LIB: Any = None
+
+
+def _ffi_ptr_addr(raw: object) -> int:
+    if raw is None:
+        return 0
+    try:
+        v = ctypes.cast(raw, ctypes.c_void_p).value or 0
+    except ctypes.ArgumentError:
+        return 0
+    return int(v)
+
+
+def _utf8_zterm_at(addr: int) -> str:
+    if addr == 0:
+        return ""
+    return ctypes.string_at(addr).decode("utf-8", errors="replace")
+
+
+def _arena_dispatcher_logging_target_publish_level_for_python_logging(level: int) -> int:
+    if level == ArenaLogLevel.ERROR:
+        return logging.ERROR
+    if level == ArenaLogLevel.WARN:
+        return logging.WARNING
+    if level == ArenaLogLevel.INFO:
+        return logging.INFO
+    if level == ArenaLogLevel.DEBUG:
+        return logging.DEBUG
+    if level == ArenaLogLevel.TRACE:
+        return _LOG_DISPATCHER_TRACE_NUM
+    return logging.INFO
+
+
+def _dispatcher_log_append_caller_suffix(
+    message: str, caller_file_addr: int, caller_line: int
+) -> str:
+    if caller_file_addr == 0 or caller_line <= 0:
+        return message
+    file_only = _utf8_zterm_at(caller_file_addr)
+    return f"{message} [{file_only}:{caller_line}]"
+
+
+def _flush_handlers_for_logger(lg: logging.Logger) -> None:
+    while lg is not None:
+        for h in lg.handlers:
+            try:
+                flush = getattr(h, "flush", None)
+                if callable(flush):
+                    flush()
+            except (OSError, RuntimeError):
+                pass
+        if not lg.propagate:
+            break
+        lg = lg.parent
+
+
+def _default_dispatcher_logging_target_invoke(
+    level: int,
+    _target_ptr,
+    ignored_ts_ns: int,
+    message_ptr,
+    caller_file_ptr,
+    caller_line: int,
+    ignored_user,
+) -> None:
+    gil_state = _ARENA_PY_GIL_ENSURE()
+    try:
+        lib = _DISPATCHER_DEFAULT_LOGGING_TARGET_LIB
+        if lib is None:
+            return
+        publish = int(lib.arena_dispatcher_default_logging_target_publish_level(int(level)))
+        publish_py = _arena_dispatcher_logging_target_publish_level_for_python_logging(publish)
+        lg = _dispatcher_default_logger(lib)
+        msg_addr = _ffi_ptr_addr(message_ptr)
+        text = _utf8_zterm_at(msg_addr)
+        cf_addr = _ffi_ptr_addr(caller_file_ptr)
+        text = _dispatcher_log_append_caller_suffix(text, cf_addr, int(caller_line))
+        lg.log(publish_py, "%s", text)
+    finally:
+        _ARENA_PY_GIL_RELEASE(gil_state)
+
+
+_custom_dispatcher_logging_targets: dict[int, "_UserDispatcherLoggerBridge"] = {}
+
+
+class _UserDispatcherLoggerBridge:
+    __slots__ = ("_ffi_lib", "_logger", "_saved_logger_level", "_closure")
+
+    def __init__(
+        self, ffi: ArenaNativeLib, lg: logging.Logger, arena_log_level: ArenaLogLevel
+    ):
+        self._ffi_lib = ffi.lib
+        self._logger = lg
+        self._saved_logger_level = lg.level
+        _install_dispatcher_direct_stderr_emitter(lg, arena_log_level)
+        self._closure = _ARENA_LOG_TARGET_CALLBACK_ABI(self._invoke)
+
+    def _invoke(
+        self,
+        level: int,
+        _target_ptr,
+        _ignored_ts_ns: int,
+        message_ptr,
+        caller_file_ptr,
+        caller_line: int,
+        _ignored_user_data,
+    ) -> None:
+        gil_state = _ARENA_PY_GIL_ENSURE()
+        try:
+            publish = int(
+                self._ffi_lib.arena_dispatcher_default_logging_target_publish_level(int(level))
+            )
+            publish_py = _arena_dispatcher_logging_target_publish_level_for_python_logging(
+                publish
+            )
+            msg_addr = _ffi_ptr_addr(message_ptr)
+            text = _utf8_zterm_at(msg_addr)
+            cf_addr = _ffi_ptr_addr(caller_file_ptr)
+            text = _dispatcher_log_append_caller_suffix(text, cf_addr, int(caller_line))
+            self._logger.log(publish_py, "%s", text)
+        finally:
+            _ARENA_PY_GIL_RELEASE(gil_state)
+
+    def ffi_callback(self) -> Any:
+        return self._closure
+
+    def restore_logger_configuration(self) -> None:
+        _remove_dispatcher_direct_stderr_emitter(self._logger)
+        self._logger.setLevel(self._saved_logger_level)
+
+
+def set_dispatcher_dependency_allow_json(
+    ffi: ArenaNativeLib, json_utf8: Optional[str]
+) -> None:
+    if json_utf8 is None:
+        ffi.lib.arena_dispatcher_dependency_allow_json_set(None)
+        return
+    buf = ctypes.create_string_buffer(json_utf8.encode("utf-8"))
+    ffi.lib.arena_dispatcher_dependency_allow_json_set(buf)
+
+
+def set_dispatcher_component_allow_json(
+    ffi: ArenaNativeLib, json_utf8: Optional[str]
+) -> None:
+    if json_utf8 is None:
+        ffi.lib.arena_dispatcher_component_allow_json_set(None)
+        return
+    buf = ctypes.create_string_buffer(json_utf8.encode("utf-8"))
+    ffi.lib.arena_dispatcher_component_allow_json_set(buf)
+
+
+def _dispatcher_default_logger(lib) -> logging.Logger:
+    nm_raw = lib.arena_dispatcher_default_logging_target_logger_name_utf8()
+    nm_addr = _ffi_ptr_addr(nm_raw)
+    name = (
+        _utf8_zterm_at(nm_addr)
+        if nm_addr
+        else "arena.rust.dispatcher"
+    )
+    return logging.getLogger(name)
+
+
+def _logging_floor_level_for_arena(arena_level: ArenaLogLevel) -> int:
+    if arena_level == ArenaLogLevel.ERROR:
+        return logging.ERROR
+    if arena_level == ArenaLogLevel.WARN:
+        return logging.WARNING
+    if arena_level == ArenaLogLevel.INFO:
+        return logging.INFO
+    if arena_level == ArenaLogLevel.DEBUG:
+        return logging.DEBUG
+    return _LOG_DISPATCHER_TRACE_NUM
+
+
+def _arena_dispatcher_stderr_handler_predicate(handler: logging.Handler) -> bool:
+    return getattr(handler, "_arena_pytest_dispatcher_stderr", False) is True
+
+
+def _install_dispatcher_direct_stderr_emitter(lg: logging.Logger, arena_level: ArenaLogLevel) -> None:
+    lg.setLevel(_logging_floor_level_for_arena(arena_level))
+    for h in lg.handlers:
+        if _arena_dispatcher_stderr_handler_predicate(h):
+            return
+    setattr(lg, "_arena_pytest_prev_propagate", lg.propagate)
+    lg.propagate = False
+    h = logging.StreamHandler(stream=sys.stderr)
+    setattr(h, "_arena_pytest_dispatcher_stderr", True)
+    h.setLevel(logging.NOTSET)
+    h.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s [%(process)d] %(levelname)s %(name)s - %(message)s",
+            datefmt="%H:%M:%S",
+        )
+    )
+    lg.addHandler(h)
+
+
+def _remove_dispatcher_direct_stderr_emitter(lg: logging.Logger) -> None:
+    for h in [x for x in list(lg.handlers) if _arena_dispatcher_stderr_handler_predicate(x)]:
+        lg.removeHandler(h)
+        try:
+            h.close()
+        except (OSError, RuntimeError):
+            pass
+    if hasattr(lg, "_arena_pytest_prev_propagate"):
+        lg.propagate = bool(getattr(lg, "_arena_pytest_prev_propagate"))
+        delattr(lg, "_arena_pytest_prev_propagate")
+
+
+def register_dispatcher_logging_target_for_logger(
+    ffi: ArenaNativeLib,
+    logger: logging.Logger,
+    *,
+    arena_log_level: ArenaLogLevel = ArenaLogLevel.INFO,
+) -> int:
+    if logger is None:
+        raise TypeError("logger must not be None")
+    bridge = _UserDispatcherLoggerBridge(ffi, logger, arena_log_level)
+    token = int(ffi.lib.arena_add_log_target(bridge.ffi_callback(), ctypes.c_void_p()))
+    if token == 0:
+        bridge.restore_logger_configuration()
+        raise ArenaBindingError("arena_add_log_target rejected callback")
+    _custom_dispatcher_logging_targets[token] = bridge
+    return token
+
+
+def register_default_dispatcher_logging_target(
+    ffi: ArenaNativeLib,
+    *,
+    arena_log_level: ArenaLogLevel = ArenaLogLevel.INFO,
+) -> int:
+    global _default_dispatcher_logging_target_callback, _DISPATCHER_DEFAULT_LOGGING_TARGET_LIB
+    if _default_dispatcher_logging_target_callback is None:
+        _default_dispatcher_logging_target_callback = _ARENA_LOG_TARGET_CALLBACK_ABI(
+            _default_dispatcher_logging_target_invoke
+        )
+    _DISPATCHER_DEFAULT_LOGGING_TARGET_LIB = ffi.lib
+    lg = _dispatcher_default_logger(ffi.lib)
+    _install_dispatcher_direct_stderr_emitter(lg, arena_log_level)
+    try:
+        token = int(
+            ffi.lib.arena_add_log_target(
+                _default_dispatcher_logging_target_callback, ctypes.c_void_p()
+            )
+        )
+        if token == 0:
+            raise ArenaBindingError("arena_add_log_target rejected callback")
+        return token
+    except BaseException:
+        _remove_dispatcher_direct_stderr_emitter(lg)
+        raise
+
+
+def unregister_dispatcher_logging_target(ffi: ArenaNativeLib, token: int) -> None:
+    if not token:
+        return
+    bridge = _custom_dispatcher_logging_targets.pop(token, None)
+    ffi.lib.arena_remove_log_target(ctypes.c_uint64(token))
+    if bridge is not None:
+        bridge.restore_logger_configuration()
+        return
+    _remove_dispatcher_direct_stderr_emitter(_dispatcher_default_logger(ffi.lib))
 
 
 def find_lib() -> Optional[str]:
@@ -111,7 +402,7 @@ def find_lib() -> Optional[str]:
     return None
 
 
-def load_ffi() -> Optional[ArenaFfi]:
+def load_ffi() -> Optional[ArenaNativeLib]:
     path = find_lib()
     if not path:
         return None
@@ -141,7 +432,35 @@ def load_ffi() -> Optional[ArenaFfi]:
     ]
     lib.arena_hard_reset.restype = ctypes.c_int
 
+    lib.arena_set_log_level.argtypes = [ctypes.c_int]
+    lib.arena_set_log_level.restype = None
+
     lib.arena_free_string.argtypes = [ctypes.c_void_p]
+
+    lib.arena_add_log_target.argtypes = [_ARENA_LOG_TARGET_CALLBACK_ABI, ctypes.c_void_p]
+    lib.arena_add_log_target.restype = ctypes.c_uint64
+
+    lib.arena_remove_log_target.argtypes = [ctypes.c_uint64]
+    lib.arena_remove_log_target.restype = None
+
+    lib.arena_dispatcher_default_logging_target_logger_name_utf8.argtypes = []
+    lib.arena_dispatcher_default_logging_target_logger_name_utf8.restype = ctypes.c_void_p
+
+    lib.arena_dispatcher_default_logging_target_publish_level.argtypes = [
+        ctypes.c_int
+    ]
+    lib.arena_dispatcher_default_logging_target_publish_level.restype = ctypes.c_int
+
+    lib.arena_dispatcher_dependency_allow_json_set.argtypes = [
+        ctypes.c_char_p,
+    ]
+    lib.arena_dispatcher_dependency_allow_json_set.restype = None
+
+    lib.arena_dispatcher_component_allow_json_set.argtypes = [
+        ctypes.c_char_p,
+    ]
+    lib.arena_dispatcher_component_allow_json_set.restype = None
+
     lib.arena_free_string.restype = None
 
     lib.arena_oauth_loopback_tls_pem_json.argtypes = [ctypes.POINTER(ctypes.c_void_p)]
@@ -200,10 +519,10 @@ def load_ffi() -> Optional[ArenaFfi]:
     ]
     lib.arena_localstack_playbook_close.restype = ctypes.c_int
 
-    return ArenaFfi(lib=lib)
+    return ArenaNativeLib(lib=lib)
 
 
-def _take_err(err_slot: "ctypes.c_void_p", ffi: ArenaFfi) -> Optional[str]:
+def _take_err(err_slot: "ctypes.c_void_p", ffi: ArenaNativeLib) -> Optional[str]:
     raw_ptr = err_slot.value
     if not raw_ptr:
         return None
@@ -214,65 +533,70 @@ def _take_err(err_slot: "ctypes.c_void_p", ffi: ArenaFfi) -> Optional[str]:
 
 
 def open_arena(
-    ffi: ArenaFfi,
+    ffi: ArenaNativeLib,
     name: bytes = b"pytest-arena",
     config: Optional[str] = None,
+    *,
+    log_level: ArenaLogLevel = ArenaLogLevel.INFO,
 ) -> int:
+    ffi.lib.arena_set_log_level(int(log_level))
     config_ptr = (config.encode("utf-8") + b"\0") if config else None
     err = ctypes.c_void_p()
     handle = ffi.lib.arena_open(name, config_ptr, ctypes.byref(err))
     if not handle:
         message = _take_err(err, ffi) or "arena_open returned null"
-        raise ArenaFfiError(message)
+        raise ArenaBindingError(message)
     return handle
 
 
-def close_arena(ffi: ArenaFfi, handle: int) -> None:
+def close_arena(
+    ffi: ArenaNativeLib,
+    handle: int,
+    *,
+    dispatcher_logging_target_token: int = 0,
+) -> None:
     if handle:
         ffi.lib.arena_close(handle)
+    flush_lg = _dispatcher_default_logger(ffi.lib)
+    if dispatcher_logging_target_token:
+        bridge = _custom_dispatcher_logging_targets.get(dispatcher_logging_target_token)
+        if bridge is not None:
+            flush_lg = bridge._logger
+        _flush_handlers_for_logger(flush_lg)
+        unregister_dispatcher_logging_target(ffi, dispatcher_logging_target_token)
+    else:
+        _flush_handlers_for_logger(flush_lg)
 
 
 def _reset(
-    ffi: ArenaFfi,
+    ffi: ArenaNativeLib,
     reset_fn,
     handle: int,
     dependency_identifier: str,
-) -> ArenaStatus:
+) -> None:
     if not handle:
-        raise ArenaFfiError("reset called on closed arena", ArenaStatus.INVALID_ARGUMENT)
+        raise ArenaBindingError("reset called on closed arena")
     err = ctypes.c_void_p()
     raw = reset_fn(handle, dependency_identifier.encode("utf-8"), ctypes.byref(err))
-    message = _take_err(err, ffi)
-    try:
-        status = ArenaStatus(raw)
-    except ValueError:
-        raise ArenaFfiError(
-            message or f"reset returned unknown status code {raw}",
-            ArenaStatus.FAILED,
-        )
-    if status is not ArenaStatus.OK:
-        raise ArenaFfiError(message or f"reset failed with status {status.name}", status)
-    return status
+    msg = _take_err(err, ffi)
+    _ffi_expect_ok(raw, msg, "reset")
 
 
-def soft_reset(ffi: ArenaFfi, handle: int, dependency_identifier: str) -> ArenaStatus:
-    return _reset(ffi, ffi.lib.arena_soft_reset, handle, dependency_identifier)
+def soft_reset(ffi: ArenaNativeLib, handle: int, dependency_identifier: str) -> None:
+    _reset(ffi, ffi.lib.arena_soft_reset, handle, dependency_identifier)
 
 
-def hard_reset(ffi: ArenaFfi, handle: int, dependency_identifier: str) -> ArenaStatus:
-    return _reset(ffi, ffi.lib.arena_hard_reset, handle, dependency_identifier)
+def hard_reset(ffi: ArenaNativeLib, handle: int, dependency_identifier: str) -> None:
+    _reset(ffi, ffi.lib.arena_hard_reset, handle, dependency_identifier)
 
 
-def http_playbook_open(
-    ffi: ArenaFfi,
+def http_playbook_begin(
+    ffi: ArenaNativeLib,
     arena_handle: int,
     spec_json: str,
 ) -> int:
     if not arena_handle:
-        raise ArenaFfiError(
-            "http_playbook_open called on closed arena",
-            ArenaStatus.INVALID_ARGUMENT,
-        )
+        raise ArenaBindingError("http_playbook_begin called on closed arena")
     err = ctypes.c_void_p()
     pb_handle = ffi.lib.arena_http_playbook_open(
         arena_handle,
@@ -281,39 +605,27 @@ def http_playbook_open(
     )
     message = _take_err(err, ffi)
     if not pb_handle:
-        raise ArenaFfiError(message or "arena_http_playbook_open returned null")
+        raise ArenaBindingError(message or "arena_http_playbook_open returned null")
     return pb_handle
 
 
-def http_playbook_close(ffi: ArenaFfi, pb_handle: int) -> None:
+def http_playbook_finish(ffi: ArenaNativeLib, pb_handle: int) -> None:
     if not pb_handle:
         return
     err = ctypes.c_void_p()
     raw = ffi.lib.arena_http_playbook_close(pb_handle, ctypes.byref(err))
     message = _take_err(err, ffi)
-    try:
-        status = ArenaStatus(raw)
-    except ValueError:
-        raise ArenaFfiError(
-            message or f"http_playbook_close returned unknown status {raw}",
-            ArenaStatus.FAILED,
-        )
-    if status is not ArenaStatus.OK:
-        raise ArenaFfiError(
-            message or f"http_playbook_close failed with status {status.name}",
-            status,
-        )
+    _ffi_expect_ok(raw, message, "http_playbook_finish")
 
 
 def http_playbook_verify(
-    ffi: ArenaFfi,
+    ffi: ArenaNativeLib,
     pb_handle: int,
     verify_spec_json: str,
 ) -> None:
     if not pb_handle:
-        raise ArenaFfiError(
-            "http_playbook_verify called on closed playbook",
-            ArenaStatus.INVALID_ARGUMENT,
+        raise ArenaBindingError(
+            "http_playbook_verify called without begun playbook scope (http_playbook_begin first)"
         )
     err = ctypes.c_void_p()
     raw = ffi.lib.arena_http_playbook_verify(
@@ -322,30 +634,16 @@ def http_playbook_verify(
         ctypes.byref(err),
     )
     message = _take_err(err, ffi)
-    try:
-        status = ArenaStatus(raw)
-    except ValueError:
-        raise ArenaFfiError(
-            message or f"http_playbook_verify returned unknown status {raw}",
-            ArenaStatus.FAILED,
-        )
-    if status is not ArenaStatus.OK:
-        raise ArenaFfiError(
-            message or f"http_playbook_verify failed with status {status.name}",
-            status,
-        )
+    _ffi_expect_ok(raw, message, "http_playbook_verify")
 
 
-def mssql_playbook_open(
-    ffi: ArenaFfi,
+def mssql_playbook_begin(
+    ffi: ArenaNativeLib,
     arena_handle: int,
     spec_json: str,
 ) -> int:
     if not arena_handle:
-        raise ArenaFfiError(
-            "mssql_playbook_open called on closed arena",
-            ArenaStatus.INVALID_ARGUMENT,
-        )
+        raise ArenaBindingError("mssql_playbook_begin called on closed arena")
     err = ctypes.c_void_p()
     pb_handle = ffi.lib.arena_mssql_playbook_open(
         arena_handle,
@@ -354,40 +652,26 @@ def mssql_playbook_open(
     )
     message = _take_err(err, ffi)
     if not pb_handle:
-        raise ArenaFfiError(message or "arena_mssql_playbook_open returned null")
+        raise ArenaBindingError(message or "arena_mssql_playbook_open returned null")
     return pb_handle
 
 
-def mssql_playbook_close(ffi: ArenaFfi, pb_handle: int) -> None:
+def mssql_playbook_finish(ffi: ArenaNativeLib, pb_handle: int) -> None:
     if not pb_handle:
         return
     err = ctypes.c_void_p()
     raw = ffi.lib.arena_mssql_playbook_close(pb_handle, ctypes.byref(err))
     message = _take_err(err, ffi)
-    try:
-        status = ArenaStatus(raw)
-    except ValueError:
-        raise ArenaFfiError(
-            message or f"mssql_playbook_close returned unknown status {raw}",
-            ArenaStatus.FAILED,
-        )
-    if status is not ArenaStatus.OK:
-        raise ArenaFfiError(
-            message or f"mssql_playbook_close failed with status {status.name}",
-            status,
-        )
+    _ffi_expect_ok(raw, message, "mssql_playbook_finish")
 
 
-def localstack_playbook_open(
-    ffi: ArenaFfi,
+def localstack_playbook_begin(
+    ffi: ArenaNativeLib,
     arena_handle: int,
     spec_json: str,
 ) -> int:
     if not arena_handle:
-        raise ArenaFfiError(
-            "localstack_playbook_open called on closed arena",
-            ArenaStatus.INVALID_ARGUMENT,
-        )
+        raise ArenaBindingError("localstack_playbook_begin called on closed arena")
     err = ctypes.c_void_p()
     pb_handle = ffi.lib.arena_localstack_playbook_open(
         arena_handle,
@@ -396,39 +680,27 @@ def localstack_playbook_open(
     )
     message = _take_err(err, ffi)
     if not pb_handle:
-        raise ArenaFfiError(message or "arena_localstack_playbook_open returned null")
+        raise ArenaBindingError(message or "arena_localstack_playbook_open returned null")
     return pb_handle
 
 
-def localstack_playbook_close(ffi: ArenaFfi, pb_handle: int) -> None:
+def localstack_playbook_finish(ffi: ArenaNativeLib, pb_handle: int) -> None:
     if not pb_handle:
         return
     err = ctypes.c_void_p()
     raw = ffi.lib.arena_localstack_playbook_close(pb_handle, ctypes.byref(err))
     message = _take_err(err, ffi)
-    try:
-        status = ArenaStatus(raw)
-    except ValueError:
-        raise ArenaFfiError(
-            message or f"localstack_playbook_close returned unknown status {raw}",
-            ArenaStatus.FAILED,
-        )
-    if status is not ArenaStatus.OK:
-        raise ArenaFfiError(
-            message or f"localstack_playbook_close failed with status {status.name}",
-            status,
-        )
+    _ffi_expect_ok(raw, message, "localstack_playbook_finish")
 
 
 def mssql_playbook_verify(
-    ffi: ArenaFfi,
+    ffi: ArenaNativeLib,
     pb_handle: int,
     verify_spec_json: str,
 ) -> None:
     if not pb_handle:
-        raise ArenaFfiError(
-            "mssql_playbook_verify called on closed playbook",
-            ArenaStatus.INVALID_ARGUMENT,
+        raise ArenaBindingError(
+            "mssql_playbook_verify called without begun playbook scope (mssql_playbook_begin first)"
         )
     err = ctypes.c_void_p()
     raw = ffi.lib.arena_mssql_playbook_verify(
@@ -437,16 +709,4 @@ def mssql_playbook_verify(
         ctypes.byref(err),
     )
     message = _take_err(err, ffi)
-    try:
-        status = ArenaStatus(raw)
-    except ValueError:
-        raise ArenaFfiError(
-            message or f"mssql_playbook_verify returned unknown status {raw}",
-            ArenaStatus.FAILED,
-        )
-    if status is not ArenaStatus.OK:
-        raise ArenaFfiError(
-            message or f"mssql_playbook_verify failed with status {status.name}",
-            status,
-        )
-
+    _ffi_expect_ok(raw, message, "mssql_playbook_verify")

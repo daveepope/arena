@@ -53,8 +53,7 @@ pub async fn oauth_bearer_middleware(
             .iter()
             .map(|s| s.as_str())
             .collect();
-        ensure_scopes(&claims, &need)
-            .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
+        ensure_scopes(&claims, &need).map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
     }
 
     req.extensions_mut().insert(claims.clone());

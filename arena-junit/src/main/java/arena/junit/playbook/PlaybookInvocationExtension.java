@@ -31,12 +31,12 @@ final class PlaybookInvocationExtension implements InvocationInterceptor {
       return;
     }
     OpenArena arena = resolveArena(extensionContext);
-    List<ActivePlaybook> list = new ArrayList<>();
+    List<Playbook> list = new ArrayList<>();
     for (Class<? extends ArenaPlaybookSupplier> t : types) {
       ArenaPlaybookSupplier sup = instantiateSupplier(t);
       list.addAll(Arrays.asList(sup.supply(extensionContext)));
     }
-    ActivePlaybook[] arr = list.toArray(ActivePlaybook[]::new);
+    Playbook[] arr = list.toArray(Playbook[]::new);
     try (ActivePlaybooks scope = ActivePlaybooks.open(arena, arr)) {
       invocation.proceed();
     }

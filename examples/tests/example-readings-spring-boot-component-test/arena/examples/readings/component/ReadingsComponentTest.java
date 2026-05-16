@@ -11,6 +11,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -24,9 +25,14 @@ public final class ReadingsComponentTest {
   @RegisterExtension
   static final ReadingsArenaFixture readings = new ReadingsArenaFixture();
 
+  @AfterAll
+  static void stopReadingsArenaAfterClass() {
+    readings.stopReadingsArena();
+  }
+
   @Test
   @ArenaPlaybooks(ReadingsDefaultPlaybooks.class)
-  void readingsHappyPathSqsEventAndList() throws Exception {
+  void postReadingsAuthorizedSameReadingOnQueueAndListedByGet() throws Exception {
     Map<String, String> credsMap = readings.awsDummyCredentials();
     var creds =
         StaticCredentialsProvider.create(
@@ -46,7 +52,7 @@ public final class ReadingsComponentTest {
 
     String base = "http://127.0.0.1:" + readings.webAppPort();
     String body =
-        "{\"user_name\":\"Spring JUnit User\",\"value\":77,\"comment\":\"sqs happy path\"}";
+        "{\"user_name\":\"Readings API User\",\"value\":77,\"comment\":\"sqs happy path\"}";
     HttpResponse<String> post =
         http.send(
             HttpRequest.newBuilder()
@@ -67,7 +73,7 @@ public final class ReadingsComponentTest {
         ReadingsSqsWait.waitReadingCreatedDetail(
             ReadingsArenaFixture.MAPPER, sqs, queueUrl, rid);
     assertEquals(rid, detail.path("id").asInt());
-    assertEquals("Spring JUnit User", detail.path("user_name").asText());
+    assertEquals("Readings API User", detail.path("user_name").asText());
     assertEquals(77, detail.path("value").asInt());
     assertEquals("sqs happy path", detail.path("comment").asText());
 
@@ -87,7 +93,7 @@ public final class ReadingsComponentTest {
     for (JsonNode x : rows) {
       if (x.path("id").asInt() == rid) {
         found = true;
-        assertEquals("Spring JUnit User", x.path("user_name").asText());
+        assertEquals("Readings API User", x.path("user_name").asText());
         assertEquals(77, x.path("value").asInt());
         break;
       }

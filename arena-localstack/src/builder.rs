@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use arena::dependency::RunnableDependency;
-use arena::healthcheck::ReadinessCheck;
 use crate::localstack_dependency::container_impl::LocalstackContainerImpl;
 use crate::localstack_dependency::{LocalstackDependency, LocalstackImpl};
+use arena::dependency::RunnableDependency;
+use arena::healthcheck::ReadinessCheck;
 
 #[derive(Debug, Clone)]
 pub struct QueueSpec {
@@ -211,8 +211,9 @@ impl LocalstackDependencyBuilder {
             event_rules,
         } = self;
 
-        let localstack_impl = localstack_impl
-            .unwrap_or_else(|| Box::new(LocalstackContainerImpl::new(network)) as Box<dyn LocalstackImpl>);
+        let localstack_impl = localstack_impl.unwrap_or_else(|| {
+            Box::new(LocalstackContainerImpl::new(network)) as Box<dyn LocalstackImpl>
+        });
 
         let port = port.unwrap_or(Self::DEFAULT_PORT);
         let image_name = image_name.unwrap_or_else(|| Self::DEFAULT_IMAGE_NAME.to_string());

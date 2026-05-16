@@ -11,7 +11,7 @@ arena = { workspace = true }
 arena-container = { workspace = true }
 async-trait = { workspace = true }
 testcontainers-modules = { workspace = true, features = ["mssql_server"] }
-log = { workspace = true }
+tracing = { workspace = true }
 futures = { workspace = true }
 tiberius = { workspace = true }
 tokio = { workspace = true, features = ["rt", "net", "macros"] }
@@ -19,4 +19,4 @@ tokio-util = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-env_logger = { workspace = true }
+tracing-subscriber = { workspace = true }

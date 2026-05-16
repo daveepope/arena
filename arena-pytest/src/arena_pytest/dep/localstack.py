@@ -229,47 +229,47 @@ class ManagedLocalstackPlaybook:
             "dependency_identifier": self._dependency_identifier,
         }
 
-    def activate(self, arena: "OpenArena") -> "LocalstackPlaybook":
-        return LocalstackPlaybook(
+    def run(self, arena: "OpenArena") -> "ActiveLocalstackPlaybook":
+        return ActiveLocalstackPlaybook(
             arena=arena,
             dependency_identifier=self._dependency_identifier,
         )
 
 
-class LocalstackPlaybook:
+class ActiveLocalstackPlaybook:
     def __init__(self, arena: "OpenArena", dependency_identifier: str):
         self._arena = arena
         self._dependency_identifier = dependency_identifier
         self._handle: Optional[int] = None
 
-    def __enter__(self) -> "LocalstackPlaybook":
-        from arena_pytest.ffi._ffi import localstack_playbook_open
+    def __enter__(self) -> "ActiveLocalstackPlaybook":
+        from arena_pytest.ffi._ffi import localstack_playbook_begin
 
         spec = json.dumps({"dependency_identifier": self._dependency_identifier})
-        self._handle = localstack_playbook_open(
+        self._handle = localstack_playbook_begin(
             self._arena._ffi, self._arena._handle, spec
         )
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        from arena_pytest.ffi._ffi import ArenaFfiError, localstack_playbook_close
+        from arena_pytest.ffi._ffi import ArenaBindingError, localstack_playbook_finish
 
         handle = self._handle
         self._handle = None
         if not handle:
             return
         try:
-            localstack_playbook_close(self._arena._ffi, handle)
-        except ArenaFfiError as e:
+            localstack_playbook_finish(self._arena._ffi, handle)
+        except ArenaBindingError as e:
             if exc_type is not None:
                 return
             raise AssertionError(str(e)) from None
 
-    def close(self) -> None:
+    def finish(self) -> None:
         if self._handle:
-            from arena_pytest.ffi._ffi import localstack_playbook_close
+            from arena_pytest.ffi._ffi import localstack_playbook_finish
 
-            localstack_playbook_close(self._arena._ffi, self._handle)
+            localstack_playbook_finish(self._arena._ffi, self._handle)
             self._handle = None
 
 

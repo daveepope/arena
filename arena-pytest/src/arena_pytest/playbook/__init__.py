@@ -12,15 +12,15 @@ def active_playbooks(arena: Any, *playbooks: Any) -> Iterator[None]:
         raise ValueError("active_playbooks requires at least one playbook argument")
 
     for pb in playbooks:
-        if not hasattr(pb, "activate"):
+        if not hasattr(pb, "run"):
             raise TypeError(
                 f"{pb!r} is not a registered playbook "
-                "(missing .activate(arena) method)"
+                "(missing .run(arena) method)"
             )
 
     with ExitStack() as stack:
         for pb in playbooks:
-            stack.enter_context(pb.activate(arena))
+            stack.enter_context(pb.run(arena))
         yield
 
 
@@ -29,10 +29,10 @@ def playbook(*playbooks: Any) -> Callable[[Callable], Callable]:
         raise ValueError("@playbook requires at least one playbook argument")
 
     for pb in playbooks:
-        if not hasattr(pb, "activate"):
+        if not hasattr(pb, "run"):
             raise TypeError(
                 f"{pb!r} is not a registered playbook "
-                "(missing .activate(arena) method)"
+                "(missing .run(arena) method)"
             )
 
     def decorator(test_fn: Callable) -> Callable:

@@ -17,10 +17,7 @@ pub(crate) struct KafkaDependencyConfig {
     pub topics: Option<Vec<String>>,
 }
 
-pub(crate) fn build(
-    config: &KafkaDependencyConfig,
-    network: &str,
-) -> Result<Dependency, String> {
+pub(crate) fn build(config: &KafkaDependencyConfig, network: &str) -> Result<Dependency, String> {
     let flavor = match config.flavor.as_deref() {
         Some("confluent") => KafkaFlavor::Confluent,
         Some("apache_native") | None => KafkaFlavor::ApacheNative,

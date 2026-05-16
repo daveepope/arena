@@ -28,7 +28,10 @@ impl ResourceCreator {
         if spec.fifo {
             req = req
                 .attributes(sqs::types::QueueAttributeName::FifoQueue, "true")
-                .attributes(sqs::types::QueueAttributeName::ContentBasedDeduplication, "true");
+                .attributes(
+                    sqs::types::QueueAttributeName::ContentBasedDeduplication,
+                    "true",
+                );
         }
 
         let out = req
@@ -205,15 +208,14 @@ async fn wait_until_lambda_active(client: &lambda::Client, name: &str) -> Result
 
     loop {
         if start.elapsed() >= timeout {
-            return Err(format!("lambda {name} did not become active within {timeout:?}"));
+            return Err(format!(
+                "lambda {name} did not become active within {timeout:?}"
+            ));
         }
 
         match client.get_function().function_name(name).send().await {
             Ok(out) => {
-                let state = out
-                    .configuration()
-                    .and_then(|c| c.state())
-                    .cloned();
+                let state = out.configuration().and_then(|c| c.state()).cloned();
                 match state {
                     Some(lambda::types::State::Active) => return Ok(()),
                     Some(lambda::types::State::Failed) => {
@@ -221,15 +223,17 @@ async fn wait_until_lambda_active(client: &lambda::Client, name: &str) -> Result
                             .configuration()
                             .and_then(|c| c.state_reason())
                             .unwrap_or("no state_reason from get_function");
-                        return Err(format!(
-                            "lambda {name} entered Failed state: {detail}"
-                        ));
+                        return Err(format!("lambda {name} entered Failed state: {detail}"));
                     }
                     _ => {}
                 }
             }
             Err(e) => {
-                log::debug!("[ResourceCreator] get_function({name}) transient error: {}", service_err(&e));
+                tracing::debug!(
+                    resource = %name,
+                    error = %service_err(&e),
+                    "lambda get_function transient error while waiting"
+                );
             }
         }
 
@@ -262,8 +266,8 @@ fn zip_directory(src: &Path) -> Result<Vec<u8>, String> {
             writer
                 .start_file(rel.clone(), options)
                 .map_err(|e| format!("zip start_file {rel}: {e}"))?;
-            let mut f = std::fs::File::open(&abs)
-                .map_err(|e| format!("open {}: {e}", abs.display()))?;
+            let mut f =
+                std::fs::File::open(&abs).map_err(|e| format!("open {}: {e}", abs.display()))?;
             let mut bytes = Vec::new();
             f.read_to_end(&mut bytes)
                 .map_err(|e| format!("read {}: {e}", abs.display()))?;
@@ -272,9 +276,7 @@ fn zip_directory(src: &Path) -> Result<Vec<u8>, String> {
                 .map_err(|e| format!("zip write {rel}: {e}"))?;
         }
 
-        writer
-            .finish()
-            .map_err(|e| format!("zip finish: {e}"))?;
+        writer.finish().map_err(|e| format!("zip finish: {e}"))?;
     }
 
     Ok(buf)
@@ -291,8 +293,7 @@ fn collect_files(src: &Path) -> Result<Vec<(String, PathBuf)>, String> {
     let mut out = Vec::new();
     let mut stack = vec![src.to_path_buf()];
     while let Some(dir) = stack.pop() {
-        let rd = std::fs::read_dir(&dir)
-            .map_err(|e| format!("read_dir {}: {e}", dir.display()))?;
+        let rd = std::fs::read_dir(&dir).map_err(|e| format!("read_dir {}: {e}", dir.display()))?;
         for entry in rd {
             let entry = entry.map_err(|e| format!("dir entry: {e}"))?;
             let p = entry.path();

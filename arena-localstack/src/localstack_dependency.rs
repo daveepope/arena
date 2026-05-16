@@ -13,7 +13,8 @@ use async_trait::async_trait;
 use futures_timer::Delay;
 
 use crate::builder::{
-    EventBusSpec, EventRuleSpec, EventTargetKind, LambdaSpec, LocalstackDependencyBuilder, QueueSpec,
+    EventBusSpec, EventRuleSpec, EventTargetKind, LambdaSpec, LocalstackDependencyBuilder,
+    QueueSpec,
 };
 use crate::localstack_dependency::healthcheck::LocalstackHealthReadinessCheck;
 use crate::localstack_dependency::resource_creator::ResourceCreator;
@@ -149,9 +150,10 @@ impl LocalstackDependency {
             match self.endpoint_on_host() {
                 Ok(v) => break v.to_string(),
                 Err(err) => {
-                    log::debug!(
-                        "[Localstack-{}] readiness endpoint missing: {}",
-                        self.identifier, err
+                    tracing::debug!(
+                        dependency = %self.identifier,
+                        reason = %err,
+                        "localstack endpoint not ready yet"
                     );
                     Delay::new(poll_every).await;
                 }
@@ -239,16 +241,14 @@ impl LocalstackDependency {
                 .iter()
                 .map(|t| {
                     let arn = match &t.kind {
-                        EventTargetKind::SqsQueue { queue_name } => self
-                            .queue_arns
-                            .get(queue_name)
-                            .cloned()
-                            .unwrap_or_else(|| {
+                        EventTargetKind::SqsQueue { queue_name } => {
+                            self.queue_arns.get(queue_name).cloned().unwrap_or_else(|| {
                                 panic!(
                                     "[Localstack-{}] event rule {} references unknown queue {}",
                                     self.identifier, rule.name, queue_name
                                 )
-                            }),
+                            })
+                        }
                         EventTargetKind::Lambda { function_name } => self
                             .lambda_arns
                             .get(function_name)
@@ -279,13 +279,13 @@ impl LocalstackDependency {
             || !self.event_buses.is_empty()
             || !self.event_rules.is_empty()
         {
-            log::info!(
-                "[Localstack-{}] provisioned {} queue(s), {} lambda(s), {} bus(es), {} rule(s)",
-                self.identifier,
-                self.queues.len(),
-                self.lambdas.len(),
-                self.event_buses.len(),
-                self.event_rules.len()
+            tracing::debug!(
+                dependency = %self.identifier,
+                queue_count = self.queues.len(),
+                lambda_count = self.lambdas.len(),
+                bus_count = self.event_buses.len(),
+                rule_count = self.event_rules.len(),
+                "provisioned localstack resources"
             );
         }
     }
@@ -310,7 +310,7 @@ impl RunnableDependency for LocalstackDependency {
             return;
         }
 
-        log::info!("[Localstack-{}] starting.", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "start_begin", "starting");
         let sw = Instant::now();
 
         for dep in self.dependencies.iter_mut().flatten() {
@@ -327,31 +327,36 @@ impl RunnableDependency for LocalstackDependency {
 
         let sw_container = Instant::now();
         self.localstack_impl
-            .start(self.port, &image_name, &image_tag, &container_name, &services)
+            .start(
+                self.port,
+                &image_name,
+                &image_tag,
+                &container_name,
+                &services,
+            )
             .await;
-        log::debug!(
-            "[Localstack-{}] container start in {:?}.",
-            self.identifier,
-            sw_container.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw_container.elapsed(),
+            "container start finished"
         );
 
         let sw_ready = Instant::now();
         self.wait_until_ready().await;
-        log::debug!(
-            "[Localstack-{}] readiness in {:?}.",
-            self.identifier,
-            sw_ready.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw_ready.elapsed(),
+            "readiness wait finished"
         );
 
         self.provision_resources().await;
 
         self.running = true;
-        log::debug!(
-            "[Localstack-{}] start complete in {:?}.",
-            self.identifier,
-            sw.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw.elapsed(),
+            "started"
         );
-        log::info!("[Localstack-{}] started.", self.identifier);
     }
 
     async fn stop(&mut self) {
@@ -359,7 +364,7 @@ impl RunnableDependency for LocalstackDependency {
             return;
         }
 
-        log::info!("[Localstack-{}] stopping.", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "stop_begin", "stopping");
         let sw = Instant::now();
 
         self.localstack_impl.stop().await;
@@ -369,12 +374,11 @@ impl RunnableDependency for LocalstackDependency {
         }
 
         self.running = false;
-        log::debug!(
-            "[Localstack-{}] stop complete in {:?}.",
-            self.identifier,
-            sw.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw.elapsed(),
+            "stopped"
         );
-        log::info!("[Localstack-{}] stopped.", self.identifier);
     }
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
@@ -393,14 +397,17 @@ impl RunnableDependency for LocalstackDependency {
 
         for (name, url) in &self.queue_urls {
             if let Err(e) = ResourceCreator::purge_queue(&endpoint, url).await {
-                log::warn!(
-                    "[Localstack-{}] soft reset: purge queue {name} failed: {e}",
-                    self.identifier
+                tracing::warn!(
+                    dependency = %self.identifier,
+                    queue = %name,
+                    error = %e,
+                    "soft reset: queue purge failed"
                 );
             } else {
-                log::info!(
-                    "[Localstack-{}] soft reset: purged queue {name}",
-                    self.identifier
+                tracing::debug!(
+                    dependency = %self.identifier,
+                    queue = %name,
+                    "soft reset: queue purged"
                 );
             }
         }
@@ -411,9 +418,10 @@ impl RunnableDependency for LocalstackDependency {
             return;
         }
 
-        log::info!(
-            "[Localstack-{}] hard reset: restarting container",
-            self.identifier
+        tracing::debug!(
+            dependency = %self.identifier,
+            phase = "hard_reset",
+            "restarting localstack container"
         );
         let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
@@ -427,7 +435,13 @@ impl RunnableDependency for LocalstackDependency {
         self.running = false;
 
         self.localstack_impl
-            .start(self.port, &image_name, &image_tag, &container_name, &services)
+            .start(
+                self.port,
+                &image_name,
+                &image_tag,
+                &container_name,
+                &services,
+            )
             .await;
         self.wait_until_ready().await;
         self.provision_resources().await;
@@ -440,9 +454,9 @@ impl Drop for LocalstackDependency {
         if !self.running {
             return;
         }
-        log::warn!(
-            "[Localstack-{}] dropped while still running; stopping container.",
-            self.identifier
+        tracing::warn!(
+            dependency = %self.identifier,
+            "drop while running; forcing stop"
         );
         futures::executor::block_on(<Self as RunnableDependency>::stop(self));
     }

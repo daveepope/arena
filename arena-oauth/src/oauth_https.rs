@@ -7,9 +7,7 @@ use axum::routing::{get, post};
 use axum::{Form, Json, Router};
 use serde_json::json;
 
-use crate::oauth_common::{
-    introspection_active, IntrospectForm, OAuthSigningState, TokenForm,
-};
+use crate::oauth_common::{introspection_active, IntrospectForm, OAuthSigningState, TokenForm};
 use crate::token::{issue_access_token, verify_access_token};
 
 pub(crate) fn https_router(state: Arc<OAuthSigningState>) -> Router {
@@ -76,7 +74,7 @@ async fn post_token(
     ) {
         Ok(t) => t,
         Err(e) => {
-            log::error!("[arena-oauth] issue token: {e}");
+            tracing::error!(error = %e, op = "oauth_issue_token", "token issue failed");
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({ "error": "server_error" })),

@@ -1,10 +1,11 @@
 package arena.junit.playbook;
+
 import arena.junit.OpenArena;
 import arena.junit.support.ArenaJson;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public final class ManagedLocalstackPlaybook implements ArenaPlaybookRegistration, ActivePlaybook {
+public final class ManagedLocalstackPlaybook implements ArenaPlaybookRegistration, Playbook {
   private final String identifier;
   private final String dependencyIdentifier;
 
@@ -30,14 +31,14 @@ public final class ManagedLocalstackPlaybook implements ArenaPlaybookRegistratio
     return n;
   }
 
-  public LocalstackPlaybook activate(OpenArena arena) {
-    return new LocalstackPlaybook(dependencyIdentifier);
+  public ActiveLocalstackPlaybook run(OpenArena arena) {
+    return new ActiveLocalstackPlaybook(dependencyIdentifier);
   }
 
   @Override
   public AutoCloseable enter(OpenArena arena) {
-    LocalstackPlaybook p = activate(arena);
-    p.open(arena);
+    ActiveLocalstackPlaybook p = run(arena);
+    p.begin(arena);
     return p;
   }
 }

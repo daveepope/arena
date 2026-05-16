@@ -1,7 +1,7 @@
-use async_trait::async_trait;
+use crate::builder::ExecutableComponentBuilder;
 use arena::component::RunnableComponent;
 use arena::healthcheck::ReadinessCheck;
-use crate::builder::ExecutableComponentBuilder;
+use async_trait::async_trait;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -36,7 +36,6 @@ impl ExecutableComponent {
         ExecutableComponentBuilder::new(identifier)
     }
 
-
     async fn wait_until_ready(&self) {
         if self.readiness_checks.is_empty() {
             return;
@@ -46,27 +45,37 @@ impl ExecutableComponent {
         for (check, target) in &self.readiness_checks {
             match check.is_ready(&self.identifier, target, timeout_ms).await {
                 Ok(()) => {
-                    log::debug!("[Component-{}] readiness check passed for target: {}", self.identifier, target);
+                    tracing::debug!(
+                        component = %self.identifier,
+                        readiness_target = %target,
+                        "readiness check passed",
+                    );
                 }
                 Err(msg) => {
-                    panic!("[Component-{}] readiness check failed for target {}: {}", self.identifier, target, msg);
+                    panic!(
+                        "{}: readiness check failed for target {}: {}",
+                        self.identifier, target, msg
+                    );
                 }
             }
         }
-        log::debug!("[Component-{}] all readiness checks passed.", self.identifier);
+        tracing::debug!(
+            component = %self.identifier,
+            "all readiness checks passed",
+        );
     }
 
     fn log_line(identifier: &str, line: &str) {
         if line.contains(" ERROR ") {
-            log::error!("[{}] {}", identifier, line);
+            tracing::error!(component = %identifier, "{}", line);
         } else if line.contains(" WARN ") {
-            log::warn!("[{}] {}", identifier, line);
+            tracing::warn!(component = %identifier, "{}", line);
         } else if line.contains(" DEBUG ") {
-            log::debug!("[{}] {}", identifier, line);
+            tracing::debug!(component = %identifier, "{}", line);
         } else if line.contains(" TRACE ") {
-            log::trace!("[{}] {}", identifier, line);
+            tracing::trace!(component = %identifier, "{}", line);
         } else {
-            log::info!("[{}] {}", identifier, line);
+            tracing::debug!(component = %identifier, "{}", line);
         }
     }
 
@@ -82,13 +91,20 @@ impl ExecutableComponent {
     }
 
     fn spawn_process(&mut self) -> Result<(), String> {
-        let executable_path = self.executable_path.as_ref()
+        let executable_path = self
+            .executable_path
+            .as_ref()
             .ok_or_else(|| "executable_path not configured".to_string())?;
 
-        log::info!("[Component-{}] spawning process: {:?}", self.identifier, executable_path);
+        tracing::debug!(
+            component = %self.identifier,
+            executable_path = ?executable_path,
+            phase = "spawn_begin",
+            "spawning child process",
+        );
 
         let mut cmd = Command::new(executable_path);
-        
+
         for (key, value) in &self.env_vars {
             cmd.env(key, value);
         }
@@ -97,15 +113,19 @@ impl ExecutableComponent {
             cmd.arg(value);
         }
 
-        cmd.stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
         let mut child = cmd
             .spawn()
             .map_err(|e| format!("failed to spawn process: {}", e))?;
 
         let pid = child.id();
-        log::info!("[Component-{}] process spawned (pid: {})", self.identifier, pid);
+        tracing::debug!(
+            component = %self.identifier,
+            pid,
+            phase = "spawned",
+            "child process spawned",
+        );
 
         if let Some(stdout) = child.stdout.take() {
             Self::spawn_output_reader(stdout, self.identifier.clone());
@@ -116,10 +136,9 @@ impl ExecutableComponent {
         }
 
         self.process_handle = Some(child);
-        
+
         Ok(())
     }
-    
 }
 
 #[async_trait]
@@ -129,17 +148,25 @@ impl RunnableComponent for ExecutableComponent {
             child.start().await;
         }
 
-        log::info!("[Component-{}] starting.", self.identifier);
+        tracing::debug!(
+            component = %self.identifier,
+            phase = "start_begin",
+            "starting",
+        );
 
         if self.executable_path.is_some() {
             if let Err(e) = self.spawn_process() {
-                panic!("[Component-{}] spawn failed: {}", self.identifier, e);
+                panic!("{}: spawn failed: {}", self.identifier, e);
             }
         }
 
         self.wait_until_ready().await;
 
-        log::info!("[Component-{}] started.", self.identifier);
+        tracing::debug!(
+            component = %self.identifier,
+            phase = "start_done",
+            "started",
+        );
     }
 
     async fn stop(&mut self) {
@@ -147,15 +174,28 @@ impl RunnableComponent for ExecutableComponent {
             return;
         }
 
-        log::info!("[Component-{}] stopping.", self.identifier);
+        tracing::debug!(
+            component = %self.identifier,
+            phase = "stop_begin",
+            "stopping",
+        );
 
         if let Some(mut child) = self.process_handle.take() {
-            log::info!("[Component-{}] killing process (pid: {})", self.identifier, child.id());
+            tracing::debug!(
+                component = %self.identifier,
+                pid = child.id(),
+                phase = "kill_begin",
+                "killing child process",
+            );
             let _ = child.kill();
             let _ = child.wait();
         }
 
-        log::info!("[Component-{}] stopped.", self.identifier);
+        tracing::debug!(
+            component = %self.identifier,
+            phase = "stop_done",
+            "stopped",
+        );
 
         for child in self.children.iter_mut().flatten().rev() {
             child.stop().await;

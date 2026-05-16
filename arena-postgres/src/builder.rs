@@ -1,7 +1,7 @@
+use crate::postgres_dependency::postgres_container_impl::{PostgresContainerImpl, PostgresImpl};
+use crate::postgres_dependency::PostgresDependency;
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
-use crate::postgres_dependency::postgres_container_impl::{PostgresContainerImpl, PostgresImpl};
-use crate::postgres_dependency::{PostgresDependency};
 
 pub struct PostgresDependencyBuilder {
     identifier: String,
@@ -20,7 +20,6 @@ pub struct PostgresDependencyBuilder {
 }
 
 impl PostgresDependencyBuilder {
-
     const DEFAULT_PORT: u16 = 5432;
     const DEFAULT_DATABASE_NAME: &'static str = "arena_db";
     const DEFAULT_DATABASE_USERNAME: &'static str = "arena_user";

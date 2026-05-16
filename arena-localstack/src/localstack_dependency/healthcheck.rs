@@ -39,14 +39,17 @@ impl ReadinessCheck for LocalstackHealthReadinessCheck {
         while start.elapsed() < timeout {
             match poll_once(&client, &health_url, &self.readiness_scope).await {
                 Ok(()) => {
-                    log::debug!(
-                        "[Localstack-{identifier}] health endpoint reports scoped services ready"
+                    tracing::debug!(
+                        identifier = %identifier,
+                        "localstack health endpoint reports scoped services ready"
                     );
                     return Ok(());
                 }
                 Err(err) => {
-                    log::debug!(
-                        "[Localstack-{identifier}] health not ready yet: {err}"
+                    tracing::debug!(
+                        identifier = %identifier,
+                        error = %err,
+                        "readiness probe failed (will retry)"
                     );
                     last_err = err;
                     Delay::new(poll_every).await;

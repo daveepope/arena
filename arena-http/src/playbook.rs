@@ -3,17 +3,16 @@ pub mod response;
 pub mod stub;
 pub mod verify;
 
-use crate::http_dependency::HttpDependency;
 use crate::admin_client::admin_api_client;
+use crate::http_dependency::HttpDependency;
 use header_pattern::HeaderPattern;
 use response::ResponseDefinition;
 use serde::Deserialize;
 use std::collections::HashSet;
 use stub::StubMapping;
 use verify::{
-    RequestCriteria, RecordedRequest, FindResponse,
-    ServeEvent, ServeEventsResponse, event_matches_criteria, event_stub_id,
-    format_request_journal,
+    event_matches_criteria, event_stub_id, format_request_journal, FindResponse, RecordedRequest,
+    RequestCriteria, ServeEvent, ServeEventsResponse,
 };
 
 #[derive(Debug, Clone)]
@@ -45,8 +44,14 @@ struct Expectation {
 impl Expectation {
     fn describe(&self) -> String {
         match self.count {
-            ExpectedCount::Exactly(n) => format!("{} {} called exactly {n} time(s)", self.method, self.url_path),
-            ExpectedCount::AtLeast(n) => format!("{} {} called at least {n} time(s)", self.method, self.url_path),
+            ExpectedCount::Exactly(n) => format!(
+                "{} {} called exactly {n} time(s)",
+                self.method, self.url_path
+            ),
+            ExpectedCount::AtLeast(n) => format!(
+                "{} {} called at least {n} time(s)",
+                self.method, self.url_path
+            ),
             ExpectedCount::Never => format!("{} {} never called", self.method, self.url_path),
         }
     }
@@ -86,9 +91,7 @@ impl Playbook {
         Self {
             identifier: format!("http-playbook:{}", dependency.identifier),
             admin_url,
-            trusted_tls_certificate_pem: dependency
-                .trusted_certificate_pem()
-                .map(str::to_string),
+            trusted_tls_certificate_pem: dependency.trusted_certificate_pem().map(str::to_string),
             mappings: Vec::new(),
             expectations: Vec::new(),
         }
@@ -116,10 +119,7 @@ impl Playbook {
     }
 
     pub async fn run(self) -> ActivePlaybook {
-        let client = admin_api_client(
-            &self.admin_url,
-            self.trusted_tls_certificate_pem.as_deref(),
-        );
+        let client = admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref());
         let mappings_url = format!("{}/mappings", self.admin_url);
 
         let mut registered: Vec<RegisteredMapping> = Vec::with_capacity(self.mappings.len());
@@ -142,7 +142,9 @@ impl Playbook {
                 panic!("mapping {idx} rejected by server (HTTP {status}): {body}");
             }
 
-            let text = resp.text().await
+            let text = resp
+                .text()
+                .await
                 .unwrap_or_else(|e| panic!("read mapping {idx} response: {e}"));
             let created: MappingCreated = serde_json::from_str(&text)
                 .unwrap_or_else(|e| panic!("parse mapping {idx} response: {e}\nbody: {text}"));
@@ -154,10 +156,11 @@ impl Playbook {
             });
         }
 
-        log::info!(
-            "Playbook applied {} mapping(s), {} expectation(s).",
-            self.mappings.len(),
-            self.expectations.len(),
+        tracing::debug!(
+            playbook_id = %self.identifier,
+            mapping_count = self.mappings.len(),
+            expectation_count = self.expectations.len(),
+            "playbook applied"
         );
 
         ActivePlaybook {
@@ -209,10 +212,8 @@ impl ActivePlaybook {
     pub async fn verify(&self, expected_count: u64, criteria: RequestCriteria) {
         let actual = self.scoped_count(&criteria).await;
         if actual != expected_count {
-            let client = admin_api_client(
-                &self.admin_url,
-                self.trusted_tls_certificate_pem.as_deref(),
-            );
+            let client =
+                admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref());
             let all = self.fetch_all_requests(&client).await;
             panic!(
                 "\n\nPlaybook verification failed for: {criteria}\n\
@@ -226,10 +227,8 @@ impl ActivePlaybook {
     pub async fn verify_at_least(&self, minimum: u64, criteria: RequestCriteria) {
         let actual = self.scoped_count(&criteria).await;
         if actual < minimum {
-            let client = admin_api_client(
-                &self.admin_url,
-                self.trusted_tls_certificate_pem.as_deref(),
-            );
+            let client =
+                admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref());
             let all = self.fetch_all_requests(&client).await;
             panic!(
                 "\n\nPlaybook verification failed for: {criteria}\n\
@@ -251,10 +250,7 @@ impl ActivePlaybook {
             self.panic_not_owned(&criteria);
         }
 
-        let client = admin_api_client(
-            &self.admin_url,
-            self.trusted_tls_certificate_pem.as_deref(),
-        );
+        let client = admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref());
         let events = self.fetch_scope_events(&client).await;
         let matched: Vec<&ServeEvent> = events
             .iter()
@@ -275,10 +271,7 @@ impl ActivePlaybook {
             self.panic_not_owned(criteria);
         }
 
-        let client = admin_api_client(
-            &self.admin_url,
-            self.trusted_tls_certificate_pem.as_deref(),
-        );
+        let client = admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref());
         let events = self.fetch_scope_events(&client).await;
         events
             .iter()
@@ -385,7 +378,9 @@ async fn fetch_scope_events_for(
         panic!("fetch serve events got HTTP {status}: {text}");
     }
 
-    let text = resp.text().await
+    let text = resp
+        .text()
+        .await
         .unwrap_or_else(|e| panic!("read serve events failed: {e}"));
     let parsed: ServeEventsResponse = serde_json::from_str(&text)
         .unwrap_or_else(|e| panic!("parse serve events failed: {e}\nbody: {text}"));
@@ -393,7 +388,11 @@ async fn fetch_scope_events_for(
     parsed
         .requests
         .into_iter()
-        .filter(|ev| event_stub_id(ev).map(|id| owned.contains(id)).unwrap_or(false))
+        .filter(|ev| {
+            event_stub_id(ev)
+                .map(|id| owned.contains(id))
+                .unwrap_or(false)
+        })
         .collect()
 }
 
@@ -418,15 +417,16 @@ impl Drop for ActivePlaybook {
             {
                 Ok(rt) => rt,
                 Err(e) => {
-                    log::warn!("ActivePlaybook::drop: failed to build runtime: {e}");
+                    tracing::warn!(
+                        error = %e,
+                        phase = "active_playbook_drop",
+                        "tokio runtime build failed during cleanup"
+                    );
                     return Ok(());
                 }
             };
             rt.block_on(async move {
-                let client = admin_api_client(
-                    &admin_url,
-                    trusted_tls_certificate_pem.as_deref(),
-                );
+                let client = admin_api_client(&admin_url, trusted_tls_certificate_pem.as_deref());
 
                 let verify_result = if already_unwinding || expectations.is_empty() {
                     Ok(())
@@ -440,15 +440,24 @@ impl Drop for ActivePlaybook {
                     let url = format!("{admin_url}/mappings/{id}");
                     match client.delete(&url).send().await {
                         Ok(r) if r.status().is_success() => {
-                            log::debug!("ActivePlaybook::drop: deleted mapping {id}");
+                            tracing::debug!(
+                                mapping_id = %id,
+                                phase = "active_playbook_drop",
+                                "mapping deleted"
+                            );
                         }
-                        Ok(r) => log::warn!(
-                            "ActivePlaybook::drop: delete mapping {id} got HTTP {}",
-                            r.status()
+                        Ok(r) => tracing::warn!(
+                            mapping_id = %id,
+                            status = %r.status(),
+                            "mapping delete rejected"
                         ),
-                        Err(e) => log::warn!(
-                            "ActivePlaybook::drop: delete mapping {id} failed: {e}"
-                        ),
+                        Err(e) => {
+                            tracing::warn!(
+                                mapping_id = %id,
+                                error = %e,
+                                "mapping delete request failed"
+                            )
+                        }
                     }
                 }
 
@@ -485,11 +494,10 @@ async fn verify_expectations(
         let actual = events
             .iter()
             .filter(|ev| {
-                ev.request.method.eq_ignore_ascii_case(&expect.method)
-                    && {
-                        let p = ev.request.url.split('?').next().unwrap_or(&ev.request.url);
-                        p == expect.url_path
-                    }
+                ev.request.method.eq_ignore_ascii_case(&expect.method) && {
+                    let p = ev.request.url.split('?').next().unwrap_or(&ev.request.url);
+                    p == expect.url_path
+                }
             })
             .count() as u64;
 
@@ -534,36 +542,48 @@ async fn delete_owned_journal_entries(
                 .unwrap_or_default()
         }
         Ok(r) => {
-            log::warn!(
-                "ActivePlaybook::drop: fetch events got HTTP {} — skipping journal cleanup",
-                r.status()
+            tracing::warn!(
+                status = %r.status(),
+                phase = "active_playbook_drop",
+                "fetch events rejected; skipping journal cleanup"
             );
             return;
         }
         Err(e) => {
-            log::warn!("ActivePlaybook::drop: fetch events failed: {e} — skipping journal cleanup");
+            tracing::warn!(
+                error = %e,
+                phase = "active_playbook_drop",
+                "fetch events failed; skipping journal cleanup"
+            );
             return;
         }
     };
 
     for ev in events {
-        let matches = event_stub_id(&ev).map(|id| owned.contains(id)).unwrap_or(false);
+        let matches = event_stub_id(&ev)
+            .map(|id| owned.contains(id))
+            .unwrap_or(false);
         if !matches {
             continue;
         }
         let url = format!("{admin_url}/requests/{id}", id = ev.id);
         match client.delete(&url).send().await {
             Ok(r) if r.status().is_success() => {
-                log::debug!("ActivePlaybook::drop: deleted journal entry {}", ev.id);
+                tracing::debug!(
+                    journal_entry_id = %ev.id,
+                    phase = "active_playbook_drop",
+                    "journal entry deleted"
+                );
             }
-            Ok(r) => log::warn!(
-                "ActivePlaybook::drop: delete journal entry {} got HTTP {}",
-                ev.id,
-                r.status()
+            Ok(r) => tracing::warn!(
+                journal_entry_id = %ev.id,
+                status = %r.status(),
+                "journal delete rejected"
             ),
-            Err(e) => log::warn!(
-                "ActivePlaybook::drop: delete journal entry {} failed: {e}",
-                ev.id
+            Err(e) => tracing::warn!(
+                journal_entry_id = %ev.id,
+                error = %e,
+                "journal delete request failed"
             ),
         }
     }
@@ -627,7 +647,10 @@ impl PlaybookMappingBuilder {
     }
 
     pub fn will_return_in_sequence(mut self, responses: Vec<ResponseDefinition>) -> Playbook {
-        assert!(!responses.is_empty(), "will_return_in_sequence requires at least one response");
+        assert!(
+            !responses.is_empty(),
+            "will_return_in_sequence requires at least one response"
+        );
         let mappings = self.mapping.will_return_sequence(responses);
         self.playbook.mappings.extend(mappings);
         self.playbook

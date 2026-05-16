@@ -28,30 +28,30 @@ impl ReadinessCheck for DefaultHttpReadinessCheck {
         let timeout = Duration::from_millis(timeout_ms);
         let poll_every = Duration::from_millis(100);
         let start = Instant::now();
-        let client = admin_api_client(
-            admin_url,
-            self.trusted_tls_certificate_pem.as_deref(),
-        );
+        let client = admin_api_client(admin_url, self.trusted_tls_certificate_pem.as_deref());
         let mappings_url = format!("{admin_url}/mappings");
 
         loop {
             if start.elapsed() >= timeout {
                 return Err(format!(
-                    "[Http-{identifier}] did not become ready within {timeout:?}"
+                    "readiness timed out identifier={identifier} deadline={timeout:?}"
                 ));
             }
 
             match client.get(&mappings_url).send().await {
                 Ok(resp) if resp.status().is_success() => return Ok(()),
                 Ok(resp) => {
-                    log::debug!(
-                        "[Http-{identifier}] healthcheck got status {}, retrying",
-                        resp.status()
+                    tracing::debug!(
+                        identifier = %identifier,
+                        status = %resp.status(),
+                        "admin mappings endpoint not successful yet"
                     );
                 }
                 Err(err) => {
-                    log::debug!(
-                        "[Http-{identifier}] healthcheck failed (will retry): {err}"
+                    tracing::debug!(
+                        identifier = %identifier,
+                        error = %err,
+                        "readiness probe failed (will retry)"
                     );
                 }
             }

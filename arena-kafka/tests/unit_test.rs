@@ -24,7 +24,13 @@ struct FakeKafkaImpl {
 
 #[async_trait]
 impl KafkaImpl for FakeKafkaImpl {
-    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) {
+    async fn start(
+        &mut self,
+        _port: u16,
+        _image_name: &str,
+        _image_tag: &str,
+        _container_name: &str,
+    ) {
         self.events.lock().unwrap().push(Event::KafkaStart);
     }
 
@@ -149,4 +155,3 @@ async fn kafka_dependency_lifecycle() {
         ]
     );
 }
-

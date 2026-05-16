@@ -1,16 +1,16 @@
-mod healthcheck;
 pub(crate) mod container_impl;
+mod healthcheck;
 pub(crate) mod topic_creator;
 
 pub use container_impl::KAFKA_INTERNAL_DOCKER_PORT;
 
-use arena::healthcheck::ReadinessCheck;
-use arena::dependency::RunnableDependency;
-use async_trait::async_trait;
 use crate::builder::KafkaDependencyBuilder;
-use futures_timer::Delay;
 use crate::kafka_dependency::healthcheck::DefaultKafkaReadinessCheck;
 use crate::kafka_dependency::topic_creator::TopicCreator;
+use arena::dependency::RunnableDependency;
+use arena::healthcheck::ReadinessCheck;
+use async_trait::async_trait;
+use futures_timer::Delay;
 use std::time::{Duration, Instant};
 
 #[async_trait]
@@ -95,7 +95,11 @@ impl KafkaDependency {
             match self.bootstrap_on_host() {
                 Ok(v) => break v.to_string(),
                 Err(err) => {
-                    log::debug!("[Kafka-{}] readiness bootstrap missing: {}", self.identifier, err);
+                    tracing::debug!(
+                        dependency = %self.identifier,
+                        reason = %err,
+                        "kafka bootstrap servers not ready yet"
+                    );
                     Delay::new(poll_every).await;
                 }
             }
@@ -115,7 +119,10 @@ impl KafkaDependency {
             .await
         {
             Ok(()) => {}
-            Err(err) => panic!("[Kafka-{}] readiness check failed: {}", self.identifier, err),
+            Err(err) => panic!(
+                "[Kafka-{}] readiness check failed: {}",
+                self.identifier, err
+            ),
         }
     }
 
@@ -124,13 +131,24 @@ impl KafkaDependency {
             return;
         }
 
-        let bootstrap = self.bootstrap_on_host().expect("bootstrap for topic creation").to_string();
+        let bootstrap = self
+            .bootstrap_on_host()
+            .expect("bootstrap for topic creation")
+            .to_string();
 
         for topic in &self.topics {
-            TopicCreator::create_topic(&bootstrap, topic)
-                .unwrap_or_else(|e| panic!("[Kafka-{}] topic create failed for {topic}: {e}", self.identifier));
+            TopicCreator::create_topic(&bootstrap, topic).unwrap_or_else(|e| {
+                panic!(
+                    "[Kafka-{}] topic create failed for {topic}: {e}",
+                    self.identifier
+                )
+            });
         }
-        log::info!("[Kafka-{}] created {} topic(s)", self.identifier, self.topics.len());
+        tracing::debug!(
+            dependency = %self.identifier,
+            topic_count = self.topics.len(),
+            "topics created"
+        );
     }
 }
 
@@ -153,7 +171,7 @@ impl RunnableDependency for KafkaDependency {
             return;
         }
 
-        log::info!("[Kafka-{}] starting.", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "start_begin", "starting");
         let sw = Instant::now();
 
         for dep in self.dependencies.iter_mut().flatten() {
@@ -162,36 +180,37 @@ impl RunnableDependency for KafkaDependency {
 
         let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
-        let container_name = self.container_name.clone()
+        let container_name = self
+            .container_name
+            .clone()
             .unwrap_or_else(|| self.set_container_name());
 
         let sw_container = Instant::now();
         self.kafka_impl
             .start(self.port, &image_name, &image_tag, &container_name)
             .await;
-        log::debug!(
-            "[Kafka-{}] container start in {:?}.",
-            self.identifier,
-            sw_container.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw_container.elapsed(),
+            "container start finished"
         );
 
         let sw_ready = Instant::now();
         self.wait_until_ready().await;
-        log::debug!(
-            "[Kafka-{}] readiness in {:?}.",
-            self.identifier,
-            sw_ready.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw_ready.elapsed(),
+            "readiness wait finished"
         );
 
         self.create_topics().await;
 
         self.running = true;
-        log::debug!(
-            "[Kafka-{}] start complete in {:?}.",
-            self.identifier,
-            sw.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw.elapsed(),
+            "started"
         );
-        log::info!("[Kafka-{}] started.", self.identifier);
     }
 
     async fn stop(&mut self) {
@@ -199,7 +218,7 @@ impl RunnableDependency for KafkaDependency {
             return;
         }
 
-        log::info!("[Kafka-{}] stopping.", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "stop_begin", "stopping");
         let sw = Instant::now();
 
         self.kafka_impl.stop().await;
@@ -209,12 +228,11 @@ impl RunnableDependency for KafkaDependency {
         }
 
         self.running = false;
-        log::debug!(
-            "[Kafka-{}] stop complete in {:?}.",
-            self.identifier,
-            sw.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw.elapsed(),
+            "stopped"
         );
-        log::info!("[Kafka-{}] stopped.", self.identifier);
     }
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
@@ -226,13 +244,25 @@ impl RunnableDependency for KafkaDependency {
             return;
         }
 
-        let bootstrap = self.bootstrap_on_host().expect("bootstrap for soft reset").to_string();
+        let bootstrap = self
+            .bootstrap_on_host()
+            .expect("bootstrap for soft reset")
+            .to_string();
 
         for topic in &self.topics {
             if let Err(e) = TopicCreator::clear_messages(&bootstrap, topic) {
-                log::warn!("[Kafka-{}] soft reset: clear messages for {topic} failed: {e}", self.identifier);
+                tracing::warn!(
+                    dependency = %self.identifier,
+                    topic = %topic,
+                    error = %e,
+                    "soft reset: topic clear failed"
+                );
             } else {
-                log::info!("[Kafka-{}] soft reset: cleared messages from {topic}", self.identifier);
+                tracing::debug!(
+                    dependency = %self.identifier,
+                    topic = %topic,
+                    "soft reset: topic messages cleared"
+                );
             }
         }
     }
@@ -242,7 +272,11 @@ impl RunnableDependency for KafkaDependency {
             return;
         }
 
-        log::info!("[Kafka-{}] hard reset: restarting container", self.identifier);
+        tracing::debug!(
+            dependency = %self.identifier,
+            phase = "hard_reset",
+            "restarting kafka container"
+        );
         let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
         let container_name = self
@@ -267,9 +301,9 @@ impl Drop for KafkaDependency {
         if !self.running {
             return;
         }
-        log::warn!(
-            "[Kafka-{}] dropped while still running; stopping container.",
-            self.identifier
+        tracing::warn!(
+            dependency = %self.identifier,
+            "drop while running; forcing stop"
         );
         futures::executor::block_on(<Self as RunnableDependency>::stop(self));
     }

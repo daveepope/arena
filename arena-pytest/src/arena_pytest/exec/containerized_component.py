@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from arena_pytest.ffi._ffi_readiness import readiness_checks_for_ffi
 from arena_pytest.support._identifier import build as _build_identifier
-from arena_pytest.readiness import ReadinessCheck
+from arena_pytest.readiness import HttpReadinessCheck
 
 
 class ContainerizedComponentBuilder:
@@ -16,7 +16,7 @@ class ContainerizedComponentBuilder:
             "port_mappings": [],
             "host_mappings": [],
         }
-        self._readiness_checks: List[Tuple[ReadinessCheck, str]] = []
+        self._readiness_checks: List[Tuple[HttpReadinessCheck, str]] = []
 
     def with_build_context(self, path: str) -> "ContainerizedComponentBuilder":
         self._config["build_context"] = path
@@ -48,7 +48,7 @@ class ContainerizedComponentBuilder:
         self._config["runtime_args"].append({"name": name, "value": value})
         return self
 
-    def with_readiness_check(self, check: ReadinessCheck, target: str) -> "ContainerizedComponentBuilder":
+    def with_readiness_check(self, check: HttpReadinessCheck, target: str) -> "ContainerizedComponentBuilder":
         self._readiness_checks.append((check, target))
         return self
 
@@ -63,7 +63,7 @@ class ContainerizedComponent:
     def __init__(
         self,
         config: Dict[str, Any],
-        readiness_checks: Optional[List[Tuple[ReadinessCheck, str]]] = None,
+        readiness_checks: Optional[List[Tuple[HttpReadinessCheck, str]]] = None,
     ):
         self._config = config
         self._readiness_checks = readiness_checks or []

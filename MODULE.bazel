@@ -38,8 +38,10 @@ arena_java_maven.install(
     name = "arena_java_maven",
     artifacts = [
         "net.java.dev.jna:jna:5.14.0",
+        "org.slf4j:slf4j-api:2.0.16",
         "com.fasterxml.jackson.core:jackson-databind:2.18.2",
         "org.junit.jupiter:junit-jupiter-api:5.11.4",
+        "org.junit.jupiter:junit-jupiter-params:5.11.4",
         "org.junit.jupiter:junit-jupiter-engine:5.11.4",
         "org.junit.platform:junit-platform-console:1.11.4",
         "org.apache.kafka:kafka-clients:3.9.0",
@@ -54,6 +56,8 @@ arena_java_maven.install(
         "software.amazon.awssdk:auth:2.29.29",
         "software.amazon.awssdk:regions:2.29.29",
         "software.amazon.awssdk:url-connection-client:2.29.29",
+        "org.springframework.boot:spring-boot-starter-logging:3.4.1",
+        "ch.qos.logback:logback-classic:1.5.12",
     ],
     fail_on_missing_checksum = False,
     repositories = [

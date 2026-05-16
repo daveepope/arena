@@ -19,8 +19,8 @@ pub static OAUTH_ID: OnceLock<String> = OnceLock::new();
 
 static OAUTH_SERVER_TLS_CERT_PEM: OnceLock<String> = OnceLock::new();
 
-pub const OAUTH_PORT: u16 = 9443;
-pub const OAUTH_ISSUER: &str = "https://127.0.0.1:9443";
+pub const OAUTH_PORT: u16 = 9446;
+pub const OAUTH_ISSUER: &str = "https://127.0.0.1:9446";
 
 pub fn oauth_server_tls_cert_pem() -> &'static str {
     OAUTH_SERVER_TLS_CERT_PEM
@@ -29,33 +29,25 @@ pub fn oauth_server_tls_cert_pem() -> &'static str {
         .expect("oauth_server_tls_cert_pem: arena dependencies not initialized")
 }
 
-pub const POSTGRES_PORT: u16 = 5555;
+pub const POSTGRES_PORT: u16 = 5560;
 pub const POSTGRES_DB_NAME: &str = "readings_db";
 pub const POSTGRES_DB_USER: &str = "readings_user";
 pub const POSTGRES_DB_PASS: &str = "readings_password";
 pub const KAFKA_PORT: u16 = 9093;
-pub const CALIBRATION_HTTP_PORT: u16 = 8888;
-pub const EXEC_WEB_APP_PORT: u16 = 3000;
-pub const MSSQL_PORT: u16 = 1435;
+pub const CALIBRATION_HTTP_PORT: u16 = 3011;
+pub const EXEC_WEB_APP_PORT: u16 = 3010;
+pub const MSSQL_PORT: u16 = 1438;
 pub const MSSQL_DB_NAME: &str = "validationDb";
 pub const MSSQL_DB_USER: &str = "sa";
 pub const MSSQL_DB_PASS: &str = "yourStrong(!)Password";
 
-pub const NETWORK_NAME: &str = "arena-component-test-network";
-
-pub fn init_logging() {
-    let _ = env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info,arena=debug"),
-    )
-    .is_test(true)
-    .try_init();
-}
+pub const NETWORK_NAME: &str = "arena-readings-api-network";
 
 pub fn setup_dependencies() -> Vec<Dependency> {
     let startup_sql_scripts =
         vec![include_str!("../../resources/instrument_reading_db_schema.sql").to_string()];
 
-    let postgres_db = PostgresDependency::builder("example readings")
+    let postgres_db = PostgresDependency::builder("readings-api-postgres")
         .with_image("14.20-trixie")
         .with_port(POSTGRES_PORT)
         .with_database_name(POSTGRES_DB_NAME)
@@ -65,7 +57,7 @@ pub fn setup_dependencies() -> Vec<Dependency> {
         .with_startup_sql_scripts(startup_sql_scripts)
         .build();
 
-    let kafka = KafkaDependency::builder("example readings")
+    let kafka = KafkaDependency::builder("readings-api-kafka")
         .with_flavor(KafkaFlavor::ApacheNative)
         .with_port(KAFKA_PORT)
         .with_network(NETWORK_NAME)
@@ -75,7 +67,7 @@ pub fn setup_dependencies() -> Vec<Dependency> {
         .set(kafka.identifier.clone())
         .expect("kafka id set once");
 
-    let calibration_service = HttpDependency::builder("example calibration")
+    let calibration_service = HttpDependency::builder("readings-api-calibration")
         .with_port(CALIBRATION_HTTP_PORT)
         .with_network(NETWORK_NAME)
         .build();
@@ -86,7 +78,7 @@ pub fn setup_dependencies() -> Vec<Dependency> {
     let mssql_startup_sql_scripts =
         vec![include_str!("../../resources/validation_db_schema.sql").to_string()];
 
-    let validation_db = MssqlDependency::builder("example validation")
+    let validation_db = MssqlDependency::builder("readings-api-mssql")
         .with_port(MSSQL_PORT)
         .with_database_name(MSSQL_DB_NAME)
         .with_database_username(MSSQL_DB_USER)
@@ -98,10 +90,11 @@ pub fn setup_dependencies() -> Vec<Dependency> {
         .set(validation_db.identifier.clone())
         .expect("mssql id set once");
 
-    let oauth = OauthDependency::builder("component test oauth")
+    let oauth = OauthDependency::builder("readings-api-oauth")
         .with_ephemeral_server_tls()
         .with_listen_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
         .with_port(OAUTH_PORT)
+        .with_metadata_base_url(OAUTH_ISSUER)
         .build();
     OAUTH_SERVER_TLS_CERT_PEM
         .set(
@@ -136,7 +129,7 @@ pub fn setup_exec_component() -> Component {
     let binary = resolve_web_app_binary();
     let is_bazel = std::env::var("RUNFILES_DIR").is_ok();
 
-    let mut builder = ExecutableComponent::builder("example web app")
+    let mut builder = ExecutableComponent::builder("readings-api-web-app")
         .with_executable_path(binary)
         .with_env_var("RUST_LOG", "info")
         .with_env_var("OAUTH_TLS_CA_PEM", oauth_server_tls_cert_pem())
@@ -178,7 +171,7 @@ pub fn calibration_default_playbook() -> ManagedHttpPlaybook {
         .get()
         .expect("calibration id initialized")
         .to_string();
-    ManagedHttpPlaybook::new("calibration-default", calibration_id, |pb| {
+    ManagedHttpPlaybook::new("readings-api-calibration-default", calibration_id, |pb| {
         pb.post("/api/v1/validate")
             .will_return(ok_json(json!({ "valid": true })))
             .into_playbook()
@@ -192,14 +185,14 @@ pub async fn create_arena() -> OpenArena {
     let components: Vec<Component> = vec![exec_component];
 
     let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new(
-        Match::new("reading lifecycle", dependencies, components)
+        Match::new("readings-api-happy-path", dependencies, components)
             .register_playbook(Box::new(calibration_default_playbook()), true)
             .register_playbook(
-                ManagedMssqlPlaybook::new("axum-readings-mssql-session", mssql_id).into_box(),
+                ManagedMssqlPlaybook::new("readings-api-validation-db-scoped", mssql_id).into_box(),
                 true,
             ),
     )];
-    let closed_arena = ClosedArena::new("Test Arena".to_string(), matches);
+    let closed_arena = ClosedArena::new("readings-api-arena".to_string(), matches);
 
     closed_arena.open().await
 }
@@ -219,8 +212,17 @@ pub fn readings_axum_component_runtime() -> &'static Runtime {
     })
 }
 
+#[ctor::ctor]
+fn install_tracing_for_readings_axum_component_tests() {
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_test_writer()
+        .try_init();
+}
+
 pub async fn shared_arena() -> &'static OpenArena {
-    init_logging();
     SHARED_ARENA
         .get_or_init(|| async { create_arena().await })
         .await

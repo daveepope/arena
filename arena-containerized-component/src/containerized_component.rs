@@ -1,12 +1,14 @@
-use async_trait::async_trait;
+use crate::builder::ContainerizedComponentBuilder;
 use arena::component::RunnableComponent;
 use arena::healthcheck::ReadinessCheck;
-use crate::builder::ContainerizedComponentBuilder;
+use async_trait::async_trait;
 use bollard::container::LogOutput;
-use bollard::models::{ContainerCreateBody, EndpointSettings, HostConfig, NetworkingConfig, PortBinding};
+use bollard::models::{
+    ContainerCreateBody, EndpointSettings, HostConfig, NetworkingConfig, PortBinding,
+};
 use bollard::query_parameters::{
-    CreateContainerOptionsBuilder, LogsOptionsBuilder,
-    RemoveContainerOptionsBuilder, StopContainerOptionsBuilder,
+    CreateContainerOptionsBuilder, LogsOptionsBuilder, RemoveContainerOptionsBuilder,
+    StopContainerOptionsBuilder,
 };
 use bollard::Docker;
 use futures::StreamExt;
@@ -29,27 +31,30 @@ pub struct ContainerizedComponent {
 }
 
 impl ContainerizedComponent {
-    pub fn builder(identifier: impl Into<String>, containerfile: impl Into<String>) -> ContainerizedComponentBuilder {
+    pub fn builder(
+        identifier: impl Into<String>,
+        containerfile: impl Into<String>,
+    ) -> ContainerizedComponentBuilder {
         ContainerizedComponentBuilder::new(identifier, containerfile)
     }
 
     async fn create_and_start_container(&mut self) {
         arena_container::container::try_remove_existing_container(&self.identifier).await;
 
-        log::info!(
-            "[Component-{}] creating container from image '{}'",
-            self.identifier, self.image_tag
+        tracing::debug!(
+            component = %self.identifier,
+            image = %self.image_tag,
+            phase = "container_create_begin",
+            "creating container from image",
         );
 
-        let env: Vec<String> = self.env_vars
+        let env: Vec<String> = self
+            .env_vars
             .iter()
             .map(|(k, v)| format!("{}={}", k, v))
             .collect();
 
-        let cmd: Vec<String> = self.runtime_args
-            .iter()
-            .map(|(_k, v)| v.clone())
-            .collect();
+        let cmd: Vec<String> = self.runtime_args.iter().map(|(_k, v)| v.clone()).collect();
 
         let mut host_config = HostConfig {
             ..Default::default()
@@ -106,7 +111,11 @@ impl ContainerizedComponent {
             image: Some(self.image_tag.clone()),
             env: if env.is_empty() { None } else { Some(env) },
             cmd: if cmd.is_empty() { None } else { Some(cmd) },
-            exposed_ports: if exposed_ports.is_empty() { None } else { Some(exposed_ports) },
+            exposed_ports: if exposed_ports.is_empty() {
+                None
+            } else {
+                Some(exposed_ports)
+            },
             host_config: Some(host_config),
             networking_config,
             ..Default::default()
@@ -118,41 +127,55 @@ impl ContainerizedComponent {
             ))
             .build();
 
-        let response = self.runtime_client
+        let response = self
+            .runtime_client
             .create_container(Some(options), body)
             .await
-            .unwrap_or_else(|e| panic!(
-                "[Component-{}] failed to create container: {}",
-                self.identifier, e
-            ));
+            .unwrap_or_else(|e| {
+                panic!(
+                    "{}: failed to create container: {}",
+                    self.identifier, e
+                )
+            });
 
         self.container_id = Some(response.id.clone());
+        let id_short = response.id[..12.min(response.id.len())].to_string();
 
         if self.network.is_some() {
-            log::info!(
-                "[Component-{}] container created on network '{}' (id: {})",
-                self.identifier,
-                self.network.as_deref().unwrap_or(""),
-                &response.id[..12.min(response.id.len())]
+            tracing::debug!(
+                component = %self.identifier,
+                network = %self.network.as_deref().unwrap_or(""),
+                container_id_prefix = %id_short,
+                phase = "container_created",
+                "container created with network attachment",
             );
         } else {
-            log::info!(
-                "[Component-{}] container created (id: {})",
-                self.identifier, &response.id[..12.min(response.id.len())]
+            tracing::debug!(
+                component = %self.identifier,
+                container_id_prefix = %id_short,
+                phase = "container_created",
+                "container created",
             );
         }
 
         self.runtime_client
-            .start_container(&response.id, None::<bollard::query_parameters::StartContainerOptions>)
+            .start_container(
+                &response.id,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
             .await
-            .unwrap_or_else(|e| panic!(
-                "[Component-{}] failed to start container: {}",
-                self.identifier, e
-            ));
+            .unwrap_or_else(|e| {
+                panic!(
+                    "{}: failed to start container: {}",
+                    self.identifier, e
+                )
+            });
 
-        log::info!(
-            "[Component-{}] container started (id: {})",
-            self.identifier, &response.id[..12.min(response.id.len())]
+        tracing::debug!(
+            component = %self.identifier,
+            container_id_prefix = %id_short,
+            phase = "container_running",
+            "container started",
         );
     }
 
@@ -190,9 +213,10 @@ impl ContainerizedComponent {
                         }
                     }
                     Err(e) => {
-                        log::warn!(
-                            "[Component-{}] error reading container logs: {}",
-                            identifier, e
+                        tracing::warn!(
+                            component = %identifier,
+                            error = %e,
+                            "container log stream error",
                         );
                         break;
                     }
@@ -203,15 +227,15 @@ impl ContainerizedComponent {
 
     fn log_line(identifier: &str, line: &str) {
         if line.contains(" ERROR ") {
-            log::error!("[{}] {}", identifier, line);
+            tracing::error!(component = %identifier, "{}", line);
         } else if line.contains(" WARN ") {
-            log::warn!("[{}] {}", identifier, line);
+            tracing::warn!(component = %identifier, "{}", line);
         } else if line.contains(" DEBUG ") {
-            log::debug!("[{}] {}", identifier, line);
+            tracing::debug!(component = %identifier, "{}", line);
         } else if line.contains(" TRACE ") {
-            log::trace!("[{}] {}", identifier, line);
+            tracing::trace!(component = %identifier, "{}", line);
         } else {
-            log::info!("[{}] {}", identifier, line);
+            tracing::debug!(component = %identifier, "{}", line);
         }
     }
 
@@ -224,20 +248,24 @@ impl ContainerizedComponent {
         for (check, target) in &self.readiness_checks {
             match check.is_ready(&self.identifier, target, timeout_ms).await {
                 Ok(()) => {
-                    log::debug!(
-                        "[Component-{}] readiness check passed for target: {}",
-                        self.identifier, target
+                    tracing::debug!(
+                        component = %self.identifier,
+                        readiness_target = %target,
+                        "readiness check passed",
                     );
                 }
                 Err(msg) => {
                     panic!(
-                        "[Component-{}] readiness check failed for target {}: {}",
+                        "{}: readiness check failed for target {}: {}",
                         self.identifier, target, msg
                     );
                 }
             }
         }
-        log::debug!("[Component-{}] all readiness checks passed.", self.identifier);
+        tracing::debug!(
+            component = %self.identifier,
+            "all readiness checks passed",
+        );
     }
 
     async fn stop_container(&self) {
@@ -246,32 +274,48 @@ impl ContainerizedComponent {
             None => return,
         };
 
-        log::info!(
-            "[Component-{}] stopping container (id: {})",
-            self.identifier, &container_id[..12.min(container_id.len())]
+        let id_short = &container_id[..12.min(container_id.len())];
+
+        tracing::debug!(
+            component = %self.identifier,
+            container_id_prefix = %id_short,
+            phase = "container_stop_begin",
+            "stopping container",
         );
 
-        let stop_options = StopContainerOptionsBuilder::default()
-            .t(10)
-            .build();
-        if let Err(e) = self.runtime_client.stop_container(container_id, Some(stop_options)).await {
-            log::warn!(
-                "[Component-{}] error stopping container: {}",
-                self.identifier, e
+        let stop_options = StopContainerOptionsBuilder::default().t(10).build();
+        if let Err(e) = self
+            .runtime_client
+            .stop_container(container_id, Some(stop_options))
+            .await
+        {
+            tracing::warn!(
+                component = %self.identifier,
+                error = %e,
+                phase = "container_stop",
+                "stop container returned error",
             );
         }
 
-        let remove_options = RemoveContainerOptionsBuilder::default()
-            .force(true)
-            .build();
-        if let Err(e) = self.runtime_client.remove_container(container_id, Some(remove_options)).await {
-            log::warn!(
-                "[Component-{}] error removing container: {}",
-                self.identifier, e
+        let remove_options = RemoveContainerOptionsBuilder::default().force(true).build();
+        if let Err(e) = self
+            .runtime_client
+            .remove_container(container_id, Some(remove_options))
+            .await
+        {
+            tracing::warn!(
+                component = %self.identifier,
+                error = %e,
+                phase = "container_remove",
+                "remove container returned error",
             );
         }
 
-        log::info!("[Component-{}] container removed", self.identifier);
+        tracing::debug!(
+            component = %self.identifier,
+            phase = "container_removed",
+            "container removed",
+        );
     }
 }
 
@@ -282,13 +326,21 @@ impl RunnableComponent for ContainerizedComponent {
             child.start().await;
         }
 
-        log::info!("[Component-{}] starting.", self.identifier);
+        tracing::debug!(
+            component = %self.identifier,
+            phase = "start_begin",
+            "starting",
+        );
 
         self.create_and_start_container().await;
         self.spawn_log_follower();
         self.wait_until_ready().await;
 
-        log::info!("[Component-{}] started.", self.identifier);
+        tracing::debug!(
+            component = %self.identifier,
+            phase = "start_done",
+            "started",
+        );
     }
 
     async fn stop(&mut self) {
@@ -296,7 +348,11 @@ impl RunnableComponent for ContainerizedComponent {
             return;
         }
 
-        log::info!("[Component-{}] stopping.", self.identifier);
+        tracing::debug!(
+            component = %self.identifier,
+            phase = "stop_begin",
+            "stopping",
+        );
 
         self.stop_container().await;
 
@@ -304,7 +360,11 @@ impl RunnableComponent for ContainerizedComponent {
             arena_container::network::remove_network(network).await;
         }
 
-        log::info!("[Component-{}] stopped.", self.identifier);
+        tracing::debug!(
+            component = %self.identifier,
+            phase = "stop_done",
+            "stopped",
+        );
 
         for child in self.children.iter_mut().flatten().rev() {
             child.stop().await;

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
-use testcontainers_modules::{mssql_server, testcontainers, testcontainers::runners::AsyncRunner};
 use testcontainers_modules::testcontainers::core::ContainerPort;
 use testcontainers_modules::testcontainers::ImageExt;
+use testcontainers_modules::{mssql_server, testcontainers, testcontainers::runners::AsyncRunner};
 use tiberius::{AuthMethod, Client, Config};
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
@@ -78,10 +78,7 @@ impl MssqlImpl for MssqlContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request
-            .start()
-            .await
-            .expect("start mssql container");
+        let container = request.start().await.expect("start mssql container");
 
         let host = container
             .get_host()
@@ -110,14 +107,14 @@ impl MssqlImpl for MssqlContainerImpl {
         ));
         self.container = Some(container);
 
-        log::info!("[MssqlImpl] started container.");
+        tracing::debug!(layer = "mssql_container", phase = "container_started");
     }
 
     async fn stop(&mut self) {
         self.container.take();
         self.connection_string = None;
         self.admin_connection_string = None;
-        log::info!("[MssqlImpl] stopped container.");
+        tracing::debug!(layer = "mssql_container", phase = "container_stopped");
 
         if let Some(ref network) = self.network {
             arena_container::network::remove_network(network).await;

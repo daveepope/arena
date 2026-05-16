@@ -49,8 +49,7 @@ pub async fn fetch_example_access_token_with_scope(scope: Option<&str>) -> Strin
 }
 
 pub async fn fetch_example_access_token() -> String {
-    fetch_example_access_token_with_scope(Some("openid profile readings"))
-        .await
+    fetch_example_access_token_with_scope(Some("openid profile readings")).await
 }
 
 pub async fn get_readings(port: u16) -> Vec<Reading> {
@@ -115,7 +114,12 @@ pub fn consume_reading_created_event(
     Err("did not receive expected ReadingCreatedEvent before timeout".to_string())
 }
 
-pub async fn create_reading(port: u16, user_name: &str, value: i32, comment: Option<String>) -> i32 {
+pub async fn create_reading(
+    port: u16,
+    user_name: &str,
+    value: i32,
+    comment: Option<String>,
+) -> i32 {
     let token = fetch_example_access_token().await;
     let url = format!("http://127.0.0.1:{}/readings", port);
     let request = CreateReadingRequest {

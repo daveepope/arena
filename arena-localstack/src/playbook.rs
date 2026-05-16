@@ -1,5 +1,5 @@
-use crate::localstack_dependency::LocalstackDependency;
 use crate::localstack_dependency::resource_creator::ResourceCreator;
+use crate::localstack_dependency::LocalstackDependency;
 
 pub struct Playbook {
     endpoint: String,
@@ -30,10 +30,10 @@ impl Playbook {
             .await
             .unwrap_or_else(|e| panic!("{e}"));
 
-        log::info!(
-            "[LocalstackPlaybook-{}] purged {} queue(s); state is now clean.",
-            self.identifier,
-            self.queue_urls.len()
+        tracing::debug!(
+            playbook_id = %self.identifier,
+            queue_count = self.queue_urls.len(),
+            "purged queues; clean state"
         );
 
         ActivePlaybook {
@@ -54,15 +54,15 @@ fn purge_on_drop(identifier: String, endpoint: String, queue_urls: Vec<(String, 
         {
             Ok(rt) => rt,
             Err(e) => {
-                log::warn!(
-                    "[LocalstackPlaybook-{identifier}] drop: failed to build runtime: {e}"
+                tracing::warn!(
+                    playbook_id = %identifier,
+                    error = %e,
+                    "drop cleanup: runtime build failed"
                 );
                 return Ok(());
             }
         };
-        rt.block_on(async move {
-            purge_queues(&identifier, &endpoint, &queue_urls).await
-        })
+        rt.block_on(async move { purge_queues(&identifier, &endpoint, &queue_urls).await })
     });
 
     let outcome = handle.join();
@@ -127,16 +127,19 @@ async fn purge_queues(
     queue_urls: &[(String, String)],
 ) -> Result<(), String> {
     if queue_urls.is_empty() {
-        log::debug!(
-            "[LocalstackPlaybook-{identifier}] purge: no managed queues; nothing to do."
+        tracing::debug!(
+            playbook_id = %identifier,
+            "purge skipped: no queues"
         );
         return Ok(());
     }
 
     for (name, url) in queue_urls {
-        ResourceCreator::purge_queue(endpoint, url).await.map_err(|e| {
-            format!("[LocalstackPlaybook-{identifier}] purge queue {name} failed: {e}")
-        })?;
+        ResourceCreator::purge_queue(endpoint, url)
+            .await
+            .map_err(|e| {
+                format!("[LocalstackPlaybook-{identifier}] purge queue {name} failed: {e}")
+            })?;
     }
 
     Ok(())

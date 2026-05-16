@@ -11,13 +11,13 @@ public final class ActivePlaybooks implements AutoCloseable {
     this.opened = opened;
   }
 
-  public static ActivePlaybooks open(OpenArena arena, ActivePlaybook... playbooks) {
+  public static ActivePlaybooks open(OpenArena arena, Playbook... playbooks) {
     if (playbooks.length == 0) {
       throw new IllegalArgumentException("active playbooks requires at least one playbook");
     }
     List<AutoCloseable> list = new ArrayList<>();
     try {
-      for (ActivePlaybook pb : playbooks) {
+      for (Playbook pb : playbooks) {
         list.add(pb.enter(arena));
       }
     } catch (RuntimeException e) {

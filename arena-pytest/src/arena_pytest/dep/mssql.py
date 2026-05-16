@@ -87,60 +87,58 @@ class ManagedMssqlPlaybook:
             "dependency_identifier": self._dependency_identifier,
         }
 
-    def activate(self, arena: "OpenArena") -> "MssqlPlaybook":
-        return MssqlPlaybook(
+    def run(self, arena: "OpenArena") -> "ActiveMssqlPlaybook":
+        return ActiveMssqlPlaybook(
             arena=arena,
             dependency_identifier=self._dependency_identifier,
         )
 
 
-class MssqlPlaybook:
-    """Context manager that opens a test-scoped mssql playbook.
-
-    Entering resets all user tables (or the configured managed_tables) for the
-    dependency; exiting resets them again so following tests start clean.
-    """
+class ActiveMssqlPlaybook:
 
     def __init__(self, arena: "OpenArena", dependency_identifier: str):
         self._arena = arena
         self._dependency_identifier = dependency_identifier
         self._handle: Optional[int] = None
 
-    def __enter__(self) -> "MssqlPlaybook":
-        from arena_pytest.ffi._ffi import mssql_playbook_open
+    def __enter__(self) -> "ActiveMssqlPlaybook":
+        from arena_pytest.ffi._ffi import mssql_playbook_begin
 
         spec = json.dumps({"dependency_identifier": self._dependency_identifier})
-        self._handle = mssql_playbook_open(
+        self._handle = mssql_playbook_begin(
             self._arena._ffi, self._arena._handle, spec
         )
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        from arena_pytest.ffi._ffi import ArenaFfiError, mssql_playbook_close
+        from arena_pytest.ffi._ffi import ArenaBindingError, mssql_playbook_finish
 
         handle = self._handle
         self._handle = None
         if not handle:
             return
         try:
-            mssql_playbook_close(self._arena._ffi, handle)
-        except ArenaFfiError as e:
+            mssql_playbook_finish(self._arena._ffi, handle)
+        except ArenaBindingError as e:
             if exc_type is not None:
                 return
             raise AssertionError(str(e)) from None
 
-    def close(self) -> None:
+    def finish(self) -> None:
         if self._handle:
-            from arena_pytest.ffi._ffi import mssql_playbook_close
+            from arena_pytest.ffi._ffi import mssql_playbook_finish
 
-            mssql_playbook_close(self._arena._ffi, self._handle)
+            mssql_playbook_finish(self._arena._ffi, self._handle)
             self._handle = None
 
     def verify(self, query: str, expected_value: int) -> None:
         from arena_pytest.ffi._ffi import mssql_playbook_verify
 
         if not self._handle:
-            raise RuntimeError("MssqlPlaybook.verify called outside of context")
+            raise RuntimeError(
+                "ActiveMssqlPlaybook.verify requires begun playbook scope "
+                "(enter `with` or __enter__ first)"
+            )
         spec = json.dumps({
             "dependency_identifier": self._dependency_identifier,
             "query": query,

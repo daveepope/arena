@@ -142,13 +142,13 @@ impl LocalstackImpl for LocalstackContainerImpl {
         self.endpoint = Some(format!("http://{host}:{host_port}"));
         self.container = Some(container);
 
-        log::info!("[LocalstackImpl] started container.");
+        tracing::debug!(layer = "localstack_container", phase = "container_started");
     }
 
     async fn stop(&mut self) {
         self.container.take();
         self.endpoint = None;
-        log::info!("[LocalstackImpl] stopped container.");
+        tracing::debug!(layer = "localstack_container", phase = "container_stopped");
 
         if let Some(ref network) = self.network {
             arena_container::network::remove_network(network).await;

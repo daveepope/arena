@@ -45,7 +45,11 @@ fn run_with_retry_blocking(
 
         match ops.ping(connection_string) {
             Ok(()) => return Ok(()),
-            Err(err) => log::debug!("[Postgres] healthcheck failed (will retry): {err}"),
+            Err(err) => tracing::debug!(
+                subsystem = "postgres",
+                error = %err,
+                "readiness probe failed (will retry)"
+            ),
         };
 
         std::thread::sleep(poll_every);

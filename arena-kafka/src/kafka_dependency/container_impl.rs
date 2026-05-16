@@ -1,9 +1,9 @@
+use crate::kafka_dependency::KafkaImpl;
 use async_trait::async_trait;
 use std::time::Duration;
-use testcontainers_modules::{kafka, testcontainers, testcontainers::runners::AsyncRunner};
 use testcontainers_modules::testcontainers::core::{ContainerPort, Healthcheck};
 use testcontainers_modules::testcontainers::ImageExt;
-use crate::kafka_dependency::KafkaImpl;
+use testcontainers_modules::{kafka, testcontainers, testcontainers::runners::AsyncRunner};
 
 pub const KAFKA_INTERNAL_DOCKER_PORT: u16 = 29092;
 
@@ -88,10 +88,7 @@ impl KafkaImpl for KafkaContainerImpl {
                 ]);
         }
 
-        let container = request
-            .start()
-            .await
-            .expect("start kafka container");
+        let container = request.start().await.expect("start kafka container");
 
         let host = container
             .get_host()
@@ -108,13 +105,13 @@ impl KafkaImpl for KafkaContainerImpl {
         self.bootstrap = Some(format!("{host}:{port}"));
         self.container = Some(container);
 
-        log::info!("[KafkaImpl] started container.");
+        tracing::debug!(layer = "kafka_container", phase = "container_started");
     }
 
     async fn stop(&mut self) {
         self.container.take();
         self.bootstrap = None;
-        log::info!("[KafkaImpl] stopped container.");
+        tracing::debug!(layer = "kafka_container", phase = "container_stopped");
 
         if let Some(ref network) = self.network {
             arena_container::network::remove_network(network).await;
@@ -194,10 +191,7 @@ impl KafkaImpl for ConfluentKafkaContainerImpl {
                 );
         }
 
-        let container = request
-            .start()
-            .await
-            .expect("start kafka container");
+        let container = request.start().await.expect("start kafka container");
 
         let host = container
             .get_host()
@@ -214,13 +208,13 @@ impl KafkaImpl for ConfluentKafkaContainerImpl {
         self.bootstrap = Some(format!("{host}:{port}"));
         self.container = Some(container);
 
-        log::info!("[KafkaImpl] started container.");
+        tracing::debug!(layer = "kafka_container", phase = "container_started");
     }
 
     async fn stop(&mut self) {
         self.container.take();
         self.bootstrap = None;
-        log::info!("[KafkaImpl] stopped container.");
+        tracing::debug!(layer = "kafka_container", phase = "container_stopped");
 
         if let Some(ref network) = self.network {
             arena_container::network::remove_network(network).await;
@@ -231,4 +225,3 @@ impl KafkaImpl for ConfluentKafkaContainerImpl {
         self.bootstrap.as_deref()
     }
 }
-

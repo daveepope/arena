@@ -10,6 +10,7 @@ import pytest
 import pytest_asyncio
 
 from arena_pytest import (
+    ArenaLogLevel,
     ClosedArena,
     EventRuleSpec,
     EventRuleTarget,
@@ -135,7 +136,9 @@ async def _localstack_session(tmp_path_factory):
         .build()
     )
 
-    closed = ClosedArena("Localstack E2E Arena", [a_match])
+    closed = ClosedArena(
+        "Localstack E2E Arena", [a_match], log_level=ArenaLogLevel.DEBUG
+    )
     arena = await closed.open()
     try:
         yield arena, localstack, session_purge_playbook

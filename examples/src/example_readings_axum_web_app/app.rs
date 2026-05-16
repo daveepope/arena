@@ -39,7 +39,7 @@ impl ExampleAxumWebApp {
 
         tokio::spawn(async move {
             if let Err(e) = connection.await {
-                log::error!("postgres connection error: {e}");
+                tracing::error!(error = %e, phase = "postgres_conn_task", "background postgres connection dropped");
             }
         });
 
@@ -77,18 +77,17 @@ impl ExampleAxumWebApp {
                 .map_err(|e| format!("load JWKS from issuer {}: {e}", self.oauth_issuer_url))?,
         );
 
-        let required_access_token_scopes: Arc<Vec<String>> = std::env::var(
-            "OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES",
-        )
-        .ok()
-        .map(|raw| {
-            raw.split_whitespace()
-                .map(String::from)
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<String>>()
-        })
-        .unwrap_or_default()
-        .into();
+        let required_access_token_scopes: Arc<Vec<String>> =
+            std::env::var("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES")
+                .ok()
+                .map(|raw| {
+                    raw.split_whitespace()
+                        .map(String::from)
+                        .filter(|s| !s.is_empty())
+                        .collect::<Vec<String>>()
+                })
+                .unwrap_or_default()
+                .into();
 
         let state = AppState {
             pg: self.pg,
@@ -105,7 +104,7 @@ impl ExampleAxumWebApp {
 
         let addr: SocketAddr = format!("0.0.0.0:{}", port).parse()?;
         let listener = tokio::net::TcpListener::bind(addr).await?;
-        log::info!("listening on http://{addr}");
+        tracing::info!(listen_addr = %addr, phase = "http_listen_begin", "listening");
 
         axum::serve(listener, app)
             .with_graceful_shutdown(async {

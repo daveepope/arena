@@ -10,10 +10,7 @@ pub struct ManagedMssqlPlaybook {
 }
 
 impl ManagedMssqlPlaybook {
-    pub fn new(
-        identifier: impl Into<String>,
-        dependency_identifier: impl Into<String>,
-    ) -> Self {
+    pub fn new(identifier: impl Into<String>, dependency_identifier: impl Into<String>) -> Self {
         Self {
             identifier: identifier.into(),
             dependency_identifier: dependency_identifier.into(),

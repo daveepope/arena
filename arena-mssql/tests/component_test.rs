@@ -6,14 +6,16 @@ use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
 fn init_test_logging() {
-    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .is_test(true)
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_test_writer()
         .try_init();
 }
 
 async fn open_client(conn_str: &str) -> Result<Client<Compat<TcpStream>>, String> {
-    let mut config = Config::from_ado_string(conn_str)
-        .map_err(|e| format!("parse ado: {e}"))?;
+    let mut config = Config::from_ado_string(conn_str).map_err(|e| format!("parse ado: {e}"))?;
     config.trust_cert();
     let tcp = TcpStream::connect(config.get_addr())
         .await
@@ -36,7 +38,14 @@ async fn lifecycle_scenario(mssql: &MssqlDependency) -> Result<(), String> {
         .as_nanos();
     let table = format!("arena_component_test_{ts}");
 
-    log::info!("[component-test] lifecycle scenario (table={table})");
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_mssql",
+        scenario = "lifecycle",
+        table = %table,
+        phase = "begin",
+        "begin lifecycle scenario",
+    );
 
     let mut client = open_client(&conn_str).await?;
 
@@ -78,12 +87,17 @@ async fn lifecycle_scenario(mssql: &MssqlDependency) -> Result<(), String> {
         return Err(format!("expected count >= 1, got {count}"));
     }
 
-    let drop_sql = format!(
-        r#"IF OBJECT_ID(N'dbo.[{table}]', N'U') IS NOT NULL DROP TABLE dbo.[{table}];"#
-    );
+    let drop_sql =
+        format!(r#"IF OBJECT_ID(N'dbo.[{table}]', N'U') IS NOT NULL DROP TABLE dbo.[{table}];"#);
     let _ = client.simple_query(drop_sql.as_str()).await;
 
-    log::info!("[component-test] lifecycle scenario ok");
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_mssql",
+        scenario = "lifecycle",
+        phase = "ok",
+        "lifecycle scenario finished",
+    );
     Ok(())
 }
 
@@ -93,7 +107,13 @@ async fn playbook_scenario(mssql: &MssqlDependency) -> Result<(), String> {
         .ok_or_else(|| "connection string missing".to_string())?
         .to_string();
 
-    log::info!("[component-test] playbook scenario");
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_mssql",
+        scenario = "playbook",
+        phase = "begin",
+        "begin playbook scenario",
+    );
 
     {
         let mut client = open_client(&conn_str).await?;
@@ -109,7 +129,9 @@ async fn playbook_scenario(mssql: &MssqlDependency) -> Result<(), String> {
 
     let count = playbook.verify("SELECT COUNT(*) FROM dbo.widgets;").await;
     if count != 0 {
-        return Err(format!("expected playbook to clear widgets, got count={count}"));
+        return Err(format!(
+            "expected playbook to clear widgets, got count={count}"
+        ));
     }
 
     {
@@ -123,7 +145,9 @@ async fn playbook_scenario(mssql: &MssqlDependency) -> Result<(), String> {
     let playbook = mssql.playbook().run().await;
     let count = playbook.verify("SELECT COUNT(*) FROM dbo.widgets;").await;
     if count != 0 {
-        return Err(format!("expected playbook to clear widgets again, got count={count}"));
+        return Err(format!(
+            "expected playbook to clear widgets again, got count={count}"
+        ));
     }
 
     let literal = playbook.verify("SELECT 1 + 1;").await;
@@ -131,7 +155,13 @@ async fn playbook_scenario(mssql: &MssqlDependency) -> Result<(), String> {
         return Err(format!("expected verify('SELECT 1+1') == 2, got {literal}"));
     }
 
-    log::info!("[component-test] playbook scenario ok");
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_mssql",
+        scenario = "playbook",
+        phase = "ok",
+        "playbook scenario finished",
+    );
     Ok(())
 }
 
@@ -140,16 +170,14 @@ async fn mssql_dependency_component_test() {
     init_test_logging();
 
     let mut mssql = MssqlDependency::builder("")
-        .with_startup_sql_scripts(vec![
-            r#"
+        .with_startup_sql_scripts(vec![r#"
             IF OBJECT_ID(N'dbo.widgets', N'U') IS NULL
             CREATE TABLE dbo.widgets (
                 id INT IDENTITY(1,1) PRIMARY KEY,
                 name NVARCHAR(64) NOT NULL
             );
             "#
-            .to_string(),
-        ])
+        .to_string()])
         .build();
 
     mssql.start().await;

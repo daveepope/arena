@@ -12,8 +12,11 @@ const SECRET_KEY: &str = "test";
 const REGION: &str = "us-east-1";
 
 fn init_test_logging() {
-    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .is_test(true)
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_test_writer()
         .try_init();
 }
 
@@ -36,7 +39,12 @@ struct TestContext {
 
 impl TestContext {
     async fn new() -> Result<Self, String> {
-        log::info!("[component-test] starting LocalstackDependency");
+        tracing::info!(
+            suite = "crate_component",
+            crate_under_test = "arena_localstack",
+            phase = "dependency_start_begin",
+            "starting dependency",
+        );
 
         let ts = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -67,7 +75,14 @@ impl TestContext {
             }
         };
 
-        log::info!("[component-test] localstack started (endpoint={endpoint}, queue_url={queue_url})");
+        tracing::info!(
+            suite = "crate_component",
+            crate_under_test = "arena_localstack",
+            phase = "dependency_running",
+            endpoint = %endpoint,
+            queue_url = %queue_url,
+            "dependency reachable",
+        );
 
         Ok(Self {
             localstack,
@@ -120,7 +135,10 @@ async fn assert_send_receive_roundtrip(ctx: &TestContext) -> Result<(), String> 
         }
     }
 
-    Err(format!("did not observe message on queue {}", ctx.queue_name))
+    Err(format!(
+        "did not observe message on queue {}",
+        ctx.queue_name
+    ))
 }
 
 #[tokio::test]
@@ -131,9 +149,12 @@ async fn localstack_dependency_lifecycle_component_test() {
         Err(e) => panic!("{e}"),
     };
 
-    log::info!(
-        "[component-test] send/receive begin (queue={})",
-        ctx.queue_name
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_localstack",
+        phase = "sqs_roundtrip_begin",
+        queue = %ctx.queue_name,
+        "begin send receive",
     );
     let outcome = std::panic::AssertUnwindSafe(assert_send_receive_roundtrip(&ctx))
         .catch_unwind()
@@ -143,7 +164,12 @@ async fn localstack_dependency_lifecycle_component_test() {
 
     match outcome {
         Ok(Ok(())) => {
-            log::info!("[component-test] ok");
+            tracing::info!(
+                suite = "crate_component",
+                crate_under_test = "arena_localstack",
+                phase = "sqs_roundtrip_ok",
+                "scenario passed",
+            );
         }
         Ok(Err(e)) => panic!("{e}"),
         Err(panic_payload) => std::panic::resume_unwind(panic_payload),

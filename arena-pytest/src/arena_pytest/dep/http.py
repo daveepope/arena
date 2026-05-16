@@ -4,7 +4,7 @@ import json
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from arena_pytest.ffi._ffi import ArenaFfi
+    from arena_pytest.ffi._ffi import ArenaNativeLib
 
 
 from arena_pytest.support._identifier import build as _build_identifier
@@ -110,26 +110,20 @@ class ManagedHttpPlaybook:
             "mappings": list(self._mappings),
         }
 
-    def activate(self, arena: "OpenArena") -> "HttpPlaybook":
-        mappings: List[Dict[str, Any]] = []
+    def run(self, arena: "OpenArena") -> "ActiveHttpPlaybook":
+        b = ActiveHttpPlaybookBuilder(self._dependency_identifier)
         for m in self._mappings:
-            response: Dict[str, Any] = {"status": m.get("status", 200)}
-            if m.get("json_body") is not None:
-                response["json_body"] = m["json_body"]
-            mappings.append({
-                "method": m["method"],
-                "url_path": m["url_path"],
-                "response": response,
-                "priority": 1,
-            })
-        return HttpPlaybook(
-            arena=arena,
-            dependency_identifier=self._dependency_identifier,
-            mappings=mappings,
-        )
+            b = b.with_mapping(
+                m["method"],
+                m["url_path"],
+                status=int(m.get("status", 200)),
+                json_body=m.get("json_body"),
+                priority=1,
+            )
+        return b.build(arena)
 
 
-class HttpPlaybookBuilder:
+class ActiveHttpPlaybookBuilder:
     def __init__(self, dependency_identifier: str):
         self._dependency_identifier = dependency_identifier
         self._mappings: List[Dict[str, Any]] = []
@@ -144,7 +138,7 @@ class HttpPlaybookBuilder:
         expect_called: Optional[int] = None,
         expect_called_at_least: Optional[int] = None,
         expect_never_called: bool = False,
-    ) -> "HttpPlaybookBuilder":
+    ) -> "ActiveHttpPlaybookBuilder":
         response: Dict[str, Any] = {"status": status}
         if json_body is not None:
             response["json_body"] = json_body
@@ -179,17 +173,19 @@ class HttpPlaybookBuilder:
         self._mappings.append(mapping)
         return self
 
-    def build(self, arena: "OpenArena") -> "HttpPlaybook":
+    def build(self, arena: "OpenArena") -> "ActiveHttpPlaybook":
         if not self._mappings:
-            raise ValueError("HttpPlaybookBuilder requires at least one mapping")
-        return HttpPlaybook(
+            raise ValueError(
+                "ActiveHttpPlaybookBuilder requires at least one mapping"
+            )
+        return ActiveHttpPlaybook(
             arena=arena,
             dependency_identifier=self._dependency_identifier,
             mappings=list(self._mappings),
         )
 
 
-class HttpPlaybook:
+class ActiveHttpPlaybook:
     def __init__(
         self,
         arena: "OpenArena",
@@ -201,18 +197,20 @@ class HttpPlaybook:
         self._mappings = mappings
         self._handle: Optional[int] = None
 
-    def __enter__(self) -> "HttpPlaybook":
-        from arena_pytest.ffi._ffi import http_playbook_open
+    def __enter__(self) -> "ActiveHttpPlaybook":
+        from arena_pytest.ffi._ffi import http_playbook_begin
 
         spec = json.dumps({
             "dependency_identifier": self._dependency_identifier,
             "mappings": self._mappings,
         })
-        self._handle = http_playbook_open(self._arena._ffi, self._arena._handle, spec)
+        self._handle = http_playbook_begin(
+            self._arena._ffi, self._arena._handle, spec
+        )
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
-        from arena_pytest.ffi._ffi import ArenaFfiError, http_playbook_close
+        from arena_pytest.ffi._ffi import ArenaBindingError, http_playbook_finish
 
         handle = self._handle
         self._handle = None
@@ -220,24 +218,27 @@ class HttpPlaybook:
             return
 
         try:
-            http_playbook_close(self._arena._ffi, handle)
-        except ArenaFfiError as e:
+            http_playbook_finish(self._arena._ffi, handle)
+        except ArenaBindingError as e:
             if exc_type is not None:
                 return
             raise AssertionError(str(e)) from None
 
-    def close(self) -> None:
+    def finish(self) -> None:
         if self._handle:
-            from arena_pytest.ffi._ffi import http_playbook_close
+            from arena_pytest.ffi._ffi import http_playbook_finish
 
-            http_playbook_close(self._arena._ffi, self._handle)
+            http_playbook_finish(self._arena._ffi, self._handle)
             self._handle = None
 
     def verify(self, method: str, url_path: str, expected_count: int) -> None:
         from arena_pytest.ffi._ffi import http_playbook_verify
 
         if not self._handle:
-            raise RuntimeError("HttpPlaybook.verify called outside of context")
+            raise RuntimeError(
+                "ActiveHttpPlaybook.verify requires begun playbook scope "
+                "(enter `with` or __enter__ first)"
+            )
         spec = json.dumps({
             "dependency_identifier": self._dependency_identifier,
             "method": method.upper(),

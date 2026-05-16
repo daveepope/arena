@@ -1,10 +1,11 @@
 package arena.junit.playbook;
+
 import arena.junit.OpenArena;
 import arena.junit.support.ArenaJson;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public final class ManagedMssqlPlaybook implements ArenaPlaybookRegistration, ActivePlaybook {
+public final class ManagedMssqlPlaybook implements ArenaPlaybookRegistration, Playbook {
   private final String identifier;
   private final String dependencyIdentifier;
 
@@ -30,14 +31,14 @@ public final class ManagedMssqlPlaybook implements ArenaPlaybookRegistration, Ac
     return n;
   }
 
-  public MssqlPlaybook activate(OpenArena arena) {
-    return new MssqlPlaybook(dependencyIdentifier);
+  public ActiveMssqlPlaybook run(OpenArena arena) {
+    return new ActiveMssqlPlaybook(dependencyIdentifier);
   }
 
   @Override
   public AutoCloseable enter(OpenArena arena) {
-    MssqlPlaybook p = activate(arena);
-    p.open(arena);
+    ActiveMssqlPlaybook p = run(arena);
+    p.begin(arena);
     return p;
   }
 }

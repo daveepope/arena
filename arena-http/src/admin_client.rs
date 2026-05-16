@@ -4,7 +4,10 @@ pub(crate) fn admin_api_client(
 ) -> reqwest::Client {
     let mut b = reqwest::Client::builder();
 
-    if let Some(pem) = trusted_certificate_pem.map(str::trim).filter(|p| !p.is_empty()) {
+    if let Some(pem) = trusted_certificate_pem
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+    {
         let cert = reqwest::Certificate::from_pem(pem.as_bytes()).unwrap_or_else(|e| {
             panic!("invalid trusted TLS certificate PEM for HTTP admin client: {e}")
         });

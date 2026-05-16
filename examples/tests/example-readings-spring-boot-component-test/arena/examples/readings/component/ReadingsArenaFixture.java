@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import arena.junit.ClosedArena;
 import arena.junit.OpenArena;
+import arena.junit.ffi.ArenaLogLevel;
 import arena.junit.dep.HttpDependency;
 import arena.junit.dep.HttpDependencyBuilder;
 import arena.junit.dep.LocalstackDependency;
@@ -45,11 +46,14 @@ import java.util.UUID;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import arena.junit.playbook.ArenaSession;
-import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public final class ReadingsArenaFixture implements BeforeAllCallback, AfterAllCallback, ArenaSession {
+public final class ReadingsArenaFixture implements BeforeAllCallback, ArenaSession {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ReadingsArenaFixture.class);
 
   static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -66,12 +70,12 @@ public final class ReadingsArenaFixture implements BeforeAllCallback, AfterAllCa
   private static final String MSSQL_DB_NAME = "validationDb";
   private static final String MSSQL_DB_USER = "sa";
   private static final String MSSQL_DB_PASS = "yourStrong(!)Password";
-  private static final String NETWORK_NAME = "arena-spring-junit-readings-network";
+  private static final String NETWORK_NAME = "arena-readings-api-network";
   private static final String CALIBRATION_VALIDATE_PATH = "/api/v1/validate";
-  private static final String EVENT_BUS_NAME = "readings-spring-events";
-  private static final String EVENT_SOURCE = "arena.readings.web";
-  private static final String QUEUE_NAME = "readings-spring-events-q";
-  private static final String EVENT_RULE_NAME = "readings-spring-rule";
+  private static final String EVENT_BUS_NAME = "readings-api-events";
+  private static final String EVENT_SOURCE = "readings.api";
+  private static final String QUEUE_NAME = "readings-api-events-q";
+  private static final String EVENT_RULE_NAME = "readings-api-rule";
   private static final String REGION = "us-east-1";
   private static final Map<String, String> AWS_DUMMY =
       Map.of("aws_access_key_id", "test", "aws_secret_access_key", "test");
@@ -123,12 +127,12 @@ public final class ReadingsArenaFixture implements BeforeAllCallback, AfterAllCa
   @Override
   public void beforeAll(ExtensionContext context) throws Exception {
     OauthLoopbackTls.PemPair pem = OauthLoopbackTls.oauthLoopbackTlsPemPair();
-    Path ca = Files.createTempFile("spring-oauth-", ".pem");
+    Path ca = Files.createTempFile("readings-api-oauth-", ".pem");
     Files.writeString(ca, pem.certificatePem(), StandardCharsets.UTF_8);
     oauthCaPath = ca.toString();
 
     OauthDependency oauth =
-        new OauthDependencyBuilder("spring junit oauth")
+        new OauthDependencyBuilder("readings-api-oauth")
             .withPort(OAUTH_PORT)
             .withListenIp("0.0.0.0")
             .withServerTlsPem(pem.certificatePem(), pem.privateKeyPem())
@@ -144,7 +148,7 @@ public final class ReadingsArenaFixture implements BeforeAllCallback, AfterAllCa
         List.of(Files.readString(Path.of(mssqlSchemaPath), StandardCharsets.UTF_8));
 
     PostgresDependency postgres =
-        new PostgresDependencyBuilder("spring junit readings")
+        new PostgresDependencyBuilder("readings-api-postgres")
             .withImage("14.20-trixie")
             .withPort(POSTGRES_PORT)
             .withDatabaseName(POSTGRES_DB_NAME)
@@ -154,7 +158,7 @@ public final class ReadingsArenaFixture implements BeforeAllCallback, AfterAllCa
             .build();
 
     MssqlDependency mssql =
-        new MssqlDependencyBuilder("spring junit validation")
+        new MssqlDependencyBuilder("readings-api-mssql")
             .withPort(MSSQL_PORT)
             .withDatabaseName(MSSQL_DB_NAME)
             .withDatabaseUsername(MSSQL_DB_USER)
@@ -164,14 +168,14 @@ public final class ReadingsArenaFixture implements BeforeAllCallback, AfterAllCa
     mssqlIdentifier = mssql.identifier();
 
     HttpDependency calibration =
-        new HttpDependencyBuilder("spring junit calibration").withPort(CALIBRATION_HOST_PORT).build();
+        new HttpDependencyBuilder("readings-api-calibration").withPort(CALIBRATION_HOST_PORT).build();
 
     ManagedHttpPlaybook calibrationPlaybook =
-        new ManagedHttpPlaybookBuilder("spring-calibration-default", calibration.identifier())
+        new ManagedHttpPlaybookBuilder("readings-api-calibration-default", calibration.identifier())
             .withMapping("POST", CALIBRATION_VALIDATE_PATH, 200, Map.of("valid", true))
             .build();
 
-    String lsId = "ls-spring-" + UUID.randomUUID().toString().substring(0, 8);
+    String lsId = "ls-readings-api-" + UUID.randomUUID().toString().substring(0, 8);
     LocalstackDependency localstack =
         new LocalstackDependencyBuilder(lsId)
             .withPort(LOCALSTACK_HOST_PORT)
@@ -189,14 +193,14 @@ public final class ReadingsArenaFixture implements BeforeAllCallback, AfterAllCa
             .build();
 
     localstackSessionPb =
-        new ManagedLocalstackPlaybook("spring-readings-localstack-session", localstack.identifier());
+        new ManagedLocalstackPlaybook("readings-api-localstack-session", localstack.identifier());
 
     localstackEndpoint = "http://127.0.0.1:" + LOCALSTACK_HOST_PORT;
 
     String appLauncher = ReadingsRunfiles.findReadingsWebAppLauncher();
     assertTrue(!appLauncher.isEmpty(), "readings web app launcher must be present under Bazel runfiles");
     ExecutableComponentBuilder exec =
-        new ExecutableComponentBuilder("spring readings web")
+        new ExecutableComponentBuilder("readings-api-web-app")
             .withExecutablePath(appLauncher)
             .withEnvVar("WEB_APP_PORT", String.valueOf(WEB_APP_PORT))
             .withEnvVar(
@@ -234,7 +238,7 @@ public final class ReadingsArenaFixture implements BeforeAllCallback, AfterAllCa
                 HttpReadinessCheck.create(), "http://127.0.0.1:" + WEB_APP_PORT + "/health");
 
     Match match =
-        new MatchBuilder("spring readings lifecycle")
+        new MatchBuilder("readings-api-happy-path")
             .withNetwork(NETWORK_NAME)
             .addDependency(oauth)
             .addDependency(postgres)
@@ -246,13 +250,24 @@ public final class ReadingsArenaFixture implements BeforeAllCallback, AfterAllCa
             .registerPlaybook(localstackSessionPb, true)
             .build();
 
-    ClosedArena closed = new ClosedArena("Spring readings component arena", List.of(match));
+    ClosedArena closed =
+        new ClosedArena(
+            "readings-api-arena",
+            List.of(match),
+            ArenaLogLevel.DEBUG,
+            LOG,
+            List.of("readings-api-web-app"),
+            List.of(
+                oauth.identifier(),
+                postgres.identifier(),
+                mssql.identifier(),
+                calibration.identifier(),
+                localstack.identifier()));
     arena = closed.open();
     fetchAccessToken();
   }
 
-  @Override
-  public void afterAll(ExtensionContext context) throws Exception {
+  public void stopReadingsArena() {
     if (arena != null) {
       arena.close();
       arena = null;

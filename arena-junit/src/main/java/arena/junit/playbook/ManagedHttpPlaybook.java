@@ -1,12 +1,15 @@
 package arena.junit.playbook;
+
 import arena.junit.OpenArena;
 import arena.junit.support.ArenaJson;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import java.util.List;
 
-public final class ManagedHttpPlaybook implements ArenaPlaybookRegistration, ActivePlaybook {
+public final class ManagedHttpPlaybook implements ArenaPlaybookRegistration, Playbook {
   private final String identifier;
   private final String dependencyIdentifier;
   private final List<ObjectNode> mappings;
@@ -35,29 +38,36 @@ public final class ManagedHttpPlaybook implements ArenaPlaybookRegistration, Act
     return n;
   }
 
-  public HttpPlaybook activate(OpenArena arena) {
-    ArrayNode out = ArenaJson.array();
+  public ActiveHttpPlaybook run(OpenArena arena) {
+    ActiveHttpPlaybookBuilder b = new ActiveHttpPlaybookBuilder(dependencyIdentifier);
     for (ObjectNode m : mappings) {
-      ObjectNode row = ArenaJson.object();
-      row.put("method", m.get("method").asText());
-      row.put("url_path", m.get("url_path").asText());
-      ObjectNode response = ArenaJson.object();
       int status = m.has("status") && !m.get("status").isNull() ? m.get("status").asInt() : 200;
-      response.put("status", status);
-      if (m.has("json_body") && !m.get("json_body").isNull()) {
-        response.set("json_body", m.get("json_body").deepCopy());
+      JsonNode jb = m.get("json_body");
+      Object jsonBody = null;
+      if (jb != null && !jb.isNull()) {
+        try {
+          jsonBody = ArenaJson.MAPPER.treeToValue(jb, Object.class);
+        } catch (Exception e) {
+          throw new IllegalArgumentException("ManagedHttpPlaybook: invalid json_body", e);
+        }
       }
-      row.set("response", response);
-      row.put("priority", 1);
-      out.add(row);
+      b.withMapping(
+          m.get("method").asText(),
+          m.get("url_path").asText(),
+          status,
+          jsonBody,
+          Integer.valueOf(1),
+          null,
+          null,
+          false);
     }
-    return new HttpPlaybook(arena, dependencyIdentifier, out);
+    return b.build(arena);
   }
 
   @Override
   public AutoCloseable enter(OpenArena arena) {
-    HttpPlaybook h = activate(arena);
-    h.open();
+    ActiveHttpPlaybook h = run(arena);
+    h.begin();
     return h;
   }
 }
