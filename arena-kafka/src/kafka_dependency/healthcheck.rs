@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use arena::healthcheck::ReadinessCheck;
+use async_trait::async_trait;
 use futures::channel::oneshot;
 use rdkafka::admin::{AdminClient, AdminOptions};
 use rdkafka::config::ClientConfig;
@@ -45,13 +45,14 @@ impl ReadinessCheck for DefaultKafkaReadinessCheck {
             let _ = tx.send(res);
         });
 
-        rx.await.map_err(|_canceled| "kafka healthcheck worker thread unexpectedly stopped".to_string())?
+        rx.await.map_err(|_canceled| {
+            "kafka healthcheck worker thread unexpectedly stopped".to_string()
+        })?
     }
 }
 
 fn healthcheck_topic_name(identifier: &str) -> String {
-    let safe = arena_container::identifier::sanitize_for_container(identifier)
-        .replace('-', "_");
+    let safe = arena_container::identifier::sanitize_for_container(identifier).replace('-', "_");
     format!("arena_healthcheck_{safe}")
 }
 
@@ -195,10 +196,13 @@ fn run_with_retry(
         match roundtrip_once(ops, &consumer, bootstrap, &topic) {
             Ok(()) => return Ok(()),
             Err(err) => {
-                log::debug!("[Kafka] healthcheck failed (will retry): {err}");
+                tracing::debug!(
+                    subsystem = "kafka",
+                    error = %err,
+                    "readiness probe failed (will retry)"
+                );
                 std::thread::sleep(poll_every);
             }
         }
     }
 }
-

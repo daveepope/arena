@@ -1,5 +1,5 @@
-use bollard::Docker;
 use bollard::query_parameters::RemoveContainerOptionsBuilder;
+use bollard::Docker;
 
 /// Force-removes a Docker container by name.
 ///
@@ -9,15 +9,15 @@ use bollard::query_parameters::RemoveContainerOptionsBuilder;
 ///
 /// If the container does not exist this is a silent no-op.
 pub async fn try_remove_existing_container(name: &str) {
-    let docker = Docker::connect_with_defaults()
-        .expect("failed to connect to Docker daemon");
+    let docker = Docker::connect_with_defaults().expect("failed to connect to Docker daemon");
 
-    let remove_options = RemoveContainerOptionsBuilder::default()
-        .force(true)
-        .build();
+    let remove_options = RemoveContainerOptionsBuilder::default().force(true).build();
 
     match docker.remove_container(name, Some(remove_options)).await {
-        Ok(_) => log::info!("[arena-container] removed existing container '{}'", name),
-        Err(_) => log::debug!("[arena-container] no existing container '{}' to remove", name),
+        Ok(_) => tracing::debug!(container = %name, "removed existing container"),
+        Err(_) => tracing::debug!(
+            container = %name,
+            "no existing container to remove"
+        ),
     }
 }

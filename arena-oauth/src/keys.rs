@@ -27,12 +27,14 @@ impl RsaKeyPair {
         Self::from_private_key(private_key, kid)
     }
 
-    fn from_private_key(private_key: RsaPrivateKey, kid: impl Into<String>) -> Result<Self, String> {
+    fn from_private_key(
+        private_key: RsaPrivateKey,
+        kid: impl Into<String>,
+    ) -> Result<Self, String> {
         let pem = private_key
             .to_pkcs8_pem(LineEnding::LF)
             .map_err(|e| e.to_string())?;
-        let encoding =
-            EncodingKey::from_rsa_pem(pem.as_bytes()).map_err(|e| e.to_string())?;
+        let encoding = EncodingKey::from_rsa_pem(pem.as_bytes()).map_err(|e| e.to_string())?;
         let public_pem = private_key
             .to_public_key()
             .to_public_key_pem(LineEnding::LF)

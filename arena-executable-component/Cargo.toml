@@ -14,9 +14,9 @@ arena = { workspace = true }
 arena-container = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 mockall = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-env_logger = { workspace = true }
+tracing-subscriber = { workspace = true }

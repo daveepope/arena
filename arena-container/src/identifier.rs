@@ -66,7 +66,10 @@ fn has_suffix(name: &str) -> bool {
     let Some(last) = name.rsplit('-').next() else {
         return false;
     };
-    last.len() == SUFFIX_LEN && last.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+    last.len() == SUFFIX_LEN
+        && last
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
 }
 
 #[cfg(test)]

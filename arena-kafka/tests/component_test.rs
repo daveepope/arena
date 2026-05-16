@@ -11,12 +11,17 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 const RDKAFKA_LOG_LEVEL_SILENT: &str = "0";
 
 fn init_test_logging() {
-    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .is_test(true)
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_test_writer()
         .try_init();
 }
 
-fn new_admin(bootstrap: &str) -> Result<AdminClient<rdkafka::client::DefaultClientContext>, String> {
+fn new_admin(
+    bootstrap: &str,
+) -> Result<AdminClient<rdkafka::client::DefaultClientContext>, String> {
     ClientConfig::new()
         .set("bootstrap.servers", bootstrap)
         .set("log_level", RDKAFKA_LOG_LEVEL_SILENT)
@@ -71,11 +76,7 @@ fn spawn_poll_until_payload_observed(
     })
 }
 
-fn produce_payload_once(
-    producer: &BaseProducer,
-    topic: &str,
-    payload: &str,
-) -> Result<(), String> {
+fn produce_payload_once(producer: &BaseProducer, topic: &str, payload: &str) -> Result<(), String> {
     let record = BaseRecord::to(topic)
         .key("component-test")
         .payload(payload.as_bytes());
@@ -96,7 +97,12 @@ struct TestContext {
 
 impl TestContext {
     async fn new() -> Result<Self, String> {
-        log::info!("[component-test] starting KafkaDependency");
+        tracing::info!(
+            suite = "crate_component",
+            crate_under_test = "arena_kafka",
+            phase = "dependency_start_begin",
+            "starting dependency",
+        );
         let mut kafka = KafkaDependency::builder("")
             .with_flavor(KafkaFlavor::ApacheNative)
             .build();
@@ -110,7 +116,13 @@ impl TestContext {
                 return Err("kafka bootstrap servers missing after start()".to_string());
             }
         };
-        log::info!("[component-test] kafka started (bootstrap={bootstrap})");
+        tracing::info!(
+            suite = "crate_component",
+            crate_under_test = "arena_kafka",
+            phase = "dependency_running",
+            bootstrap = %bootstrap,
+            "dependency bootstrap known",
+        );
 
         let admin = match new_admin(&bootstrap) {
             Ok(v) => v,
@@ -156,7 +168,13 @@ impl TestContext {
 async fn assert_pub_sub_roundtrip(ctx: &TestContext) -> Result<(), String> {
     let sw = std::time::Instant::now();
     ctx.create_topic()?;
-    log::info!("[timing] create_topic took {:?}", sw.elapsed());
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_kafka",
+        step = "create_topic",
+        elapsed = ?sw.elapsed(),
+        "timing checkpoint",
+    );
 
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -167,43 +185,79 @@ async fn assert_pub_sub_roundtrip(ctx: &TestContext) -> Result<(), String> {
 
     let sw = std::time::Instant::now();
     let consumer = new_consumer(&ctx.bootstrap, &group_id)?;
-    log::info!("[timing] new_consumer took {:?}", sw.elapsed());
-    
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_kafka",
+        step = "new_consumer",
+        elapsed = ?sw.elapsed(),
+        "timing checkpoint",
+    );
+
     let sw = std::time::Instant::now();
     consumer
         .subscribe(&[&ctx.topic])
         .map_err(|e| format!("subscribe failed: {e}"))?;
-    log::info!("[timing] subscribe took {:?}", sw.elapsed());
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_kafka",
+        step = "subscribe",
+        elapsed = ?sw.elapsed(),
+        "timing checkpoint",
+    );
 
     let sw = std::time::Instant::now();
     for _ in 0..30 {
         consumer.poll(Duration::from_millis(100));
     }
-    log::info!("[timing] consumer warmup took {:?}", sw.elapsed());
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_kafka",
+        step = "consumer_warmup",
+        elapsed = ?sw.elapsed(),
+        "timing checkpoint",
+    );
 
     let poll_handle =
         spawn_poll_until_payload_observed(consumer, payload.clone(), Duration::from_secs(5));
 
     let sw = std::time::Instant::now();
     let producer = new_producer(&ctx.bootstrap)?;
-    log::info!("[timing] new_producer took {:?}", sw.elapsed());
-    
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_kafka",
+        step = "new_producer",
+        elapsed = ?sw.elapsed(),
+        "timing checkpoint",
+    );
+
     let topic = ctx.topic.clone();
     let payload_for_produce = payload.clone();
     let sw = std::time::Instant::now();
     tokio::task::spawn_blocking(move || {
         produce_payload_once(&producer, topic.as_str(), payload_for_produce.as_str())
     })
-        .await
-        .map_err(|e| format!("produce task join failed: {e}"))??;
-    log::info!("[timing] produce took {:?}", sw.elapsed());
+    .await
+    .map_err(|e| format!("produce task join failed: {e}"))??;
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_kafka",
+        step = "produce",
+        elapsed = ?sw.elapsed(),
+        "timing checkpoint",
+    );
 
     let sw = std::time::Instant::now();
     let result = poll_handle
         .await
         .map_err(|e| format!("poll task join failed: {e}"))?;
-    log::info!("[timing] consume took {:?}", sw.elapsed());
-    
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_kafka",
+        step = "consume",
+        elapsed = ?sw.elapsed(),
+        "timing checkpoint",
+    );
+
     result
 }
 
@@ -215,7 +269,13 @@ async fn kafka_dependency_lifecycle_component_test() {
         Err(e) => panic!("{e}"),
     };
 
-    log::info!("[component-test] pub/sub begin (topic={})", ctx.topic);
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_kafka",
+        phase = "pub_sub_begin",
+        topic = %ctx.topic,
+        "begin pub sub roundtrip",
+    );
     let outcome = std::panic::AssertUnwindSafe(assert_pub_sub_roundtrip(&ctx))
         .catch_unwind()
         .await;
@@ -225,7 +285,12 @@ async fn kafka_dependency_lifecycle_component_test() {
 
     match outcome {
         Ok(Ok(())) => {
-            log::info!("[component-test] ok");
+            tracing::info!(
+                suite = "crate_component",
+                crate_under_test = "arena_kafka",
+                phase = "pub_sub_ok",
+                "scenario passed",
+            );
         }
         Ok(Err(e)) => panic!("{e}"),
         Err(panic_payload) => std::panic::resume_unwind(panic_payload),

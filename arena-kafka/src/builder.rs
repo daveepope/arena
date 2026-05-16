@@ -1,7 +1,7 @@
+use crate::kafka_dependency::container_impl::{ConfluentKafkaContainerImpl, KafkaContainerImpl};
+use crate::kafka_dependency::{KafkaDependency, KafkaImpl};
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
-use crate::kafka_dependency::container_impl::{ConfluentKafkaContainerImpl, KafkaContainerImpl };
-use crate::kafka_dependency::{KafkaDependency, KafkaImpl };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KafkaFlavor {
@@ -131,12 +131,22 @@ impl KafkaDependencyBuilder {
         } = self;
 
         let (default_port, default_image_name, default_tag) = match flavor {
-            KafkaFlavor::ApacheNative => (Self::APACHE_DEFAULT_PORT, Self::APACHE_DEFAULT_IMAGE_NAME, Self::APACHE_DEFAULT_TAG),
-            KafkaFlavor::Confluent => (Self::CONFLUENT_DEFAULT_PORT, Self::CONFLUENT_DEFAULT_IMAGE_NAME, Self::CONFLUENT_DEFAULT_TAG),
+            KafkaFlavor::ApacheNative => (
+                Self::APACHE_DEFAULT_PORT,
+                Self::APACHE_DEFAULT_IMAGE_NAME,
+                Self::APACHE_DEFAULT_TAG,
+            ),
+            KafkaFlavor::Confluent => (
+                Self::CONFLUENT_DEFAULT_PORT,
+                Self::CONFLUENT_DEFAULT_IMAGE_NAME,
+                Self::CONFLUENT_DEFAULT_TAG,
+            ),
         };
 
         let kafka_impl = kafka_impl.unwrap_or_else(|| match flavor {
-            KafkaFlavor::ApacheNative => Box::new(KafkaContainerImpl::new(network)) as Box<dyn KafkaImpl>,
+            KafkaFlavor::ApacheNative => {
+                Box::new(KafkaContainerImpl::new(network)) as Box<dyn KafkaImpl>
+            }
             KafkaFlavor::Confluent => {
                 Box::new(ConfluentKafkaContainerImpl::new(network)) as Box<dyn KafkaImpl>
             }
@@ -164,4 +174,3 @@ impl KafkaDependencyBuilder {
         dep
     }
 }
-

@@ -33,8 +33,7 @@ pub(crate) struct OauthServer {
 }
 
 fn reserve_bind_port(listen_ip: IpAddr) -> u16 {
-    let l = TcpListener::bind(SocketAddr::new(listen_ip, 0))
-        .expect("bind ephemeral port for TLS");
+    let l = TcpListener::bind(SocketAddr::new(listen_ip, 0)).expect("bind ephemeral port for TLS");
     let p = l.local_addr().expect("local_addr").port();
     drop(l);
     p
@@ -131,9 +130,11 @@ impl OauthServer {
         let timeout = Duration::from_secs(15);
         let poll_every = Duration::from_millis(100);
         let start = Instant::now();
-        let poll_base = self.inner.as_ref().map(|s| s.readiness_poll_base.as_str()).unwrap_or_else(|| {
-            panic!("[Oauth-{log_label}] readiness: server not started")
-        });
+        let poll_base = self
+            .inner
+            .as_ref()
+            .map(|s| s.readiness_poll_base.as_str())
+            .unwrap_or_else(|| panic!("[Oauth-{log_label}] readiness: server not started"));
         let url = format!("{poll_base}/.well-known/oauth-authorization-server");
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -150,14 +151,17 @@ impl OauthServer {
             match client.get(&url).send().await {
                 Ok(r) if r.status().is_success() => break,
                 Ok(r) => {
-                    log::debug!(
-                        "[Oauth-{log_label}] readiness: GET discovery -> {}",
-                        r.status()
+                    tracing::debug!(
+                        log_label = log_label,
+                        status = %r.status(),
+                        "oauth discovery readiness polling"
                     );
                 }
                 Err(e) => {
-                    log::debug!(
-                        "[Oauth-{log_label}] readiness: GET discovery failed: {e}",
+                    tracing::debug!(
+                        log_label = log_label,
+                        error = %e,
+                        "oauth discovery readiness GET failed"
                     );
                 }
             }

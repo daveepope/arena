@@ -1,12 +1,12 @@
-use arena::Component;
-use arena::healthcheck::ReadinessCheck;
 use crate::containerized_component::ContainerizedComponent;
+use arena::healthcheck::ReadinessCheck;
+use arena::Component;
 use bollard::query_parameters::BuildImageOptionsBuilder;
 use bollard::{body_full, Docker};
 use futures::StreamExt;
 use std::path::{Path, PathBuf};
 
-pub struct ContainerizedComponentBuilder { 
+pub struct ContainerizedComponentBuilder {
     identifier: String,
     children: Option<Vec<Component>>,
     containerfile: String,
@@ -99,8 +99,7 @@ impl ContainerizedComponentBuilder {
         if path.is_absolute() {
             path
         } else {
-            let current_dir = std::env::current_dir()
-                .expect("get current directory");
+            let current_dir = std::env::current_dir().expect("get current directory");
 
             current_dir
                 .ancestors()
@@ -117,10 +116,19 @@ impl ContainerizedComponentBuilder {
     }
 
     const SKIP_DIRS: &'static [&'static str] = &[
-        ".git", "target", "node_modules", ".idea", ".vscode", ".arena",
+        ".git",
+        "target",
+        "node_modules",
+        ".idea",
+        ".vscode",
+        ".arena",
     ];
 
-    fn create_build_context_tar(identifier: &str, containerfile: &str, build_context: &Option<PathBuf>) -> Vec<u8> {
+    fn create_build_context_tar(
+        identifier: &str,
+        containerfile: &str,
+        build_context: &Option<PathBuf>,
+    ) -> Vec<u8> {
         let buf = Vec::new();
         let mut tar = tar::Builder::new(buf);
 
@@ -148,9 +156,11 @@ impl ContainerizedComponentBuilder {
         let entries = match std::fs::read_dir(current_path) {
             Ok(entries) => entries,
             Err(e) => {
-                log::warn!(
-                    "[Component-{}] skipping unreadable directory {:?}: {}",
-                    identifier, current_path, e
+                tracing::warn!(
+                    component = %identifier,
+                    path = ?current_path,
+                    error = %e,
+                    "skipping unreadable directory",
                 );
                 return;
             }
@@ -182,9 +192,11 @@ impl ContainerizedComponentBuilder {
                 header.set_mode(0o755);
                 header.set_cksum();
                 if let Err(e) = tar.append_data(&mut header, relative, &[] as &[u8]) {
-                    log::warn!(
-                        "[Component-{}] skipping directory {:?}: {}",
-                        identifier, relative, e
+                    tracing::warn!(
+                        component = %identifier,
+                        path = ?relative,
+                        error = %e,
+                        "skipping directory archive entry",
                     );
                     continue;
                 }
@@ -193,9 +205,11 @@ impl ContainerizedComponentBuilder {
                 let content = match std::fs::read(&path) {
                     Ok(c) => c,
                     Err(e) => {
-                        log::warn!(
-                            "[Component-{}] skipping file {:?}: {}",
-                            identifier, relative, e
+                        tracing::warn!(
+                            component = %identifier,
+                            path = ?relative,
+                            error = %e,
+                            "skipping unreadable file",
                         );
                         continue;
                     }
@@ -205,19 +219,29 @@ impl ContainerizedComponentBuilder {
                 header.set_mode(0o644);
                 header.set_cksum();
                 if let Err(e) = tar.append_data(&mut header, relative, content.as_slice()) {
-                    log::warn!(
-                        "[Component-{}] skipping file {:?}: {}",
-                        identifier, relative, e
+                    tracing::warn!(
+                        component = %identifier,
+                        path = ?relative,
+                        error = %e,
+                        "skipping tar file append failure",
                     );
                 }
             }
         }
     }
 
-    async fn build_image(identifier: &str, containerfile: &str, image_tag: &str, build_context: &Option<PathBuf>, runtime_client: &Docker) {
-        log::info!(
-            "[Component-{}] building container image '{}'",
-            identifier, image_tag
+    async fn build_image(
+        identifier: &str,
+        containerfile: &str,
+        image_tag: &str,
+        build_context: &Option<PathBuf>,
+        runtime_client: &Docker,
+    ) {
+        tracing::debug!(
+            component = %identifier,
+            image = %image_tag,
+            phase = "image_build_begin",
+            "building container image",
         );
 
         let tar_body = Self::create_build_context_tar(identifier, containerfile, build_context);
@@ -228,7 +252,8 @@ impl ContainerizedComponentBuilder {
             .rm(true)
             .build();
 
-        let mut stream = runtime_client.build_image(options, None, Some(body_full(tar_body.into())));
+        let mut stream =
+            runtime_client.build_image(options, None, Some(body_full(tar_body.into())));
 
         while let Some(result) = stream.next().await {
             match result {
@@ -236,28 +261,29 @@ impl ContainerizedComponentBuilder {
                     if let Some(ref stream_msg) = info.stream {
                         let msg = stream_msg.trim_end();
                         if !msg.is_empty() {
-                            log::info!("[Component-{}] {}", identifier, msg);
+                            tracing::debug!(
+                                component = %identifier,
+                                text = %msg,
+                                phase = "image_build_stream",
+                                "image build output line",
+                            );
                         }
                     }
                     if let Some(ref error) = info.error {
-                        panic!(
-                            "[Component-{}] image build error: {}",
-                            identifier, error
-                        );
+                        panic!("{}: image build error: {}", identifier, error);
                     }
                 }
                 Err(e) => {
-                    panic!(
-                        "[Component-{}] image build failed: {}",
-                        identifier, e
-                    );
+                    panic!("{}: image build failed: {}", identifier, e);
                 }
             }
         }
 
-        log::info!(
-            "[Component-{}] container image '{}' built successfully",
-            identifier, image_tag
+        tracing::debug!(
+            component = %identifier,
+            image = %image_tag,
+            phase = "image_build_done",
+            "container image built",
         );
     }
 
@@ -268,8 +294,8 @@ impl ContainerizedComponentBuilder {
             arena_container::identifier::sanitize_for_container(&self.identifier)
         });
 
-        let runtime_client = Docker::connect_with_local_defaults()
-            .expect("connect to container runtime");
+        let runtime_client =
+            Docker::connect_with_local_defaults().expect("connect to container runtime");
 
         Self::build_image(
             &self.identifier,

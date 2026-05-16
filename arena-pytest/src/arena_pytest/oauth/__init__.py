@@ -62,7 +62,7 @@ class OauthDependency:
 
 
 def oauth_loopback_tls_pem_pair() -> tuple[str, str]:
-    from arena_pytest.ffi._ffi import ArenaFfiError, load_ffi, _take_err
+    from arena_pytest.ffi._ffi import ArenaBindingError, load_ffi, _take_err
 
     ffi = load_ffi()
     if ffi is None:
@@ -73,7 +73,7 @@ def oauth_loopback_tls_pem_pair() -> tuple[str, str]:
     raw = ffi.lib.arena_oauth_loopback_tls_pem_json(ctypes.byref(err))
     if not raw:
         msg = _take_err(err, ffi) or "arena_oauth_loopback_tls_pem_json returned null"
-        raise ArenaFfiError(msg)
+        raise ArenaBindingError(msg)
     try:
         payload = json.loads(ctypes.string_at(raw).decode("utf-8"))
     finally:
@@ -81,7 +81,7 @@ def oauth_loopback_tls_pem_pair() -> tuple[str, str]:
     cert = payload.get("certificate_pem")
     key = payload.get("private_key_pem")
     if not isinstance(cert, str) or not isinstance(key, str):
-        raise ArenaFfiError(
+        raise ArenaBindingError(
             "arena_oauth_loopback_tls_pem_json: missing certificate_pem or private_key_pem"
         )
     return cert, key

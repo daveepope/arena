@@ -32,7 +32,7 @@ async def test_fastapi_readings_happy_path_sqs_event_and_list(
         s.verify = ctx.oauth_ca_path
         headers = {"Authorization": f"Bearer {ctx.access_token}"}
         body = {
-            "user_name": "FastAPI Pytest User",
+            "user_name": "Readings API User",
             "value": 77,
             "comment": "sqs happy path",
         }
@@ -66,5 +66,11 @@ async def test_fastapi_readings_happy_path_sqs_event_and_list(
 
 if __name__ == "__main__":
     sys.exit(
-        pytest.main([os.path.dirname(os.path.abspath(__file__)), "-v", "-s"])
+        pytest.main(
+            [
+                os.path.dirname(os.path.abspath(__file__)),
+                "-v",
+                "-s",
+            ]
+        )
     )

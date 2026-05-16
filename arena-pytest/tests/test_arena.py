@@ -50,9 +50,9 @@ def test_create_reading_publishes_kafka_event_and_lists_via_http(
 
         created_id = _create_reading(
             BASE_URL_EXEC,
-            "Exec Test User",
-            42,
-            "test comment",
+            "Readings API User",
+            77,
+            "sqs happy path",
             oauth_access_token,
         )
         id_queue.put(created_id)
@@ -63,17 +63,17 @@ def test_create_reading_publishes_kafka_event_and_lists_via_http(
         if isinstance(consumed, Exception):
             raise consumed
         assert consumed["id"] == created_id
-        assert consumed["user_name"] == "Exec Test User"
-        assert consumed["value"] == 42
-        assert consumed.get("comment") == "test comment"
+        assert consumed["user_name"] == "Readings API User"
+        assert consumed["value"] == 77
+        assert consumed.get("comment") == "sqs happy path"
 
         readings = _get_readings(BASE_URL_EXEC, oauth_access_token)
         found = next((r for r in readings if r["id"] == created_id), None)
         assert found is not None, "should find newly created reading"
         assert found["id"] == created_id
-        assert found["user_name"] == "Exec Test User"
-        assert found["value"] == 42
-        assert found.get("comment") == "test comment"
+        assert found["user_name"] == "Readings API User"
+        assert found["value"] == 77
+        assert found.get("comment") == "sqs happy path"
 
     _body(arena)
 
@@ -100,10 +100,10 @@ def test_create_multiple_readings_are_listed(arena, validation_db_playbook, oaut
 def test_post_reading_returns_500_when_calibration_api_returns_500(
     arena, calibration_identifier, oauth_access_token
 ):
-    from arena_pytest import HttpPlaybookBuilder
+    from arena_pytest import ActiveHttpPlaybookBuilder
 
     outage = (
-        HttpPlaybookBuilder(calibration_identifier)
+        ActiveHttpPlaybookBuilder(calibration_identifier)
             .with_mapping(
                 method="POST",
                 url_path=CALIBRATION_VALIDATE_PATH,
@@ -197,11 +197,11 @@ def test_post_reading_returns_500_under_scoped_playbook_stack(arena, outage_and_
     )
 
 
-def test_http_playbook_close_fails_when_call_expectation_unmet(arena, calibration_identifier):
-    from arena_pytest import HttpPlaybookBuilder
+def test_http_playbook_scope_exit_exact_call_expectation_unmet_raises(arena, calibration_identifier):
+    from arena_pytest import ActiveHttpPlaybookBuilder
 
     unused = (
-        HttpPlaybookBuilder(calibration_identifier)
+        ActiveHttpPlaybookBuilder(calibration_identifier)
             .with_mapping(
                 method="POST",
                 url_path=CALIBRATION_VALIDATE_PATH,

@@ -2,13 +2,16 @@ package arena.junit;
 
 import com.sun.jna.Pointer;
 import arena.junit.ffi.ArenaBindings;
+import arena.junit.ffi.ArenaLogbackFlush;
 import arena.junit.ffi.ArenaStatus;
 
 public final class OpenArena {
-  private final Pointer handle;
+  private Pointer handle;
+  private volatile long dispatcherLoggingTargetToken;
 
-  OpenArena(Pointer handle) {
+  OpenArena(Pointer handle, long dispatcherLoggingTargetToken) {
     this.handle = handle;
+    this.dispatcherLoggingTargetToken = dispatcherLoggingTargetToken;
   }
 
   public Pointer handle() {
@@ -16,7 +19,26 @@ public final class OpenArena {
   }
 
   public void close() {
-    ArenaBindings.arenaClose(handle);
+    Pointer h = handle;
+    if (h == null || Pointer.nativeValue(h) == 0) {
+      long t = dispatcherLoggingTargetToken;
+      if (t != 0L) {
+        ArenaBindings.unregisterDispatcherLoggingTarget(t);
+        dispatcherLoggingTargetToken = 0L;
+      }
+      return;
+    }
+    handle = null;
+    try {
+      ArenaBindings.arenaClose(h);
+    } finally {
+      ArenaLogbackFlush.flushIfPresent();
+      long tok = dispatcherLoggingTargetToken;
+      if (tok != 0L) {
+        ArenaBindings.unregisterDispatcherLoggingTarget(tok);
+        dispatcherLoggingTargetToken = 0L;
+      }
+    }
   }
 
   public ArenaStatus softReset(String dependencyIdentifier) {

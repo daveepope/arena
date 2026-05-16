@@ -1,7 +1,7 @@
-use arena::dependency::RunnableDependency;
-use arena::healthcheck::ReadinessCheck;
 use crate::mssql_dependency::mssql_container_impl::{MssqlContainerImpl, MssqlImpl};
 use crate::mssql_dependency::MssqlDependency;
+use arena::dependency::RunnableDependency;
+use arena::healthcheck::ReadinessCheck;
 
 pub struct MssqlDependencyBuilder {
     identifier: String,
@@ -20,7 +20,6 @@ pub struct MssqlDependencyBuilder {
 }
 
 impl MssqlDependencyBuilder {
-
     const DEFAULT_PORT: u16 = 1433;
     const DEFAULT_DATABASE_NAME: &'static str = "arena_db";
     const DEFAULT_DATABASE_USERNAME: &'static str = "sa";

@@ -31,11 +31,22 @@ impl ReadinessCheck for HttpReadinessCheck {
         while start.elapsed() < timeout {
             match reqwest::get(target).await {
                 Ok(_) => {
-                    log::debug!("[{}] HTTP healthcheck passed", identifier);
+                    tracing::debug!(
+                        component = %identifier,
+                        target = %target,
+                        phase = "http_readiness",
+                        "http readiness ok",
+                    );
                     return Ok(());
                 }
                 Err(e) => {
-                    log::trace!("[{}] HTTP healthcheck failed: {}", identifier, e);
+                    tracing::trace!(
+                        component = %identifier,
+                        target = %target,
+                        error = %e,
+                        phase = "http_readiness_retry",
+                        "http readiness probe failed",
+                    );
                 }
             }
 
@@ -43,8 +54,7 @@ impl ReadinessCheck for HttpReadinessCheck {
         }
 
         Err(format!(
-            "[{}] HTTP healthcheck timed out after {:?}",
-            identifier, timeout
+            "http readiness timed out identifier={identifier} deadline={timeout:?}",
         ))
     }
 }

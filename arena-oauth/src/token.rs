@@ -19,10 +19,9 @@ impl std::fmt::Display for TokenError {
         match self {
             TokenError::Jwt(e) => write!(f, "jwt: {e}"),
             TokenError::MissingScope => write!(f, "missing scope claim"),
-            TokenError::InsufficientScope { required, granted } => write!(
-                f,
-                "insufficient scope: need {required:?}, have {granted:?}"
-            ),
+            TokenError::InsufficientScope { required, granted } => {
+                write!(f, "insufficient scope: need {required:?}, have {granted:?}")
+            }
             TokenError::NotRunning => write!(f, "oauth dependency is not running"),
         }
     }

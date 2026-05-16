@@ -1,7 +1,6 @@
 use arena::Playbook;
 use arena_http::{
-    ManagedHttpPlaybook, Playbook as HttpPlaybook, PlaybookSequenceBuilder,
-    ResponseDefinition,
+    ManagedHttpPlaybook, Playbook as HttpPlaybook, PlaybookSequenceBuilder, ResponseDefinition,
 };
 use arena_localstack::ManagedLocalstackPlaybook;
 use arena_mssql::ManagedMssqlPlaybook;
@@ -108,10 +107,7 @@ fn first_sequence(pb: HttpPlaybook, m: &HttpMapping) -> PlaybookSequenceBuilder 
     }
 }
 
-fn append_mapping(
-    seq: PlaybookSequenceBuilder,
-    m: &HttpMapping,
-) -> PlaybookSequenceBuilder {
+fn append_mapping(seq: PlaybookSequenceBuilder, m: &HttpMapping) -> PlaybookSequenceBuilder {
     let resp = response_for(m);
     match m.method.to_ascii_uppercase().as_str() {
         "GET" => seq.get(&m.url_path).will_return(resp),

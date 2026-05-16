@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use std::time::Duration;
-use testcontainers_modules::{postgres, testcontainers, testcontainers::runners::AsyncRunner};
 use testcontainers_modules::testcontainers::core::{ContainerPort, Healthcheck};
 use testcontainers_modules::testcontainers::ImageExt;
+use testcontainers_modules::{postgres, testcontainers, testcontainers::runners::AsyncRunner};
 
 #[async_trait]
 pub trait PostgresImpl: Send + Sync {
@@ -29,7 +29,11 @@ pub(crate) struct PostgresContainerImpl {
 
 impl PostgresContainerImpl {
     pub(crate) fn new(network: Option<String>) -> Self {
-        Self { container: None, connection_string: None, network }
+        Self {
+            container: None,
+            connection_string: None,
+            network,
+        }
     }
 }
 
@@ -77,10 +81,7 @@ impl PostgresImpl for PostgresContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request
-            .start()
-            .await
-            .expect("start postgres container");
+        let container = request.start().await.expect("start postgres container");
 
         let host = container
             .get_host()
@@ -98,13 +99,13 @@ impl PostgresImpl for PostgresContainerImpl {
         ));
         self.container = Some(container);
 
-        log::info!("[PostgresImpl] started container.");
+        tracing::debug!(layer = "postgres_container", phase = "container_started");
     }
 
     async fn stop(&mut self) {
         self.container.take();
         self.connection_string = None;
-        log::info!("[PostgresImpl] stopped container.");
+        tracing::debug!(layer = "postgres_container", phase = "container_stopped");
 
         if let Some(ref network) = self.network {
             arena_container::network::remove_network(network).await;

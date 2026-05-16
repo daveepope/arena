@@ -83,14 +83,15 @@ impl OauthDependency {
     }
 
     pub fn verify_access_token(&self, token: &str) -> Result<AccessTokenClaims, TokenError> {
-        let state = self.oauth_server.signing_state().ok_or(TokenError::NotRunning)?;
+        let state = self
+            .oauth_server
+            .signing_state()
+            .ok_or(TokenError::NotRunning)?;
         crate::token::verify_access_token(token, state.keys.as_ref(), &state.metadata.issuer)
     }
 
     fn tls_pair_for_listen(&mut self) -> (String, String) {
-        self.active_server_tls
-            .clone()
-            .expect("server TLS material")
+        self.active_server_tls.clone().expect("server TLS material")
     }
 }
 
@@ -113,7 +114,7 @@ impl RunnableDependency for OauthDependency {
             return;
         }
 
-        log::info!("[Oauth-{}] starting.", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "start_begin", "starting");
         let sw = Instant::now();
 
         for dep in self.dependencies.iter_mut().flatten() {
@@ -136,13 +137,12 @@ impl RunnableDependency for OauthDependency {
         self.oauth_server.wait_until_ready(&self.identifier).await;
 
         self.running = true;
-        log::debug!(
-            "[Oauth-{}] start complete in {:?} (issuer {}).",
-            self.identifier,
-            sw.elapsed(),
-            self.base_url().unwrap_or("")
+        tracing::debug!(
+            dependency = %self.identifier,
+            issuer = %self.base_url().unwrap_or(""),
+            elapsed = ?sw.elapsed(),
+            "started"
         );
-        log::info!("[Oauth-{}] started.", self.identifier);
     }
 
     async fn stop(&mut self) {
@@ -150,7 +150,7 @@ impl RunnableDependency for OauthDependency {
             return;
         }
 
-        log::info!("[Oauth-{}] stopping.", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "stop_begin", "stopping");
         self.oauth_server.stop().await;
 
         for dep in self.dependencies.iter_mut().flatten().rev() {
@@ -158,7 +158,7 @@ impl RunnableDependency for OauthDependency {
         }
 
         self.running = false;
-        log::info!("[Oauth-{}] stopped.", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "stopped", "stopped");
     }
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
@@ -169,14 +169,14 @@ impl RunnableDependency for OauthDependency {
         if !self.running {
             return;
         }
-        log::debug!("[Oauth-{}] soft_reset: no-op", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "soft_reset", "no-op");
     }
 
     async fn hard_reset(&mut self) {
         if !self.running {
             return;
         }
-        log::info!("[Oauth-{}] hard_reset: restart server", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "hard_reset", "restarting oauth server");
         self.stop().await;
         self.start().await;
     }
@@ -187,9 +187,9 @@ impl Drop for OauthDependency {
         if !self.running {
             return;
         }
-        log::warn!(
-            "[Oauth-{}] dropped while still running; stopping server.",
-            self.identifier
+        tracing::warn!(
+            dependency = %self.identifier,
+            "drop while oauth server running; forcing stop"
         );
         futures::executor::block_on(<Self as RunnableDependency>::stop(self));
     }

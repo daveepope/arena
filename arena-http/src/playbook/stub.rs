@@ -1,7 +1,7 @@
-use serde::Serialize;
-use std::collections::HashMap;
 use crate::playbook::header_pattern::HeaderPattern;
 use crate::playbook::response::ResponseDefinition;
+use serde::Serialize;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -157,9 +157,17 @@ impl MappingBuilder {
         }
     }
 
-    pub(crate) fn will_return_sequence(self, responses: Vec<ResponseDefinition>) -> Vec<StubMapping> {
+    pub(crate) fn will_return_sequence(
+        self,
+        responses: Vec<ResponseDefinition>,
+    ) -> Vec<StubMapping> {
         if responses.len() <= 1 {
-            return vec![self.will_return(responses.into_iter().next().expect("at least one response required"))];
+            return vec![self.will_return(
+                responses
+                    .into_iter()
+                    .next()
+                    .expect("at least one response required"),
+            )];
         }
 
         let scenario_name = format!("__seq_{}_{}", self.method, self.url_path);

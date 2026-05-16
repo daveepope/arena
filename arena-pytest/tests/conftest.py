@@ -1,5 +1,6 @@
 import os
 import sys
+import logging
 
 _TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _TESTS_DIR not in sys.path:
@@ -23,6 +24,7 @@ if not _arena_plugin_already_registered_via_entry_point():
     pytest_plugins = ("arena_pytest.arena",)
 
 from arena_pytest import (
+    ArenaLogLevel,
     BuildTool,
     ClosedArena,
     ContainerizedComponentBuilder,
@@ -83,6 +85,25 @@ from readings_arena_config import (
     POSTGRES_PORT,
     TEMP_DIRECTORY_PREFIX,
 )
+
+_DISPATCHER_IMPLEMENTATION_DEPENDENCY_LOG_IDS = (
+    DEP_NAME_OAUTH,
+    DEP_NAME_POSTGRES,
+    DEP_NAME_KAFKA,
+    DEP_NAME_MSSQL,
+    DEP_NAME_CALIBRATION_HTTP,
+    PLAYBOOK_CALIBRATION_DEFAULT,
+    PLAYBOOK_CALIBRATION_OUTAGE_MANAGED,
+    PLAYBOOK_CALIBRATION_OUTAGE_FIXTURE_SCOPE,
+    PLAYBOOK_VALIDATION_DB_SCOPED,
+)
+
+_DISPATCHER_IMPLEMENTATION_COMPONENT_LOG_IDS = (
+    COMPONENT_NAME_EXECUTABLE,
+    COMPONENT_NAME_CONTAINERIZED,
+)
+
+_LOG = logging.getLogger(__name__)
 
 _DOCKER_WEB_ENABLED = False
 
@@ -300,7 +321,7 @@ def _build_exec_component(oauth_ca_pem: str) -> object:
             "mssql_connection_string", MSSQL_CONNECTION_STRING_LOCAL
         )
         .with_runtime_arg("oauth_issuer_url", OAUTH_ISSUER)
-        .with_readiness_check(HttpReadinessCheck(), healthcheck_url)
+        .with_readiness_check(HttpReadinessCheck.create(), healthcheck_url)
     )
     if not is_bazel:
         exec_builder = exec_builder.with_source_path("examples").with_build_tool(BuildTool.CARGO)
@@ -337,7 +358,7 @@ def _build_containerized_component(
         )
         .with_runtime_arg("oauth_issuer_url", OAUTH_ISSUER)
         .with_readiness_check(
-            HttpReadinessCheck(),
+            HttpReadinessCheck.create(),
             f"http://127.0.0.1:{DOCKER_WEB_HOST_PORT}/health",
         )
         .build()
@@ -412,7 +433,14 @@ def closed_arena() -> ClosedArena:
     for c in components:
         a_match = a_match.add_component(c)
 
-    return ClosedArena(CLOSED_ARENA_NAME, [a_match.build()])
+    return ClosedArena(
+        CLOSED_ARENA_NAME,
+        [a_match.build()],
+        log_level=ArenaLogLevel.DEBUG,
+        logger=_LOG,
+        log_component_ids=_DISPATCHER_IMPLEMENTATION_COMPONENT_LOG_IDS,
+        log_dependency_ids=_DISPATCHER_IMPLEMENTATION_DEPENDENCY_LOG_IDS,
+    )
 
 
 @pytest.fixture(scope="session")

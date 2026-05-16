@@ -1,6 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple
-
-from arena_pytest.readiness import HttpReadinessCheck, ReadinessCheck
+from typing import Any, Dict, List, Optional
 
 
 class Match:
@@ -34,21 +32,6 @@ class Match:
             out["playbooks"] = [
                 p._for_ffi() if hasattr(p, "_for_ffi") else p for p in self._playbooks
             ]
-        return out
-
-    def readiness_hooks(self) -> List[Tuple[str, str, ReadinessCheck]]:
-        out: List[Tuple[str, str, ReadinessCheck]] = []
-        for c in self._components:
-            checks = getattr(c, "_readiness_checks", None)
-            if not checks:
-                continue
-            identifier = ""
-            if hasattr(c, "_config") and isinstance(c._config, dict):
-                identifier = str(c._config.get("identifier", ""))
-            for check, target in checks:
-                if isinstance(check, HttpReadinessCheck):
-                    continue
-                out.append((identifier, target, check))
         return out
 
 

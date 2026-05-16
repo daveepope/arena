@@ -2,6 +2,7 @@ package arena.junit.readings;
 
 import arena.junit.ClosedArena;
 import arena.junit.OpenArena;
+import arena.junit.ffi.ArenaLogLevel;
 import arena.junit.dep.HttpDependency;
 import arena.junit.dep.HttpDependencyBuilder;
 import arena.junit.dep.KafkaDependency;
@@ -30,8 +31,12 @@ import arena.junit.playbook.ArenaSession;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ReadingsArenaSessionFixture implements BeforeAllCallback, AfterAllCallback, ArenaSession {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ReadingsArenaSessionFixture.class);
 
   private static final ExtensionContext.Namespace NS =
       ExtensionContext.Namespace.create("arena.junit.readings.session");
@@ -249,7 +254,21 @@ public final class ReadingsArenaSessionFixture implements BeforeAllCallback, Aft
         }
       }
       Match match = mb.build();
-      ClosedArena closed = new ClosedArena(ReadingsArenaConfig.CLOSED_ARENA_NAME, List.of(match));
+      ClosedArena closed =
+          new ClosedArena(
+              ReadingsArenaConfig.CLOSED_ARENA_NAME,
+              List.of(match),
+              ArenaLogLevel.DEBUG,
+              LOG,
+              List.of(
+                  ReadingsArenaConfig.COMPONENT_NAME_EXECUTABLE,
+                  ReadingsArenaConfig.COMPONENT_NAME_CONTAINERIZED),
+              List.of(
+                  ReadingsArenaConfig.DEP_NAME_OAUTH,
+                  ReadingsArenaConfig.DEP_NAME_POSTGRES,
+                  ReadingsArenaConfig.DEP_NAME_KAFKA,
+                  ReadingsArenaConfig.DEP_NAME_MSSQL,
+                  ReadingsArenaConfig.DEP_NAME_CALIBRATION_HTTP));
       OpenArena openArena = closed.open();
       Session s =
           new Session(openArena, oauthCa, mssqlId, calibrationId, containerized);

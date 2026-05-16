@@ -4,12 +4,12 @@ use serde::Deserialize;
 
 use crate::containerized_component;
 use crate::executable_component;
-use crate::http_dependency;
+use crate::dependency::http::http_dependency;
+use crate::dependency::localstack::localstack_dependency;
+use crate::dependency::mssql::mssql_dependency;
 use crate::kafka_dependency;
-use crate::localstack_dependency;
-use crate::mssql_dependency;
-use crate::postgres_dependency;
 use crate::managed_playbook;
+use crate::postgres_dependency;
 
 const DEFAULT_NETWORK: &str = "arena-network";
 const DEFAULT_MATCH_NAME: &str = "arena-match";
@@ -43,14 +43,9 @@ pub(crate) enum ComponentConfig {
     Containerized(containerized_component::ContainerizedComponentConfig),
 }
 
-pub(crate) async fn build_match_async(
-    config: &MatchConfig,
-) -> Result<Box<dyn MatchTrait>, String> {
+pub(crate) async fn build_match_async(config: &MatchConfig) -> Result<Box<dyn MatchTrait>, String> {
     let network = config.network.as_deref().unwrap_or(DEFAULT_NETWORK);
-    let match_name = config
-        .match_name
-        .as_deref()
-        .unwrap_or(DEFAULT_MATCH_NAME);
+    let match_name = config.match_name.as_deref().unwrap_or(DEFAULT_MATCH_NAME);
 
     let dependencies = build_dependencies(config, network)?;
     let components = build_components_async(config).await?;
@@ -64,10 +59,7 @@ pub(crate) async fn build_match_async(
     Ok(Box::new(a_match))
 }
 
-fn build_dependencies(
-    config: &MatchConfig,
-    network: &str,
-) -> Result<Vec<Dependency>, String> {
+fn build_dependencies(config: &MatchConfig, network: &str) -> Result<Vec<Dependency>, String> {
     config
         .dependencies
         .as_deref()
@@ -84,9 +76,7 @@ fn build_dependencies(
         .collect()
 }
 
-async fn build_components_async(
-    config: &MatchConfig,
-) -> Result<Vec<Component>, String> {
+async fn build_components_async(config: &MatchConfig) -> Result<Vec<Component>, String> {
     let comps = config.components.as_deref().unwrap_or(&[]);
     let mut out = Vec::with_capacity(comps.len());
     for c in comps {

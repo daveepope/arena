@@ -3,8 +3,11 @@ use arena_oauth::{ensure_scopes, OauthDependency, TokenError};
 use serde_json::Value;
 
 fn init_test_logging() {
-    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .is_test(true)
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_test_writer()
         .try_init();
 }
 

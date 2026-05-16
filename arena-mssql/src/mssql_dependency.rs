@@ -1,14 +1,14 @@
 mod healthcheck;
 pub mod mssql_container_impl;
 
+use crate::builder::MssqlDependencyBuilder;
+use crate::mssql_dependency::healthcheck::DefaultMssqlReadinessCheck;
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
-use crate::builder::MssqlDependencyBuilder;
-use mssql_container_impl::MssqlImpl;
 use futures::channel::oneshot;
+use mssql_container_impl::MssqlImpl;
 use std::time::{Duration, Instant};
-use crate::mssql_dependency::healthcheck::DefaultMssqlReadinessCheck;
 
 pub struct MssqlDependency {
     pub identifier: String,
@@ -96,22 +96,22 @@ impl MssqlDependency {
         conn_str: &str,
         scripts: &[String],
     ) -> Result<(), String> {
-        let mut client = mssql_container_impl::connect(conn_str)
-            .await
-            .map_err(|e| format!("[MssqlDependency-{identifier}] connect for startup scripts: {e}"))?;
+        let mut client = mssql_container_impl::connect(conn_str).await.map_err(|e| {
+            format!("[MssqlDependency-{identifier}] connect for startup scripts: {e}")
+        })?;
 
-        log::info!(
-            "[MssqlDependency-{}] running {} startup sql script(s).",
-            identifier,
-            scripts.len()
+        tracing::debug!(
+            dependency = %identifier,
+            script_count = scripts.len(),
+            "running startup sql scripts"
         );
 
         for (idx, sql) in scripts.iter().enumerate() {
-            log::info!(
-                "[MssqlDependency-{}] running startup sql script {}/{}.",
-                identifier,
-                idx + 1,
-                scripts.len()
+            tracing::debug!(
+                dependency = %identifier,
+                script_index = idx + 1,
+                script_total = scripts.len(),
+                "executing startup sql script"
             );
 
             client.simple_query(sql.as_str()).await.map_err(|err| {
@@ -124,10 +124,7 @@ impl MssqlDependency {
             })?;
         }
 
-        log::info!(
-            "[MssqlDependency-{}] startup sql scripts complete.",
-            identifier
-        );
+        tracing::debug!(dependency = %identifier, "startup sql scripts complete");
         Ok(())
     }
 
@@ -175,12 +172,15 @@ impl MssqlDependency {
                     safe = safe,
                 );
 
-                client.simple_query(sql.as_str()).await.map_err(|e| {
-                    format!("create database [{database_name}] failed: {e}")
-                })?;
+                client
+                    .simple_query(sql.as_str())
+                    .await
+                    .map_err(|e| format!("create database [{database_name}] failed: {e}"))?;
 
-                log::info!(
-                    "[MssqlDependency-{identifier}] ensured database [{database_name}] exists"
+                tracing::debug!(
+                    dependency = %identifier,
+                    database = %database_name,
+                    "ensured database exists"
                 );
                 Ok::<(), String>(())
             }
@@ -248,10 +248,11 @@ impl MssqlDependency {
 
         match rx.await {
             Ok(Ok(tables)) => {
-                log::info!(
-                    "[MssqlDependency-{identifier}] snapshot {} managed table(s): {:?}",
-                    tables.len(),
-                    tables
+                tracing::debug!(
+                    dependency = %identifier,
+                    table_count = tables.len(),
+                    tables = ?tables,
+                    "captured managed table snapshot"
                 );
                 self.managed_tables = tables;
             }
@@ -272,7 +273,8 @@ impl MssqlDependency {
         let (tx, rx) = oneshot::channel::<Result<(), String>>();
 
         tokio::spawn(async move {
-            let res = MssqlDependency::run_startup_sql_scripts(&identifier, &conn_str, &scripts).await;
+            let res =
+                MssqlDependency::run_startup_sql_scripts(&identifier, &conn_str, &scripts).await;
             let _ = tx.send(res);
         });
 
@@ -306,7 +308,7 @@ impl RunnableDependency for MssqlDependency {
             return;
         }
 
-        log::info!("[MssqlDependency-{}] starting.", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "start_begin", "starting");
         let sw = Instant::now();
 
         for dep in self.dependencies.iter_mut().flatten() {
@@ -336,18 +338,18 @@ impl RunnableDependency for MssqlDependency {
                 &container_name,
             )
             .await;
-        log::debug!(
-            "[MssqlDependency-{}] container start in {:?}.",
-            self.identifier,
-            sw_container.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw_container.elapsed(),
+            "container start finished"
         );
 
         let sw_ready = Instant::now();
         self.wait_until_ready().await;
-        log::debug!(
-            "[MssqlDependency-{}] readiness in {:?}.",
-            self.identifier,
-            sw_ready.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw_ready.elapsed(),
+            "readiness wait finished"
         );
 
         self.ensure_database_exists().await;
@@ -355,22 +357,21 @@ impl RunnableDependency for MssqlDependency {
         if let Some(scripts) = scripts {
             let sw_scripts = Instant::now();
             self.run_startup_sql_scripts_blocking(scripts).await;
-            log::debug!(
-                "[MssqlDependency-{}] startup scripts in {:?}.",
-                self.identifier,
-                sw_scripts.elapsed()
+            tracing::debug!(
+                dependency = %self.identifier,
+                elapsed = ?sw_scripts.elapsed(),
+                "startup scripts finished"
             );
 
             self.snapshot_managed_tables().await;
         }
 
         self.running = true;
-        log::debug!(
-            "[MssqlDependency-{}] start complete in {:?}.",
-            self.identifier,
-            sw.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw.elapsed(),
+            "started and ready"
         );
-        log::info!("[MssqlDependency-{}] started and ready.", self.identifier);
     }
 
     async fn stop(&mut self) {
@@ -378,7 +379,7 @@ impl RunnableDependency for MssqlDependency {
             return;
         }
 
-        log::info!("[MssqlDependency-{}] stopping.", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "stop_begin", "stopping");
         let sw = Instant::now();
 
         self.mssql_impl.stop().await;
@@ -388,12 +389,11 @@ impl RunnableDependency for MssqlDependency {
         }
 
         self.running = false;
-        log::debug!(
-            "[MssqlDependency-{}] stop complete in {:?}.",
-            self.identifier,
-            sw.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw.elapsed(),
+            "stopped"
         );
-        log::info!("[MssqlDependency-{}] stopped.", self.identifier);
     }
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
@@ -406,7 +406,10 @@ impl RunnableDependency for MssqlDependency {
         }
 
         let Some(scripts) = &self.startup_sql_scripts else {
-            log::warn!("[MssqlDependency-{}] soft reset: no startup scripts", self.identifier);
+            tracing::warn!(
+                dependency = %self.identifier,
+                "soft reset skipped: no startup scripts"
+            );
             return;
         };
 
@@ -421,7 +424,11 @@ impl RunnableDependency for MssqlDependency {
         let database_name = self.database_name.clone();
         let identifier = self.identifier.clone();
 
-        log::info!("[MssqlDependency-{}] soft reset: dropping and recreating database", self.identifier);
+        tracing::debug!(
+            dependency = %self.identifier,
+            phase = "soft_reset",
+            "drop and recreate database"
+        );
 
         let reset_res: Result<(), String> = async {
             let mut admin = mssql_container_impl::connect(&admin_conn)
@@ -450,9 +457,7 @@ impl RunnableDependency for MssqlDependency {
             panic!("[MssqlDependency-{identifier}] soft reset failed: {msg}");
         }
 
-        if let Err(msg) =
-            Self::run_startup_sql_scripts(&identifier, &conn_str, scripts).await
-        {
+        if let Err(msg) = Self::run_startup_sql_scripts(&identifier, &conn_str, scripts).await {
             panic!("{msg}");
         }
     }
@@ -462,7 +467,11 @@ impl RunnableDependency for MssqlDependency {
             return;
         }
 
-        log::info!("[MssqlDependency-{}] hard reset: restarting container", self.identifier);
+        tracing::debug!(
+            dependency = %self.identifier,
+            phase = "hard_reset",
+            "restarting mssql container"
+        );
 
         let scripts = self.startup_sql_scripts.clone();
         let database_name = self.database_name.clone();
@@ -506,9 +515,9 @@ impl Drop for MssqlDependency {
         if !self.running {
             return;
         }
-        log::warn!(
-            "[MssqlDependency-{}] dropped while still running; stopping container.",
-            self.identifier
+        tracing::warn!(
+            dependency = %self.identifier,
+            "drop while running; forcing stop"
         );
         futures::executor::block_on(<Self as RunnableDependency>::stop(self));
     }

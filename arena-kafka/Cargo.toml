@@ -11,11 +11,11 @@ arena = { workspace = true }
 arena-container = { workspace = true }
 async-trait = { workspace = true }
 testcontainers-modules = { workspace = true, features = ["kafka"] }
-log = { workspace = true }
+tracing = { workspace = true }
 futures-timer = { workspace = true }
 rdkafka = { workspace = true }
 futures = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-env_logger = { workspace = true }
+tracing-subscriber = { workspace = true }

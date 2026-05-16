@@ -172,7 +172,10 @@ py_test(
         "@pip//requests",
         "@pip_examples//boto3",
     ],
-    tags = ["requires_docker"],
+    tags = [
+        "requires_docker",
+        "exclusive",
+    ],
     python_version = "PY3",
     visibility = ["//visibility:public"],
 )
@@ -183,7 +186,10 @@ rust_test(
     crate_root = "tests/example-readings-axum-component-test/readings_axum_component_test.rs",
     size = "small",
     edition = "2021",
-    tags = ["requires_docker"],
+    tags = [
+        "requires_docker",
+        "exclusive",
+    ],
     compile_data = [
         "resources/instrument_reading_db_schema.sql",
         "resources/validation_db_schema.sql",
@@ -259,6 +265,13 @@ java_binary(
     runtime_deps = [":example_readings_spring_boot_lib"],
 )
 
+java_library(
+    name = "example_readings_spring_boot_component_test_logging_resources",
+    resources = glob(["tests/example-readings-spring-boot-component-test/resources/**"]),
+    resource_strip_prefix = "examples/tests/example-readings-spring-boot-component-test/resources",
+    visibility = ["//visibility:private"],
+)
+
 java_test(
     name = "example-readings-spring-boot-component-test",
     size = "small",
@@ -267,7 +280,10 @@ java_test(
         "--release",
         "21",
     ],
-    tags = ["requires_docker"],
+    tags = [
+        "requires_docker",
+        "exclusive",
+    ],
     use_testrunner = False,
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
@@ -282,6 +298,7 @@ java_test(
     ],
     jvm_flags = ["-Djna.nosys=true"],
     runtime_deps = [
+        ":example_readings_spring_boot_component_test_logging_resources",
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
         "@arena_java_maven//:org_junit_platform_junit_platform_console",
         "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
@@ -291,6 +308,8 @@ java_test(
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
         "@arena_java_maven//:org_apache_kafka_kafka_clients",
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:org_slf4j_slf4j_api",
+        "@arena_java_maven//:org_springframework_boot_spring_boot_starter_logging",
         "@arena_java_maven//:software_amazon_awssdk_auth",
         "@arena_java_maven//:software_amazon_awssdk_regions",
         "@arena_java_maven//:software_amazon_awssdk_sqs",

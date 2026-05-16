@@ -1,12 +1,12 @@
-mod healthcheck;
 pub(crate) mod container_impl;
+mod healthcheck;
 
 use crate::admin_client::admin_api_client;
+use crate::builder::HttpDependencyBuilder;
+use crate::http_dependency::healthcheck::DefaultHttpReadinessCheck;
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
-use crate::builder::HttpDependencyBuilder;
-use crate::http_dependency::healthcheck::DefaultHttpReadinessCheck;
 use std::time::{Duration, Instant};
 
 #[async_trait]
@@ -19,7 +19,6 @@ pub trait HttpImpl: Send + Sync {
         None
     }
 }
-
 
 pub struct HttpDependency {
     pub identifier: String,
@@ -46,9 +45,9 @@ impl HttpDependency {
         container_name: Option<String>,
         trusted_tls_certificate_pem: Option<String>,
     ) -> Self {
-        let readiness_check: Box<dyn ReadinessCheck> = Box::new(
-            DefaultHttpReadinessCheck::new(trusted_tls_certificate_pem.clone()),
-        );
+        let readiness_check: Box<dyn ReadinessCheck> = Box::new(DefaultHttpReadinessCheck::new(
+            trusted_tls_certificate_pem.clone(),
+        ));
         Self {
             identifier,
             http_impl,
@@ -94,22 +93,18 @@ impl HttpDependency {
 
         let admin_url = self.admin_url_or_panic();
 
-        log::info!(
-            "[Http-{}] resetting request journal (mappings preserved)",
-            self.identifier
+        tracing::debug!(
+            dependency = %self.identifier,
+            phase = "reset_journal",
+            "clearing request journal"
         );
 
-        let client = admin_api_client(
-            &admin_url,
-            self.trusted_tls_certificate_pem.as_deref(),
-        );
+        let client = admin_api_client(&admin_url, self.trusted_tls_certificate_pem.as_deref());
         let response = client
             .delete(format!("{admin_url}/requests"))
             .send()
             .await
-            .unwrap_or_else(|e| {
-                panic!("[Http-{}] reset_journal failed: {e}", self.identifier)
-            });
+            .unwrap_or_else(|e| panic!("[Http-{}] reset_journal failed: {e}", self.identifier));
 
         if !response.status().is_success() {
             panic!(
@@ -149,7 +144,11 @@ impl HttpDependency {
             match self.admin_url() {
                 Some(url) => break url,
                 None => {
-                    log::debug!("[Http-{}] readiness: admin url not available yet", self.identifier);
+                    tracing::debug!(
+                        dependency = %self.identifier,
+                        phase = "readiness_poll",
+                        "admin url not available yet"
+                    );
                     futures_timer::Delay::new(poll_every).await;
                 }
             }
@@ -193,7 +192,7 @@ impl RunnableDependency for HttpDependency {
             return;
         }
 
-        log::info!("[Http-{}] starting.", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "start_begin", "starting");
         let sw = Instant::now();
 
         for dep in self.dependencies.iter_mut().flatten() {
@@ -202,34 +201,35 @@ impl RunnableDependency for HttpDependency {
 
         let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
-        let container_name = self.container_name.clone()
+        let container_name = self
+            .container_name
+            .clone()
             .unwrap_or_else(|| self.default_container_name());
 
         let sw_container = Instant::now();
         self.http_impl
             .start(self.port, &image_name, &image_tag, &container_name)
             .await;
-        log::debug!(
-            "[Http-{}] container start in {:?}.",
-            self.identifier,
-            sw_container.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw_container.elapsed(),
+            "container start finished"
         );
 
         let sw_ready = Instant::now();
         self.wait_until_ready().await;
-        log::debug!(
-            "[Http-{}] readiness in {:?}.",
-            self.identifier,
-            sw_ready.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw_ready.elapsed(),
+            "readiness wait finished"
         );
 
         self.running = true;
-        log::debug!(
-            "[Http-{}] start complete in {:?}.",
-            self.identifier,
-            sw.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw.elapsed(),
+            "started"
         );
-        log::info!("[Http-{}] started.", self.identifier);
     }
 
     async fn stop(&mut self) {
@@ -237,7 +237,7 @@ impl RunnableDependency for HttpDependency {
             return;
         }
 
-        log::info!("[Http-{}] stopping.", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "stop_begin", "stopping");
         let sw = Instant::now();
 
         self.http_impl.stop().await;
@@ -247,12 +247,11 @@ impl RunnableDependency for HttpDependency {
         }
 
         self.running = false;
-        log::debug!(
-            "[Http-{}] stop complete in {:?}.",
-            self.identifier,
-            sw.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw.elapsed(),
+            "stopped"
         );
-        log::info!("[Http-{}] stopped.", self.identifier);
     }
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
@@ -266,12 +265,13 @@ impl RunnableDependency for HttpDependency {
 
         let admin_url = self.admin_url_or_panic();
 
-        log::info!("[Http-{}] soft reset: resetting mappings and request journal", self.identifier);
-
-        let client = admin_api_client(
-            &admin_url,
-            self.trusted_tls_certificate_pem.as_deref(),
+        tracing::debug!(
+            dependency = %self.identifier,
+            phase = "soft_reset",
+            "reset mappings and request journal"
         );
+
+        let client = admin_api_client(&admin_url, self.trusted_tls_certificate_pem.as_deref());
         client
             .post(format!("{admin_url}/reset"))
             .send()
@@ -284,7 +284,11 @@ impl RunnableDependency for HttpDependency {
             return;
         }
 
-        log::info!("[Http-{}] hard reset: restarting container", self.identifier);
+        tracing::debug!(
+            dependency = %self.identifier,
+            phase = "hard_reset",
+            "restarting http container"
+        );
 
         let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
@@ -309,9 +313,9 @@ impl Drop for HttpDependency {
         if !self.running {
             return;
         }
-        log::warn!(
-            "[Http-{}] dropped while still running; stopping container.",
-            self.identifier
+        tracing::warn!(
+            dependency = %self.identifier,
+            "drop while running; forcing stop"
         );
         futures::executor::block_on(<Self as RunnableDependency>::stop(self));
     }

@@ -58,19 +58,52 @@ impl MatchTrait for Match {
             return;
         }
 
-        log::info!("[Match-{}] starting.", self.name);
+        tracing::info!(match_name = %self.name, phase = "start_begin", "starting");
         let sw = Instant::now();
 
+        let dep_count = self.dependencies.len();
         let deps = std::mem::take(&mut self.dependencies);
+        let match_label = self.name.clone();
 
-        let mut started = join_all(deps.into_iter().enumerate().map(|(i, mut dep)| async move {
-            dep.start().await;
-            (i, dep)
+        if dep_count > 0 {
+            tracing::info!(
+                match_name = %self.name,
+                dependency_count = dep_count,
+                phase = "dependencies_start_begin",
+                "starting dependencies"
+            );
+        }
+        let sw_deps_batch = Instant::now();
+        let mut started = join_all(deps.into_iter().enumerate().map(|(i, mut dep)| {
+            let match_label = match_label.clone();
+            async move {
+                let id = dep.identifier().to_string();
+                let sw_one = Instant::now();
+                dep.start().await;
+                tracing::info!(
+                    match_name = %match_label,
+                    dependency = %id,
+                    elapsed = ?sw_one.elapsed(),
+                    phase = "dependency_start_complete",
+                    "dependency started"
+                );
+                (i, dep)
+            }
         }))
         .await;
 
         started.sort_by_key(|(i, _)| *i);
         self.dependencies = started.into_iter().map(|(_, dep)| dep).collect();
+
+        if dep_count > 0 {
+            tracing::info!(
+                match_name = %self.name,
+                elapsed = ?sw_deps_batch.elapsed(),
+                dependency_count = dep_count,
+                phase = "dependencies_start_end",
+                "dependencies started"
+            );
+        }
 
         let startup: Vec<&dyn Playbook> = self
             .playbooks
@@ -79,44 +112,90 @@ impl MatchTrait for Match {
             .collect();
 
         if !startup.is_empty() {
-            log::info!(
-                "[Match-{}] running {} playbook(s) in parallel.",
-                self.name,
-                startup.len()
+            tracing::info!(
+                match_name = %self.name,
+                playbook_count = startup.len(),
+                phase = "playbook_parallel_begin",
+                "running playbooks in parallel"
             );
             let sw_pb = Instant::now();
             let deps_ref: &[Dependency] = &self.dependencies;
-            let actives = join_all(
-                startup
-                    .iter()
-                    .map(|pb| async move { pb.run(deps_ref).await }),
-            )
+            let match_label_for_pb = self.name.clone();
+            let actives = join_all((0..startup.len()).map(|idx| {
+                let pb = startup[idx];
+                let id = pb.identifier().to_string();
+                let match_label_for_pb = match_label_for_pb.clone();
+                async move {
+                    let sw_one = Instant::now();
+                    let active = pb.run(deps_ref).await;
+                    tracing::info!(
+                        match_name = %match_label_for_pb,
+                        playbook = %id,
+                        elapsed = ?sw_one.elapsed(),
+                        phase = "playbook_run_complete",
+                        "playbook applied"
+                    );
+                    active
+                }
+            }))
             .await;
             self.active_playbooks.extend(actives);
-            log::debug!(
-                "[Match-{}] playbooks completed in {:?}.",
-                self.name,
-                sw_pb.elapsed()
+            tracing::info!(
+                match_name = %self.name,
+                elapsed = ?sw_pb.elapsed(),
+                phase = "playbook_parallel_end",
+                "playbooks complete"
             );
         }
 
+        let comp_count = self.components.len();
+        if comp_count > 0 {
+            tracing::info!(
+                match_name = %self.name,
+                component_count = comp_count,
+                phase = "components_start_begin",
+                "starting components"
+            );
+        }
+        let sw_comps_batch = Instant::now();
         let comps = std::mem::take(&mut self.components);
 
-        let mut started_comps = join_all(comps.into_iter().enumerate().map(|(i, mut comp)| async move {
-            comp.start().await;
-            (i, comp)
+        let mut started_comps = join_all(comps.into_iter().enumerate().map(|(i, mut comp)| {
+            let match_label = match_label.clone();
+            async move {
+                let sw_one = Instant::now();
+                comp.start().await;
+                tracing::info!(
+                    match_name = %match_label,
+                    component_index = i,
+                    elapsed = ?sw_one.elapsed(),
+                    phase = "component_start_complete",
+                    "component started"
+                );
+                (i, comp)
+            }
         }))
         .await;
 
         started_comps.sort_by_key(|(i, _)| *i);
         self.components = started_comps.into_iter().map(|(_, comp)| comp).collect();
 
-        log::debug!(
-            "[Match-{}] start complete in {:?}.",
-            self.name,
-            sw.elapsed()
+        if comp_count > 0 {
+            tracing::info!(
+                match_name = %self.name,
+                elapsed = ?sw_comps_batch.elapsed(),
+                component_count = comp_count,
+                phase = "components_start_end",
+                "components started"
+            );
+        }
+
+        tracing::info!(
+            match_name = %self.name,
+            elapsed = ?sw.elapsed(),
+            phase = "start_end",
+            "started"
         );
-        log::info!("[Match-{}] started.", self.name);
         self.started = true;
     }
 
@@ -125,39 +204,104 @@ impl MatchTrait for Match {
             return;
         }
 
-        log::info!("[Match-{}] stopping.", self.name);
+        tracing::info!(match_name = %self.name, phase = "stop_begin", "stopping");
         let sw = Instant::now();
 
+        let comp_count = self.components.len();
+        let match_label = self.name.clone();
+        if comp_count > 0 {
+            tracing::info!(
+                match_name = %self.name,
+                component_count = comp_count,
+                phase = "components_stop_begin",
+                "stopping components"
+            );
+        }
+        let sw_comps_batch = Instant::now();
         let comps = std::mem::take(&mut self.components);
 
-        let mut stopped_comps = join_all(comps.into_iter().enumerate().map(|(i, mut comp)| async move {
-            comp.stop().await;
-            (i, comp)
+        let mut stopped_comps = join_all(comps.into_iter().enumerate().map(|(i, mut comp)| {
+            let match_label = match_label.clone();
+            async move {
+                let sw_one = Instant::now();
+                comp.stop().await;
+                tracing::info!(
+                    match_name = %match_label,
+                    component_index = i,
+                    elapsed = ?sw_one.elapsed(),
+                    phase = "component_stop_complete",
+                    "component stopped"
+                );
+                (i, comp)
+            }
         }))
         .await;
 
         stopped_comps.sort_by_key(|(i, _)| *i);
         self.components = stopped_comps.into_iter().map(|(_, comp)| comp).collect();
 
+        if comp_count > 0 {
+            tracing::info!(
+                match_name = %self.name,
+                elapsed = ?sw_comps_batch.elapsed(),
+                component_count = comp_count,
+                phase = "components_stop_end",
+                "components stopped"
+            );
+        }
+
         self.active_playbooks.clear();
 
+        let dep_count = self.dependencies.len();
         let deps = std::mem::take(&mut self.dependencies);
 
-        let mut stopped = join_all(deps.into_iter().enumerate().map(|(i, mut dep)| async move {
-            dep.stop().await;
-            (i, dep)
+        if dep_count > 0 {
+            tracing::info!(
+                match_name = %self.name,
+                dependency_count = dep_count,
+                phase = "dependencies_stop_begin",
+                "stopping dependencies"
+            );
+        }
+        let sw_deps_batch = Instant::now();
+
+        let mut stopped = join_all(deps.into_iter().enumerate().map(|(i, mut dep)| {
+            let match_label = match_label.clone();
+            async move {
+                let id = dep.identifier().to_string();
+                let sw_one = Instant::now();
+                dep.stop().await;
+                tracing::info!(
+                    match_name = %match_label,
+                    dependency = %id,
+                    elapsed = ?sw_one.elapsed(),
+                    phase = "dependency_stop_complete",
+                    "dependency stopped"
+                );
+                (i, dep)
+            }
         }))
         .await;
 
         stopped.sort_by_key(|(i, _)| *i);
         self.dependencies = stopped.into_iter().map(|(_, dep)| dep).collect();
 
-        log::debug!(
-            "[Match-{}] stop complete in {:?}.",
-            self.name,
-            sw.elapsed()
+        if dep_count > 0 {
+            tracing::info!(
+                match_name = %self.name,
+                elapsed = ?sw_deps_batch.elapsed(),
+                dependency_count = dep_count,
+                phase = "dependencies_stop_end",
+                "dependencies stopped"
+            );
+        }
+
+        tracing::info!(
+            match_name = %self.name,
+            elapsed = ?sw.elapsed(),
+            phase = "stop_end",
+            "stopped"
         );
-        log::info!("[Match-{}] stopped.", self.name);
         self.started = false;
     }
 
@@ -278,7 +422,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn register_playbook_runs_after_dependencies_started_and_in_parallel() {
-        let _ = env_logger::builder().is_test(true).try_init();
+        let _ = tracing_subscriber::fmt().with_test_writer().try_init();
 
         let dep_started = Arc::new(Mutex::new(false));
         let dep = StubDependency {
@@ -350,7 +494,7 @@ mod tests {
 
     #[tokio::test]
     async fn register_playbook_skips_execution_when_exec_on_start_is_false() {
-        let _ = env_logger::builder().is_test(true).try_init();
+        let _ = tracing_subscriber::fmt().with_test_writer().try_init();
 
         let dep = StubDependency {
             identifier: "dep-1".to_string(),

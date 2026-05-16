@@ -48,7 +48,11 @@ async fn run_with_retry(
 
         match ops.ping(connection_string).await {
             Ok(()) => return Ok(()),
-            Err(err) => log::debug!("[Mssql] healthcheck failed (will retry): {err}"),
+            Err(err) => tracing::debug!(
+                subsystem = "mssql",
+                error = %err,
+                "readiness probe failed (will retry)"
+            ),
         };
 
         tokio::time::sleep(poll_every).await;

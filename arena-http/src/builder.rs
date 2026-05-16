@@ -1,7 +1,7 @@
-use arena::dependency::RunnableDependency;
-use arena::healthcheck::ReadinessCheck;
 use crate::http_dependency::container_impl::{HttpContainerCliConfig, HttpContainerImpl};
 use crate::http_dependency::{HttpDependency, HttpImpl};
+use arena::dependency::RunnableDependency;
+use arena::healthcheck::ReadinessCheck;
 
 const DEFAULT_CONTAINER_HTTP_PORT: u16 = 8080;
 

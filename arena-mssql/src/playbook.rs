@@ -1,5 +1,5 @@
-use crate::mssql_dependency::MssqlDependency;
 use crate::mssql_dependency::mssql_container_impl::connect;
+use crate::mssql_dependency::MssqlDependency;
 
 pub struct Playbook {
     connection_string: String,
@@ -38,10 +38,10 @@ impl Playbook {
             .await
             .unwrap_or_else(|e| panic!("{e}"));
 
-        log::info!(
-            "[MssqlPlaybook-{}] reset {} table(s); state is now clean.",
-            self.identifier,
-            tables.len()
+        tracing::debug!(
+            playbook_id = %self.identifier,
+            table_count = tables.len(),
+            "reset tables; clean state"
         );
 
         ActivePlaybook {
@@ -66,15 +66,17 @@ fn reset_on_drop(
         {
             Ok(rt) => rt,
             Err(e) => {
-                log::warn!(
-                    "[MssqlPlaybook-{identifier}] drop: failed to build runtime: {e}"
+                tracing::warn!(
+                    playbook_id = %identifier,
+                    error = %e,
+                    "drop cleanup: runtime build failed"
                 );
                 return Ok(());
             }
         };
-        rt.block_on(async move {
-            reset_tables(&identifier, &connection_string, &managed_tables).await
-        })
+        rt.block_on(
+            async move { reset_tables(&identifier, &connection_string, &managed_tables).await },
+        )
     });
 
     let outcome = handle.join();
@@ -169,8 +171,9 @@ async fn reset_tables(
     tables: &[(String, String)],
 ) -> Result<(), String> {
     if tables.is_empty() {
-        log::debug!(
-            "[MssqlPlaybook-{identifier}] reset: no managed tables; nothing to do."
+        tracing::debug!(
+            playbook_id = %identifier,
+            "reset skipped: no managed tables"
         );
         return Ok(());
     }
@@ -188,10 +191,7 @@ async fn reset_tables(
         ));
     }
     for (schema, name) in tables {
-        sql.push_str(&format!(
-            "DELETE FROM {};\n",
-            quote_ident(schema, name)
-        ));
+        sql.push_str(&format!("DELETE FROM {};\n", quote_ident(schema, name)));
     }
     for (schema, name) in tables {
         sql.push_str(&format!(

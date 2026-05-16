@@ -1,7 +1,7 @@
+use crate::playbook::header_pattern::HeaderPattern;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
-use crate::playbook::header_pattern::HeaderPattern;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,7 +35,10 @@ impl RequestCriteria {
     }
 
     pub(crate) fn has_header_criteria(&self) -> bool {
-        self.headers.as_ref().map(|h| !h.is_empty()).unwrap_or(false)
+        self.headers
+            .as_ref()
+            .map(|h| !h.is_empty())
+            .unwrap_or(false)
     }
 }
 
@@ -46,7 +49,15 @@ impl fmt::Display for RequestCriteria {
         write!(f, "{method} {path}")?;
         if let Some(headers) = &self.headers {
             let names: Vec<&String> = headers.keys().collect();
-            write!(f, " [headers: {}]", names.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "))?;
+            write!(
+                f,
+                " [headers: {}]",
+                names
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )?;
         }
         Ok(())
     }
@@ -92,7 +103,12 @@ impl fmt::Display for RecordedRequest {
             if self.body.len() <= BODY_PREVIEW_MAX {
                 write!(f, "  body={}", self.body)?;
             } else {
-                write!(f, "  body={}...({}B total)", &self.body[..BODY_PREVIEW_MAX], self.body.len())?;
+                write!(
+                    f,
+                    "  body={}...({}B total)",
+                    &self.body[..BODY_PREVIEW_MAX],
+                    self.body.len()
+                )?;
             }
         }
         Ok(())
@@ -157,7 +173,12 @@ pub(crate) fn event_matches_criteria(event: &ServeEvent, criteria: &RequestCrite
         }
     }
     if let Some(expected_path) = path {
-        let logged_path = event.request.url.split('?').next().unwrap_or(&event.request.url);
+        let logged_path = event
+            .request
+            .url
+            .split('?')
+            .next()
+            .unwrap_or(&event.request.url);
         if logged_path != expected_path {
             return false;
         }

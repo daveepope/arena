@@ -8,8 +8,8 @@ use arena_oauth::OauthDependency;
 use std::time::Duration;
 
 use crate::arena::{
-    readings_axum_component_runtime, shared_arena, CALIBRATION_ID, EXEC_WEB_APP_PORT, KAFKA_ID,
-    MSSQL_ID, OAUTH_ID, SCENARIO_LOCK, oauth_server_tls_cert_pem,
+    oauth_server_tls_cert_pem, readings_axum_component_runtime, shared_arena, CALIBRATION_ID,
+    EXEC_WEB_APP_PORT, KAFKA_ID, MSSQL_ID, OAUTH_ID, SCENARIO_LOCK,
 };
 use crate::http::{
     consume_reading_created_event, create_reading, fetch_example_access_token,
@@ -59,9 +59,9 @@ fn readings_axum_exec_creates_reading_consumes_and_gets_reading() {
 
         let created_id = create_reading(
             EXEC_WEB_APP_PORT,
-            "Exec Test User",
-            42,
-            Some("test comment".to_string()),
+            "Readings API User",
+            77,
+            Some("sqs happy path".to_string()),
         )
         .await;
         id_tx
@@ -74,9 +74,9 @@ fn readings_axum_exec_creates_reading_consumes_and_gets_reading() {
             .expect("should consume ReadingCreatedEvent from Kafka");
 
         assert_eq!(consumed.id, created_id as i64);
-        assert_eq!(consumed.user_name, "Exec Test User");
-        assert_eq!(consumed.value, 42);
-        assert_eq!(consumed.comment.as_deref(), Some("test comment"));
+        assert_eq!(consumed.user_name, "Readings API User");
+        assert_eq!(consumed.value, 77);
+        assert_eq!(consumed.comment.as_deref(), Some("sqs happy path"));
 
         let readings = get_readings(EXEC_WEB_APP_PORT).await;
         let found = readings
@@ -85,12 +85,12 @@ fn readings_axum_exec_creates_reading_consumes_and_gets_reading() {
             .expect("should find newly created reading");
 
         assert_eq!(found.id, created_id);
-        assert_eq!(found.user_name, "Exec Test User");
-        assert_eq!(found.value, 42);
-        assert_eq!(found.comment.as_deref(), Some("test comment"));
+        assert_eq!(found.user_name, "Readings API User");
+        assert_eq!(found.value, 77);
+        assert_eq!(found.comment.as_deref(), Some("sqs happy path"));
 
         let validation_count = validation_playbook
-            .verify("SELECT COUNT(*) FROM dbo.validation_results WHERE user_name = N'Exec Test User' AND value = 42 AND valid = 1;")
+            .verify("SELECT COUNT(*) FROM dbo.validation_results WHERE user_name = N'Readings API User' AND value = 77 AND valid = 1;")
             .await;
         assert_eq!(
             validation_count, 1,
@@ -165,8 +165,7 @@ fn readings_axum_exec_readings_returns_401_when_access_token_scopes_insufficient
         let _arena = shared_arena().await;
         let _scenario = SCENARIO_LOCK.lock().await;
 
-        let token = fetch_example_access_token_with_scope(Some("openid profile"))
-            .await;
+        let token = fetch_example_access_token_with_scope(Some("openid profile")).await;
         let url = format!("http://127.0.0.1:{}/readings", EXEC_WEB_APP_PORT);
         let client = build_http_client_trusting_oauth_ca(oauth_server_tls_cert_pem());
         let response = client

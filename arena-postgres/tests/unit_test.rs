@@ -98,7 +98,11 @@ async fn postgres_dependency_lifecycle() {
     let got = events.lock().unwrap().clone();
     assert_eq!(
         got,
-        vec![Event::PostgresStart, Event::ReadinessCheck, Event::PostgresStop]
+        vec![
+            Event::PostgresStart,
+            Event::ReadinessCheck,
+            Event::PostgresStop
+        ]
     );
 
     assert_eq!(
@@ -111,4 +115,3 @@ async fn postgres_dependency_lifecycle() {
     );
     assert_eq!(*last_timeout_ms.lock().unwrap(), Some(10_000));
 }
-

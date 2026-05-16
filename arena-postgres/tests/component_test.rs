@@ -4,8 +4,11 @@ use futures::FutureExt;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 fn init_test_logging() {
-    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .is_test(true)
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_test_writer()
         .try_init();
 }
 
@@ -26,7 +29,12 @@ struct TestContext {
 
 impl TestContext {
     async fn new() -> Result<Self, String> {
-        log::info!("[component-test] starting PostgresDependency");
+        tracing::info!(
+            suite = "crate_component",
+            crate_under_test = "arena_postgres",
+            phase = "dependency_start_begin",
+            "starting dependency",
+        );
         let mut pg = PostgresDependency::builder("").build();
         pg.start().await;
 
@@ -41,7 +49,11 @@ impl TestContext {
             .as_millis();
         let table = format!("arena_component_test_{ts}");
 
-        Ok(Self { pg, conn_str, table })
+        Ok(Self {
+            pg,
+            conn_str,
+            table,
+        })
     }
 
     async fn create_table(&self) -> Result<(), String> {
@@ -111,7 +123,13 @@ async fn postgres_dependency_lifecycle_component_test() {
         Err(e) => panic!("{e}"),
     };
 
-    log::info!("[component-test] db roundtrip begin (table={})", ctx.table);
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_postgres",
+        phase = "db_roundtrip_begin",
+        table = %ctx.table,
+        "begin db roundtrip",
+    );
     let outcome = std::panic::AssertUnwindSafe(async {
         ctx.create_table().await?;
         let count = ctx.insert_and_count().await?;
@@ -130,7 +148,12 @@ async fn postgres_dependency_lifecycle_component_test() {
         .unwrap_or_else(|_| panic!("postgres stop timed out"));
 
     match outcome {
-        Ok(Ok(())) => log::info!("[component-test] ok"),
+        Ok(Ok(())) => tracing::info!(
+            suite = "crate_component",
+            crate_under_test = "arena_postgres",
+            phase = "db_roundtrip_ok",
+            "scenario passed",
+        ),
         Ok(Err(e)) => panic!("{e}"),
         Err(panic_payload) => std::panic::resume_unwind(panic_payload),
     }

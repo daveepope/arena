@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 import time
@@ -12,6 +13,7 @@ import pytest_asyncio
 import requests
 
 from arena_pytest import (
+    ArenaLogLevel,
     ClosedArena,
     EventRuleSpec,
     EventRuleTarget,
@@ -43,15 +45,17 @@ POSTGRES_DB_PASS = "readings_password"
 MSSQL_DB_NAME = "validationDb"
 MSSQL_DB_USER = "sa"
 MSSQL_DB_PASS = "yourStrong(!)Password"
-NETWORK_NAME = "arena-pytest-fastapi-readings-network"
-EVENT_BUS_NAME = "readings-fastapi-events"
-EVENT_SOURCE = "arena.readings.fastapi"
-QUEUE_NAME = "readings-fastapi-events-q"
-EVENT_RULE_NAME = "readings-fastapi-rule"
+NETWORK_NAME = "arena-readings-api-network"
+EVENT_BUS_NAME = "readings-api-events"
+EVENT_SOURCE = "readings.api"
+QUEUE_NAME = "readings-api-events-q"
+EVENT_RULE_NAME = "readings-api-rule"
 CALIBRATION_VALIDATE_PATH = "/api/v1/validate"
-LOCALSTACK_SESSION_PLAYBOOK_ID = "fastapi-readings-localstack-session"
+LOCALSTACK_SESSION_PLAYBOOK_ID = "readings-api-localstack-session"
 DUMMY_CREDS = {"aws_access_key_id": "test", "aws_secret_access_key": "test"}
 REGION = "us-east-1"
+
+_LOG = logging.getLogger(__name__)
 
 
 def _find_resource_file(filename: str) -> str:
@@ -168,7 +172,7 @@ async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
     pytest.importorskip("boto3")
     cert, key = oauth_loopback_tls_pem_pair()
 
-    fd, oauth_ca_file = tempfile.mkstemp(prefix="fastapi-oauth-", suffix=".pem")
+    fd, oauth_ca_file = tempfile.mkstemp(prefix="readings-api-oauth-", suffix=".pem")
     os.close(fd)
     with open(oauth_ca_file, "w", encoding="utf-8") as f:
         f.write(cert)
@@ -183,7 +187,7 @@ async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
     mssql_startup_sql = [open(mssql_schema_path, encoding="utf-8").read()]
 
     oauth = (
-        OauthDependencyBuilder("fastapi pytest oauth")
+        OauthDependencyBuilder("readings-api-oauth")
         .with_port(OAUTH_PORT)
         .with_listen_ip("0.0.0.0")
         .with_server_tls_pem(cert, key)
@@ -192,7 +196,7 @@ async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
     )
 
     postgres = (
-        PostgresDependencyBuilder("fastapi pytest readings")
+        PostgresDependencyBuilder("readings-api-postgres")
         .with_image("14.20-trixie")
         .with_port(POSTGRES_PORT)
         .with_database_name(POSTGRES_DB_NAME)
@@ -203,7 +207,7 @@ async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
     )
 
     mssql = (
-        MssqlDependencyBuilder("fastapi pytest validation")
+        MssqlDependencyBuilder("readings-api-mssql")
         .with_port(MSSQL_PORT)
         .with_database_name(MSSQL_DB_NAME)
         .with_database_username(MSSQL_DB_USER)
@@ -213,20 +217,20 @@ async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
     )
 
     calibration = (
-        HttpDependencyBuilder("fastapi pytest calibration")
+        HttpDependencyBuilder("readings-api-calibration")
         .with_port(CALIBRATION_HOST_PORT)
         .build()
     )
 
     calibration_playbook = (
         ManagedHttpPlaybookBuilder(
-            "fastapi-calibration-default", calibration.identifier
+            "readings-api-calibration-default", calibration.identifier
         )
         .with_mapping("POST", CALIBRATION_VALIDATE_PATH, 200, {"valid": True})
         .build()
     )
 
-    ls_id = f"ls-fastapi-{uuid.uuid4().hex[:8]}"
+    ls_id = f"ls-readings-api-{uuid.uuid4().hex[:8]}"
     localstack = (
         LocalstackDependencyBuilder(ls_id)
         .with_port(LOCALSTACK_HOST_PORT)
@@ -271,7 +275,7 @@ async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
     ls_ep = f"http://127.0.0.1:{LOCALSTACK_HOST_PORT}"
 
     fastapi_component = (
-        ExecutableComponentBuilder("fastapi readings web")
+        ExecutableComponentBuilder("readings-api-web-app")
         .with_executable_path(exe)
         .with_env_var("WEB_APP_PORT", str(WEB_APP_PORT))
         .with_env_var("POSTGRES_CONNECTION_STRING", pg_cs)
@@ -287,13 +291,13 @@ async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
         .with_env_var("EVENT_BUS_NAME", EVENT_BUS_NAME)
         .with_env_var("EVENT_SOURCE", EVENT_SOURCE)
         .with_readiness_check(
-            HttpReadinessCheck(), f"http://127.0.0.1:{WEB_APP_PORT}/health"
+            HttpReadinessCheck.create(), f"http://127.0.0.1:{WEB_APP_PORT}/health"
         )
         .build()
     )
 
     a_match = (
-        MatchBuilder("fastapi readings lifecycle")
+        MatchBuilder("readings-api-happy-path")
         .with_network(NETWORK_NAME)
         .add_dependency(oauth)
         .add_dependency(postgres)
@@ -306,7 +310,20 @@ async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
         .build()
     )
 
-    closed = ClosedArena("FastAPI readings component arena", [a_match])
+    closed = ClosedArena(
+        "readings-api-arena",
+        [a_match],
+        log_level=ArenaLogLevel.DEBUG,
+        logger=_LOG,
+        log_component_ids=("readings-api-web-app",),
+        log_dependency_ids=(
+            oauth.identifier,
+            postgres.identifier,
+            mssql.identifier,
+            calibration.identifier,
+            localstack.identifier,
+        ),
+    )
     arena = await closed.open()
     try:
         token = _fetch_access_token(oauth_ca_file, OAUTH_ISSUER)
@@ -334,5 +351,5 @@ async def arena(readings_fastapi_ctx: ReadingsFastapiCtx):
 @pytest.fixture(scope="session")
 def validation_db_playbook(readings_fastapi_ctx: ReadingsFastapiCtx):
     return ManagedMssqlPlaybookBuilder(
-        "fastapi-validation-db-scoped", readings_fastapi_ctx.mssql_identifier
+        "readings-api-validation-db-scoped", readings_fastapi_ctx.mssql_identifier
     ).build()

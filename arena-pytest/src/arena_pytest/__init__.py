@@ -1,4 +1,10 @@
-from arena_pytest.ffi._ffi import ArenaFfiError, ArenaStatus
+from arena_pytest.ffi._ffi import (
+    ArenaBindingError,
+    ArenaLogLevel,
+    ArenaNativeLib,
+    register_dispatcher_logging_target_for_logger,
+    unregister_dispatcher_logging_target,
+)
 from arena_pytest.arena import (
     OpenArena,
     arena,
@@ -17,10 +23,10 @@ from arena_pytest.exec.executable_component import (
     ExecutableComponentBuilder,
 )
 from arena_pytest.dep.http import (
+    ActiveHttpPlaybook,
+    ActiveHttpPlaybookBuilder,
     HttpDependency,
     HttpDependencyBuilder,
-    HttpPlaybook,
-    HttpPlaybookBuilder,
     ManagedHttpPlaybook,
     ManagedHttpPlaybookBuilder,
 )
@@ -42,7 +48,7 @@ from arena_pytest.dep.localstack import (
     LambdaTarget,
     LocalstackDependency,
     LocalstackDependencyBuilder,
-    LocalstackPlaybook,
+    ActiveLocalstackPlaybook,
     ManagedLocalstackPlaybook,
     ManagedLocalstackPlaybookBuilder,
     QueueSpec,
@@ -53,7 +59,7 @@ from arena_pytest.dep.mssql import (
     ManagedMssqlPlaybookBuilder,
     MssqlDependency,
     MssqlDependencyBuilder,
-    MssqlPlaybook,
+    ActiveMssqlPlaybook,
 )
 from arena_pytest.oauth import (
     DEFAULT_OAUTH_PORT,
@@ -64,17 +70,15 @@ from arena_pytest.oauth import (
 )
 from arena_pytest.playbook import active_playbooks, playbook
 from arena_pytest.dep.postgres import PostgresDependency, PostgresDependencyBuilder
-from arena_pytest.readiness import (
-    DEFAULT_READINESS_TIMEOUT_MS,
-    HttpReadinessCheck,
-    ReadinessCheck,
-    run_readiness,
-)
+from arena_pytest.readiness import HttpReadinessCheck, ReadinessCheck
 
 __all__ = [
-    "ArenaFfiError",
-    "ArenaStatus",
+    "ArenaBindingError",
+    "ArenaLogLevel",
+    "ArenaNativeLib",
     "ClosedArena",
+    "register_dispatcher_logging_target_for_logger",
+    "unregister_dispatcher_logging_target",
     "ContainerizedComponent",
     "ContainerizedComponentBuilder",
     "Match",
@@ -84,8 +88,8 @@ __all__ = [
     "ExecutableComponentBuilder",
     "HttpDependency",
     "HttpDependencyBuilder",
-    "HttpPlaybook",
-    "HttpPlaybookBuilder",
+    "ActiveHttpPlaybook",
+    "ActiveHttpPlaybookBuilder",
     "ManagedHttpPlaybook",
     "ManagedHttpPlaybookBuilder",
     "ManagedMssqlPlaybook",
@@ -105,14 +109,14 @@ __all__ = [
     "LambdaTarget",
     "LocalstackDependency",
     "LocalstackDependencyBuilder",
-    "LocalstackPlaybook",
+    "ActiveLocalstackPlaybook",
     "ManagedLocalstackPlaybook",
     "ManagedLocalstackPlaybookBuilder",
     "QueueSpec",
     "SqsQueueTarget",
     "MssqlDependency",
     "MssqlDependencyBuilder",
-    "MssqlPlaybook",
+    "ActiveMssqlPlaybook",
     "DEFAULT_OAUTH_PORT",
     "OAUTH_ISSUER",
     "OauthDependency",
@@ -120,10 +124,8 @@ __all__ = [
     "oauth_loopback_tls_pem_pair",
     "PostgresDependency",
     "PostgresDependencyBuilder",
-    "DEFAULT_READINESS_TIMEOUT_MS",
     "HttpReadinessCheck",
     "ReadinessCheck",
-    "run_readiness",
     "active_playbooks",
     "arena",
     "arena_ffi",

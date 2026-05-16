@@ -1,14 +1,14 @@
 mod healthcheck;
 pub mod postgres_container_impl;
 
+use crate::builder::PostgresDependencyBuilder;
+use crate::postgres_dependency::healthcheck::DefaultPostgresReadinessCheck;
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
-use crate::builder::PostgresDependencyBuilder;
-use postgres_container_impl::PostgresImpl;
 use futures::channel::oneshot;
+use postgres_container_impl::PostgresImpl;
 use std::time::{Duration, Instant};
-use crate::postgres_dependency::healthcheck::DefaultPostgresReadinessCheck;
 
 pub struct PostgresDependency {
     pub identifier: String,
@@ -74,40 +74,34 @@ impl PostgresDependency {
     }
 
     fn run_startup_sql_scripts(identifier: &str, conn_str: &str, scripts: &[String]) {
-        let mut client =
-            postgres::Client::connect(conn_str, postgres::NoTls)
-                .expect("connect to postgres to run startup scripts");
+        let mut client = postgres::Client::connect(conn_str, postgres::NoTls)
+            .expect("connect to postgres to run startup scripts");
 
-        log::info!(
-            "[PostgresDependency-{}] running {} startup sql script(s).",
-            identifier,
-            scripts.len()
+        tracing::debug!(
+            dependency = %identifier,
+            script_count = scripts.len(),
+            "running startup sql scripts"
         );
 
         for (idx, sql) in scripts.iter().enumerate() {
-            log::info!(
-                "[PostgresDependency-{}] running startup sql script {}/{}.",
-                identifier,
-                idx + 1,
-                scripts.len()
+            tracing::debug!(
+                dependency = %identifier,
+                script_index = idx + 1,
+                script_total = scripts.len(),
+                "executing startup sql script"
             );
 
-            client
-                .batch_execute(sql)
-                .unwrap_or_else(|err| {
-                    panic!(
-                        "[PostgresDependency-{}] startup sql script {}/{} failed: {err}",
-                        identifier,
-                        idx + 1,
-                        scripts.len()
-                    )
-                });
+            client.batch_execute(sql).unwrap_or_else(|err| {
+                panic!(
+                    "[PostgresDependency-{}] startup sql script {}/{} failed: {err}",
+                    identifier,
+                    idx + 1,
+                    scripts.len()
+                )
+            });
         }
 
-        log::info!(
-            "[PostgresDependency-{}] startup sql scripts complete.",
-            identifier
-        );
+        tracing::debug!(dependency = %identifier, "startup sql scripts complete");
     }
 
     async fn wait_until_ready(&self) {
@@ -151,7 +145,10 @@ impl PostgresDependency {
                     } else if let Some(s) = panic_payload.downcast_ref::<&str>() {
                         s.to_string()
                     } else {
-                        format!("[PostgresDependency-{}] startup sql scripts panicked.", identifier)
+                        format!(
+                            "[PostgresDependency-{}] startup sql scripts panicked.",
+                            identifier
+                        )
                     };
 
                     let _ = tx.send(Err(msg));
@@ -189,7 +186,7 @@ impl RunnableDependency for PostgresDependency {
             return;
         }
 
-        log::info!("[PostgresDependency-{}] starting.", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "start_begin", "starting");
         let sw = Instant::now();
 
         for dep in self.dependencies.iter_mut().flatten() {
@@ -219,37 +216,36 @@ impl RunnableDependency for PostgresDependency {
                 &container_name,
             )
             .await;
-        log::debug!(
-            "[PostgresDependency-{}] container start in {:?}.",
-            self.identifier,
-            sw_container.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw_container.elapsed(),
+            "container start finished"
         );
 
         let sw_ready = Instant::now();
         self.wait_until_ready().await;
-        log::debug!(
-            "[PostgresDependency-{}] readiness in {:?}.",
-            self.identifier,
-            sw_ready.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw_ready.elapsed(),
+            "readiness wait finished"
         );
 
         if let Some(scripts) = scripts {
             let sw_scripts = Instant::now();
             self.run_startup_sql_scripts_blocking(scripts).await;
-            log::debug!(
-                "[PostgresDependency-{}] startup scripts in {:?}.",
-                self.identifier,
-                sw_scripts.elapsed()
+            tracing::debug!(
+                dependency = %self.identifier,
+                elapsed = ?sw_scripts.elapsed(),
+                "startup scripts finished"
             );
         }
 
         self.running = true;
-        log::debug!(
-            "[PostgresDependency-{}] start complete in {:?}.",
-            self.identifier,
-            sw.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw.elapsed(),
+            "started and ready"
         );
-        log::info!("[PostgresDependency-{}] started and ready.", self.identifier);
     }
 
     async fn stop(&mut self) {
@@ -257,7 +253,7 @@ impl RunnableDependency for PostgresDependency {
             return;
         }
 
-        log::info!("[PostgresDependency-{}] stopping.", self.identifier);
+        tracing::debug!(dependency = %self.identifier, phase = "stop_begin", "stopping");
         let sw = Instant::now();
 
         self.postgres_impl.stop().await;
@@ -267,12 +263,11 @@ impl RunnableDependency for PostgresDependency {
         }
 
         self.running = false;
-        log::debug!(
-            "[PostgresDependency-{}] stop complete in {:?}.",
-            self.identifier,
-            sw.elapsed()
+        tracing::debug!(
+            dependency = %self.identifier,
+            elapsed = ?sw.elapsed(),
+            "stopped"
         );
-        log::info!("[PostgresDependency-{}] stopped.", self.identifier);
     }
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
@@ -285,7 +280,10 @@ impl RunnableDependency for PostgresDependency {
         }
 
         let Some(scripts) = &self.startup_sql_scripts else {
-            log::warn!("[PostgresDependency-{}] soft reset: no startup scripts", self.identifier);
+            tracing::warn!(
+                dependency = %self.identifier,
+                "soft reset skipped: no startup scripts"
+            );
             return;
         };
 
@@ -293,10 +291,15 @@ impl RunnableDependency for PostgresDependency {
             .connection_string()
             .expect("connection string for soft reset");
 
-        log::info!("[PostgresDependency-{}] soft reset: dropping and recreating schema", self.identifier);
-        let mut client = postgres::Client::connect(conn_str, postgres::NoTls)
-            .expect("connect for soft reset");
-        client.batch_execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
+        tracing::debug!(
+            dependency = %self.identifier,
+            phase = "soft_reset",
+            "drop and recreate schema"
+        );
+        let mut client =
+            postgres::Client::connect(conn_str, postgres::NoTls).expect("connect for soft reset");
+        client
+            .batch_execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
             .expect("drop/recreate schema");
         drop(client);
 
@@ -308,7 +311,11 @@ impl RunnableDependency for PostgresDependency {
             return;
         }
 
-        log::info!("[PostgresDependency-{}] hard reset: restarting container", self.identifier);
+        tracing::debug!(
+            dependency = %self.identifier,
+            phase = "hard_reset",
+            "restarting postgres container"
+        );
 
         let scripts = self.startup_sql_scripts.clone();
         let database_name = self.database_name.clone();
@@ -350,9 +357,9 @@ impl Drop for PostgresDependency {
         if !self.running {
             return;
         }
-        log::warn!(
-            "[PostgresDependency-{}] dropped while still running; stopping container.",
-            self.identifier
+        tracing::warn!(
+            dependency = %self.identifier,
+            "drop while running; forcing stop"
         );
         futures::executor::block_on(<Self as RunnableDependency>::stop(self));
     }

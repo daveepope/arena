@@ -2,8 +2,18 @@ package arena.junit.ffi;
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.PointerByReference;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
 
 public final class ArenaBindings {
+  private static final Set<Long> DEFAULT_DISPATCHER_LOGGING_TARGET_TOKENS =
+      ConcurrentHashMap.newKeySet();
+
+  private static final Map<Long, ArenaSlf4jDispatcherStderrPublication>
+      SLF4J_DISPATCHER_STDERR_PUBLICATIONS = new ConcurrentHashMap<>();
+
   private ArenaBindings() {}
 
   public static ArenaNativeLib lib() {
@@ -31,8 +41,10 @@ public final class ArenaBindings {
     }
   }
 
-  public static Pointer arenaOpen(String name, String configJson) {
+  public static Pointer arenaOpen(
+      String name, String configJson, ArenaLogLevel logLevel) {
     ArenaNativeLib lib = lib();
+    lib.arena_set_log_level(logLevel.code());
     PointerByReference err = new PointerByReference();
     Pointer h = lib.arena_open(name, configJson, err);
     if (h == null || Pointer.nativeValue(h) == 0) {
@@ -40,6 +52,85 @@ public final class ArenaBindings {
       throw new ArenaBindingError(msg != null ? msg : "arena_open returned null");
     }
     return h;
+  }
+
+  public static void setDispatcherDependencyAllowJson(String jsonUtf8MaybeNull) {
+    lib().arena_dispatcher_dependency_allow_json_set(jsonUtf8MaybeNull);
+  }
+
+  public static void setDispatcherComponentAllowJson(String jsonUtf8MaybeNull) {
+    lib().arena_dispatcher_component_allow_json_set(jsonUtf8MaybeNull);
+  }
+
+  public static long registerDefaultDispatcherLoggingTarget() {
+    return registerDefaultDispatcherLoggingTarget(ArenaLogLevel.INFO);
+  }
+
+  public static long registerDefaultDispatcherLoggingTarget(ArenaLogLevel arenaLogLevel) {
+    ArenaPlatformLoggingTarget.installJulDirectStderr(arenaLogLevel);
+    long token = lib().arena_add_log_target(ArenaPlatformLoggingTarget.INSTANCE, Pointer.NULL);
+    if (token == 0L) {
+      ArenaPlatformLoggingTarget.removeJulDirectStderrInstallation();
+      throw new ArenaBindingError("arena_add_log_target rejected callback");
+    }
+    DEFAULT_DISPATCHER_LOGGING_TARGET_TOKENS.add(token);
+    return token;
+  }
+
+  public static long registerSlf4jDispatcherLoggingTarget(Logger logger) {
+    return registerSlf4jDispatcherLoggingTarget(logger, ArenaLogLevel.INFO);
+  }
+
+  public static long registerSlf4jDispatcherLoggingTarget(
+      Logger logger, ArenaLogLevel arenaLogLevel) {
+    ArenaSlf4jDispatcherStderrPublication publication =
+        ArenaSlf4jDispatcherStderrPublication.installIfApplicable(logger, arenaLogLevel);
+    long token;
+    try {
+      token = registerDispatcherLoggingTarget(new ArenaSlf4jLoggingTarget(logger), Pointer.NULL);
+    } catch (RuntimeException e) {
+      if (publication != null) {
+        publication.restore();
+      }
+      throw e;
+    }
+    if (publication != null) {
+      SLF4J_DISPATCHER_STDERR_PUBLICATIONS.put(token, publication);
+    }
+    return token;
+  }
+
+  public static long registerDispatcherLoggingTarget(
+      ArenaLoggingTargetCallback callback, Pointer userData) {
+    if (callback == null) {
+      throw new ArenaBindingError("log target callback is null");
+    }
+    Pointer bound = userData != null ? userData : Pointer.NULL;
+    long token = lib().arena_add_log_target(callback, bound);
+    if (token == 0L) {
+      throw new ArenaBindingError("arena_add_log_target rejected callback");
+    }
+    return token;
+  }
+
+  public static void unregisterDispatcherLoggingTarget(long token) {
+    if (token == 0L) {
+      return;
+    }
+    lib().arena_remove_log_target(token);
+    if (DEFAULT_DISPATCHER_LOGGING_TARGET_TOKENS.remove(token)) {
+      ArenaPlatformLoggingTarget.removeJulDirectStderrInstallation();
+      return;
+    }
+    ArenaSlf4jDispatcherStderrPublication pub =
+        SLF4J_DISPATCHER_STDERR_PUBLICATIONS.remove(token);
+    if (pub != null) {
+      pub.restore();
+    }
+  }
+
+  public static Pointer arenaOpen(String name, String configJson) {
+    return arenaOpen(name, configJson, ArenaLogLevel.INFO);
   }
 
   public static void arenaClose(Pointer handle) {
@@ -91,7 +182,7 @@ public final class ArenaBindings {
     }
   }
 
-  public static Pointer httpPlaybookOpen(Pointer arena, String specJson) {
+  public static Pointer httpPlaybookBegin(Pointer arena, String specJson) {
     ArenaNativeLib lib = lib();
     PointerByReference err = new PointerByReference();
     Pointer pb = lib.arena_http_playbook_open(arena, specJson, err);
@@ -102,7 +193,7 @@ public final class ArenaBindings {
     return pb;
   }
 
-  public static void httpPlaybookClose(Pointer pb) {
+  public static void httpPlaybookFinish(Pointer pb) {
     if (pb == null || Pointer.nativeValue(pb) == 0) {
       return;
     }
@@ -113,10 +204,10 @@ public final class ArenaBindings {
     try {
       st = ArenaStatus.fromInt(raw);
     } catch (IllegalArgumentException e) {
-      throw new ArenaBindingError(msg != null ? msg : "http_playbook_close unknown status " + raw);
+      throw new ArenaBindingError(msg != null ? msg : "http_playbook_finish unknown status " + raw);
     }
     if (st != ArenaStatus.OK) {
-      throw new ArenaBindingError(msg != null ? msg : "http_playbook_close failed: " + st, st);
+      throw new ArenaBindingError(msg != null ? msg : "http_playbook_finish failed: " + st, st);
     }
   }
 
@@ -135,7 +226,7 @@ public final class ArenaBindings {
     }
   }
 
-  public static Pointer mssqlPlaybookOpen(Pointer arena, String specJson) {
+  public static Pointer mssqlPlaybookBegin(Pointer arena, String specJson) {
     ArenaNativeLib lib = lib();
     PointerByReference err = new PointerByReference();
     Pointer pb = lib.arena_mssql_playbook_open(arena, specJson, err);
@@ -146,7 +237,7 @@ public final class ArenaBindings {
     return pb;
   }
 
-  public static void mssqlPlaybookClose(Pointer pb) {
+  public static void mssqlPlaybookFinish(Pointer pb) {
     if (pb == null || Pointer.nativeValue(pb) == 0) {
       return;
     }
@@ -157,10 +248,10 @@ public final class ArenaBindings {
     try {
       st = ArenaStatus.fromInt(raw);
     } catch (IllegalArgumentException e) {
-      throw new ArenaBindingError(msg != null ? msg : "mssql_playbook_close unknown status " + raw);
+      throw new ArenaBindingError(msg != null ? msg : "mssql_playbook_finish unknown status " + raw);
     }
     if (st != ArenaStatus.OK) {
-      throw new ArenaBindingError(msg != null ? msg : "mssql_playbook_close failed: " + st, st);
+      throw new ArenaBindingError(msg != null ? msg : "mssql_playbook_finish failed: " + st, st);
     }
   }
 
@@ -179,7 +270,7 @@ public final class ArenaBindings {
     }
   }
 
-  public static Pointer localstackPlaybookOpen(Pointer arena, String specJson) {
+  public static Pointer localstackPlaybookBegin(Pointer arena, String specJson) {
     ArenaNativeLib lib = lib();
     PointerByReference err = new PointerByReference();
     Pointer pb = lib.arena_localstack_playbook_open(arena, specJson, err);
@@ -190,7 +281,7 @@ public final class ArenaBindings {
     return pb;
   }
 
-  public static void localstackPlaybookClose(Pointer pb) {
+  public static void localstackPlaybookFinish(Pointer pb) {
     if (pb == null || Pointer.nativeValue(pb) == 0) {
       return;
     }
@@ -201,10 +292,10 @@ public final class ArenaBindings {
     try {
       st = ArenaStatus.fromInt(raw);
     } catch (IllegalArgumentException e) {
-      throw new ArenaBindingError(msg != null ? msg : "localstack_playbook_close unknown status " + raw);
+      throw new ArenaBindingError(msg != null ? msg : "localstack_playbook_finish unknown status " + raw);
     }
     if (st != ArenaStatus.OK) {
-      throw new ArenaBindingError(msg != null ? msg : "localstack_playbook_close failed: " + st, st);
+      throw new ArenaBindingError(msg != null ? msg : "localstack_playbook_finish failed: " + st, st);
     }
   }
 }

@@ -1,42 +1,42 @@
 {
   "schema_version": 1,
-  "network_name": "arena-readings-axum-network",
-  "docker_image_tag": "arena-readings-axum-container-image",
-  "closed_arena_name": "Arena readings axum session",
-  "match_name": "reading lifecycle",
-  "temp_directory_prefix": "arena-readings-axum-image-ctx-",
-  "kafka_consumer_group_label": "arena-readings-axum",
+  "network_name": "arena-readings-api-network",
+  "docker_image_tag": "readings-api-axum-container-image",
+  "closed_arena_name": "readings-api-arena",
+  "match_name": "readings-api-happy-path",
+  "temp_directory_prefix": "readings-api-image-build-ctx-",
+  "kafka_consumer_group_label": "readings-api-consumer",
   "postgres_image": "14.20-trixie",
   "dependency_names": {
-    "oauth": "arena readings oauth",
-    "postgres": "arena readings postgres",
-    "kafka": "arena readings kafka",
-    "mssql": "arena readings mssql",
-    "calibration_http": "arena readings calibration http"
+    "oauth": "readings-api-oauth",
+    "postgres": "readings-api-postgres",
+    "kafka": "readings-api-kafka",
+    "mssql": "readings-api-mssql",
+    "calibration_http": "readings-api-calibration"
   },
   "component_names": {
-    "executable": "arena readings axum exec",
-    "containerized": "arena readings axum container"
+    "executable": "readings-api-web-app",
+    "containerized": "readings-api-containerized-web-app"
   },
   "container_names": {
-    "postgres": "arena-readings-axum-postgres",
-    "kafka": "arena-readings-axum-kafka",
-    "mssql": "arena-readings-axum-mssql",
-    "calibration": "arena-readings-axum-calibration"
+    "postgres": "readings-api-postgres",
+    "kafka": "readings-api-kafka",
+    "mssql": "readings-api-mssql",
+    "calibration": "readings-api-calibration"
   },
   "playbook_names": {
-    "calibration_default": "arena-readings-calibration-default",
-    "calibration_outage_managed": "arena-readings-calibration-outage-managed",
-    "calibration_outage_fixture_scope": "arena-readings-calibration-outage-fixture-scope",
-    "validation_db_scoped": "arena-readings-validation-db-scoped"
+    "calibration_default": "readings-api-calibration-default",
+    "calibration_outage_managed": "readings-api-calibration-outage-managed",
+    "calibration_outage_fixture_scope": "readings-api-calibration-outage-fixture-scope",
+    "validation_db_scoped": "readings-api-validation-db-scoped"
   },
   "ports": {
-    "exec_web_app": 3001,
-    "docker_web_host": 3002,
-    "kafka_host": 9094,
-    "calibration_host": 3003,
-    "postgres_host": 5556,
-    "mssql_host": 1436
+    "exec_web_app": 3010,
+    "docker_web_host": 3112,
+    "kafka_host": 9093,
+    "calibration_host": 3011,
+    "postgres_host": 5560,
+    "mssql_host": 1438
   },
   "database": {
     "postgres_name": "readings_db",

@@ -2,7 +2,9 @@ use arena_examples::example_readings_axum_web_app::ExampleAxumWebApp;
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     let args: Vec<String> = std::env::args().collect();
 
@@ -46,11 +48,11 @@ async fn main() {
     tokio::select! {
         result = web_app.serve(web_app_port, rx) => {
             if let Err(e) = result {
-                log::error!("web app error: {}", e);
+                tracing::error!(error = %e, phase = "web_app_main", "serve returned error");
             }
         }
         _ = tokio::signal::ctrl_c() => {
-            log::info!("shutting down");
+            tracing::info!(phase = "shutdown_signal", "shutting down");
         }
     }
 }

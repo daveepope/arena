@@ -1,21 +1,26 @@
-use bollard::Docker;
 use bollard::models::NetworkCreateRequest;
+use bollard::Docker;
 
 /// Ensures a Docker bridge network with the given name exists.
 ///
 /// If the network already exists this is a no-op.
 /// If it does not exist it will be created as a `bridge` network.
 pub async fn ensure_network_exists(name: &str) {
-    let docker = Docker::connect_with_defaults()
-        .expect("failed to connect to Docker daemon");
+    let docker = Docker::connect_with_defaults().expect("failed to connect to Docker daemon");
 
-    match docker.inspect_network(name, None::<bollard::query_parameters::InspectNetworkOptions>).await {
+    match docker
+        .inspect_network(
+            name,
+            None::<bollard::query_parameters::InspectNetworkOptions>,
+        )
+        .await
+    {
         Ok(_) => {
-            log::debug!("[arena-container] network '{}' already exists", name);
+            tracing::debug!(network = %name, "network already exists");
             return;
         }
         Err(_) => {
-            log::debug!("[arena-container] network '{}' not found, creating", name);
+            tracing::debug!(network = %name, "network missing, creating");
         }
     }
 
@@ -26,10 +31,20 @@ pub async fn ensure_network_exists(name: &str) {
     };
 
     match docker.create_network(config).await {
-        Ok(_) => log::info!("[arena-container] created network '{}'", name),
+        Ok(_) => tracing::debug!(network = %name, "network created"),
         Err(e) => {
-            if docker.inspect_network(name, None::<bollard::query_parameters::InspectNetworkOptions>).await.is_ok() {
-                log::debug!("[arena-container] network '{}' was created concurrently", name);
+            if docker
+                .inspect_network(
+                    name,
+                    None::<bollard::query_parameters::InspectNetworkOptions>,
+                )
+                .await
+                .is_ok()
+            {
+                tracing::debug!(
+                    network = %name,
+                    "network created concurrently by another caller"
+                );
             } else {
                 panic!("failed to create docker network '{}': {}", name, e);
             }
@@ -40,11 +55,14 @@ pub async fn ensure_network_exists(name: &str) {
 /// Removes a Docker network by name. Silently ignores errors (e.g. network
 /// doesn't exist or still has connected containers).
 pub async fn remove_network(name: &str) {
-    let docker = Docker::connect_with_defaults()
-        .expect("failed to connect to Docker daemon");
+    let docker = Docker::connect_with_defaults().expect("failed to connect to Docker daemon");
 
     match docker.remove_network(name).await {
-        Ok(_) => log::info!("[arena-container] removed network '{}'", name),
-        Err(e) => log::debug!("[arena-container] could not remove network '{}': {}", name, e),
+        Ok(_) => tracing::debug!(network = %name, "network removed"),
+        Err(e) => tracing::debug!(
+            network = %name,
+            error = %e,
+            "network remove skipped or failed"
+        ),
     }
 }

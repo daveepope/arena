@@ -8,7 +8,6 @@ use arena_kafka::{KafkaDependency, KafkaFlavor, KAFKA_INTERNAL_DOCKER_PORT};
 use arena_mssql::MssqlDependency;
 use arena_oauth::OauthDependency;
 use arena_postgres::PostgresDependency;
-use env_logger::Env;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
@@ -210,14 +209,14 @@ async fn create_topic_with_retry(bootstrap: &str, topic: &str, timeout: Duration
                             break;
                         }
                         ok = false;
-                        log::debug!("kafka topic create failed: {e}");
+                        tracing::debug!(error = %e, phase = "kafka_topic_create", "topic create rejected");
                         break;
                     }
                 }
                 ok
             }
             Err(err) => {
-                log::debug!("kafka topic create request failed: {err}");
+                tracing::debug!(error = %err, phase = "kafka_topic_create_admin", "admin create topics failed");
                 false
             }
         };
@@ -236,7 +235,7 @@ struct KafkaConsumerHandle {
 
 impl Drop for KafkaConsumerHandle {
     fn drop(&mut self) {
-        log::debug!("dropping kafka consumer handle, signaling shutdown");
+        tracing::debug!(phase = "kafka_consumer_shutdown", "dropping kafka consumer handle");
         self.shutdown_signal.store(true, Ordering::Relaxed);
         std::thread::sleep(Duration::from_millis(100));
     }
@@ -263,15 +262,20 @@ fn create_output_kafka_consumer(kafka_bootstrap: &str, topic: &str) -> KafkaCons
                 match consumer.poll(Duration::from_millis(250)) {
                     None => {}
                     Some(Err(err)) => {
-                        log::debug!("kafka consume error: {err}");
+                        tracing::debug!(error = %err, phase = "kafka_consume_poll", "consumer poll returned error");
                     }
                     Some(Ok(msg)) => {
                         let payload = msg.payload_view::<str>().and_then(|r| r.ok()).unwrap_or("");
-                        log::debug!("kafka received {}: {}", topic, payload);
+                        tracing::debug!(
+                            topic = %topic,
+                            payload = %payload,
+                            phase = "kafka_consume_received",
+                            "consumer received message",
+                        );
                     }
                 }
             }
-            log::debug!("kafka consumer shutting down");
+            tracing::debug!(phase = "kafka_consumer_stopped", "kafka consumer shutting down");
         })
         .await
         .ok();
@@ -284,12 +288,9 @@ fn create_output_kafka_consumer(kafka_bootstrap: &str, topic: &str) -> KafkaCons
 
 #[tokio::main]
 async fn main() {
-    env_logger::Builder::from_env(
-        Env::default().default_filter_or(
-            "arena=debug,arena_examples=debug,arena_postgres=debug,arena_kafka=debug,testcontainers=info,testcontainers_modules=info,arena_oauth=debug",
-        ),
-    )
-    .init();
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     let (dependencies, kafka_id, oauth_ca_pem) = setup_arena_dependencies();
     let components = setup_arena_components(&oauth_ca_pem).await;

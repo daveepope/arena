@@ -15,7 +15,7 @@ axum-server = { workspace = true, default-features = false, features = ["tls-rus
 futures = { workspace = true }
 base64 = { workspace = true }
 jsonwebtoken = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 rand = { workspace = true }
 rcgen = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
@@ -28,4 +28,4 @@ tokio = { workspace = true, features = ["rt", "net", "sync", "signal"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-env_logger = { workspace = true }
+tracing-subscriber = { workspace = true }

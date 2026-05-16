@@ -104,9 +104,7 @@ impl OauthDependencyBuilder {
                 .unwrap_or_else(|e| panic!("[Oauth-{}] RSA generate failed: {e}", self.identifier)),
         };
         let port = self.port.unwrap_or(0);
-        let listen_ip = self
-            .listen_ip
-            .unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST));
+        let listen_ip = self.listen_ip.unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST));
         let token_ttl_secs = self.token_ttl_secs.unwrap_or(Self::DEFAULT_TOKEN_TTL_SECS);
         let tls_plan = match self.inbound_transport {
             InboundTransport::EphemeralTls => OauthTlsPlan::EphemeralOnStart,
