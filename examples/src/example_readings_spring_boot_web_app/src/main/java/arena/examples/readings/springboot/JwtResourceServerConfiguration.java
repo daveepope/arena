@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
@@ -76,7 +76,8 @@ public class JwtResourceServerConfiguration {
   SecurityFilterChain arenaSecurityFilterChain(
       HttpSecurity http, JwtDecoder arenaJwtDecoder, JwtAuthenticationConverter arenaJwtAuthenticationConverter)
       throws Exception {
-    http.csrf(AbstractHttpConfigurer::disable);
+    http.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+    http.csrf(csrf -> csrf.ignoringRequestMatchers("/**"));
     http.authorizeHttpRequests(
         a -> a.requestMatchers("/health").permitAll().anyRequest().authenticated());
     http.oauth2ResourceServer(

@@ -146,12 +146,11 @@ def _arena_oauth_tls_session() -> tuple[str, str, str]:
     if _OAUTH_TLS_CERT_PEM is None:
         from arena_pytest import oauth_loopback_tls_pem_pair
 
-        cert, key = oauth_loopback_tls_pem_pair()
+        ca_pem, server_key_pem = oauth_loopback_tls_pem_pair()
         fd, path = tempfile.mkstemp(prefix="arena-pytest-oauth-ca-", suffix=".pem")
-        os.close(fd)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(cert)
-        _OAUTH_TLS_CERT_PEM, _OAUTH_TLS_KEY_PEM, _OAUTH_TLS_CA_FILE = cert, key, path
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(ca_pem)
+        _OAUTH_TLS_CERT_PEM, _OAUTH_TLS_KEY_PEM, _OAUTH_TLS_CA_FILE = ca_pem, server_key_pem, path
     return _OAUTH_TLS_CERT_PEM, _OAUTH_TLS_KEY_PEM, _OAUTH_TLS_CA_FILE
 
 

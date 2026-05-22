@@ -170,12 +170,11 @@ class ReadingsFastapiCtx:
 @pytest_asyncio.fixture(scope="session")
 async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
     pytest.importorskip("boto3")
-    cert, key = oauth_loopback_tls_pem_pair()
+    ca_pem, server_key_pem = oauth_loopback_tls_pem_pair()
 
     fd, oauth_ca_file = tempfile.mkstemp(prefix="readings-api-oauth-", suffix=".pem")
-    os.close(fd)
-    with open(oauth_ca_file, "w", encoding="utf-8") as f:
-        f.write(cert)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(ca_pem)
 
     schema_path = _find_resource_file("instrument_reading_db_schema.sql")
     if not schema_path:
@@ -190,7 +189,7 @@ async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
         OauthDependencyBuilder("readings-api-oauth")
         .with_port(OAUTH_PORT)
         .with_listen_ip("0.0.0.0")
-        .with_server_tls_pem(cert, key)
+        .with_server_tls_pem(ca_pem, server_key_pem)
         .with_metadata_base_url(OAUTH_ISSUER)
         .build()
     )
