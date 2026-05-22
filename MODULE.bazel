@@ -8,6 +8,17 @@ bazel_dep(name = "rules_rust", version = "0.69.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "rules_java", version = "7.12.2")
 bazel_dep(name = "rules_jvm_external", version = "6.6")
+bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "openssl",
+    sha256 = "b28c91532a8b65a1f983b4c28b7488174e4a01008e29ce8e69bd789f28bc2a89",
+    strip_prefix = "openssl-3.5.5",
+    urls = ["https://github.com/openssl/openssl/releases/download/openssl-3.5.5/openssl-3.5.5.tar.gz"],
+    build_file = "//third_party:openssl.BUILD.bazel",
+)
 
 java_toolchains = use_extension("@rules_java//java:extensions.bzl", "toolchains")
 use_repo(
@@ -98,10 +109,22 @@ use_repo(rust, "rust_toolchains")
 register_toolchains("@rust_toolchains//:all")
 
 crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
+crate.annotation(
+    crate = "openssl-sys",
+    build_script_data = ["@openssl//:gen_dir"],
+    build_script_env = {
+        "OPENSSL_NO_VENDOR": "1",
+        "OPENSSL_STATIC": "1",
+        "OPENSSL_DIR": "$(execpath @openssl//:gen_dir)",
+        "OPENSSL_LIB_DIR": "$(execpath @openssl//:gen_dir)/lib64",
+        "OPENSSL_INCLUDE_DIR": "$(execpath @openssl//:gen_dir)/include",
+    },
+)
 crate.from_cargo(
     name = "crates",
     cargo_lockfile = "//:Cargo.lock",
     manifests = ["//:Cargo.toml"],
     lockfile = "//:Cargo.Bazel.lock",
 )
+inject_repo(crate, "openssl")
 use_repo(crate, "crates")

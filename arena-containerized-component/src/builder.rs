@@ -269,8 +269,9 @@ impl ContainerizedComponentBuilder {
                             );
                         }
                     }
-                    if let Some(ref error) = info.error {
-                        panic!("{}: image build error: {}", identifier, error);
+                    if let Some(ref error_detail) = info.error_detail {
+                        let message = error_detail.message.as_deref().unwrap_or("");
+                        panic!("{}: image build error: {}", identifier, message);
                     }
                 }
                 Err(e) => {

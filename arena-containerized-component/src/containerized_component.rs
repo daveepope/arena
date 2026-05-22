@@ -60,12 +60,12 @@ impl ContainerizedComponent {
             ..Default::default()
         };
 
-        let mut exposed_ports: HashMap<String, HashMap<(), ()>> = HashMap::new();
+        let mut exposed_ports: Vec<String> = Vec::new();
         let mut port_bindings: HashMap<String, Option<Vec<PortBinding>>> = HashMap::new();
 
         for (host_port, container_port) in &self.port_mappings {
             let port_key = format!("{}/tcp", container_port);
-            exposed_ports.insert(port_key.clone(), HashMap::new());
+            exposed_ports.push(port_key.clone());
 
             let binding = PortBinding {
                 host_ip: Some("0.0.0.0".to_string()),
