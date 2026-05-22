@@ -1,5 +1,5 @@
 {
-  "checksum": "bb67cfec48e04169cf30c6f9f24631992887ea98dde2f37f0484057e26849a8e",
+  "checksum": "9f66799ecad6701b9bc2afbf364bfdec6089550ec51b9a3d59ecb31126104392",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -382,20 +382,12 @@
         "deps": {
           "common": [
             {
-              "id": "arc-swap 1.9.1",
-              "target": "arc_swap"
-            },
-            {
               "id": "futures 0.3.32",
               "target": "futures"
             },
             {
               "id": "tracing 0.1.44",
               "target": "tracing"
-            },
-            {
-              "id": "tracing-subscriber 0.3.23",
-              "target": "tracing_subscriber"
             }
           ],
           "selects": {}
@@ -413,6 +405,10 @@
             {
               "id": "tokio 1.52.1",
               "target": "tokio"
+            },
+            {
+              "id": "tracing-subscriber 0.3.23",
+              "target": "tracing_subscriber"
             }
           ],
           "selects": {}
@@ -594,7 +590,7 @@
               "target": "futures_timer"
             },
             {
-              "id": "jsonwebtoken 9.3.1",
+              "id": "jsonwebtoken 10.4.0",
               "target": "jsonwebtoken"
             },
             {
@@ -1199,7 +1195,7 @@
               "target": "futures"
             },
             {
-              "id": "jsonwebtoken 9.3.1",
+              "id": "jsonwebtoken 10.4.0",
               "target": "jsonwebtoken"
             },
             {
@@ -4551,6 +4547,51 @@
       ],
       "license_file": "LICENSE"
     },
+    "base16ct 0.2.0": {
+      "name": "base16ct",
+      "version": "0.2.0",
+      "package_url": "https://github.com/RustCrypto/formats/tree/master/base16ct",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/base16ct/0.2.0/download",
+          "sha256": "4c7f02d4ea65f2c1853089ffd8d2787bdbc63de2f0d29dedbcf8ccdfa0ccd4cf"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "base16ct",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "base16ct",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "alloc"
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.2.0"
+      },
+      "license": "Apache-2.0 OR MIT",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
     "base64 0.21.7": {
       "name": "base64",
       "version": "0.21.7",
@@ -6541,6 +6582,74 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
+    "crypto-bigint 0.5.5": {
+      "name": "crypto-bigint",
+      "version": "0.5.5",
+      "package_url": "https://github.com/RustCrypto/crypto-bigint",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/crypto-bigint/0.5.5/download",
+          "sha256": "0dc92fb57ca44df6db8059111ab3af99a63d5d0f8375d9972e319a379c6bab76"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "crypto_bigint",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "crypto_bigint",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "generic-array",
+            "rand_core",
+            "zeroize"
+          ],
+          "selects": {}
+        },
+        "deps": {
+          "common": [
+            {
+              "id": "generic-array 0.14.7",
+              "target": "generic_array"
+            },
+            {
+              "id": "rand_core 0.6.4",
+              "target": "rand_core"
+            },
+            {
+              "id": "subtle 2.6.1",
+              "target": "subtle"
+            },
+            {
+              "id": "zeroize 1.8.2",
+              "target": "zeroize"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.5.5"
+      },
+      "license": "Apache-2.0 OR MIT",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
     "crypto-common 0.1.7": {
       "name": "crypto-common",
       "version": "0.1.7",
@@ -6800,6 +6909,190 @@
         "version": "0.4.2"
       },
       "license": "Apache-2.0 OR MIT",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
+    "curve25519-dalek 4.1.3": {
+      "name": "curve25519-dalek",
+      "version": "4.1.3",
+      "package_url": "https://github.com/dalek-cryptography/curve25519-dalek/tree/main/curve25519-dalek",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/curve25519-dalek/4.1.3/download",
+          "sha256": "97fb8b7c4503de7d6ae7b42ab72a5a59857b4c937ec27a3d4539dba95b5ab2be"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "curve25519_dalek",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        },
+        {
+          "BuildScript": {
+            "crate_name": "build_script_build",
+            "crate_root": "build.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "curve25519_dalek",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "alloc",
+            "digest",
+            "precomputed-tables",
+            "zeroize"
+          ],
+          "selects": {}
+        },
+        "deps": {
+          "common": [
+            {
+              "id": "cfg-if 1.0.4",
+              "target": "cfg_if"
+            },
+            {
+              "id": "curve25519-dalek 4.1.3",
+              "target": "build_script_build"
+            },
+            {
+              "id": "digest 0.10.7",
+              "target": "digest"
+            },
+            {
+              "id": "subtle 2.6.1",
+              "target": "subtle"
+            },
+            {
+              "id": "zeroize 1.8.2",
+              "target": "zeroize"
+            }
+          ],
+          "selects": {
+            "cfg(curve25519_dalek_backend = \"fiat\")": [
+              {
+                "id": "fiat-crypto 0.2.9",
+                "target": "fiat_crypto"
+              }
+            ],
+            "cfg(target_arch = \"x86_64\")": [
+              {
+                "id": "cpufeatures 0.2.17",
+                "target": "cpufeatures"
+              }
+            ]
+          }
+        },
+        "edition": "2021",
+        "proc_macro_deps": {
+          "common": [],
+          "selects": {
+            "cfg(all(not(curve25519_dalek_backend = \"fiat\"), not(curve25519_dalek_backend = \"serial\"), target_arch = \"x86_64\"))": [
+              {
+                "id": "curve25519-dalek-derive 0.1.1",
+                "target": "curve25519_dalek_derive"
+              }
+            ]
+          }
+        },
+        "version": "4.1.3"
+      },
+      "build_script_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "compile_data_glob_excludes": [
+          "**/*.rs"
+        ],
+        "data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "rustc_version 0.4.1",
+              "target": "rustc_version"
+            }
+          ],
+          "selects": {}
+        }
+      },
+      "license": "BSD-3-Clause",
+      "license_ids": [
+        "BSD-3-Clause"
+      ],
+      "license_file": "LICENSE"
+    },
+    "curve25519-dalek-derive 0.1.1": {
+      "name": "curve25519-dalek-derive",
+      "version": "0.1.1",
+      "package_url": "https://github.com/dalek-cryptography/curve25519-dalek",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/curve25519-dalek-derive/0.1.1/download",
+          "sha256": "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
+        }
+      },
+      "targets": [
+        {
+          "ProcMacro": {
+            "crate_name": "curve25519_dalek_derive",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "curve25519_dalek_derive",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "proc-macro2 1.0.106",
+              "target": "proc_macro2"
+            },
+            {
+              "id": "quote 1.0.45",
+              "target": "quote"
+            },
+            {
+              "id": "syn 2.0.117",
+              "target": "syn"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.1.1"
+      },
+      "license": "MIT/Apache-2.0",
       "license_ids": [
         "Apache-2.0",
         "MIT"
@@ -7759,6 +8052,225 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
+    "ecdsa 0.16.9": {
+      "name": "ecdsa",
+      "version": "0.16.9",
+      "package_url": "https://github.com/RustCrypto/signatures/tree/master/ecdsa",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/ecdsa/0.16.9/download",
+          "sha256": "ee27f32b5c5292967d2d4a9d7f1e0b0aed2c15daded5a60300e4abb9d8020bca"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "ecdsa",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "ecdsa",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "alloc",
+            "arithmetic",
+            "der",
+            "digest",
+            "hazmat",
+            "pem",
+            "pkcs8",
+            "rfc6979",
+            "signing",
+            "spki",
+            "std",
+            "verifying"
+          ],
+          "selects": {}
+        },
+        "deps": {
+          "common": [
+            {
+              "id": "der 0.7.10",
+              "target": "der"
+            },
+            {
+              "id": "digest 0.10.7",
+              "target": "digest"
+            },
+            {
+              "id": "elliptic-curve 0.13.8",
+              "target": "elliptic_curve"
+            },
+            {
+              "id": "rfc6979 0.4.0",
+              "target": "rfc6979"
+            },
+            {
+              "id": "signature 2.2.0",
+              "target": "signature"
+            },
+            {
+              "id": "spki 0.7.3",
+              "target": "spki"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.16.9"
+      },
+      "license": "Apache-2.0 OR MIT",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
+    "ed25519 2.2.3": {
+      "name": "ed25519",
+      "version": "2.2.3",
+      "package_url": "https://github.com/RustCrypto/signatures/tree/master/ed25519",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/ed25519/2.2.3/download",
+          "sha256": "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "ed25519",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "ed25519",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "alloc",
+            "pkcs8",
+            "std"
+          ],
+          "selects": {}
+        },
+        "deps": {
+          "common": [
+            {
+              "id": "pkcs8 0.10.2",
+              "target": "pkcs8"
+            },
+            {
+              "id": "signature 2.2.0",
+              "target": "signature"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "2.2.3"
+      },
+      "license": "Apache-2.0 OR MIT",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
+    "ed25519-dalek 2.2.0": {
+      "name": "ed25519-dalek",
+      "version": "2.2.0",
+      "package_url": "https://github.com/dalek-cryptography/curve25519-dalek/tree/main/ed25519-dalek",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/ed25519-dalek/2.2.0/download",
+          "sha256": "70e796c081cee67dc755e1a36a0a172b897fab85fc3f6bc48307991f64e4eca9"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "ed25519_dalek",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "ed25519_dalek",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "alloc",
+            "default",
+            "fast",
+            "pkcs8",
+            "std",
+            "zeroize"
+          ],
+          "selects": {}
+        },
+        "deps": {
+          "common": [
+            {
+              "id": "curve25519-dalek 4.1.3",
+              "target": "curve25519_dalek"
+            },
+            {
+              "id": "ed25519 2.2.3",
+              "target": "ed25519"
+            },
+            {
+              "id": "sha2 0.10.9",
+              "target": "sha2"
+            },
+            {
+              "id": "subtle 2.6.1",
+              "target": "subtle"
+            },
+            {
+              "id": "zeroize 1.8.2",
+              "target": "zeroize"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "2.2.0"
+      },
+      "license": "BSD-3-Clause",
+      "license_ids": [
+        "BSD-3-Clause"
+      ],
+      "license_file": "LICENSE"
+    },
     "either 1.15.0": {
       "name": "either",
       "version": "1.15.0",
@@ -7800,6 +8312,118 @@
         "version": "1.15.0"
       },
       "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
+    "elliptic-curve 0.13.8": {
+      "name": "elliptic-curve",
+      "version": "0.13.8",
+      "package_url": "https://github.com/RustCrypto/traits/tree/master/elliptic-curve",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/elliptic-curve/0.13.8/download",
+          "sha256": "b5e6043086bf7973472e0c7dff2142ea0b680d30e18d9cc40f267efbf222bd47"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "elliptic_curve",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "elliptic_curve",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "alloc",
+            "arithmetic",
+            "digest",
+            "ecdh",
+            "ff",
+            "group",
+            "hazmat",
+            "pem",
+            "pkcs8",
+            "sec1",
+            "std"
+          ],
+          "selects": {}
+        },
+        "deps": {
+          "common": [
+            {
+              "id": "base16ct 0.2.0",
+              "target": "base16ct"
+            },
+            {
+              "id": "crypto-bigint 0.5.5",
+              "target": "crypto_bigint"
+            },
+            {
+              "id": "digest 0.10.7",
+              "target": "digest"
+            },
+            {
+              "id": "ff 0.13.1",
+              "target": "ff"
+            },
+            {
+              "id": "generic-array 0.14.7",
+              "target": "generic_array"
+            },
+            {
+              "id": "group 0.13.0",
+              "target": "group"
+            },
+            {
+              "id": "hkdf 0.12.4",
+              "target": "hkdf"
+            },
+            {
+              "id": "pem-rfc7468 0.7.0",
+              "target": "pem_rfc7468"
+            },
+            {
+              "id": "pkcs8 0.10.2",
+              "target": "pkcs8"
+            },
+            {
+              "id": "rand_core 0.6.4",
+              "target": "rand_core"
+            },
+            {
+              "id": "sec1 0.7.3",
+              "target": "sec1"
+            },
+            {
+              "id": "subtle 2.6.1",
+              "target": "subtle"
+            },
+            {
+              "id": "zeroize 1.8.2",
+              "target": "zeroize"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.13.8"
+      },
+      "license": "Apache-2.0 OR MIT",
       "license_ids": [
         "Apache-2.0",
         "MIT"
@@ -8295,6 +8919,104 @@
         "MIT"
       ],
       "license_file": null
+    },
+    "ff 0.13.1": {
+      "name": "ff",
+      "version": "0.13.1",
+      "package_url": "https://github.com/zkcrypto/ff",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/ff/0.13.1/download",
+          "sha256": "c0b50bfb653653f9ca9095b427bed08ab8d75a137839d9ad64eb11810d5b6393"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "ff",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "ff",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "alloc"
+          ],
+          "selects": {}
+        },
+        "deps": {
+          "common": [
+            {
+              "id": "rand_core 0.6.4",
+              "target": "rand_core"
+            },
+            {
+              "id": "subtle 2.6.1",
+              "target": "subtle"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.13.1"
+      },
+      "license": "MIT/Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
+    "fiat-crypto 0.2.9": {
+      "name": "fiat-crypto",
+      "version": "0.2.9",
+      "package_url": "https://github.com/mit-plv/fiat-crypto",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/fiat-crypto/0.2.9/download",
+          "sha256": "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "fiat_crypto",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "fiat_crypto",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "edition": "2018",
+        "version": "0.2.9"
+      },
+      "license": "MIT OR Apache-2.0 OR BSD-1-Clause",
+      "license_ids": [
+        "Apache-2.0",
+        "BSD-1-Clause",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
     },
     "filetime 0.2.27": {
       "name": "filetime",
@@ -9415,7 +10137,8 @@
         ],
         "crate_features": {
           "common": [
-            "more_lengths"
+            "more_lengths",
+            "zeroize"
           ],
           "selects": {}
         },
@@ -9428,6 +10151,10 @@
             {
               "id": "typenum 1.20.0",
               "target": "typenum"
+            },
+            {
+              "id": "zeroize 1.8.2",
+              "target": "zeroize"
             }
           ],
           "selects": {}
@@ -9844,6 +10571,68 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
+    "group 0.13.0": {
+      "name": "group",
+      "version": "0.13.0",
+      "package_url": "https://github.com/zkcrypto/group",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/group/0.13.0/download",
+          "sha256": "f0f9ef7462f7c099f518d754361858f86d8a07af53ba9af0fe635bbccb151a63"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "group",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "group",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "alloc"
+          ],
+          "selects": {}
+        },
+        "deps": {
+          "common": [
+            {
+              "id": "ff 0.13.1",
+              "target": "ff"
+            },
+            {
+              "id": "rand_core 0.6.4",
+              "target": "rand_core"
+            },
+            {
+              "id": "subtle 2.6.1",
+              "target": "subtle"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.13.0"
+      },
+      "license": "MIT/Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
     "h2 0.3.27": {
       "name": "h2",
       "version": "0.3.27",
@@ -10236,6 +11025,54 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
+    "hkdf 0.12.4": {
+      "name": "hkdf",
+      "version": "0.12.4",
+      "package_url": "https://github.com/RustCrypto/KDFs/",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/hkdf/0.12.4/download",
+          "sha256": "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "hkdf",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "hkdf",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "hmac 0.12.1",
+              "target": "hmac"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2018",
+        "version": "0.12.4"
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
     "hmac 0.12.1": {
       "name": "hmac",
       "version": "0.12.1",
@@ -10265,6 +11102,12 @@
         "compile_data_glob": [
           "**"
         ],
+        "crate_features": {
+          "common": [
+            "reset"
+          ],
+          "selects": {}
+        },
         "deps": {
           "common": [
             {
@@ -13019,14 +13862,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "jsonwebtoken 9.3.1": {
+    "jsonwebtoken 10.4.0": {
       "name": "jsonwebtoken",
-      "version": "9.3.1",
+      "version": "10.4.0",
       "package_url": "https://github.com/Keats/jsonwebtoken",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/jsonwebtoken/9.3.1/download",
-          "sha256": "5a87cc7a48537badeae96744432de36f4be2b4a34a05a5ef32e9dd8a1c169dde"
+          "url": "https://static.crates.io/crates/jsonwebtoken/10.4.0/download",
+          "sha256": "eba32bfb4ffdeaca3e34431072faf01745c9b26d25504aa7a6cf5684334fc4fc"
         }
       },
       "targets": [
@@ -13050,7 +13893,15 @@
         ],
         "crate_features": {
           "common": [
+            "ed25519-dalek",
+            "hmac",
+            "p256",
+            "p384",
             "pem",
+            "rand",
+            "rsa",
+            "rust_crypto",
+            "sha2",
             "simple_asn1",
             "use_pem"
           ],
@@ -13063,8 +13914,32 @@
               "target": "base64"
             },
             {
+              "id": "ed25519-dalek 2.2.0",
+              "target": "ed25519_dalek"
+            },
+            {
+              "id": "hmac 0.12.1",
+              "target": "hmac"
+            },
+            {
+              "id": "p256 0.13.2",
+              "target": "p256"
+            },
+            {
+              "id": "p384 0.13.1",
+              "target": "p384"
+            },
+            {
               "id": "pem 3.0.6",
               "target": "pem"
+            },
+            {
+              "id": "rand 0.8.6",
+              "target": "rand"
+            },
+            {
+              "id": "rsa 0.9.10",
+              "target": "rsa"
             },
             {
               "id": "serde 1.0.228",
@@ -13075,31 +13950,37 @@
               "target": "serde_json"
             },
             {
+              "id": "sha2 0.10.9",
+              "target": "sha2"
+            },
+            {
+              "id": "signature 2.2.0",
+              "target": "signature"
+            },
+            {
               "id": "simple_asn1 0.6.4",
               "target": "simple_asn1"
+            },
+            {
+              "id": "zeroize 1.8.2",
+              "target": "zeroize"
             }
           ],
           "selects": {
-            "cfg(not(target_arch = \"wasm32\"))": [
-              {
-                "id": "ring 0.17.14",
-                "target": "ring"
-              }
-            ],
             "cfg(target_arch = \"wasm32\")": [
+              {
+                "id": "getrandom 0.2.17",
+                "target": "getrandom"
+              },
               {
                 "id": "js-sys 0.3.95",
                 "target": "js_sys"
-              },
-              {
-                "id": "ring 0.17.14",
-                "target": "ring"
               }
             ]
           }
         },
-        "edition": "2021",
-        "version": "9.3.1"
+        "edition": "2024",
+        "version": "10.4.0"
       },
       "license": "MIT",
       "license_ids": [
@@ -15212,7 +16093,7 @@
         "deps": {
           "common": [
             {
-              "id": "base64 0.22.1",
+              "id": "base64 0.21.7",
               "target": "base64"
             },
             {
@@ -15629,6 +16510,161 @@
         "MIT"
       ],
       "license_file": "LICENSE"
+    },
+    "p256 0.13.2": {
+      "name": "p256",
+      "version": "0.13.2",
+      "package_url": "https://github.com/RustCrypto/elliptic-curves/tree/master/p256",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/p256/0.13.2/download",
+          "sha256": "c9863ad85fa8f4460f9c48cb909d38a0d689dba1f6f6988a5e3e0d31071bcd4b"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "p256",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "p256",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "alloc",
+            "arithmetic",
+            "default",
+            "digest",
+            "ecdsa",
+            "ecdsa-core",
+            "pem",
+            "pkcs8",
+            "sha2",
+            "sha256",
+            "std"
+          ],
+          "selects": {}
+        },
+        "deps": {
+          "common": [
+            {
+              "id": "ecdsa 0.16.9",
+              "target": "ecdsa",
+              "alias": "ecdsa_core"
+            },
+            {
+              "id": "elliptic-curve 0.13.8",
+              "target": "elliptic_curve"
+            },
+            {
+              "id": "primeorder 0.13.6",
+              "target": "primeorder"
+            },
+            {
+              "id": "sha2 0.10.9",
+              "target": "sha2"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.13.2"
+      },
+      "license": "Apache-2.0 OR MIT",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
+    "p384 0.13.1": {
+      "name": "p384",
+      "version": "0.13.1",
+      "package_url": "https://github.com/RustCrypto/elliptic-curves/tree/master/p384",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/p384/0.13.1/download",
+          "sha256": "fe42f1670a52a47d448f14b6a5c61dd78fce51856e68edaa38f7ae3a46b8d6b6"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "p384",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "p384",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "alloc",
+            "arithmetic",
+            "default",
+            "digest",
+            "ecdh",
+            "ecdsa",
+            "ecdsa-core",
+            "pem",
+            "pkcs8",
+            "sha2",
+            "sha384",
+            "std"
+          ],
+          "selects": {}
+        },
+        "deps": {
+          "common": [
+            {
+              "id": "ecdsa 0.16.9",
+              "target": "ecdsa",
+              "alias": "ecdsa_core"
+            },
+            {
+              "id": "elliptic-curve 0.13.8",
+              "target": "elliptic_curve"
+            },
+            {
+              "id": "primeorder 0.13.6",
+              "target": "primeorder"
+            },
+            {
+              "id": "sha2 0.10.9",
+              "target": "sha2"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.13.1"
+      },
+      "license": "Apache-2.0 OR MIT",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
     },
     "parking_lot 0.12.5": {
       "name": "parking_lot",
@@ -17273,6 +18309,54 @@
         "links": "prettyplease02"
       },
       "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
+    "primeorder 0.13.6": {
+      "name": "primeorder",
+      "version": "0.13.6",
+      "package_url": "https://github.com/RustCrypto/elliptic-curves/tree/master/primeorder",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/primeorder/0.13.6/download",
+          "sha256": "353e1ca18966c16d9deb1c69278edbc5f194139612772bd9537af60ac231e1e6"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "primeorder",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "primeorder",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "elliptic-curve 0.13.8",
+              "target": "elliptic_curve"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.13.6"
+      },
+      "license": "Apache-2.0 OR MIT",
       "license_ids": [
         "Apache-2.0",
         "MIT"
@@ -19602,6 +20686,58 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
+    "rfc6979 0.4.0": {
+      "name": "rfc6979",
+      "version": "0.4.0",
+      "package_url": "https://github.com/RustCrypto/signatures/tree/master/rfc6979",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/rfc6979/0.4.0/download",
+          "sha256": "f8dd2a808d456c4a54e300a23e9f5a67e122c3024119acbfd73e3bf664491cb2"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "rfc6979",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "rfc6979",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "hmac 0.12.1",
+              "target": "hmac"
+            },
+            {
+              "id": "subtle 2.6.1",
+              "target": "subtle"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.4.0"
+      },
+      "license": "Apache-2.0 OR MIT",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
     "ring 0.17.14": {
       "name": "ring",
       "version": "0.17.14",
@@ -19647,17 +20783,9 @@
           "common": [
             "alloc",
             "default",
-            "dev_urandom_fallback",
-            "std"
+            "dev_urandom_fallback"
           ],
-          "selects": {
-            "wasm32-unknown-unknown": [
-              "wasm32_unknown_unknown_js"
-            ],
-            "wasm32-wasip1": [
-              "wasm32_unknown_unknown_js"
-            ]
-          }
+          "selects": {}
         },
         "deps": {
           "common": [
@@ -21139,6 +22267,88 @@
         "MIT"
       ],
       "license_file": "LICENSE"
+    },
+    "sec1 0.7.3": {
+      "name": "sec1",
+      "version": "0.7.3",
+      "package_url": "https://github.com/RustCrypto/formats/tree/master/sec1",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/sec1/0.7.3/download",
+          "sha256": "d3e97a565f76233a6003f9f5c54be1d9c5bdfa3eccfb189469f11ec4901c47dc"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "sec1",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "sec1",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "alloc",
+            "default",
+            "der",
+            "pem",
+            "pkcs8",
+            "point",
+            "std",
+            "subtle",
+            "zeroize"
+          ],
+          "selects": {}
+        },
+        "deps": {
+          "common": [
+            {
+              "id": "base16ct 0.2.0",
+              "target": "base16ct"
+            },
+            {
+              "id": "der 0.7.10",
+              "target": "der"
+            },
+            {
+              "id": "generic-array 0.14.7",
+              "target": "generic_array"
+            },
+            {
+              "id": "pkcs8 0.10.2",
+              "target": "pkcs8"
+            },
+            {
+              "id": "subtle 2.6.1",
+              "target": "subtle"
+            },
+            {
+              "id": "zeroize 1.8.2",
+              "target": "zeroize"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.7.3"
+      },
+      "license": "Apache-2.0 OR MIT",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
     },
     "security-framework 2.11.1": {
       "name": "security-framework",
@@ -23146,6 +24356,12 @@
         "compile_data_glob": [
           "**"
         ],
+        "crate_features": {
+          "common": [
+            "i128"
+          ],
+          "selects": {}
+        },
         "edition": "2018",
         "version": "2.6.1"
       },
@@ -31604,12 +32820,79 @@
         "crate_features": {
           "common": [
             "alloc",
-            "default"
+            "default",
+            "derive",
+            "zeroize_derive"
           ],
           "selects": {}
         },
         "edition": "2021",
+        "proc_macro_deps": {
+          "common": [
+            {
+              "id": "zeroize_derive 1.4.3",
+              "target": "zeroize_derive"
+            }
+          ],
+          "selects": {}
+        },
         "version": "1.8.2"
+      },
+      "license": "Apache-2.0 OR MIT",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
+    "zeroize_derive 1.4.3": {
+      "name": "zeroize_derive",
+      "version": "1.4.3",
+      "package_url": "https://github.com/RustCrypto/utils/tree/master/zeroize/derive",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/zeroize_derive/1.4.3/download",
+          "sha256": "85a5b4158499876c763cb03bc4e49185d3cccbabb15b33c627f7884f43db852e"
+        }
+      },
+      "targets": [
+        {
+          "ProcMacro": {
+            "crate_name": "zeroize_derive",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "zeroize_derive",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "proc-macro2 1.0.106",
+              "target": "proc_macro2"
+            },
+            {
+              "id": "quote 1.0.45",
+              "target": "quote"
+            },
+            {
+              "id": "syn 2.0.117",
+              "target": "syn"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "1.4.3"
       },
       "license": "Apache-2.0 OR MIT",
       "license_ids": [
@@ -32113,6 +33396,11 @@
       "x86_64-unknown-linux-gnu",
       "x86_64-unknown-nixos-gnu"
     ],
+    "cfg(all(not(curve25519_dalek_backend = \"fiat\"), not(curve25519_dalek_backend = \"serial\"), target_arch = \"x86_64\"))": [
+      "x86_64-pc-windows-msvc",
+      "x86_64-unknown-linux-gnu",
+      "x86_64-unknown-nixos-gnu"
+    ],
     "cfg(all(not(rustix_use_libc), not(miri), target_os = \"linux\", any(target_endian = \"little\", any(target_arch = \"s390x\", target_arch = \"powerpc\")), any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"riscv64\", all(rustix_use_experimental_asm, target_arch = \"powerpc\"), all(rustix_use_experimental_asm, target_arch = \"powerpc64\"), all(rustix_use_experimental_asm, target_arch = \"s390x\"), all(rustix_use_experimental_asm, target_arch = \"mips\"), all(rustix_use_experimental_asm, target_arch = \"mips32r6\"), all(rustix_use_experimental_asm, target_arch = \"mips64\"), all(rustix_use_experimental_asm, target_arch = \"mips64r6\"), target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\"))))": [
       "aarch64-unknown-linux-gnu",
       "x86_64-unknown-linux-gnu",
@@ -32194,6 +33482,7 @@
       "x86_64-unknown-nixos-gnu"
     ],
     "cfg(aws_sdk_unstable)": [],
+    "cfg(curve25519_dalek_backend = \"fiat\")": [],
     "cfg(fuzzing)": [],
     "cfg(not(all(target_family = \"wasm\", target_os = \"unknown\")))": [
       "aarch64-apple-darwin",
@@ -32213,6 +33502,11 @@
     "cfg(target_arch = \"wasm32\")": [
       "wasm32-unknown-unknown",
       "wasm32-wasip1"
+    ],
+    "cfg(target_arch = \"x86_64\")": [
+      "x86_64-pc-windows-msvc",
+      "x86_64-unknown-linux-gnu",
+      "x86_64-unknown-nixos-gnu"
     ],
     "cfg(target_os = \"android\")": [],
     "cfg(target_os = \"haiku\")": [],
@@ -32279,7 +33573,7 @@
     "bollard 0.19.4",
     "futures 0.3.32",
     "futures-timer 3.0.3",
-    "jsonwebtoken 9.3.1",
+    "jsonwebtoken 10.4.0",
     "oauth2 5.0.0",
     "postgres 0.19.13",
     "rand 0.8.6",
