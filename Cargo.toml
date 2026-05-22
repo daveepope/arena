@@ -43,20 +43,20 @@ futures = "0.3"
 futures-timer = "3.0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-testcontainers-modules = "0.14.0"
+testcontainers-modules = "0.15.0"
 tokio = "1"
 mockall = "0.14.0"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 rstest = "0.22"
-bollard = "0.19"
+bollard = "0.20"
 ctor = "0.4"
 tar = "0.4"
-tiberius = { version = "0.12", default-features = false, features = ["tds73", "rustls"] }
+tiberius = { version = "0.12", default-features = false, features = ["tds73", "native-tls"] }
 tokio-util = { version = "0.7", features = ["compat"] }
-aws-config = { version = "1", default-features = false, features = ["behavior-version-latest", "rustls", "rt-tokio"] }
-aws-sdk-sqs = { version = "1", default-features = false, features = ["behavior-version-latest", "rustls", "rt-tokio"] }
-aws-sdk-lambda = { version = "1", default-features = false, features = ["behavior-version-latest", "rustls", "rt-tokio"] }
-aws-sdk-eventbridge = { version = "1", default-features = false, features = ["behavior-version-latest", "rustls", "rt-tokio"] }
+aws-config = { version = "1", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio"] }
+aws-sdk-sqs = { version = "1", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio"] }
+aws-sdk-lambda = { version = "1", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio"] }
+aws-sdk-eventbridge = { version = "1", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio"] }
 aws-credential-types = { version = "1" }
 aws-smithy-types = { version = "1" }
 base64 = "0.22.1"
