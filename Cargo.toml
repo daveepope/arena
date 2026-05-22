@@ -60,7 +60,7 @@ aws-sdk-eventbridge = { version = "1", default-features = false, features = ["be
 aws-credential-types = { version = "1" }
 aws-smithy-types = { version = "1" }
 base64 = "0.22.1"
-jsonwebtoken = { version = "9.3.1", default-features = false, features = ["use_pem"] }
+jsonwebtoken = { version = "10.3.0", default-features = false, features = ["use_pem"] }
 rand = "0.8.6"
 rsa = { version = "0.9.10", features = ["pem", "sha2"] }
 rcgen = "0.14"
