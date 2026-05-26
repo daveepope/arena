@@ -55,11 +55,12 @@ from arena_pytest.dep.localstack import (
     SqsQueueTarget,
 )
 from arena_pytest.dep.mssql import (
+    ActiveMssqlPlaybook,
     ManagedMssqlPlaybook,
     ManagedMssqlPlaybookBuilder,
     MssqlDependency,
     MssqlDependencyBuilder,
-    ActiveMssqlPlaybook,
+    MssqlEncryption,
 )
 from arena_pytest.oauth import (
     DEFAULT_OAUTH_PORT,
@@ -116,6 +117,7 @@ __all__ = [
     "SqsQueueTarget",
     "MssqlDependency",
     "MssqlDependencyBuilder",
+    "MssqlEncryption",
     "ActiveMssqlPlaybook",
     "DEFAULT_OAUTH_PORT",
     "OAUTH_ISSUER",

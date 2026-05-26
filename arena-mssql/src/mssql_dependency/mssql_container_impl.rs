@@ -9,6 +9,18 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
 pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MssqlEncryption {
+    Off,
+    On,
+}
+
+impl Default for MssqlEncryption {
+    fn default() -> Self {
+        MssqlEncryption::Off
+    }
+}
+
 #[async_trait]
 pub trait MssqlImpl: Send + Sync {
     async fn start(
@@ -33,15 +45,17 @@ pub(crate) struct MssqlContainerImpl {
     connection_string: Option<String>,
     admin_connection_string: Option<String>,
     network: Option<String>,
+    encryption: MssqlEncryption,
 }
 
 impl MssqlContainerImpl {
-    pub(crate) fn new(network: Option<String>) -> Self {
+    pub(crate) fn new(network: Option<String>, encryption: MssqlEncryption) -> Self {
         Self {
             container: None,
             connection_string: None,
             admin_connection_string: None,
             network,
+            encryption,
         }
     }
 }
@@ -100,6 +114,7 @@ impl MssqlImpl for MssqlContainerImpl {
             "master",
             database_username,
             database_password,
+            self.encryption,
         ));
         self.connection_string = Some(build_ado_connection_string(
             &host,
@@ -107,6 +122,7 @@ impl MssqlImpl for MssqlContainerImpl {
             database_name,
             database_username,
             database_password,
+            self.encryption,
         ));
         self.container = Some(container);
 
@@ -139,10 +155,15 @@ pub(crate) fn build_ado_connection_string(
     database_name: &str,
     username: &str,
     password: &str,
+    encryption: MssqlEncryption,
 ) -> String {
-    format!(
+    let base = format!(
         "Server=tcp:{host},{port};Database={database_name};User Id={username};Password={password};TrustServerCertificate=True;"
-    )
+    );
+    match encryption {
+        MssqlEncryption::Off => format!("{base}encrypt=DANGER_PLAINTEXT;"),
+        MssqlEncryption::On => base,
+    }
 }
 
 pub async fn connect(connection_string: &str) -> Result<Client<Compat<TcpStream>>, String> {
@@ -196,4 +217,77 @@ pub(crate) fn config_from_parts(
     config.authentication(AuthMethod::sql_server(username, password));
     config.trust_cert();
     config
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample(encryption: MssqlEncryption) -> String {
+        build_ado_connection_string("127.0.0.1", 1433, "demo_db", "sa", "pw", encryption)
+    }
+
+    #[test]
+    fn encryption_default_is_off() {
+        assert_eq!(MssqlEncryption::default(), MssqlEncryption::Off);
+    }
+
+    #[test]
+    fn build_ado_off_appends_danger_plaintext_clause() {
+        let s = sample(MssqlEncryption::Off);
+        assert!(
+            s.ends_with("encrypt=DANGER_PLAINTEXT;"),
+            "expected DANGER_PLAINTEXT clause at end, got: {s}"
+        );
+    }
+
+    #[test]
+    fn build_ado_on_omits_encrypt_clause() {
+        let s = sample(MssqlEncryption::On);
+        assert!(
+            !s.to_ascii_lowercase().contains("encrypt="),
+            "expected no encrypt= clause, got: {s}"
+        );
+    }
+
+    #[test]
+    fn build_ado_always_includes_trust_server_certificate() {
+        for mode in [MssqlEncryption::Off, MssqlEncryption::On] {
+            let s = sample(mode);
+            assert!(
+                s.contains("TrustServerCertificate=True;"),
+                "expected TrustServerCertificate=True; in mode {mode:?}, got: {s}"
+            );
+        }
+    }
+
+    #[test]
+    fn build_ado_contains_host_port_database_user_password() {
+        let s = sample(MssqlEncryption::Off);
+        assert!(s.contains("Server=tcp:127.0.0.1,1433;"), "host/port: {s}");
+        assert!(s.contains("Database=demo_db;"), "database: {s}");
+        assert!(s.contains("User Id=sa;"), "user: {s}");
+        assert!(s.contains("Password=pw;"), "password: {s}");
+    }
+
+    #[test]
+    fn build_ado_off_full_string_shape() {
+        let s = sample(MssqlEncryption::Off);
+        assert_eq!(
+            s,
+            "Server=tcp:127.0.0.1,1433;Database=demo_db;User Id=sa;Password=pw;TrustServerCertificate=True;encrypt=DANGER_PLAINTEXT;"
+        );
+    }
+
+    #[test]
+    fn tiberius_parses_off_string_without_error() {
+        let s = sample(MssqlEncryption::Off);
+        Config::from_ado_string(&s).expect("tiberius should parse encrypt=DANGER_PLAINTEXT cleanly");
+    }
+
+    #[test]
+    fn tiberius_parses_on_string_without_error() {
+        let s = sample(MssqlEncryption::On);
+        Config::from_ado_string(&s).expect("tiberius should parse string with encryption On");
+    }
 }

@@ -1,6 +1,23 @@
 use arena::Dependency;
-use arena_mssql::MssqlDependency;
+use arena_mssql::{MssqlDependency, MssqlEncryption};
 use serde::Deserialize;
+
+#[derive(Debug, Deserialize, Default, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum EncryptionConfig {
+    #[default]
+    Off,
+    On,
+}
+
+impl From<EncryptionConfig> for MssqlEncryption {
+    fn from(value: EncryptionConfig) -> Self {
+        match value {
+            EncryptionConfig::Off => MssqlEncryption::Off,
+            EncryptionConfig::On => MssqlEncryption::On,
+        }
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct MssqlDependencyConfig {
@@ -21,6 +38,8 @@ pub(crate) struct MssqlDependencyConfig {
     pub container_name: Option<String>,
     #[serde(default)]
     pub startup_sql_scripts: Option<Vec<String>>,
+    #[serde(default)]
+    pub encryption: Option<EncryptionConfig>,
 }
 
 pub(crate) fn build(config: &MssqlDependencyConfig, network: &str) -> Result<Dependency, String> {
@@ -40,9 +59,55 @@ pub(crate) fn build(config: &MssqlDependencyConfig, network: &str) -> Result<Dep
                 .unwrap_or("yourStrong(!)Password"),
         )
         .with_network(network)
+        .with_encryption(config.encryption.unwrap_or_default().into())
         .with_startup_sql_scripts(config.startup_sql_scripts.clone().unwrap_or_default());
     if let Some(ref container_name) = config.container_name {
         builder = builder.with_container_name(container_name);
     }
     Ok(Box::new(builder.build()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encryption_config_default_is_off() {
+        assert_eq!(EncryptionConfig::default(), EncryptionConfig::Off);
+    }
+
+    #[test]
+    fn encryption_config_deserializes_off_lowercase() {
+        let parsed: EncryptionConfig = serde_json::from_str("\"off\"").expect("parse off");
+        assert_eq!(parsed, EncryptionConfig::Off);
+    }
+
+    #[test]
+    fn encryption_config_deserializes_on_lowercase() {
+        let parsed: EncryptionConfig = serde_json::from_str("\"on\"").expect("parse on");
+        assert_eq!(parsed, EncryptionConfig::On);
+    }
+
+    #[test]
+    fn encryption_config_rejects_unknown_value() {
+        let res: Result<EncryptionConfig, _> = serde_json::from_str("\"sometimes\"");
+        assert!(res.is_err(), "expected unknown variant to error, got {res:?}");
+    }
+
+    #[test]
+    fn mssql_config_missing_encryption_defaults_to_off() {
+        let json = r#"{"identifier":"x"}"#;
+        let cfg: MssqlDependencyConfig = serde_json::from_str(json).expect("parse cfg");
+        assert!(cfg.encryption.is_none());
+        let resolved: MssqlEncryption = cfg.encryption.unwrap_or_default().into();
+        assert_eq!(resolved, MssqlEncryption::Off);
+    }
+
+    #[test]
+    fn mssql_config_explicit_on_maps_to_encryption_on() {
+        let json = r#"{"identifier":"x","encryption":"on"}"#;
+        let cfg: MssqlDependencyConfig = serde_json::from_str(json).expect("parse cfg");
+        let resolved: MssqlEncryption = cfg.encryption.unwrap_or_default().into();
+        assert_eq!(resolved, MssqlEncryption::On);
+    }
 }

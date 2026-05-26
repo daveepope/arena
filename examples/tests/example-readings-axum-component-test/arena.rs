@@ -150,7 +150,7 @@ pub fn setup_exec_component() -> Component {
         .with_runtime_arg(
             "mssql_connection_string",
             format!(
-                "Server=tcp:localhost,{};Database={};User Id={};Password={};TrustServerCertificate=True;",
+                "Server=tcp:localhost,{};Database={};User Id={};Password={};TrustServerCertificate=True;encrypt=DANGER_PLAINTEXT;",
                 MSSQL_PORT, MSSQL_DB_NAME, MSSQL_DB_USER, MSSQL_DB_PASS
             ),
         )
