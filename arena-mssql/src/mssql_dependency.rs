@@ -1,4 +1,4 @@
-mod healthcheck;
+pub mod healthcheck;
 pub mod mssql_container_impl;
 
 use crate::builder::MssqlDependencyBuilder;
@@ -54,7 +54,7 @@ impl MssqlDependency {
             image_tag,
             container_name,
             running: false,
-            readiness_check: Box::new(DefaultMssqlReadinessCheck),
+            readiness_check: Box::new(DefaultMssqlReadinessCheck::new()),
             managed_tables: Vec::new(),
         }
     }
