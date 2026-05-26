@@ -14,5 +14,7 @@ mod token;
 
 pub use crate::builder::OauthDependencyBuilder;
 pub use crate::oauth_dependency::OauthDependency;
-pub use crate::oauth_ffi::{build_oauth_dependency_from_config, OauthFfiDependencyConfig};
+pub use crate::oauth_ffi::{
+    build_oauth_dependency_from_config, OauthFfiDependencyConfig, OauthFfiInboundTransport,
+};
 pub use crate::token::{ensure_scopes, validate_scopes, AccessTokenClaims, TokenError};

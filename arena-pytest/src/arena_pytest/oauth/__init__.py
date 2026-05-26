@@ -36,6 +36,11 @@ class OauthDependencyBuilder:
     def with_server_tls_pem(self, cert_pem: str, key_pem: str) -> "OauthDependencyBuilder":
         self._config["server_tls_certificate_pem"] = cert_pem
         self._config["server_tls_private_key_pem"] = key_pem
+        self._config["transport"] = "tls"
+        return self
+
+    def with_http(self) -> "OauthDependencyBuilder":
+        self._config["transport"] = "http"
         return self
 
     def with_metadata_base_url(self, url: str) -> "OauthDependencyBuilder":

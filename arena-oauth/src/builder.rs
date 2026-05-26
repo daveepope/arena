@@ -7,6 +7,7 @@ use crate::oauth_common::OauthListenAddr;
 use crate::oauth_dependency::{OauthDependency, OauthTlsPlan};
 
 enum InboundTransport {
+    Http,
     EphemeralTls,
     CustomTls { cert_pem: String, key_pem: String },
 }
@@ -38,6 +39,11 @@ impl OauthDependencyBuilder {
             inbound_transport: InboundTransport::EphemeralTls,
             metadata_base_url: None,
         }
+    }
+
+    pub fn with_http(mut self) -> Self {
+        self.inbound_transport = InboundTransport::Http;
+        self
     }
 
     /// Ephemeral self-signed TLS for `localhost` / `127.0.0.1` (default).
@@ -107,6 +113,7 @@ impl OauthDependencyBuilder {
         let listen_ip = self.listen_ip.unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST));
         let token_ttl_secs = self.token_ttl_secs.unwrap_or(Self::DEFAULT_TOKEN_TTL_SECS);
         let tls_plan = match self.inbound_transport {
+            InboundTransport::Http => OauthTlsPlan::Disabled,
             InboundTransport::EphemeralTls => OauthTlsPlan::EphemeralOnStart,
             InboundTransport::CustomTls { cert_pem, key_pem } => {
                 if cert_pem.trim().is_empty() || key_pem.trim().is_empty() {

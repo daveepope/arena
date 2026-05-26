@@ -51,6 +51,11 @@ public final class MssqlDependencyBuilder {
     return this;
   }
 
+  public MssqlDependencyBuilder withEncryption(MssqlEncryption encryption) {
+    config.put("encryption", encryption.value());
+    return this;
+  }
+
   public MssqlDependencyBuilder withStartupSqlScripts(List<String> scripts) {
     ArrayNode a = ArenaJson.array();
     for (String s : scripts) {

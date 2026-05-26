@@ -143,6 +143,67 @@ async fn oauth_dependency_https_discovery_token_introspect_and_dependency_verify
 }
 
 #[tokio::test]
+async fn oauth_dependency_http_transport_serves_discovery_token_and_verifies_jwt() {
+    init_test_logging();
+    let mut dep = OauthDependency::builder("oauth http flow").with_http().build();
+    assert!(
+        dep.server_tls_certificate_pem().is_none(),
+        "http transport should not expose any server TLS certificate PEM"
+    );
+    dep.start().await;
+
+    let base = dep
+        .base_url()
+        .expect("base_url after start")
+        .trim_end_matches('/')
+        .to_string();
+    assert!(
+        base.starts_with("http://"),
+        "expected plain http base_url, got {base}"
+    );
+
+    let client = reqwest::Client::new();
+
+    let disc_url = format!("{base}/.well-known/oauth-authorization-server");
+    let disc: Value = client
+        .get(&disc_url)
+        .send()
+        .await
+        .expect("discovery GET")
+        .error_for_status()
+        .expect("discovery status")
+        .json()
+        .await
+        .expect("discovery JSON");
+
+    let token_endpoint = disc["token_endpoint"]
+        .as_str()
+        .expect("token_endpoint string");
+    let jwks_uri = disc["jwks_uri"].as_str().expect("jwks_uri string");
+    assert!(token_endpoint.starts_with("http://"));
+    assert!(jwks_uri.starts_with("http://"));
+
+    let token_resp = client
+        .post(token_endpoint)
+        .form(&[("grant_type", "client_credentials")])
+        .send()
+        .await
+        .expect("token POST")
+        .error_for_status()
+        .expect("token status");
+
+    let token_json: Value = token_resp.json().await.expect("token JSON");
+    let access_token = token_json["access_token"]
+        .as_str()
+        .expect("access_token string");
+
+    dep.verify_access_token(access_token)
+        .expect("dependency JWT verify");
+
+    dep.stop().await;
+}
+
+#[tokio::test]
 async fn oauth_dependency_issued_token_scope_claims_enforce_ensure_scopes() {
     init_test_logging();
     let mut dep = start_oauth_https_default().await;

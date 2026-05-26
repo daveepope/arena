@@ -67,6 +67,7 @@ from arena_pytest.oauth import (
     OAUTH_ISSUER,
     OauthDependency,
     OauthDependencyBuilder,
+    oauth_issuer_host_is_non_loopback,
     oauth_loopback_tls_pem_pair,
 )
 from arena_pytest.playbook import active_playbooks, playbook
@@ -123,6 +124,7 @@ __all__ = [
     "OAUTH_ISSUER",
     "OauthDependency",
     "OauthDependencyBuilder",
+    "oauth_issuer_host_is_non_loopback",
     "oauth_loopback_tls_pem_pair",
     "PostgresDependency",
     "PostgresDependencyBuilder",

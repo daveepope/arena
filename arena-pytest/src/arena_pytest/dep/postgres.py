@@ -14,10 +14,6 @@ class PostgresDependencyBuilder:
         self._config["image_name"] = image_name
         return self
 
-    def with_image_name(self, image_name: str) -> "PostgresDependencyBuilder":
-        self._config["image_name"] = image_name
-        return self
-
     def with_image(self, image: str) -> "PostgresDependencyBuilder":
         self._config["image"] = image
         return self

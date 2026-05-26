@@ -28,8 +28,16 @@ public final class LocalstackDependency implements ArenaMatchPiece {
     return LocalstackModels.LOCALSTACK_INTERNAL_DOCKER_PORT;
   }
 
+  public String endpointUrl() {
+    return endpointUrl("localhost");
+  }
+
   public String endpointUrl(String host) {
     return "http://" + host + ":" + port();
+  }
+
+  public String internalEndpointUrl() {
+    return internalEndpointUrl(null);
   }
 
   public String internalEndpointUrl(String containerName) {
@@ -40,29 +48,45 @@ public final class LocalstackDependency implements ArenaMatchPiece {
     return "http://" + name + ":" + LocalstackModels.LOCALSTACK_INTERNAL_DOCKER_PORT;
   }
 
+  public String queueUrl(String queueName) {
+    return queueUrl(queueName, "localhost", LocalstackModels.LOCALSTACK_DEFAULT_ACCOUNT_ID);
+  }
+
   public String queueUrl(String queueName, String host) {
-    return endpointUrl(host)
-        + "/"
-        + LocalstackModels.LOCALSTACK_DEFAULT_ACCOUNT_ID
-        + "/"
-        + queueName;
+    return queueUrl(queueName, host, LocalstackModels.LOCALSTACK_DEFAULT_ACCOUNT_ID);
+  }
+
+  public String queueUrl(String queueName, String host, String accountId) {
+    return endpointUrl(host) + "/" + accountId + "/" + queueName;
+  }
+
+  public String queueArn(String queueName) {
+    return queueArn(
+        queueName,
+        LocalstackModels.LOCALSTACK_DEFAULT_REGION,
+        LocalstackModels.LOCALSTACK_DEFAULT_ACCOUNT_ID);
   }
 
   public String queueArn(String queueName, String region) {
-    return "arn:aws:sqs:"
-        + region
-        + ":"
-        + LocalstackModels.LOCALSTACK_DEFAULT_ACCOUNT_ID
-        + ":"
-        + queueName;
+    return queueArn(queueName, region, LocalstackModels.LOCALSTACK_DEFAULT_ACCOUNT_ID);
+  }
+
+  public String queueArn(String queueName, String region, String accountId) {
+    return "arn:aws:sqs:" + region + ":" + accountId + ":" + queueName;
+  }
+
+  public String lambdaArn(String functionName) {
+    return lambdaArn(
+        functionName,
+        LocalstackModels.LOCALSTACK_DEFAULT_REGION,
+        LocalstackModels.LOCALSTACK_DEFAULT_ACCOUNT_ID);
   }
 
   public String lambdaArn(String functionName, String region) {
-    return "arn:aws:lambda:"
-        + region
-        + ":"
-        + LocalstackModels.LOCALSTACK_DEFAULT_ACCOUNT_ID
-        + ":function:"
-        + functionName;
+    return lambdaArn(functionName, region, LocalstackModels.LOCALSTACK_DEFAULT_ACCOUNT_ID);
+  }
+
+  public String lambdaArn(String functionName, String region, String accountId) {
+    return "arn:aws:lambda:" + region + ":" + accountId + ":function:" + functionName;
   }
 }

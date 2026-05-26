@@ -11,6 +11,7 @@ use crate::oauth_server::OauthServer;
 use crate::token::{AccessTokenClaims, TokenError};
 
 pub(crate) enum OauthTlsPlan {
+    Disabled,
     EphemeralOnStart,
     CustomPem { cert_pem: String, key_pem: String },
 }
@@ -40,6 +41,7 @@ impl OauthDependency {
         metadata_base_url: Option<String>,
     ) -> Self {
         let active_server_tls = match &tls_plan {
+            OauthTlsPlan::Disabled => None,
             OauthTlsPlan::CustomPem { cert_pem, key_pem } => {
                 Some((cert_pem.clone(), key_pem.clone()))
             }
@@ -90,8 +92,8 @@ impl OauthDependency {
         crate::token::verify_access_token(token, state.keys.as_ref(), &state.metadata.issuer)
     }
 
-    fn tls_pair_for_listen(&mut self) -> (String, String) {
-        self.active_server_tls.clone().expect("server TLS material")
+    fn tls_pair_for_listen(&mut self) -> Option<(String, String)> {
+        self.active_server_tls.clone()
     }
 }
 
