@@ -2,6 +2,7 @@ use crate::mssql_dependency::mssql_container_impl::{MssqlContainerImpl, MssqlImp
 use crate::mssql_dependency::MssqlDependency;
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
+use std::time::Duration;
 
 pub struct MssqlDependencyBuilder {
     identifier: String,
@@ -17,6 +18,7 @@ pub struct MssqlDependencyBuilder {
     container_name: Option<String>,
     network: Option<String>,
     readiness_check: Option<Box<dyn ReadinessCheck>>,
+    connect_timeout: Option<Option<Duration>>,
 }
 
 impl MssqlDependencyBuilder {
@@ -42,6 +44,7 @@ impl MssqlDependencyBuilder {
             container_name: None,
             network: None,
             readiness_check: None,
+            connect_timeout: None,
         }
     }
 
@@ -118,6 +121,16 @@ impl MssqlDependencyBuilder {
         self
     }
 
+    pub fn with_connect_timeout(mut self, timeout: Duration) -> Self {
+        self.connect_timeout = Some(Some(timeout));
+        self
+    }
+
+    pub fn without_connect_timeout(mut self) -> Self {
+        self.connect_timeout = Some(None);
+        self
+    }
+
     pub fn with_container_tag(self, image_tag: impl Into<String>) -> Self {
         self.with_image_tag(image_tag)
     }
@@ -164,6 +177,10 @@ impl MssqlDependencyBuilder {
 
         if let Some(check) = readiness_check {
             dep.set_readiness_check(check);
+        }
+
+        if let Some(timeout) = self.connect_timeout {
+            dep.set_connect_timeout(timeout);
         }
 
         dep

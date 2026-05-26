@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use std::time::{Duration, Instant};
 use tiberius::Config;
 
-pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
+pub const DEFAULT_PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[async_trait]
 pub trait MssqlHealthcheckOps: Send + Sync {
@@ -11,31 +11,39 @@ pub trait MssqlHealthcheckOps: Send + Sync {
 }
 
 pub(super) struct MssqlClientHealthcheckOps {
-    connect_timeout: Option<Duration>,
+    probe_timeout: Option<Duration>,
 }
 
 impl MssqlClientHealthcheckOps {
-    pub(super) fn new(connect_timeout: Option<Duration>) -> Self {
-        Self { connect_timeout }
+    pub(super) fn new(probe_timeout: Option<Duration>) -> Self {
+        Self { probe_timeout }
     }
 }
 
 #[async_trait]
 impl MssqlHealthcheckOps for MssqlClientHealthcheckOps {
     async fn ping(&self, conn_str: &str) -> Result<(), String> {
-        let config = Config::from_ado_string(conn_str)
-            .map_err(|e| format!("parse ADO connection string: {e}"))?;
+        let probe = async {
+            let config = Config::from_ado_string(conn_str)
+                .map_err(|e| format!("parse ADO connection string: {e}"))?;
 
-        let mut client =
-            super::mssql_container_impl::connect_with_config(config, self.connect_timeout)
+            let mut client = super::mssql_container_impl::connect_with_config(config)
                 .await
                 .map_err(|err| format!("mssql connect failed: {err}"))?;
 
-        client
-            .simple_query("SELECT 1")
-            .await
-            .map(|_res| ())
-            .map_err(|err| format!("mssql ping query failed: {err}"))
+            client
+                .simple_query("SELECT 1")
+                .await
+                .map(|_res| ())
+                .map_err(|err| format!("mssql ping query failed: {err}"))
+        };
+
+        match self.probe_timeout {
+            Some(timeout) => tokio::time::timeout(timeout, probe)
+                .await
+                .map_err(|_| format!("mssql probe exceeded {timeout:?}"))?,
+            None => probe.await,
+        }
     }
 }
 
@@ -75,23 +83,23 @@ async fn run_with_retry(
 }
 
 pub struct DefaultMssqlReadinessCheck {
-    connect_timeout: Option<Duration>,
+    probe_timeout: Option<Duration>,
 }
 
 impl DefaultMssqlReadinessCheck {
     pub fn new() -> Self {
         Self {
-            connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
+            probe_timeout: Some(DEFAULT_PROBE_TIMEOUT),
         }
     }
 
-    pub fn with_connect_timeout(mut self, connect_timeout: Option<Duration>) -> Self {
-        self.connect_timeout = connect_timeout;
+    pub fn with_probe_timeout(mut self, probe_timeout: Option<Duration>) -> Self {
+        self.probe_timeout = probe_timeout;
         self
     }
 
-    pub fn connect_timeout(&self) -> Option<Duration> {
-        self.connect_timeout
+    pub fn probe_timeout(&self) -> Option<Duration> {
+        self.probe_timeout
     }
 }
 
@@ -109,7 +117,7 @@ impl ReadinessCheck for DefaultMssqlReadinessCheck {
         connection_string: &str,
         timeout_ms: u64,
     ) -> Result<(), String> {
-        let ops = MssqlClientHealthcheckOps::new(self.connect_timeout);
+        let ops = MssqlClientHealthcheckOps::new(self.probe_timeout);
         run_with_retry(&ops, identifier, connection_string, timeout_ms).await
     }
 }
