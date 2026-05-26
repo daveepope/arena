@@ -141,27 +141,62 @@ impl OauthServer {
             .build()
             .expect("reqwest client");
 
+        tracing::debug!(
+            subsystem = "oauth",
+            log_label = log_label,
+            url = %url,
+            overall = ?timeout,
+            poll_every = ?poll_every,
+            "readiness probe loop starting"
+        );
+
+        let mut attempt: u64 = 0;
+        let mut last_outcome: Option<String> = None;
+
         loop {
             if start.elapsed() >= timeout {
                 panic!(
-                    "[Oauth-{log_label}] did not become ready within {:?}",
-                    timeout
+                    "[Oauth-{log_label}] did not become ready within {:?}. url={url}, attempts={attempt}, last_outcome={:?}",
+                    timeout, last_outcome
                 );
             }
+
+            attempt = attempt.saturating_add(1);
+            let attempt_started = Instant::now();
+
             match client.get(&url).send().await {
-                Ok(r) if r.status().is_success() => break,
-                Ok(r) => {
+                Ok(r) if r.status().is_success() => {
                     tracing::debug!(
+                        subsystem = "oauth",
                         log_label = log_label,
+                        attempts = attempt,
+                        elapsed_total = ?start.elapsed(),
                         status = %r.status(),
-                        "oauth discovery readiness polling"
+                        "readiness probe succeeded"
+                    );
+                    break;
+                }
+                Ok(r) => {
+                    let status = r.status();
+                    last_outcome = Some(format!("http {status}"));
+                    tracing::error!(
+                        subsystem = "oauth",
+                        log_label = log_label,
+                        attempt = attempt,
+                        elapsed = ?attempt_started.elapsed(),
+                        status = %status,
+                        "readiness probe non-success (will retry)"
                     );
                 }
                 Err(e) => {
-                    tracing::debug!(
+                    last_outcome = Some(format!("send error: {e}"));
+                    tracing::error!(
+                        subsystem = "oauth",
                         log_label = log_label,
+                        attempt = attempt,
+                        elapsed = ?attempt_started.elapsed(),
                         error = %e,
-                        "oauth discovery readiness GET failed"
+                        "readiness probe send failed (will retry)"
                     );
                 }
             }
