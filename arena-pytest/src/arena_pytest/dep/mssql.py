@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from enum import Enum
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
 from arena_pytest.support._identifier import build as _build_identifier
 
 if TYPE_CHECKING:
     from arena_pytest.arena import OpenArena
+
+
+class MssqlEncryption(str, Enum):
+    OFF = "off"
+    ON = "on"
 
 
 class MssqlDependencyBuilder:
@@ -46,6 +52,13 @@ class MssqlDependencyBuilder:
 
     def with_startup_sql_scripts(self, scripts: List[str]) -> "MssqlDependencyBuilder":
         self._config["startup_sql_scripts"] = scripts
+        return self
+
+    def with_encryption(
+        self, encryption: Union[MssqlEncryption, str]
+    ) -> "MssqlDependencyBuilder":
+        value = MssqlEncryption(encryption).value
+        self._config["encryption"] = value
         return self
 
     def build(self) -> "MssqlDependency":

@@ -9,6 +9,18 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
 pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MssqlEncryption {
+    Off,
+    On,
+}
+
+impl Default for MssqlEncryption {
+    fn default() -> Self {
+        MssqlEncryption::Off
+    }
+}
+
 #[async_trait]
 pub trait MssqlImpl: Send + Sync {
     async fn start(
@@ -33,15 +45,17 @@ pub(crate) struct MssqlContainerImpl {
     connection_string: Option<String>,
     admin_connection_string: Option<String>,
     network: Option<String>,
+    encryption: MssqlEncryption,
 }
 
 impl MssqlContainerImpl {
-    pub(crate) fn new(network: Option<String>) -> Self {
+    pub(crate) fn new(network: Option<String>, encryption: MssqlEncryption) -> Self {
         Self {
             container: None,
             connection_string: None,
             admin_connection_string: None,
             network,
+            encryption,
         }
     }
 }
@@ -100,6 +114,7 @@ impl MssqlImpl for MssqlContainerImpl {
             "master",
             database_username,
             database_password,
+            self.encryption,
         ));
         self.connection_string = Some(build_ado_connection_string(
             &host,
@@ -107,6 +122,7 @@ impl MssqlImpl for MssqlContainerImpl {
             database_name,
             database_username,
             database_password,
+            self.encryption,
         ));
         self.container = Some(container);
 
@@ -139,10 +155,15 @@ pub(crate) fn build_ado_connection_string(
     database_name: &str,
     username: &str,
     password: &str,
+    encryption: MssqlEncryption,
 ) -> String {
-    format!(
+    let base = format!(
         "Server=tcp:{host},{port};Database={database_name};User Id={username};Password={password};TrustServerCertificate=True;"
-    )
+    );
+    match encryption {
+        MssqlEncryption::Off => format!("{base}encrypt=DANGER_PLAINTEXT;"),
+        MssqlEncryption::On => base,
+    }
 }
 
 pub async fn connect(connection_string: &str) -> Result<Client<Compat<TcpStream>>, String> {
@@ -197,3 +218,4 @@ pub(crate) fn config_from_parts(
     config.trust_cert();
     config
 }
+

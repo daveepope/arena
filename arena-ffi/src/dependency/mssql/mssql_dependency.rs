@@ -1,6 +1,23 @@
 use arena::Dependency;
-use arena_mssql::MssqlDependency;
+use arena_mssql::{MssqlDependency, MssqlEncryption};
 use serde::Deserialize;
+
+#[derive(Debug, Deserialize, Default, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum EncryptionConfig {
+    #[default]
+    Off,
+    On,
+}
+
+impl From<EncryptionConfig> for MssqlEncryption {
+    fn from(value: EncryptionConfig) -> Self {
+        match value {
+            EncryptionConfig::Off => MssqlEncryption::Off,
+            EncryptionConfig::On => MssqlEncryption::On,
+        }
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct MssqlDependencyConfig {
@@ -21,6 +38,8 @@ pub(crate) struct MssqlDependencyConfig {
     pub container_name: Option<String>,
     #[serde(default)]
     pub startup_sql_scripts: Option<Vec<String>>,
+    #[serde(default)]
+    pub encryption: Option<EncryptionConfig>,
 }
 
 pub(crate) fn build(config: &MssqlDependencyConfig, network: &str) -> Result<Dependency, String> {
@@ -40,9 +59,11 @@ pub(crate) fn build(config: &MssqlDependencyConfig, network: &str) -> Result<Dep
                 .unwrap_or("yourStrong(!)Password"),
         )
         .with_network(network)
+        .with_encryption(config.encryption.unwrap_or_default().into())
         .with_startup_sql_scripts(config.startup_sql_scripts.clone().unwrap_or_default());
     if let Some(ref container_name) = config.container_name {
         builder = builder.with_container_name(container_name);
     }
     Ok(Box::new(builder.build()))
 }
+

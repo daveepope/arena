@@ -95,9 +95,9 @@ PLAYBOOK_VALIDATION_DB_SCOPED = _PB_NAMES["validation_db_scoped"]
 
 MSSQL_CONNECTION_STRING_LOCAL = (
     f"Server=tcp:localhost,{MSSQL_PORT};Database={MSSQL_DB_NAME};"
-    f"User Id={MSSQL_DB_USER};Password={MSSQL_DB_PASS};TrustServerCertificate=True;"
+    f"User Id={MSSQL_DB_USER};Password={MSSQL_DB_PASS};TrustServerCertificate=True;encrypt=DANGER_PLAINTEXT;"
 )
 MSSQL_CONNECTION_STRING_DOCKER = (
     f"Server=tcp:{MSSQL_CONTAINER_NAME},1433;Database={MSSQL_DB_NAME};"
-    f"User Id={MSSQL_DB_USER};Password={MSSQL_DB_PASS};TrustServerCertificate=True;"
+    f"User Id={MSSQL_DB_USER};Password={MSSQL_DB_PASS};TrustServerCertificate=True;encrypt=DANGER_PLAINTEXT;"
 )

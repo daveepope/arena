@@ -51,6 +51,25 @@ rust_test(
 )
 
 rust_test(
+    name = "mssql_container_impl_test",
+    srcs = ["tests/mssql_container_impl_test.rs"],
+    size = "small",
+    edition = "2021",
+    tags = ["requires_docker"],
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_mssql",
+        "//arena",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
     name = "healthcheck_test",
     srcs = ["tests/healthcheck_test.rs"],
     size = "small",

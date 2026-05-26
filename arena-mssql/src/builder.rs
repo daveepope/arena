@@ -1,4 +1,6 @@
-use crate::mssql_dependency::mssql_container_impl::{MssqlContainerImpl, MssqlImpl};
+use crate::mssql_dependency::mssql_container_impl::{
+    MssqlContainerImpl, MssqlEncryption, MssqlImpl,
+};
 use crate::mssql_dependency::MssqlDependency;
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
@@ -19,6 +21,7 @@ pub struct MssqlDependencyBuilder {
     network: Option<String>,
     readiness_check: Option<Box<dyn ReadinessCheck>>,
     connect_timeout: Option<Option<Duration>>,
+    encryption: Option<MssqlEncryption>,
 }
 
 impl MssqlDependencyBuilder {
@@ -45,6 +48,7 @@ impl MssqlDependencyBuilder {
             network: None,
             readiness_check: None,
             connect_timeout: None,
+            encryption: None,
         }
     }
 
@@ -131,14 +135,20 @@ impl MssqlDependencyBuilder {
         self
     }
 
+    pub fn with_encryption(mut self, encryption: MssqlEncryption) -> Self {
+        self.encryption = Some(encryption);
+        self
+    }
+
     pub fn with_container_tag(self, image_tag: impl Into<String>) -> Self {
         self.with_image_tag(image_tag)
     }
 
     pub fn build(self) -> MssqlDependency {
+        let encryption = self.encryption.unwrap_or_default();
         let mssql_impl = self
             .mssql_impl
-            .unwrap_or_else(|| Box::new(MssqlContainerImpl::new(self.network)));
+            .unwrap_or_else(|| Box::new(MssqlContainerImpl::new(self.network, encryption)));
 
         let port = self.port.unwrap_or(Self::DEFAULT_PORT);
         let database_name = self
