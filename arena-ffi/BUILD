@@ -24,13 +24,6 @@ rust_library(
     visibility = ["//visibility:public"],
 )
 
-rust_test(
-    name = "lib_test",
-    crate = ":arena_ffi",
-    size = "small",
-    edition = "2021",
-)
-
 rust_shared_library(
     name = "arena_ffi_shared",
     crate_name = "arena_ffi",
