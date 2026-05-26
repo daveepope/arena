@@ -1,20 +1,35 @@
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
 use std::time::{Duration, Instant};
+use tiberius::Config;
+
+pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[async_trait]
 pub trait MssqlHealthcheckOps: Send + Sync {
     async fn ping(&self, conn_str: &str) -> Result<(), String>;
 }
 
-pub(super) struct MssqlClientHealthcheckOps;
+pub(super) struct MssqlClientHealthcheckOps {
+    connect_timeout: Option<Duration>,
+}
+
+impl MssqlClientHealthcheckOps {
+    pub(super) fn new(connect_timeout: Option<Duration>) -> Self {
+        Self { connect_timeout }
+    }
+}
 
 #[async_trait]
 impl MssqlHealthcheckOps for MssqlClientHealthcheckOps {
     async fn ping(&self, conn_str: &str) -> Result<(), String> {
-        let mut client = super::mssql_container_impl::connect(conn_str)
-            .await
-            .map_err(|err| format!("mssql connect failed: {err}"))?;
+        let config = Config::from_ado_string(conn_str)
+            .map_err(|e| format!("parse ADO connection string: {e}"))?;
+
+        let mut client =
+            super::mssql_container_impl::connect_with_config(config, self.connect_timeout)
+                .await
+                .map_err(|err| format!("mssql connect failed: {err}"))?;
 
         client
             .simple_query("SELECT 1")
@@ -35,7 +50,7 @@ async fn run_with_retry(
     #[cfg(test)]
     let poll_every = Duration::from_millis(1);
     #[cfg(not(test))]
-    let poll_every = Duration::from_millis(500);
+    let poll_every = Duration::from_millis(250);
 
     let start = Instant::now();
     loop {
@@ -59,7 +74,32 @@ async fn run_with_retry(
     }
 }
 
-pub(super) struct DefaultMssqlReadinessCheck;
+pub struct DefaultMssqlReadinessCheck {
+    connect_timeout: Option<Duration>,
+}
+
+impl DefaultMssqlReadinessCheck {
+    pub fn new() -> Self {
+        Self {
+            connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
+        }
+    }
+
+    pub fn with_connect_timeout(mut self, connect_timeout: Option<Duration>) -> Self {
+        self.connect_timeout = connect_timeout;
+        self
+    }
+
+    pub fn connect_timeout(&self) -> Option<Duration> {
+        self.connect_timeout
+    }
+}
+
+impl Default for DefaultMssqlReadinessCheck {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[async_trait]
 impl ReadinessCheck for DefaultMssqlReadinessCheck {
@@ -69,7 +109,7 @@ impl ReadinessCheck for DefaultMssqlReadinessCheck {
         connection_string: &str,
         timeout_ms: u64,
     ) -> Result<(), String> {
-        let ops = MssqlClientHealthcheckOps;
+        let ops = MssqlClientHealthcheckOps::new(self.connect_timeout);
         run_with_retry(&ops, identifier, connection_string, timeout_ms).await
     }
 }
