@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use axum_server::tls_rustls::RustlsConfig;
-use axum_server::{bind_rustls, Handle};
+use axum_server::{bind, bind_rustls, Handle};
 use std::sync::Once;
 
 use crate::discovery::OAuthAuthorizationServerMetadata;
@@ -39,10 +39,10 @@ fn reserve_bind_port(listen_ip: IpAddr) -> u16 {
     p
 }
 
-fn tls_origin_base_url(listen_ip: IpAddr, bind_port: u16) -> String {
+fn origin_base_url(scheme: &str, listen_ip: IpAddr, bind_port: u16) -> String {
     match listen_ip {
-        IpAddr::V4(v4) => format!("https://{v4}:{bind_port}"),
-        IpAddr::V6(v6) => format!("https://[{v6}]:{bind_port}"),
+        IpAddr::V4(v4) => format!("{scheme}://{v4}:{bind_port}"),
+        IpAddr::V6(v6) => format!("{scheme}://[{v6}]:{bind_port}"),
     }
 }
 
@@ -54,7 +54,7 @@ impl OauthServer {
         keys: RsaKeyPair,
         scopes_supported: Vec<String>,
         token_ttl_secs: u64,
-        tls_pem: (String, String),
+        tls_pem: Option<(String, String)>,
         metadata_base_url_override: Option<String>,
     ) {
         assert!(
@@ -62,8 +62,7 @@ impl OauthServer {
             "[Oauth-{log_label}] oauth server already running"
         );
 
-        ensure_rustls_default_crypto_provider();
-        let (cert_pem, key_pem) = tls_pem;
+        let scheme = if tls_pem.is_some() { "https" } else { "http" };
 
         let bind_port = if listen.port == 0 {
             reserve_bind_port(listen.ip)
@@ -71,9 +70,9 @@ impl OauthServer {
             listen.port
         };
         let readiness_poll_base = if listen.ip.is_unspecified() {
-            format!("https://127.0.0.1:{bind_port}")
+            format!("{scheme}://127.0.0.1:{bind_port}")
         } else {
-            tls_origin_base_url(listen.ip, bind_port)
+            origin_base_url(scheme, listen.ip, bind_port)
         };
         let metadata_base = metadata_base_url_override
             .as_deref()
@@ -92,15 +91,24 @@ impl OauthServer {
             token_ttl_secs,
         });
 
-        let rustls = RustlsConfig::from_pem(cert_pem.into_bytes(), key_pem.into_bytes())
-            .await
-            .unwrap_or_else(|e| panic!("[Oauth-{log_label}] invalid TLS PEM: {e}"));
-
         let addr = SocketAddr::new(listen.ip, bind_port);
         let router = https_router(signing_state.clone());
         let handle = Handle::new();
-        let server = bind_rustls(addr, rustls).handle(handle.clone());
-        let join = tokio::spawn(async move { server.serve(router.into_make_service()).await });
+
+        let join = match tls_pem {
+            Some((cert_pem, key_pem)) => {
+                ensure_rustls_default_crypto_provider();
+                let rustls = RustlsConfig::from_pem(cert_pem.into_bytes(), key_pem.into_bytes())
+                    .await
+                    .unwrap_or_else(|e| panic!("[Oauth-{log_label}] invalid TLS PEM: {e}"));
+                let server = bind_rustls(addr, rustls).handle(handle.clone());
+                tokio::spawn(async move { server.serve(router.into_make_service()).await })
+            }
+            None => {
+                let server = bind(addr).handle(handle.clone());
+                tokio::spawn(async move { server.serve(router.into_make_service()).await })
+            }
+        };
 
         self.inner = Some(OauthServerStarted {
             handle,

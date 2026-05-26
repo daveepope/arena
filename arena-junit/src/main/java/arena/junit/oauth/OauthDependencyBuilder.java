@@ -43,6 +43,12 @@ public final class OauthDependencyBuilder {
   public OauthDependencyBuilder withServerTlsPem(String certPem, String keyPem) {
     config.put("server_tls_certificate_pem", certPem);
     config.put("server_tls_private_key_pem", keyPem);
+    config.put("transport", "tls");
+    return this;
+  }
+
+  public OauthDependencyBuilder withHttp() {
+    config.put("transport", "http");
     return this;
   }
 

@@ -265,7 +265,7 @@ final class ReadingsArenaConfig {
         + MSSQL_DB_USER
         + ";Password="
         + MSSQL_DB_PASS
-        + ";TrustServerCertificate=True;";
+        + ";TrustServerCertificate=True;encrypt=DANGER_PLAINTEXT;";
   }
 
   static String mssqlConnectionDocker() {
@@ -277,7 +277,7 @@ final class ReadingsArenaConfig {
         + MSSQL_DB_USER
         + ";Password="
         + MSSQL_DB_PASS
-        + ";TrustServerCertificate=True;";
+        + ";TrustServerCertificate=True;encrypt=DANGER_PLAINTEXT;";
   }
 
   static String postgresConnectionLocal() {
