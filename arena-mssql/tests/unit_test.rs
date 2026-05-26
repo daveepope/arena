@@ -1,9 +1,10 @@
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
-use arena_mssql::{MssqlDependency, MssqlImpl};
+use arena_mssql::{MssqlDependency, MssqlImpl, DEFAULT_CONNECT_TIMEOUT};
 use async_trait::async_trait;
 use futures::FutureExt;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Event {
@@ -125,4 +126,43 @@ async fn mssql_dependency_lifecycle() {
         Some("Server=tcp:127.0.0.1,1433;Database=master;User Id=sa;Password=pw;TrustServerCertificate=True;")
     );
     assert_eq!(*last_timeout_ms.lock().unwrap(), Some(60_000));
+}
+
+#[tokio::test]
+async fn builder_default_connect_timeout_matches_constant() {
+    let dep = MssqlDependency::builder("mssql_defaults")
+        .with_impl(FakeMssqlImpl {
+            conn_str: None,
+            admin_conn_str: None,
+            events: Arc::new(Mutex::new(Vec::new())),
+        })
+        .build();
+    assert_eq!(dep.connect_timeout(), Some(DEFAULT_CONNECT_TIMEOUT));
+}
+
+#[tokio::test]
+async fn builder_with_connect_timeout_overrides_default() {
+    let custom = Duration::from_millis(25);
+    let dep = MssqlDependency::builder("mssql_custom")
+        .with_impl(FakeMssqlImpl {
+            conn_str: None,
+            admin_conn_str: None,
+            events: Arc::new(Mutex::new(Vec::new())),
+        })
+        .with_connect_timeout(custom)
+        .build();
+    assert_eq!(dep.connect_timeout(), Some(custom));
+}
+
+#[tokio::test]
+async fn builder_without_connect_timeout_disables_bounding() {
+    let dep = MssqlDependency::builder("mssql_unbounded")
+        .with_impl(FakeMssqlImpl {
+            conn_str: None,
+            admin_conn_str: None,
+            events: Arc::new(Mutex::new(Vec::new())),
+        })
+        .without_connect_timeout()
+        .build();
+    assert_eq!(dep.connect_timeout(), None);
 }

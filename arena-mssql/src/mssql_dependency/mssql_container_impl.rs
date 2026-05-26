@@ -7,6 +7,8 @@ use tiberius::{AuthMethod, Client, Config};
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
+pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
+
 #[async_trait]
 pub trait MssqlImpl: Send + Sync {
     async fn start(
@@ -144,35 +146,39 @@ pub(crate) fn build_ado_connection_string(
 }
 
 pub async fn connect(connection_string: &str) -> Result<Client<Compat<TcpStream>>, String> {
+    connect_with_timeout(connection_string, Some(DEFAULT_CONNECT_TIMEOUT)).await
+}
+
+pub async fn connect_with_timeout(
+    connection_string: &str,
+    timeout: Option<Duration>,
+) -> Result<Client<Compat<TcpStream>>, String> {
     let config = Config::from_ado_string(connection_string)
         .map_err(|e| format!("parse ADO connection string: {e}"))?;
-    connect_with_config(config, None).await
+
+    let fut = connect_with_config(config);
+    match timeout {
+        Some(budget) => tokio::time::timeout(budget, fut)
+            .await
+            .map_err(|_| format!("mssql connect exceeded {budget:?}"))?,
+        None => fut.await,
+    }
 }
 
 pub(crate) async fn connect_with_config(
     mut config: Config,
-    connect_timeout: Option<Duration>,
 ) -> Result<Client<Compat<TcpStream>>, String> {
     config.trust_cert();
 
-    let fut = async {
-        let tcp = TcpStream::connect(config.get_addr())
-            .await
-            .map_err(|e| format!("tcp connect failed: {e}"))?;
-        tcp.set_nodelay(true)
-            .map_err(|e| format!("set_nodelay failed: {e}"))?;
+    let tcp = TcpStream::connect(config.get_addr())
+        .await
+        .map_err(|e| format!("tcp connect failed: {e}"))?;
+    tcp.set_nodelay(true)
+        .map_err(|e| format!("set_nodelay failed: {e}"))?;
 
-        Client::connect(config, tcp.compat_write())
-            .await
-            .map_err(|e| format!("tiberius connect failed: {e}"))
-    };
-
-    match connect_timeout {
-        Some(timeout) => tokio::time::timeout(timeout, fut)
-            .await
-            .map_err(|_| format!("mssql connect exceeded {timeout:?}"))?,
-        None => fut.await,
-    }
+    Client::connect(config, tcp.compat_write())
+        .await
+        .map_err(|e| format!("tiberius connect failed: {e}"))
 }
 
 #[allow(dead_code)]

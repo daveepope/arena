@@ -3,6 +3,7 @@ pub mod mssql_container_impl;
 
 use crate::builder::MssqlDependencyBuilder;
 use crate::mssql_dependency::healthcheck::DefaultMssqlReadinessCheck;
+use crate::mssql_dependency::mssql_container_impl::DEFAULT_CONNECT_TIMEOUT;
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
@@ -24,6 +25,7 @@ pub struct MssqlDependency {
     image_tag: String,
     container_name: Option<String>,
     readiness_check: Box<dyn ReadinessCheck>,
+    connect_timeout: Option<Duration>,
     managed_tables: Vec<(String, String)>,
 }
 
@@ -55,6 +57,7 @@ impl MssqlDependency {
             container_name,
             running: false,
             readiness_check: Box::new(DefaultMssqlReadinessCheck::new()),
+            connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             managed_tables: Vec::new(),
         }
     }
@@ -91,14 +94,23 @@ impl MssqlDependency {
         self.readiness_check = check;
     }
 
+    pub(crate) fn set_connect_timeout(&mut self, connect_timeout: Option<Duration>) {
+        self.connect_timeout = connect_timeout;
+    }
+
+    pub fn connect_timeout(&self) -> Option<Duration> {
+        self.connect_timeout
+    }
+
     async fn run_startup_sql_scripts(
         identifier: &str,
         conn_str: &str,
         scripts: &[String],
+        connect_timeout: Option<Duration>,
     ) -> Result<(), String> {
-        let mut client = mssql_container_impl::connect(conn_str).await.map_err(|e| {
-            format!("[MssqlDependency-{identifier}] connect for startup scripts: {e}")
-        })?;
+        let mut client = mssql_container_impl::connect_with_timeout(conn_str, connect_timeout)
+            .await
+            .map_err(|e| format!("[MssqlDependency-{identifier}] connect for startup scripts: {e}"))?;
 
         tracing::debug!(
             dependency = %identifier,
@@ -156,14 +168,16 @@ impl MssqlDependency {
             .to_string();
         let identifier = self.identifier.clone();
         let database_name = self.database_name.clone();
+        let connect_timeout = self.connect_timeout;
 
         let (tx, rx) = oneshot::channel::<Result<(), String>>();
 
         tokio::spawn(async move {
             let res = async {
-                let mut client = mssql_container_impl::connect(&admin_conn)
-                    .await
-                    .map_err(|e| format!("connect to master: {e}"))?;
+                let mut client =
+                    mssql_container_impl::connect_with_timeout(&admin_conn, connect_timeout)
+                        .await
+                        .map_err(|e| format!("connect to master: {e}"))?;
 
                 let safe = database_name.replace(']', "]]");
                 let sql = format!(
@@ -207,14 +221,16 @@ impl MssqlDependency {
             .connection_string()
             .expect("connection string should be available after mssql starts")
             .to_string();
+        let connect_timeout = self.connect_timeout;
 
         let (tx, rx) = oneshot::channel::<Result<Vec<(String, String)>, String>>();
 
         tokio::spawn(async move {
             let res = async {
-                let mut client = mssql_container_impl::connect(&conn_str)
-                    .await
-                    .map_err(|e| format!("connect to snapshot tables: {e}"))?;
+                let mut client =
+                    mssql_container_impl::connect_with_timeout(&conn_str, connect_timeout)
+                        .await
+                        .map_err(|e| format!("connect to snapshot tables: {e}"))?;
 
                 let sql = "SELECT s.name AS schema_name, t.name AS table_name \
                            FROM sys.tables t \
@@ -269,12 +285,18 @@ impl MssqlDependency {
             .connection_string()
             .expect("connection string should be available after mssql starts")
             .to_string();
+        let connect_timeout = self.connect_timeout;
 
         let (tx, rx) = oneshot::channel::<Result<(), String>>();
 
         tokio::spawn(async move {
-            let res =
-                MssqlDependency::run_startup_sql_scripts(&identifier, &conn_str, &scripts).await;
+            let res = MssqlDependency::run_startup_sql_scripts(
+                &identifier,
+                &conn_str,
+                &scripts,
+                connect_timeout,
+            )
+            .await;
             let _ = tx.send(res);
         });
 
@@ -430,8 +452,9 @@ impl RunnableDependency for MssqlDependency {
             "drop and recreate database"
         );
 
+        let connect_timeout = self.connect_timeout;
         let reset_res: Result<(), String> = async {
-            let mut admin = mssql_container_impl::connect(&admin_conn)
+            let mut admin = mssql_container_impl::connect_with_timeout(&admin_conn, connect_timeout)
                 .await
                 .map_err(|e| format!("connect to master: {e}"))?;
 
@@ -457,7 +480,9 @@ impl RunnableDependency for MssqlDependency {
             panic!("[MssqlDependency-{identifier}] soft reset failed: {msg}");
         }
 
-        if let Err(msg) = Self::run_startup_sql_scripts(&identifier, &conn_str, scripts).await {
+        if let Err(msg) =
+            Self::run_startup_sql_scripts(&identifier, &conn_str, scripts, connect_timeout).await
+        {
             panic!("{msg}");
         }
     }
