@@ -21,7 +21,6 @@ from arena_pytest import (
     MatchBuilder,
     SqsQueueTarget,
 )
-from arena_pytest.playbook import active_playbooks
 
 LOCALSTACK_HOST_PORT = 4567
 LOCALSTACK_NETWORK = "arena-pytest-localstack-network"
@@ -35,6 +34,14 @@ DUMMY_CREDS = {"aws_access_key_id": "test", "aws_secret_access_key": "test"}
 
 LOCALSTACK_ID = f"ls-{uuid.uuid4().hex[:8]}"
 MANAGED_LOCALSTACK_PLAYBOOK_ID = "localstack-session-purge"
+
+
+class LocalstackSessionPurgePlaybook(ManagedLocalstackPlaybook):
+    def __init__(self, dependency_identifier: str):
+        super().__init__(
+            identifier=MANAGED_LOCALSTACK_PLAYBOOK_ID,
+            dependency_identifier=dependency_identifier,
+        )
 
 
 def _write_lambda_source(base_dir) -> str:
@@ -123,10 +130,7 @@ async def _localstack_session(tmp_path_factory):
         .build()
     )
 
-    session_purge_playbook = ManagedLocalstackPlaybook(
-        MANAGED_LOCALSTACK_PLAYBOOK_ID,
-        localstack.identifier,
-    )
+    session_purge_playbook = LocalstackSessionPurgePlaybook(localstack.identifier)
 
     a_match = (
         MatchBuilder("localstack-e2e")
@@ -226,7 +230,7 @@ async def test_localstack_full_stack_end_to_end(arena, localstack_dep):
 async def test_localstack_playbook_purges_queue(
     arena, localstack_dep, session_purge_playbook
 ):
-    with active_playbooks(arena, session_purge_playbook):
+    with session_purge_playbook.run(arena):
         boto3 = pytest.importorskip("boto3")
         localstack = localstack_dep
         endpoint = localstack.endpoint_url("127.0.0.1")

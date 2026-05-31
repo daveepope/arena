@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
+from arena_pytest.ffi._ffi import match_playbook_run
+from arena_pytest.playbook import ActiveLocalstackPlaybook, Playbook
 from arena_pytest.support._identifier import build as _build_identifier
 
 if TYPE_CHECKING:
@@ -209,12 +210,16 @@ class LocalstackDependency:
         return self._config
 
 
-class ManagedLocalstackPlaybook:
-    def __init__(self, identifier: str, dependency_identifier: str):
+class ManagedLocalstackPlaybook(Playbook):
+    def __init__(
+        self,
+        *,
+        identifier: str,
+        dependency_identifier: str,
+    ):
         self._identifier = identifier
         self._dependency_identifier = dependency_identifier
 
-    @property
     def identifier(self) -> str:
         return self._identifier
 
@@ -229,56 +234,6 @@ class ManagedLocalstackPlaybook:
             "dependency_identifier": self._dependency_identifier,
         }
 
-    def run(self, arena: "OpenArena") -> "ActiveLocalstackPlaybook":
-        return ActiveLocalstackPlaybook(
-            arena=arena,
-            dependency_identifier=self._dependency_identifier,
-        )
-
-
-class ActiveLocalstackPlaybook:
-    def __init__(self, arena: "OpenArena", dependency_identifier: str):
-        self._arena = arena
-        self._dependency_identifier = dependency_identifier
-        self._handle: Optional[int] = None
-
-    def __enter__(self) -> "ActiveLocalstackPlaybook":
-        from arena_pytest.ffi._ffi import localstack_playbook_begin
-
-        spec = json.dumps({"dependency_identifier": self._dependency_identifier})
-        self._handle = localstack_playbook_begin(
-            self._arena._ffi, self._arena._handle, spec
-        )
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        from arena_pytest.ffi._ffi import ArenaBindingError, localstack_playbook_finish
-
-        handle = self._handle
-        self._handle = None
-        if not handle:
-            return
-        try:
-            localstack_playbook_finish(self._arena._ffi, handle)
-        except ArenaBindingError as e:
-            if exc_type is not None:
-                return
-            raise AssertionError(str(e)) from None
-
-    def finish(self) -> None:
-        if self._handle:
-            from arena_pytest.ffi._ffi import localstack_playbook_finish
-
-            localstack_playbook_finish(self._arena._ffi, self._handle)
-            self._handle = None
-
-
-class ManagedLocalstackPlaybookBuilder:
-    def __init__(self, identifier: str, dependency_identifier: str):
-        self._identifier = identifier
-        self._dependency_identifier = dependency_identifier
-
-    def build(self) -> ManagedLocalstackPlaybook:
-        return ManagedLocalstackPlaybook(
-            self._identifier, self._dependency_identifier
-        )
+    def run(self, arena: "OpenArena") -> ActiveLocalstackPlaybook:
+        handle = match_playbook_run(arena._ffi, arena._handle, self._identifier)
+        return ActiveLocalstackPlaybook(arena._ffi, handle)

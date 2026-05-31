@@ -3,12 +3,31 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 import tempfile
 import time
 import uuid
 from dataclasses import dataclass
 
+_TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _TESTS_DIR not in sys.path:
+    sys.path.insert(0, _TESTS_DIR)
+
 import pytest
+
+
+def _arena_plugin_already_registered_via_entry_point() -> bool:
+    try:
+        from importlib.metadata import entry_points
+        eps = entry_points(group="pytest11")
+    except Exception:
+        return False
+    return any(getattr(ep, "value", "") == "arena_pytest.arena" for ep in eps)
+
+
+if not _arena_plugin_already_registered_via_entry_point():
+    pytest_plugins = ("arena_pytest.arena",)
+
 import pytest_asyncio
 import requests
 
@@ -21,9 +40,6 @@ from arena_pytest import (
     HttpDependencyBuilder,
     HttpReadinessCheck,
     LocalstackDependencyBuilder,
-    ManagedHttpPlaybookBuilder,
-    ManagedLocalstackPlaybook,
-    ManagedMssqlPlaybookBuilder,
     MatchBuilder,
     MssqlDependencyBuilder,
     OauthDependencyBuilder,
@@ -32,26 +48,32 @@ from arena_pytest import (
     oauth_loopback_tls_pem_pair,
 )
 
-WEB_APP_PORT = 3010
-POSTGRES_PORT = 5560
-MSSQL_PORT = 1438
-CALIBRATION_HOST_PORT = 3011
-LOCALSTACK_HOST_PORT = 4570
-OAUTH_PORT = 9446
-OAUTH_ISSUER = f"https://127.0.0.1:{OAUTH_PORT}"
+from readings_ephemeral_test_runtime import RUNTIME
+
+from readings_playbooks import (
+    CalibrationDefaultPlaybook,
+    LocalstackSessionPlaybook,
+    ValidationDbPlaybook,
+)
+
+WEB_APP_PORT = RUNTIME.exec_web_app_port
+POSTGRES_PORT = RUNTIME.postgres_port
+MSSQL_PORT = RUNTIME.mssql_port
+CALIBRATION_HOST_PORT = RUNTIME.calibration_host_port
+LOCALSTACK_HOST_PORT = RUNTIME.localstack_host_port
+OAUTH_PORT = RUNTIME.oauth_port
+OAUTH_ISSUER = RUNTIME.oauth_issuer
 POSTGRES_DB_NAME = "readings_db"
 POSTGRES_DB_USER = "readings_user"
 POSTGRES_DB_PASS = "readings_password"
 MSSQL_DB_NAME = "validationDb"
 MSSQL_DB_USER = "sa"
 MSSQL_DB_PASS = "yourStrong(!)Password"
-NETWORK_NAME = "arena-readings-api-network"
+NETWORK_NAME = RUNTIME.network_name("arena-readings-api-network")
 EVENT_BUS_NAME = "readings-api-events"
 EVENT_SOURCE = "readings.api"
 QUEUE_NAME = "readings-api-events-q"
 EVENT_RULE_NAME = "readings-api-rule"
-CALIBRATION_VALIDATE_PATH = "/api/v1/validate"
-LOCALSTACK_SESSION_PLAYBOOK_ID = "readings-api-localstack-session"
 DUMMY_CREDS = {"aws_access_key_id": "test", "aws_secret_access_key": "test"}
 REGION = "us-east-1"
 
@@ -126,8 +148,6 @@ class ReadingsFastapiCtx:
     queue_name: str
     region: str
     dummy_aws_creds: dict[str, str]
-    mssql_identifier: str
-    localstack_session_playbook: ManagedLocalstackPlaybook
 
     def wait_sqs_reading_created(
         self,
@@ -167,14 +187,19 @@ class ReadingsFastapiCtx:
         )
 
 
-@pytest_asyncio.fixture(scope="session")
-async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
+_OAUTH_CA_FILE = ""
+
+
+@pytest.fixture(scope="session")
+def closed_arena() -> ClosedArena:
+    global _OAUTH_CA_FILE
     pytest.importorskip("boto3")
     ca_pem, server_key_pem = oauth_loopback_tls_pem_pair()
 
     fd, oauth_ca_file = tempfile.mkstemp(prefix="readings-api-oauth-", suffix=".pem")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(ca_pem)
+    _OAUTH_CA_FILE = oauth_ca_file
 
     schema_path = _find_resource_file("instrument_reading_db_schema.sql")
     if not schema_path:
@@ -221,14 +246,6 @@ async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
         .build()
     )
 
-    calibration_playbook = (
-        ManagedHttpPlaybookBuilder(
-            "readings-api-calibration-default", calibration.identifier
-        )
-        .with_mapping("POST", CALIBRATION_VALIDATE_PATH, 200, {"valid": True})
-        .build()
-    )
-
     ls_id = f"ls-readings-api-{uuid.uuid4().hex[:8]}"
     localstack = (
         LocalstackDependencyBuilder(ls_id)
@@ -250,11 +267,6 @@ async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
             )
         )
         .build()
-    )
-
-    localstack_session_playbook = ManagedLocalstackPlaybook(
-        LOCALSTACK_SESSION_PLAYBOOK_ID,
-        localstack.identifier,
     )
 
     exe = _find_fastapi_executable()
@@ -304,12 +316,16 @@ async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
         .add_dependency(calibration)
         .add_dependency(localstack)
         .add_component(fastapi_component)
-        .register_playbook(calibration_playbook, exec_on_dependency_start=True)
-        .register_playbook(localstack_session_playbook)
+        .register_playbook(
+            CalibrationDefaultPlaybook(calibration.identifier),
+            exec_on_dependency_start=True,
+        )
+        .register_playbook(LocalstackSessionPlaybook(localstack.identifier))
+        .register_playbook(ValidationDbPlaybook(mssql.identifier))
         .build()
     )
 
-    closed = ClosedArena(
+    return ClosedArena(
         "readings-api-arena",
         [a_match],
         log_level=ArenaLogLevel.DEBUG,
@@ -323,32 +339,19 @@ async def readings_fastapi_ctx() -> ReadingsFastapiCtx:
             localstack.identifier,
         ),
     )
-    arena = await closed.open()
-    try:
-        token = _fetch_access_token(oauth_ca_file, OAUTH_ISSUER)
-        yield ReadingsFastapiCtx(
-            arena=arena,
-            oauth_ca_path=oauth_ca_file,
-            access_token=token,
-            web_base=f"http://127.0.0.1:{WEB_APP_PORT}",
-            localstack_endpoint=ls_ep,
-            queue_name=QUEUE_NAME,
-            region=REGION,
-            dummy_aws_creds=DUMMY_CREDS,
-            mssql_identifier=mssql.identifier,
-            localstack_session_playbook=localstack_session_playbook,
-        )
-    finally:
-        await arena.close()
 
 
 @pytest_asyncio.fixture(scope="session")
-async def arena(readings_fastapi_ctx: ReadingsFastapiCtx):
-    return readings_fastapi_ctx.arena
-
-
-@pytest.fixture(scope="session")
-def validation_db_playbook(readings_fastapi_ctx: ReadingsFastapiCtx):
-    return ManagedMssqlPlaybookBuilder(
-        "readings-api-validation-db-scoped", readings_fastapi_ctx.mssql_identifier
-    ).build()
+async def readings_fastapi_ctx(arena) -> ReadingsFastapiCtx:
+    token = _fetch_access_token(_OAUTH_CA_FILE, OAUTH_ISSUER)
+    ls_ep = f"http://127.0.0.1:{LOCALSTACK_HOST_PORT}"
+    return ReadingsFastapiCtx(
+        arena=arena,
+        oauth_ca_path=_OAUTH_CA_FILE,
+        access_token=token,
+        web_base=f"http://127.0.0.1:{WEB_APP_PORT}",
+        localstack_endpoint=ls_ep,
+        queue_name=QUEUE_NAME,
+        region=REGION,
+        dummy_aws_creds=DUMMY_CREDS,
+    )

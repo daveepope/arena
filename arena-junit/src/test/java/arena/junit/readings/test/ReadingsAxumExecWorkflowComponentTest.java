@@ -1,16 +1,18 @@
-package arena.junit.readings;
+package arena.junit.readings.test;
 
-import static arena.junit.readings.ReadingsArenaConfig.KAFKA_PORT;
-import static arena.junit.readings.ReadingsArenaConfig.baseUrlExec;
-import static arena.junit.readings.ReadingsArenaConfig.consumeReadingCreated;
-import static arena.junit.readings.ReadingsArenaConfig.createReading;
-import static arena.junit.readings.ReadingsArenaConfig.getReadings;
-import static arena.junit.readings.ReadingsArenaConfig.readingsClient;
+import static arena.junit.readings.fixture.ReadingsArenaConfig.KAFKA_PORT;
+import static arena.junit.readings.fixture.ReadingsArenaConfig.baseUrlExec;
+import static arena.junit.readings.fixture.ReadingsArenaConfig.consumeReadingCreated;
+import static arena.junit.readings.fixture.ReadingsArenaConfig.createReading;
+import static arena.junit.readings.fixture.ReadingsArenaConfig.getReadings;
+import static arena.junit.readings.fixture.ReadingsArenaConfig.readingsClient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import arena.junit.Playbook;
+import arena.junit.readings.fixture.ReadingsArenaFixture;
+import arena.junit.readings.playbook.ReadingsValidationDbPlaybook;
 import com.fasterxml.jackson.databind.JsonNode;
-import arena.junit.playbook.ArenaPlaybooks;
 import java.net.http.HttpClient;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,10 +26,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 final class ReadingsAxumExecWorkflowComponentTest {
 
   @RegisterExtension
-  static final ReadingsArenaSessionFixture readingsArena = new ReadingsArenaSessionFixture();
+  static final ReadingsArenaFixture readingsArena = new ReadingsArenaFixture();
 
   @Test
-  @ArenaPlaybooks(ReadingsAxumValidationDbPlaybooks.class)
+  @Playbook(ReadingsValidationDbPlaybook.class)
   void createReadingPublishesKafkaEventAndListsViaHttp() throws Exception {
     HttpClient c = readingsClient();
     String token = readingsArena.accessToken();
@@ -65,7 +67,7 @@ final class ReadingsAxumExecWorkflowComponentTest {
   }
 
   @Test
-  @ArenaPlaybooks(ReadingsAxumValidationDbPlaybooks.class)
+  @Playbook(ReadingsValidationDbPlaybook.class)
   void createMultipleReadingsAreListed() throws Exception {
     HttpClient c = readingsClient();
     String token = readingsArena.accessToken();

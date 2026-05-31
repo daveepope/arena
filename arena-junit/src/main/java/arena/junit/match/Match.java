@@ -1,17 +1,21 @@
 package arena.junit.match;
 
+import arena.junit.playbook.Playbook;
 import arena.junit.support.ArenaJson;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class Match {
   private final String name;
   private final List<ArenaMatchPiece> dependencies = new ArrayList<>();
   private final List<ArenaMatchPiece> components = new ArrayList<>();
-  private final List<RegisteredPlaybook> playbooks = new ArrayList<>();
+  private final Map<Class<? extends Playbook>, RegisteredPlaybook> playbooks =
+      new LinkedHashMap<>();
   private String network;
 
   Match(
@@ -19,12 +23,26 @@ public final class Match {
       List<ArenaMatchPiece> dependencies,
       List<ArenaMatchPiece> components,
       String network,
-      List<RegisteredPlaybook> playbooks) {
+      Map<Class<? extends Playbook>, RegisteredPlaybook> playbooks) {
     this.name = name;
     this.dependencies.addAll(dependencies);
     this.components.addAll(components);
     this.network = network;
-    this.playbooks.addAll(playbooks);
+    this.playbooks.putAll(playbooks);
+  }
+
+  public String name() {
+    return name;
+  }
+
+  public Playbook playbook(Class<? extends Playbook> klass) {
+    RegisteredPlaybook rp = playbooks.get(klass);
+    return rp == null ? null : rp.playbook();
+  }
+
+  public Boolean execOnDependencyStart(Class<? extends Playbook> klass) {
+    RegisteredPlaybook rp = playbooks.get(klass);
+    return rp == null ? null : rp.execOnDependencyStart();
   }
 
   public ObjectNode forFfi() {
@@ -45,7 +63,7 @@ public final class Match {
     }
     if (!playbooks.isEmpty()) {
       ArrayNode pbs = ArenaJson.array();
-      for (RegisteredPlaybook p : playbooks) {
+      for (RegisteredPlaybook p : playbooks.values()) {
         pbs.add(p.forFfi());
       }
       out.set("playbooks", pbs);

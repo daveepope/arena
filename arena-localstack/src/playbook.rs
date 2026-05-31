@@ -88,6 +88,10 @@ impl arena::ActivePlaybook for ActivePlaybook {
     fn identifier(&self) -> &str {
         &self.identifier
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl ActivePlaybook {

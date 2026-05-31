@@ -9,6 +9,7 @@ use arena_postgres::PostgresDependency;
 use serde_json::json;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::runtime::Runtime;
 use tokio::sync::OnceCell;
 
@@ -19,8 +20,58 @@ pub static OAUTH_ID: OnceLock<String> = OnceLock::new();
 
 static OAUTH_SERVER_TLS_CERT_PEM: OnceLock<String> = OnceLock::new();
 
-pub const OAUTH_PORT: u16 = 9446;
-pub const OAUTH_ISSUER: &str = "https://127.0.0.1:9446";
+pub struct ReadingsTestRuntime {
+    pub oauth_port: u16,
+    pub oauth_issuer: String,
+    pub postgres_port: u16,
+    pub kafka_port: u16,
+    pub calibration_http_port: u16,
+    pub exec_web_app_port: u16,
+    pub mssql_port: u16,
+    pub network_name: String,
+}
+
+fn ephemeral_tcp_port() -> u16 {
+    std::net::TcpListener::bind("127.0.0.1:0")
+        .expect("bind ephemeral tcp port")
+        .local_addr()
+        .expect("local_addr")
+        .port()
+}
+
+fn run_suffix() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time")
+        .subsec_nanos();
+    format!("{:x}-{:x}", std::process::id(), nanos)
+}
+
+static TEST_RUNTIME: OnceLock<ReadingsTestRuntime> = OnceLock::new();
+
+pub fn test_runtime() -> &'static ReadingsTestRuntime {
+    TEST_RUNTIME.get_or_init(|| {
+        let oauth_port = ephemeral_tcp_port();
+        ReadingsTestRuntime {
+            oauth_issuer: format!("https://127.0.0.1:{oauth_port}"),
+            oauth_port,
+            postgres_port: ephemeral_tcp_port(),
+            kafka_port: ephemeral_tcp_port(),
+            calibration_http_port: ephemeral_tcp_port(),
+            exec_web_app_port: ephemeral_tcp_port(),
+            mssql_port: ephemeral_tcp_port(),
+            network_name: format!("arena-readings-api-network-{}", run_suffix()),
+        }
+    })
+}
+
+pub fn oauth_issuer() -> &'static str {
+    &test_runtime().oauth_issuer
+}
+
+pub fn exec_web_app_port() -> u16 {
+    test_runtime().exec_web_app_port
+}
 
 pub fn oauth_server_tls_cert_pem() -> &'static str {
     OAUTH_SERVER_TLS_CERT_PEM
@@ -29,38 +80,32 @@ pub fn oauth_server_tls_cert_pem() -> &'static str {
         .expect("oauth_server_tls_cert_pem: arena dependencies not initialized")
 }
 
-pub const POSTGRES_PORT: u16 = 5560;
 pub const POSTGRES_DB_NAME: &str = "readings_db";
 pub const POSTGRES_DB_USER: &str = "readings_user";
 pub const POSTGRES_DB_PASS: &str = "readings_password";
-pub const KAFKA_PORT: u16 = 9093;
-pub const CALIBRATION_HTTP_PORT: u16 = 3011;
-pub const EXEC_WEB_APP_PORT: u16 = 3010;
-pub const MSSQL_PORT: u16 = 1438;
 pub const MSSQL_DB_NAME: &str = "validationDb";
 pub const MSSQL_DB_USER: &str = "sa";
 pub const MSSQL_DB_PASS: &str = "yourStrong(!)Password";
 
-pub const NETWORK_NAME: &str = "arena-readings-api-network";
-
 pub fn setup_dependencies() -> Vec<Dependency> {
+    let rt = test_runtime();
     let startup_sql_scripts =
         vec![include_str!("../../resources/instrument_reading_db_schema.sql").to_string()];
 
     let postgres_db = PostgresDependency::builder("readings-api-postgres")
         .with_image("14.20-trixie")
-        .with_port(POSTGRES_PORT)
+        .with_port(rt.postgres_port)
         .with_database_name(POSTGRES_DB_NAME)
         .with_database_username(POSTGRES_DB_USER)
         .with_database_password(POSTGRES_DB_PASS)
-        .with_network(NETWORK_NAME)
+        .with_network(&rt.network_name)
         .with_startup_sql_scripts(startup_sql_scripts)
         .build();
 
     let kafka = KafkaDependency::builder("readings-api-kafka")
         .with_flavor(KafkaFlavor::ApacheNative)
-        .with_port(KAFKA_PORT)
-        .with_network(NETWORK_NAME)
+        .with_port(rt.kafka_port)
+        .with_network(&rt.network_name)
         .with_topic("readings")
         .build();
     KAFKA_ID
@@ -68,8 +113,8 @@ pub fn setup_dependencies() -> Vec<Dependency> {
         .expect("kafka id set once");
 
     let calibration_service = HttpDependency::builder("readings-api-calibration")
-        .with_port(CALIBRATION_HTTP_PORT)
-        .with_network(NETWORK_NAME)
+        .with_port(rt.calibration_http_port)
+        .with_network(&rt.network_name)
         .build();
     CALIBRATION_ID
         .set(calibration_service.identifier.clone())
@@ -79,11 +124,11 @@ pub fn setup_dependencies() -> Vec<Dependency> {
         vec![include_str!("../../resources/validation_db_schema.sql").to_string()];
 
     let validation_db = MssqlDependency::builder("readings-api-mssql")
-        .with_port(MSSQL_PORT)
+        .with_port(rt.mssql_port)
         .with_database_name(MSSQL_DB_NAME)
         .with_database_username(MSSQL_DB_USER)
         .with_database_password(MSSQL_DB_PASS)
-        .with_network(NETWORK_NAME)
+        .with_network(&rt.network_name)
         .with_startup_sql_scripts(mssql_startup_sql_scripts)
         .build();
     MSSQL_ID
@@ -93,8 +138,8 @@ pub fn setup_dependencies() -> Vec<Dependency> {
     let oauth = OauthDependency::builder("readings-api-oauth")
         .with_ephemeral_server_tls()
         .with_listen_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
-        .with_port(OAUTH_PORT)
-        .with_metadata_base_url(OAUTH_ISSUER)
+        .with_port(rt.oauth_port)
+        .with_metadata_base_url(&rt.oauth_issuer)
         .build();
     OAUTH_SERVER_TLS_CERT_PEM
         .set(
@@ -125,7 +170,8 @@ pub fn resolve_web_app_binary() -> String {
 }
 
 pub fn setup_exec_component() -> Component {
-    let healthcheck_url = format!("http://127.0.0.1:{}/health", EXEC_WEB_APP_PORT);
+    let rt = test_runtime();
+    let healthcheck_url = format!("http://127.0.0.1:{}/health", rt.exec_web_app_port);
     let binary = resolve_web_app_binary();
     let is_bazel = std::env::var("RUNFILES_DIR").is_ok();
 
@@ -134,27 +180,27 @@ pub fn setup_exec_component() -> Component {
         .with_env_var("RUST_LOG", "info")
         .with_env_var("OAUTH_TLS_CA_PEM", oauth_server_tls_cert_pem())
         .with_env_var("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
-        .with_runtime_arg("web_app_port", EXEC_WEB_APP_PORT.to_string())
+        .with_runtime_arg("web_app_port", rt.exec_web_app_port.to_string())
         .with_runtime_arg(
             "postgres_connection_string",
             format!(
                 "host=localhost port={} user={} password={} dbname={}",
-                POSTGRES_PORT, POSTGRES_DB_USER, POSTGRES_DB_PASS, POSTGRES_DB_NAME
+                rt.postgres_port, POSTGRES_DB_USER, POSTGRES_DB_PASS, POSTGRES_DB_NAME
             ),
         )
-        .with_runtime_arg("kafka_bootstrap", format!("localhost:{}", KAFKA_PORT))
+        .with_runtime_arg("kafka_bootstrap", format!("localhost:{}", rt.kafka_port))
         .with_runtime_arg(
             "calibration_url",
-            format!("http://127.0.0.1:{}", CALIBRATION_HTTP_PORT),
+            format!("http://127.0.0.1:{}", rt.calibration_http_port),
         )
         .with_runtime_arg(
             "mssql_connection_string",
             format!(
                 "Server=tcp:localhost,{};Database={};User Id={};Password={};TrustServerCertificate=True;encrypt=DANGER_PLAINTEXT;",
-                MSSQL_PORT, MSSQL_DB_NAME, MSSQL_DB_USER, MSSQL_DB_PASS
+                rt.mssql_port, MSSQL_DB_NAME, MSSQL_DB_USER, MSSQL_DB_PASS
             ),
         )
-        .with_runtime_arg("oauth_issuer_url", OAUTH_ISSUER)
+        .with_runtime_arg("oauth_issuer_url", rt.oauth_issuer.clone())
         .with_readiness_check(HttpReadinessCheck::new(), healthcheck_url);
 
     if !is_bazel {
@@ -174,6 +220,7 @@ pub fn calibration_default_playbook() -> ManagedHttpPlaybook {
     ManagedHttpPlaybook::new("readings-api-calibration-default", calibration_id, |pb| {
         pb.post("/api/v1/validate")
             .will_return(ok_json(json!({ "valid": true })))
+            .expect_called_at_least(1)
             .into_playbook()
     })
 }

@@ -1,6 +1,8 @@
 import json
 import os
 
+from readings_ephemeral_test_runtime import RUNTIME
+
 
 def _find_config_json_path() -> str:
     try:
@@ -42,14 +44,13 @@ def _load_raw() -> dict:
 
 
 _DATA = _load_raw()
-_PORTS = _DATA["ports"]
 _DATABASE = _DATA["database"]
 _DEP_NAMES = _DATA["dependency_names"]
 _COMP_NAMES = _DATA["component_names"]
 _CTR_NAMES = _DATA["container_names"]
 _PB_NAMES = _DATA["playbook_names"]
 
-NETWORK_NAME = _DATA["network_name"]
+NETWORK_NAME = RUNTIME.network_name(_DATA["network_name"])
 DOCKER_IMAGE_TAG = _DATA["docker_image_tag"]
 CLOSED_ARENA_NAME = _DATA["closed_arena_name"]
 MATCH_NAME = _DATA["match_name"]
@@ -57,12 +58,15 @@ TEMP_DIRECTORY_PREFIX = _DATA["temp_directory_prefix"]
 KAFKA_CONSUMER_GROUP_LABEL = _DATA["kafka_consumer_group_label"]
 POSTGRES_IMAGE = _DATA["postgres_image"]
 
-EXEC_WEB_APP_PORT = _PORTS["exec_web_app"]
-DOCKER_WEB_HOST_PORT = _PORTS["docker_web_host"]
-KAFKA_PORT = _PORTS["kafka_host"]
-CALIBRATION_HOST_PORT = _PORTS["calibration_host"]
-POSTGRES_PORT = _PORTS["postgres_host"]
-MSSQL_PORT = _PORTS["mssql_host"]
+EXEC_WEB_APP_PORT = RUNTIME.exec_web_app_port
+DOCKER_WEB_HOST_PORT = RUNTIME.docker_web_host_port
+KAFKA_PORT = RUNTIME.kafka_port
+CALIBRATION_HOST_PORT = RUNTIME.calibration_host_port
+POSTGRES_PORT = RUNTIME.postgres_port
+MSSQL_PORT = RUNTIME.mssql_port
+OAUTH_PORT = RUNTIME.oauth_port
+OAUTH_ISSUER = RUNTIME.oauth_issuer
+LOCALSTACK_HOST_PORT = RUNTIME.localstack_host_port
 
 POSTGRES_DB_NAME = _DATABASE["postgres_name"]
 POSTGRES_DB_USER = _DATABASE["postgres_user"]
@@ -71,10 +75,10 @@ MSSQL_DB_NAME = _DATABASE["mssql_name"]
 MSSQL_DB_USER = _DATABASE["mssql_user"]
 MSSQL_DB_PASS = _DATABASE["mssql_password"]
 
-POSTGRES_CONTAINER_NAME = _CTR_NAMES["postgres"]
-KAFKA_CONTAINER_NAME = _CTR_NAMES["kafka"]
-MSSQL_CONTAINER_NAME = _CTR_NAMES["mssql"]
-CALIBRATION_CONTAINER_NAME = _CTR_NAMES["calibration"]
+POSTGRES_CONTAINER_NAME = RUNTIME.container_name(_CTR_NAMES["postgres"])
+KAFKA_CONTAINER_NAME = RUNTIME.container_name(_CTR_NAMES["kafka"])
+MSSQL_CONTAINER_NAME = RUNTIME.container_name(_CTR_NAMES["mssql"])
+CALIBRATION_CONTAINER_NAME = RUNTIME.container_name(_CTR_NAMES["calibration"])
 
 KAFKA_TOPIC = _DATA["kafka_topic"]
 CALIBRATION_VALIDATE_PATH = _DATA["calibration_validate_path"]

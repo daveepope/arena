@@ -65,7 +65,7 @@ public final class ClosedArena {
             : ArenaBindings.registerDefaultDispatcherLoggingTarget(logLevel);
     try {
       Pointer h = ArenaBindings.arenaOpen(name, json, logLevel);
-      return new OpenArena(h, logTok);
+      return new OpenArena(h, logTok, matches);
     } catch (ArenaBindingError e) {
       ArenaBindings.unregisterDispatcherLoggingTarget(logTok);
       throw e;

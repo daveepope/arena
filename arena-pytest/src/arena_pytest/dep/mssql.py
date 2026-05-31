@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import json
 from enum import Enum
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
+from arena_pytest.ffi._ffi import match_playbook_run
+from arena_pytest.playbook import ActiveMssqlPlaybook, Playbook
 from arena_pytest.support._identifier import build as _build_identifier
 
 if TYPE_CHECKING:
@@ -80,12 +81,16 @@ class MssqlDependency:
         return self._config
 
 
-class ManagedMssqlPlaybook:
-    def __init__(self, identifier: str, dependency_identifier: str):
+class ManagedMssqlPlaybook(Playbook):
+    def __init__(
+        self,
+        *,
+        identifier: str,
+        dependency_identifier: str,
+    ):
         self._identifier = identifier
         self._dependency_identifier = dependency_identifier
 
-    @property
     def identifier(self) -> str:
         return self._identifier
 
@@ -100,72 +105,6 @@ class ManagedMssqlPlaybook:
             "dependency_identifier": self._dependency_identifier,
         }
 
-    def run(self, arena: "OpenArena") -> "ActiveMssqlPlaybook":
-        return ActiveMssqlPlaybook(
-            arena=arena,
-            dependency_identifier=self._dependency_identifier,
-        )
-
-
-class ActiveMssqlPlaybook:
-
-    def __init__(self, arena: "OpenArena", dependency_identifier: str):
-        self._arena = arena
-        self._dependency_identifier = dependency_identifier
-        self._handle: Optional[int] = None
-
-    def __enter__(self) -> "ActiveMssqlPlaybook":
-        from arena_pytest.ffi._ffi import mssql_playbook_begin
-
-        spec = json.dumps({"dependency_identifier": self._dependency_identifier})
-        self._handle = mssql_playbook_begin(
-            self._arena._ffi, self._arena._handle, spec
-        )
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        from arena_pytest.ffi._ffi import ArenaBindingError, mssql_playbook_finish
-
-        handle = self._handle
-        self._handle = None
-        if not handle:
-            return
-        try:
-            mssql_playbook_finish(self._arena._ffi, handle)
-        except ArenaBindingError as e:
-            if exc_type is not None:
-                return
-            raise AssertionError(str(e)) from None
-
-    def finish(self) -> None:
-        if self._handle:
-            from arena_pytest.ffi._ffi import mssql_playbook_finish
-
-            mssql_playbook_finish(self._arena._ffi, self._handle)
-            self._handle = None
-
-    def verify(self, query: str, expected_value: int) -> None:
-        from arena_pytest.ffi._ffi import mssql_playbook_verify
-
-        if not self._handle:
-            raise RuntimeError(
-                "ActiveMssqlPlaybook.verify requires begun playbook scope "
-                "(enter `with` or __enter__ first)"
-            )
-        spec = json.dumps({
-            "dependency_identifier": self._dependency_identifier,
-            "query": query,
-            "expected_value": int(expected_value),
-        })
-        mssql_playbook_verify(self._arena._ffi, self._handle, spec)
-
-
-class ManagedMssqlPlaybookBuilder:
-    def __init__(self, identifier: str, dependency_identifier: str):
-        self._identifier = identifier
-        self._dependency_identifier = dependency_identifier
-
-    def build(self) -> ManagedMssqlPlaybook:
-        return ManagedMssqlPlaybook(
-            self._identifier, self._dependency_identifier
-        )
+    def run(self, arena: "OpenArena") -> ActiveMssqlPlaybook:
+        handle = match_playbook_run(arena._ffi, arena._handle, self._identifier)
+        return ActiveMssqlPlaybook(arena._ffi, handle, self._dependency_identifier)

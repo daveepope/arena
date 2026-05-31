@@ -1,7 +1,8 @@
-package arena.junit.readings;
+package arena.junit.readings.fixture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import arena.examples.readings.testruntime.ReadingsEphemeralTestRuntime;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import arena.junit.oauth.OauthDependencyBuilder;
@@ -31,69 +32,73 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
-final class ReadingsArenaConfig {
+public final class ReadingsArenaConfig {
 
-  static final ObjectMapper MAPPER = new ObjectMapper();
+  public static final ObjectMapper MAPPER = new ObjectMapper();
 
-  static final int EXEC_WEB_APP_PORT;
-  static final int DOCKER_WEB_HOST_PORT;
-  static final int KAFKA_PORT;
-  static final String KAFKA_TOPIC;
-  static final int CALIBRATION_HOST_PORT;
-  static final String CALIBRATION_VALIDATE_PATH;
+  public static final int EXEC_WEB_APP_PORT;
+  public static final int DOCKER_WEB_HOST_PORT;
+  public static final int KAFKA_PORT;
+  public static final String KAFKA_TOPIC;
+  public static final int CALIBRATION_HOST_PORT;
+  public static final String CALIBRATION_VALIDATE_PATH;
 
-  static final int POSTGRES_PORT;
-  static final String POSTGRES_DB_NAME;
-  static final String POSTGRES_DB_USER;
-  static final String POSTGRES_DB_PASS;
-  static final int MSSQL_PORT;
-  static final String MSSQL_DB_NAME;
-  static final String MSSQL_DB_USER;
-  static final String MSSQL_DB_PASS;
+  public static final int POSTGRES_PORT;
+  public static final String POSTGRES_DB_NAME;
+  public static final String POSTGRES_DB_USER;
+  public static final String POSTGRES_DB_PASS;
+  public static final int MSSQL_PORT;
+  public static final String MSSQL_DB_NAME;
+  public static final String MSSQL_DB_USER;
+  public static final String MSSQL_DB_PASS;
+  public static final int OAUTH_PORT;
+  public static final String OAUTH_ISSUER;
 
-  static final String NETWORK_NAME;
-  static final String POSTGRES_CONTAINER_NAME;
-  static final String KAFKA_CONTAINER_NAME;
-  static final String MSSQL_CONTAINER_NAME;
-  static final String CALIBRATION_CONTAINER_NAME;
-  static final String DOCKER_IMAGE_TAG;
+  public static final String NETWORK_NAME;
+  public static final String POSTGRES_CONTAINER_NAME;
+  public static final String KAFKA_CONTAINER_NAME;
+  public static final String MSSQL_CONTAINER_NAME;
+  public static final String CALIBRATION_CONTAINER_NAME;
+  public static final String DOCKER_IMAGE_TAG;
 
-  static final String CLOSED_ARENA_NAME;
-  static final String MATCH_NAME;
-  static final String TEMP_DIRECTORY_PREFIX;
-  static final String KAFKA_CONSUMER_GROUP_LABEL;
+  public static final String CLOSED_ARENA_NAME;
+  public static final String MATCH_NAME;
+  public static final String TEMP_DIRECTORY_PREFIX;
+  public static final String KAFKA_CONSUMER_GROUP_LABEL;
 
-  static final String DEP_NAME_OAUTH;
-  static final String DEP_NAME_POSTGRES;
-  static final String DEP_NAME_KAFKA;
-  static final String DEP_NAME_MSSQL;
-  static final String DEP_NAME_CALIBRATION_HTTP;
-  static final String COMPONENT_NAME_EXECUTABLE;
-  static final String COMPONENT_NAME_CONTAINERIZED;
+  public static final String DEP_NAME_OAUTH;
+  public static final String DEP_NAME_POSTGRES;
+  public static final String DEP_NAME_KAFKA;
+  public static final String DEP_NAME_MSSQL;
+  public static final String DEP_NAME_CALIBRATION_HTTP;
+  public static final String COMPONENT_NAME_EXECUTABLE;
+  public static final String COMPONENT_NAME_CONTAINERIZED;
 
-  static final String PLAYBOOK_CALIBRATION_DEFAULT;
-  static final String PLAYBOOK_CALIBRATION_OUTAGE_MANAGED;
-  static final String PLAYBOOK_CALIBRATION_OUTAGE_FIXTURE_SCOPE;
-  static final String PLAYBOOK_VALIDATION_DB_SCOPED;
+  public static final String PLAYBOOK_CALIBRATION_DEFAULT;
+  public static final String PLAYBOOK_CALIBRATION_OUTAGE_MANAGED;
+  public static final String PLAYBOOK_CALIBRATION_OUTAGE_FIXTURE_SCOPE;
+  public static final String PLAYBOOK_VALIDATION_DB_SCOPED;
 
-  static final String POSTGRES_IMAGE;
+  public static final String POSTGRES_IMAGE;
 
   static {
     try {
+      ReadingsEphemeralTestRuntime rt = ReadingsEphemeralTestRuntime.get();
       JsonNode root = loadRoot();
-      JsonNode ports = root.path("ports");
       JsonNode db = root.path("database");
       JsonNode dn = root.path("dependency_names");
       JsonNode cn = root.path("component_names");
       JsonNode ctr = root.path("container_names");
       JsonNode pb = root.path("playbook_names");
 
-      EXEC_WEB_APP_PORT = ports.path("exec_web_app").asInt();
-      DOCKER_WEB_HOST_PORT = ports.path("docker_web_host").asInt();
-      KAFKA_PORT = ports.path("kafka_host").asInt();
-      CALIBRATION_HOST_PORT = ports.path("calibration_host").asInt();
-      POSTGRES_PORT = ports.path("postgres_host").asInt();
-      MSSQL_PORT = ports.path("mssql_host").asInt();
+      EXEC_WEB_APP_PORT = rt.execWebAppPort;
+      DOCKER_WEB_HOST_PORT = rt.dockerWebHostPort;
+      KAFKA_PORT = rt.kafkaPort;
+      CALIBRATION_HOST_PORT = rt.calibrationHostPort;
+      POSTGRES_PORT = rt.postgresPort;
+      MSSQL_PORT = rt.mssqlPort;
+      OAUTH_PORT = rt.oauthPort;
+      OAUTH_ISSUER = rt.oauthIssuer;
 
       KAFKA_TOPIC = root.path("kafka_topic").asText();
       CALIBRATION_VALIDATE_PATH = root.path("calibration_validate_path").asText();
@@ -105,7 +110,7 @@ final class ReadingsArenaConfig {
       MSSQL_DB_USER = db.path("mssql_user").asText();
       MSSQL_DB_PASS = db.path("mssql_password").asText();
 
-      NETWORK_NAME = root.path("network_name").asText();
+      NETWORK_NAME = rt.networkName(root.path("network_name").asText());
       DOCKER_IMAGE_TAG = root.path("docker_image_tag").asText();
       CLOSED_ARENA_NAME = root.path("closed_arena_name").asText();
       MATCH_NAME = root.path("match_name").asText();
@@ -113,10 +118,10 @@ final class ReadingsArenaConfig {
       KAFKA_CONSUMER_GROUP_LABEL = root.path("kafka_consumer_group_label").asText();
       POSTGRES_IMAGE = root.path("postgres_image").asText();
 
-      POSTGRES_CONTAINER_NAME = ctr.path("postgres").asText();
-      KAFKA_CONTAINER_NAME = ctr.path("kafka").asText();
-      MSSQL_CONTAINER_NAME = ctr.path("mssql").asText();
-      CALIBRATION_CONTAINER_NAME = ctr.path("calibration").asText();
+      POSTGRES_CONTAINER_NAME = rt.containerName(ctr.path("postgres").asText());
+      KAFKA_CONTAINER_NAME = rt.containerName(ctr.path("kafka").asText());
+      MSSQL_CONTAINER_NAME = rt.containerName(ctr.path("mssql").asText());
+      CALIBRATION_CONTAINER_NAME = rt.containerName(ctr.path("calibration").asText());
 
       DEP_NAME_OAUTH = dn.path("oauth").asText();
       DEP_NAME_POSTGRES = dn.path("postgres").asText();
@@ -164,15 +169,15 @@ final class ReadingsArenaConfig {
     return "";
   }
 
-  static String baseUrlExec() {
+  public static String baseUrlExec() {
     return "http://127.0.0.1:" + EXEC_WEB_APP_PORT;
   }
 
-  static String baseUrlDocker() {
+  public static String baseUrlDocker() {
     return "http://127.0.0.1:" + DOCKER_WEB_HOST_PORT;
   }
 
-  static String findRunfile(String... candidates) throws Exception {
+  public static String findRunfile(String... candidates) throws Exception {
     String rf = System.getenv("RUNFILES_DIR");
     if (rf != null) {
       for (String rel : candidates) {
@@ -187,21 +192,21 @@ final class ReadingsArenaConfig {
     return "";
   }
 
-  static String findSchema(String filename) throws Exception {
+  public static String findSchema(String filename) throws Exception {
     return findRunfile(
         "arena/examples/resources/" + filename,
         "_main/examples/resources/" + filename,
         "examples/resources/" + filename);
   }
 
-  static String findAxumBinary() throws Exception {
+  public static String findAxumBinary() throws Exception {
     return findRunfile(
         "arena/examples/example-readings-axum-web-app",
         "_main/examples/example-readings-axum-web-app",
         "examples/example-readings-axum-web-app");
   }
 
-  static SSLContext sslContextFromPem(String pem) throws Exception {
+  public static SSLContext sslContextFromPem(String pem) throws Exception {
     CertificateFactory cf = CertificateFactory.getInstance("X.509");
     Collection<? extends Certificate> certs =
         cf.generateCertificates(new ByteArrayInputStream(pem.getBytes(StandardCharsets.UTF_8)));
@@ -219,19 +224,19 @@ final class ReadingsArenaConfig {
     return ctx;
   }
 
-  static HttpClient oauthClient(String oauthCaPem) throws Exception {
+  public static HttpClient oauthClient(String oauthCaPem) throws Exception {
     return HttpClient.newBuilder()
         .sslContext(sslContextFromPem(oauthCaPem))
         .connectTimeout(Duration.ofSeconds(30))
         .build();
   }
 
-  static String fetchAccessToken(String oauthCaPem, String cachedToken) throws Exception {
+  public static String fetchAccessToken(String oauthCaPem, String cachedToken) throws Exception {
     if (cachedToken != null && !cachedToken.isEmpty()) {
       return cachedToken;
     }
     HttpClient c = oauthClient(oauthCaPem);
-    String issuer = OauthDependencyBuilder.OAUTH_ISSUER;
+    String issuer = OAUTH_ISSUER;
     HttpResponse<String> disc =
         c.send(
             HttpRequest.newBuilder()
@@ -256,7 +261,7 @@ final class ReadingsArenaConfig {
     return MAPPER.readTree(tok.body()).get("access_token").asText();
   }
 
-  static String mssqlConnectionLocal() {
+  public static String mssqlConnectionLocal() {
     return "Server=tcp:localhost,"
         + MSSQL_PORT
         + ";Database="
@@ -268,7 +273,7 @@ final class ReadingsArenaConfig {
         + ";TrustServerCertificate=True;encrypt=DANGER_PLAINTEXT;";
   }
 
-  static String mssqlConnectionDocker() {
+  public static String mssqlConnectionDocker() {
     return "Server=tcp:"
         + MSSQL_CONTAINER_NAME
         + ",1433;Database="
@@ -280,7 +285,7 @@ final class ReadingsArenaConfig {
         + ";TrustServerCertificate=True;encrypt=DANGER_PLAINTEXT;";
   }
 
-  static String postgresConnectionLocal() {
+  public static String postgresConnectionLocal() {
     return "host=localhost port="
         + POSTGRES_PORT
         + " user="
@@ -291,7 +296,7 @@ final class ReadingsArenaConfig {
         + POSTGRES_DB_NAME;
   }
 
-  static String postgresConnectionDocker() {
+  public static String postgresConnectionDocker() {
     return "host="
         + POSTGRES_CONTAINER_NAME
         + " port=5432 user="
@@ -302,11 +307,11 @@ final class ReadingsArenaConfig {
         + POSTGRES_DB_NAME;
   }
 
-  static String kafkaBootstrapDocker(String kafkaContainerName, int internalPort) {
+  public static String kafkaBootstrapDocker(String kafkaContainerName, int internalPort) {
     return kafkaContainerName + ":" + internalPort;
   }
 
-  static String runtimeContainerfile() {
+  public static String runtimeContainerfile() {
     return "FROM debian:trixie-slim\n"
         + "RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*\n"
         + "COPY example-readings-axum-web-app /usr/local/bin/example-readings-axum-web-app\n"
@@ -315,7 +320,7 @@ final class ReadingsArenaConfig {
         + "ENTRYPOINT [\"/usr/local/bin/example-readings-axum-web-app\"]\n";
   }
 
-  static Path prepareDockerImageContext(String binaryPath) throws Exception {
+  public static Path prepareDockerImageContext(String binaryPath) throws Exception {
     if (binaryPath == null || binaryPath.isEmpty() || !Files.isRegularFile(Path.of(binaryPath))) {
       return null;
     }
@@ -326,15 +331,15 @@ final class ReadingsArenaConfig {
     return ctx;
   }
 
-  static HttpClient readingsClient() {
+  public static HttpClient readingsClient() {
     return HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
   }
 
-  static HttpRequest.Builder auth(String token) {
+  public static HttpRequest.Builder auth(String token) {
     return HttpRequest.newBuilder().header("Authorization", "Bearer " + token);
   }
 
-  static JsonNode postJson(HttpClient c, String url, String token, String json) throws Exception {
+  public static JsonNode postJson(HttpClient c, String url, String token, String json) throws Exception {
     HttpResponse<String> r =
         c.send(
             auth(token)
@@ -348,7 +353,7 @@ final class ReadingsArenaConfig {
     return MAPPER.readTree(r.body());
   }
 
-  static List<JsonNode> getReadings(HttpClient c, String base, String token) throws Exception {
+  public static List<JsonNode> getReadings(HttpClient c, String base, String token) throws Exception {
     HttpResponse<String> r =
         c.send(
             auth(token)
@@ -364,7 +369,7 @@ final class ReadingsArenaConfig {
     return out;
   }
 
-  static int createReading(
+  public static int createReading(
       HttpClient c, String base, String token, String user, int value, String comment)
       throws Exception {
     String cmt = comment == null ? "null" : MAPPER.writeValueAsString(comment);
@@ -380,7 +385,7 @@ final class ReadingsArenaConfig {
     return j.get("id").asInt();
   }
 
-  static JsonNode consumeReadingCreated(String bootstrap, int expectedId, String groupPrefix)
+  public static JsonNode consumeReadingCreated(String bootstrap, int expectedId, String groupPrefix)
       throws Exception {
     Properties p = new Properties();
     p.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrap);

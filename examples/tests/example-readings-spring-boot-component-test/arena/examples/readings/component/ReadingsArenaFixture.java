@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import arena.examples.readings.testruntime.ReadingsEphemeralTestRuntime;
 import arena.junit.ClosedArena;
+import arena.junit.ClosedArenaExtension;
 import arena.junit.OpenArena;
 import arena.junit.ffi.ArenaLogLevel;
 import arena.junit.dep.HttpDependency;
@@ -22,9 +24,6 @@ import arena.junit.oauth.OauthDependency;
 import arena.junit.oauth.OauthDependencyBuilder;
 import arena.junit.oauth.OauthLoopbackTls;
 import arena.junit.playbook.LocalstackModels;
-import arena.junit.playbook.ManagedHttpPlaybook;
-import arena.junit.playbook.ManagedHttpPlaybookBuilder;
-import arena.junit.playbook.ManagedLocalstackPlaybook;
 import arena.junit.readiness.HttpReadinessCheck;
 import java.io.ByteArrayInputStream;
 import java.net.URI;
@@ -45,33 +44,31 @@ import java.util.Map;
 import java.util.UUID;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
-import arena.junit.playbook.ArenaSession;
-import org.junit.jupiter.api.extension.BeforeAllCallback;
-import org.junit.jupiter.api.extension.ExtensionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public final class ReadingsArenaFixture implements BeforeAllCallback, ArenaSession {
+public final class ReadingsArenaFixture extends ClosedArenaExtension {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReadingsArenaFixture.class);
 
   static final ObjectMapper MAPPER = new ObjectMapper();
 
-  private static final int WEB_APP_PORT = 3010;
-  private static final int POSTGRES_PORT = 5560;
-  private static final int MSSQL_PORT = 1438;
-  private static final int CALIBRATION_HOST_PORT = 3011;
-  private static final int LOCALSTACK_HOST_PORT = 4570;
-  private static final int OAUTH_PORT = 9446;
-  private static final String OAUTH_ISSUER = "https://127.0.0.1:" + OAUTH_PORT;
+  private static final ReadingsEphemeralTestRuntime RT = ReadingsEphemeralTestRuntime.get();
+  private static final int WEB_APP_PORT = RT.execWebAppPort;
+  private static final int POSTGRES_PORT = RT.postgresPort;
+  private static final int MSSQL_PORT = RT.mssqlPort;
+  private static final int CALIBRATION_HOST_PORT = RT.calibrationHostPort;
+  private static final int LOCALSTACK_HOST_PORT = RT.localstackHostPort;
+  private static final int OAUTH_PORT = RT.oauthPort;
+  private static final String OAUTH_ISSUER = RT.oauthIssuer;
   private static final String POSTGRES_DB_NAME = "readings_db";
   private static final String POSTGRES_DB_USER = "readings_user";
   private static final String POSTGRES_DB_PASS = "readings_password";
   private static final String MSSQL_DB_NAME = "validationDb";
   private static final String MSSQL_DB_USER = "sa";
   private static final String MSSQL_DB_PASS = "yourStrong(!)Password";
-  private static final String NETWORK_NAME = "arena-readings-api-network";
-  private static final String CALIBRATION_VALIDATE_PATH = "/api/v1/validate";
+  private static final String NETWORK_NAME = RT.networkName("arena-readings-api-network");
+  static final String CALIBRATION_VALIDATE_PATH = "/api/v1/validate";
   private static final String EVENT_BUS_NAME = "readings-api-events";
   private static final String EVENT_SOURCE = "readings.api";
   private static final String QUEUE_NAME = "readings-api-events-q";
@@ -80,32 +77,16 @@ public final class ReadingsArenaFixture implements BeforeAllCallback, ArenaSessi
   private static final Map<String, String> AWS_DUMMY =
       Map.of("aws_access_key_id", "test", "aws_secret_access_key", "test");
 
-  private OpenArena arena;
   private String oauthCaPath;
   private String accessToken;
-  private String mssqlIdentifier;
   private String localstackEndpoint;
-  private ManagedLocalstackPlaybook localstackSessionPb;
-
-  @Override
-  public OpenArena arena() {
-    return arena;
-  }
 
   public String accessToken() {
     return accessToken;
   }
 
-  public String mssqlIdentifier() {
-    return mssqlIdentifier;
-  }
-
   public String localstackEndpoint() {
     return localstackEndpoint;
-  }
-
-  public ManagedLocalstackPlaybook localstackSessionPlaybook() {
-    return localstackSessionPb;
   }
 
   public int webAppPort() {
@@ -125,7 +106,7 @@ public final class ReadingsArenaFixture implements BeforeAllCallback, ArenaSessi
   }
 
   @Override
-  public void beforeAll(ExtensionContext context) throws Exception {
+  protected ClosedArena buildClosedArena() throws Exception {
     OauthLoopbackTls.PemPair pem = OauthLoopbackTls.oauthLoopbackTlsPemPair();
     Path ca = Files.createTempFile("readings-api-oauth-", ".pem");
     Files.writeString(ca, pem.certificatePem(), StandardCharsets.UTF_8);
@@ -165,15 +146,15 @@ public final class ReadingsArenaFixture implements BeforeAllCallback, ArenaSessi
             .withDatabasePassword(MSSQL_DB_PASS)
             .withStartupSqlScripts(mssqlSql)
             .build();
-    mssqlIdentifier = mssql.identifier();
 
     HttpDependency calibration =
         new HttpDependencyBuilder("readings-api-calibration").withPort(CALIBRATION_HOST_PORT).build();
 
-    ManagedHttpPlaybook calibrationPlaybook =
-        new ManagedHttpPlaybookBuilder("readings-api-calibration-default", calibration.identifier())
-            .withMapping("POST", CALIBRATION_VALIDATE_PATH, 200, Map.of("valid", true))
-            .build();
+    ReadingsPlaybooks.CalibrationDefaultPlaybook calibrationPlaybook =
+        new ReadingsPlaybooks.CalibrationDefaultPlaybook(calibration.identifier());
+
+    ReadingsPlaybooks.ValidationDbPlaybook validationDbPlaybook =
+        new ReadingsPlaybooks.ValidationDbPlaybook(mssql.identifier());
 
     String lsId = "ls-readings-api-" + UUID.randomUUID().toString().substring(0, 8);
     LocalstackDependency localstack =
@@ -192,8 +173,8 @@ public final class ReadingsArenaFixture implements BeforeAllCallback, ArenaSessi
                     EVENT_BUS_NAME))
             .build();
 
-    localstackSessionPb =
-        new ManagedLocalstackPlaybook("readings-api-localstack-session", localstack.identifier());
+    ReadingsPlaybooks.LocalstackSessionPlaybook localstackSessionPlaybook =
+        new ReadingsPlaybooks.LocalstackSessionPlaybook(localstack.identifier());
 
     localstackEndpoint = "http://127.0.0.1:" + LOCALSTACK_HOST_PORT;
 
@@ -247,7 +228,8 @@ public final class ReadingsArenaFixture implements BeforeAllCallback, ArenaSessi
             .addDependency(localstack)
             .addComponent(exec.build())
             .registerPlaybook(calibrationPlaybook, true)
-            .registerPlaybook(localstackSessionPb, true)
+            .registerPlaybook(localstackSessionPlaybook, false)
+            .registerPlaybook(validationDbPlaybook, false)
             .build();
 
     ClosedArena closed =
@@ -263,15 +245,12 @@ public final class ReadingsArenaFixture implements BeforeAllCallback, ArenaSessi
                 mssql.identifier(),
                 calibration.identifier(),
                 localstack.identifier()));
-    arena = closed.open();
-    fetchAccessToken();
+    return closed;
   }
 
-  public void stopReadingsArena() {
-    if (arena != null) {
-      arena.close();
-      arena = null;
-    }
+  @Override
+  protected void afterOpen(OpenArena openArena) throws Exception {
+    fetchAccessToken();
   }
 
   private SSLContext sslContextFromPemFile(String path) throws Exception {

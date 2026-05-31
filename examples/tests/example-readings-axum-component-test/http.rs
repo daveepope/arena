@@ -5,7 +5,7 @@ use rdkafka::message::Message;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
-use crate::arena::{oauth_server_tls_cert_pem, OAUTH_ISSUER};
+use crate::arena::{oauth_issuer, oauth_server_tls_cert_pem};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Reading {
@@ -41,7 +41,7 @@ pub async fn fetch_example_access_token_with_scope(scope: Option<&str>) -> Strin
     let client = build_http_client_trusting_oauth_ca(oauth_server_tls_cert_pem());
     arena_examples::oauth_client_credentials::fetch_client_credentials_access_token(
         &client,
-        OAUTH_ISSUER,
+        oauth_issuer(),
         scope,
     )
     .await

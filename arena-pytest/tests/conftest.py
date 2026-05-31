@@ -23,28 +23,11 @@ def _arena_plugin_already_registered_via_entry_point() -> bool:
 if not _arena_plugin_already_registered_via_entry_point():
     pytest_plugins = ("arena_pytest.arena",)
 
-from arena_pytest import (
-    ArenaLogLevel,
-    BuildTool,
-    ClosedArena,
-    ContainerizedComponentBuilder,
-    DEFAULT_OAUTH_PORT,
-    ExecutableComponentBuilder,
-    HttpDependencyBuilder,
-    HttpReadinessCheck,
-    KafkaDependencyBuilder,
-    KafkaFlavor,
-    KAFKA_INTERNAL_DOCKER_PORT,
-    ManagedHttpPlaybookBuilder,
-    ManagedMssqlPlaybookBuilder,
-    MatchBuilder,
-    MssqlDependencyBuilder,
-    OAUTH_ISSUER,
-    OauthDependencyBuilder,
-    PostgresDependencyBuilder,
-    active_playbooks,
+from readings_playbooks import (
+    CalibrationDefaultPlaybook,
+    CalibrationOutagePlaybook,
+    ValidationDbPlaybook,
 )
-from arena_pytest.oauth import oauth_issuer_host_is_non_loopback
 
 from readings_arena_config import (
     CALIBRATION_CONTAINER_NAME,
@@ -73,8 +56,9 @@ from readings_arena_config import (
     MSSQL_DB_USER,
     MSSQL_PORT,
     NETWORK_NAME,
+    OAUTH_ISSUER,
+    OAUTH_PORT,
     PLAYBOOK_CALIBRATION_DEFAULT,
-    PLAYBOOK_CALIBRATION_OUTAGE_FIXTURE_SCOPE,
     PLAYBOOK_CALIBRATION_OUTAGE_MANAGED,
     PLAYBOOK_VALIDATION_DB_SCOPED,
     POSTGRES_CONTAINER_NAME,
@@ -86,6 +70,25 @@ from readings_arena_config import (
     TEMP_DIRECTORY_PREFIX,
 )
 
+from arena_pytest import (
+    ArenaLogLevel,
+    BuildTool,
+    ClosedArena,
+    ContainerizedComponentBuilder,
+    ExecutableComponentBuilder,
+    HttpDependencyBuilder,
+    HttpReadinessCheck,
+    KafkaDependencyBuilder,
+    KafkaFlavor,
+    KAFKA_INTERNAL_DOCKER_PORT,
+    MatchBuilder,
+    MssqlDependencyBuilder,
+    OauthDependencyBuilder,
+    PostgresDependencyBuilder,
+)
+from arena_pytest.oauth import oauth_issuer_host_is_non_loopback
+
+
 _DISPATCHER_IMPLEMENTATION_DEPENDENCY_LOG_IDS = (
     DEP_NAME_OAUTH,
     DEP_NAME_POSTGRES,
@@ -94,7 +97,6 @@ _DISPATCHER_IMPLEMENTATION_DEPENDENCY_LOG_IDS = (
     DEP_NAME_CALIBRATION_HTTP,
     PLAYBOOK_CALIBRATION_DEFAULT,
     PLAYBOOK_CALIBRATION_OUTAGE_MANAGED,
-    PLAYBOOK_CALIBRATION_OUTAGE_FIXTURE_SCOPE,
     PLAYBOOK_VALIDATION_DB_SCOPED,
 )
 
@@ -194,9 +196,10 @@ def _build_oauth():
     cert, key, _ = _arena_oauth_tls_session()
     return (
         OauthDependencyBuilder(DEP_NAME_OAUTH)
-        .with_port(DEFAULT_OAUTH_PORT)
+        .with_port(OAUTH_PORT)
         .with_listen_ip("0.0.0.0")
         .with_server_tls_pem(cert, key)
+        .with_metadata_base_url(OAUTH_ISSUER)
         .build()
     )
 
@@ -248,53 +251,9 @@ def _build_calibration_http():
     )
 
 
-def _build_calibration_playbook(dependency_identifier: str):
-    return (
-        ManagedHttpPlaybookBuilder(
-            PLAYBOOK_CALIBRATION_DEFAULT, dependency_identifier
-        )
-        .with_mapping("POST", CALIBRATION_VALIDATE_PATH, 200, {"valid": True})
-        .build()
-    )
-
-
 @pytest.fixture(scope="session")
-def calibration_outage_playbook(calibration_identifier):
-    return (
-        ManagedHttpPlaybookBuilder(
-            PLAYBOOK_CALIBRATION_OUTAGE_MANAGED, calibration_identifier
-        )
-        .with_mapping("POST", CALIBRATION_VALIDATE_PATH, status=500)
-        .build()
-    )
-
-
-@pytest.fixture(scope="session")
-def validation_db_playbook(mssql_identifier):
-    return ManagedMssqlPlaybookBuilder(
-        PLAYBOOK_VALIDATION_DB_SCOPED, mssql_identifier
-    ).build()
-
-
-@pytest.fixture(scope="session")
-def calibration_outage_fixture_scope_playbook(calibration_identifier):
-    return (
-        ManagedHttpPlaybookBuilder(
-            PLAYBOOK_CALIBRATION_OUTAGE_FIXTURE_SCOPE, calibration_identifier
-        )
-        .with_mapping("POST", CALIBRATION_VALIDATE_PATH, status=500)
-        .build()
-    )
-
-
-@pytest.fixture
-def outage_and_db_reset(
-    arena, calibration_outage_fixture_scope_playbook, validation_db_playbook
-):
-    with active_playbooks(
-        arena, calibration_outage_fixture_scope_playbook, validation_db_playbook
-    ):
-        yield
+def calibration_outage_playbook(closed_arena):
+    return closed_arena._matches[0].playbook(CalibrationOutagePlaybook)
 
 
 def _build_exec_component(oauth_ca_pem: str) -> object:
@@ -426,8 +385,14 @@ def closed_arena() -> ClosedArena:
     a_match = a_match.add_dependency(mssql)
     a_match = a_match.add_dependency(calibration_http)
     a_match = a_match.register_playbook(
-        _build_calibration_playbook(calibration_http.identifier),
+        CalibrationDefaultPlaybook(calibration_http.identifier),
         exec_on_dependency_start=True,
+    )
+    a_match = a_match.register_playbook(
+        CalibrationOutagePlaybook(calibration_http.identifier),
+    )
+    a_match = a_match.register_playbook(
+        ValidationDbPlaybook(mssql.identifier),
     )
     for c in components:
         a_match = a_match.add_component(c)

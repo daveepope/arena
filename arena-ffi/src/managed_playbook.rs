@@ -34,6 +34,14 @@ pub(crate) struct HttpPlaybookConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum ExpectSpec {
+    Exactly { count: u64 },
+    AtLeast { count: u64 },
+    Never,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub(crate) struct HttpMapping {
     pub method: String,
     pub url_path: String,
@@ -41,6 +49,8 @@ pub(crate) struct HttpMapping {
     pub status: u16,
     #[serde(default)]
     pub json_body: Option<serde_json::Value>,
+    #[serde(default)]
+    expect: Option<ExpectSpec>,
 }
 
 fn default_status() -> u16 {
@@ -96,24 +106,35 @@ fn build_http_playbook(pb: HttpPlaybook, mappings: &[HttpMapping]) -> HttpPlaybo
     seq.into_playbook()
 }
 
+fn apply_expect(seq: PlaybookSequenceBuilder, expect: &Option<ExpectSpec>) -> PlaybookSequenceBuilder {
+    match expect {
+        Some(ExpectSpec::Exactly { count }) => seq.expect_called(*count),
+        Some(ExpectSpec::AtLeast { count }) => seq.expect_called_at_least(*count),
+        Some(ExpectSpec::Never) => seq.expect_never_called(),
+        None => seq,
+    }
+}
+
 fn first_sequence(pb: HttpPlaybook, m: &HttpMapping) -> PlaybookSequenceBuilder {
     let resp = response_for(m);
-    match m.method.to_ascii_uppercase().as_str() {
+    let seq = match m.method.to_ascii_uppercase().as_str() {
         "GET" => pb.get(&m.url_path).will_return(resp),
         "POST" => pb.post(&m.url_path).will_return(resp),
         "PUT" => pb.put(&m.url_path).will_return(resp),
         "DELETE" => pb.delete(&m.url_path).will_return(resp),
         other => panic!("unsupported HTTP method in playbook registration: {other}"),
-    }
+    };
+    apply_expect(seq, &m.expect)
 }
 
 fn append_mapping(seq: PlaybookSequenceBuilder, m: &HttpMapping) -> PlaybookSequenceBuilder {
     let resp = response_for(m);
-    match m.method.to_ascii_uppercase().as_str() {
+    let seq = match m.method.to_ascii_uppercase().as_str() {
         "GET" => seq.get(&m.url_path).will_return(resp),
         "POST" => seq.post(&m.url_path).will_return(resp),
         "PUT" => seq.put(&m.url_path).will_return(resp),
         "DELETE" => seq.delete(&m.url_path).will_return(resp),
         other => panic!("unsupported HTTP method in playbook registration: {other}"),
-    }
+    };
+    apply_expect(seq, &m.expect)
 }

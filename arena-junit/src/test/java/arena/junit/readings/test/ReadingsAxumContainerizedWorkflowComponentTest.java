@@ -1,15 +1,18 @@
-package arena.junit.readings;
+package arena.junit.readings.test;
 
-import static arena.junit.readings.ReadingsArenaConfig.KAFKA_PORT;
-import static arena.junit.readings.ReadingsArenaConfig.baseUrlDocker;
-import static arena.junit.readings.ReadingsArenaConfig.consumeReadingCreated;
-import static arena.junit.readings.ReadingsArenaConfig.createReading;
+import static arena.junit.readings.fixture.ReadingsArenaConfig.KAFKA_PORT;
+import static arena.junit.readings.fixture.ReadingsArenaConfig.baseUrlDocker;
+import static arena.junit.readings.fixture.ReadingsArenaConfig.consumeReadingCreated;
+import static arena.junit.readings.fixture.ReadingsArenaConfig.createReading;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import arena.junit.Playbook;
+import arena.junit.readings.fixture.ReadingsArenaConfig;
+import arena.junit.readings.fixture.ReadingsArenaFixture;
+import arena.junit.readings.playbook.ReadingsValidationDbPlaybook;
 import com.fasterxml.jackson.databind.JsonNode;
-import arena.junit.playbook.ArenaPlaybooks;
 import java.net.http.HttpClient;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,10 +26,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 final class ReadingsAxumContainerizedWorkflowComponentTest {
 
   @RegisterExtension
-  static final ReadingsArenaSessionFixture readingsArena = new ReadingsArenaSessionFixture();
+  static final ReadingsArenaFixture readingsArena = new ReadingsArenaFixture();
 
   @Test
-  @ArenaPlaybooks(ReadingsAxumValidationDbPlaybooks.class)
+  @Playbook(ReadingsValidationDbPlaybook.class)
   void containerizedAppCreateReadingPublishesKafkaEvent() throws Exception {
     assumeTrue(readingsArena.containerizedWebEnabled());
     HttpClient c = ReadingsArenaConfig.readingsClient();

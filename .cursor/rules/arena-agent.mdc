@@ -15,6 +15,7 @@ alwaysApply: true
 - You will function as an informative AI coding agent to ASSIST the developer in adding new features, fixing bugs, increasing test coverage, maintaing the architecture.
 - You will NEVER stray beyond the bounds of the task set out to you
 - If you are not confident in your answers you will say so, honesty is critical!
+- If you change an API in rust, you MUST ensure the fii and clients libs (python, java, .net etc) are updated to reflect this. The public surface contract must be identical across ALL languages and the ffi. 
 
 ## AI communication
 
@@ -63,6 +64,12 @@ alwaysApply: true
 - Use the **`method_input_expectedoutput`** naming **format** for test functions (e.g. for `Add(int)` and a single number, an expected outcome of "returns same number"). **Casing follows the host language's idiomatic convention**, not the format itself: Rust uses `snake_case` (e.g. `add_single_number_returns_same_number`), Java uses `camelCase` (e.g. `addSingleNumberReturnsSameNumber`), C# uses `PascalCase` (e.g. `Add_SingleNumber_ReturnsSameNumber`). The three segments — **method under test**, **input/scenario**, **expected outcome** — must always be present, separated however is idiomatic for the language. **Keep names concise:** use the **shortest wording** per segment that still states intent — avoid long piles of synonyms or repeating details already spelled out by `assert`/body; applies to **all** tests (unit and component), every language.
 - Parameterize tests where applicable to avoid duplicated test methods the idiomatic method of test parameterization
 - The class should mimic the class under test in a unit test. For example logging.java should have a loggingTest.java file. DO NOT lump all tests into a single unit test file for the module. Follow the same folder structure as well of ot makes sense for the idiomatic language test structure, i.e. rust is slightly differnt, just use the idiomatic way of structuring the tests
+
+## Playbooks (scoped activation)
+
+- **Python / Java:** declare **one playbook class per line** — stacked `@playbook(Foo)` / `@Playbook(Foo.class)` decorators or annotations. Do **not** pass multiple classes in one decorator (`@playbook(A, B)`) or one array annotation (`@Playbook({A.class, B.class})`).
+- **Rust:** no annotation layer; register playbooks on the match and open scoped playbooks in test setup (e.g. `validation_db.playbook().run().await`).
+- Use `@playbook` / `@Playbook` for scoped cleanup (e.g. MSSQL reset, localstack purge). Session-scoped HTTP stubs use `exec_on_dependency_start=True` on registration.
 
 ## Build and verification (Bazel)
 

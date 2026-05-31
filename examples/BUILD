@@ -22,6 +22,19 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+py_library(
+    name = "readings_ephemeral_test_runtime",
+    srcs = ["tests/readings_ephemeral_test_runtime.py"],
+    imports = ["tests"],
+    visibility = ["//visibility:public"],
+)
+
+java_library(
+    name = "readings_ephemeral_test_runtime_java",
+    srcs = ["tests/java/arena/examples/readings/testruntime/ReadingsEphemeralTestRuntime.java"],
+    visibility = ["//visibility:public"],
+)
+
 exports_files(
     [
         "requirements.txt",
@@ -157,6 +170,7 @@ py_test(
     srcs = [
         "tests/example-readings-fastapi-pytest-component-test/conftest.py",
         "tests/example-readings-fastapi-pytest-component-test/readings_fastapi_component_test.py",
+        "tests/example-readings-fastapi-pytest-component-test/readings_playbooks.py",
     ],
     main = "tests/example-readings-fastapi-pytest-component-test/readings_fastapi_component_test.py",
     data = [
@@ -166,6 +180,7 @@ py_test(
         "//examples:validation_db_schema",
     ],
     deps = [
+        ":readings_ephemeral_test_runtime",
         "//arena-pytest:arena_pytest_lib",
         "@pip//pytest",
         "@pip//pytest_asyncio",
@@ -304,6 +319,7 @@ java_test(
         "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
     ],
     deps = [
+        ":readings_ephemeral_test_runtime_java",
         "//arena-junit:arena_junit_lib",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
         "@arena_java_maven//:org_apache_kafka_kafka_clients",

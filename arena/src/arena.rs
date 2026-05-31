@@ -94,6 +94,18 @@ impl OpenArena {
         None
     }
 
+    pub async fn run_playbook(
+        &self,
+        identifier: &str,
+    ) -> Option<Box<dyn crate::playbook::ActivePlaybook>> {
+        for m in &self.matches {
+            if let Some(active) = m.run_playbook(identifier).await {
+                return Some(active);
+            }
+        }
+        None
+    }
+
     pub async fn close(mut self) -> ClosedArena {
         self.internal_close().await;
 

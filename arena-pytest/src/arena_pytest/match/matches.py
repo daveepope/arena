@@ -1,4 +1,8 @@
-from typing import Any, Dict, List, Optional
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Tuple, Type
+
+from arena_pytest.playbook import Playbook
 
 
 class Match:
@@ -7,14 +11,27 @@ class Match:
         name: str,
         dependencies: List[Any],
         components: List[Any],
-        network: Optional[str] = None,
-        playbooks: Optional[List[Any]] = None,
+        network: Optional[str],
+        playbooks: Dict[Type[Playbook], Tuple[Playbook, bool]],
     ):
         self._name = name
         self._dependencies = dependencies
         self._components = components
         self._network = network
-        self._playbooks = playbooks or []
+        self._playbooks: Dict[Type[Playbook], Tuple[Playbook, bool]] = dict(playbooks)
+
+    def playbook(self, klass: Type[Playbook]) -> Playbook:
+        if klass not in self._playbooks:
+            raise KeyError(
+                f"no playbook of type {klass.__name__} is registered on match "
+                f"{self._name!r}"
+            )
+        return self._playbooks[klass][0]
+
+    def _registration_for(
+        self, klass: Type[Playbook]
+    ) -> Optional[Tuple[Playbook, bool]]:
+        return self._playbooks.get(klass)
 
     def _for_ffi(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {
@@ -28,10 +45,15 @@ class Match:
         }
         if self._network:
             out["network"] = self._network
-        if self._playbooks:
-            out["playbooks"] = [
-                p._for_ffi() if hasattr(p, "_for_ffi") else p for p in self._playbooks
-            ]
+        serialized_playbooks: List[Dict[str, Any]] = []
+        for pb, exec_on_start in self._playbooks.values():
+            if not hasattr(pb, "_for_ffi"):
+                continue
+            cfg = dict(pb._for_ffi())
+            cfg["exec_on_dependency_start"] = bool(exec_on_start)
+            serialized_playbooks.append(cfg)
+        if serialized_playbooks:
+            out["playbooks"] = serialized_playbooks
         return out
 
 
@@ -41,7 +63,7 @@ class MatchBuilder:
         self._network: Optional[str] = None
         self._dependencies: List[Any] = []
         self._components: List[Any] = []
-        self._playbooks: List[Any] = []
+        self._playbooks: Dict[Type[Playbook], Tuple[Playbook, bool]] = {}
 
     def with_network(self, network: str) -> "MatchBuilder":
         self._network = network
@@ -57,34 +79,34 @@ class MatchBuilder:
 
     def register_playbook(
         self,
-        playbook: Any,
-        exec_on_dependency_start: bool = True,
+        playbook: Playbook,
+        exec_on_dependency_start: bool = False,
     ) -> "MatchBuilder":
-        self._playbooks.append(
-            _RegisteredPlaybook(playbook, exec_on_dependency_start)
-        )
+        if not isinstance(playbook, Playbook):
+            raise TypeError(
+                "register_playbook requires a Playbook instance "
+                f"(got {type(playbook).__name__})"
+            )
+        if not hasattr(playbook, "_for_ffi"):
+            raise TypeError(
+                "register_playbook only accepts playbooks that serialize their "
+                "manifest (ManagedHttpPlaybook, ManagedMssqlPlaybook, "
+                "ManagedLocalstackPlaybook, or subclasses); "
+                f"{type(playbook).__name__} does not"
+            )
+        key = type(playbook)
+        if key in self._playbooks:
+            raise ValueError(
+                f"a playbook of type {key.__name__} is already registered on this match"
+            )
+        self._playbooks[key] = (playbook, bool(exec_on_dependency_start))
         return self
 
     def build(self) -> Match:
         return Match(
             self._name,
-            self._dependencies,
-            self._components,
+            list(self._dependencies),
+            list(self._components),
             self._network,
             self._playbooks,
         )
-
-
-class _RegisteredPlaybook:
-    def __init__(self, playbook: Any, exec_on_dependency_start: bool):
-        self._playbook = playbook
-        self._exec_on_dependency_start = exec_on_dependency_start
-
-    def _for_ffi(self) -> Dict[str, Any]:
-        if not hasattr(self._playbook, "_for_ffi"):
-            raise TypeError(
-                "register_playbook expects an object with a _for_ffi() method"
-            )
-        cfg = dict(self._playbook._for_ffi())
-        cfg["exec_on_dependency_start"] = self._exec_on_dependency_start
-        return cfg

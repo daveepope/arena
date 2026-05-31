@@ -14,8 +14,21 @@ from typing import Any
 import pytest
 import requests
 
-from arena_pytest import active_playbooks, playbook
+from arena_pytest import ArenaBindingError, playbook
+from arena_pytest.dep.http import HttpDependencyBuilder
+from arena_pytest.ffi._ffi import (
+    active_playbook_drop,
+    close_arena,
+    http_playbook_open,
+    http_playbook_verify,
+    load_ffi,
+    open_arena,
+)
 
+from readings_playbooks import (
+    CalibrationOutagePlaybook,
+    ValidationDbPlaybook,
+)
 from readings_arena_config import (
     CALIBRATION_VALIDATE_PATH,
     DOCKER_WEB_HOST_PORT,
@@ -24,6 +37,7 @@ from readings_arena_config import (
     KAFKA_PORT,
     KAFKA_TOPIC,
 )
+from readings_ephemeral_test_runtime import ephemeral_tcp_port
 
 BASE_URL_EXEC = f"http://127.0.0.1:{EXEC_WEB_APP_PORT}"
 BASE_URL_DOCKER = f"http://127.0.0.1:{DOCKER_WEB_HOST_PORT}"
@@ -33,88 +47,68 @@ def _auth_headers(access_token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {access_token}"}
 
 
+@playbook(ValidationDbPlaybook)
 def test_create_reading_publishes_kafka_event_and_lists_via_http(
-    arena, validation_db_playbook, oauth_access_token
+    arena, oauth_access_token
 ):
-    @playbook(validation_db_playbook)
-    def _body(arena):
-        bootstrap = f"localhost:{KAFKA_PORT}"
-        id_queue: queue.Queue[int] = queue.Queue()
-        result_holder: list[Any] = []
+    bootstrap = f"localhost:{KAFKA_PORT}"
+    id_queue: queue.Queue[int] = queue.Queue()
+    result_holder: list[Any] = []
 
-        consumer_thread = threading.Thread(
-            target=_run_reading_created_consumer,
-            args=(bootstrap, KAFKA_TOPIC, id_queue, result_holder, "exec"),
-        )
-        consumer_thread.start()
+    consumer_thread = threading.Thread(
+        target=_run_reading_created_consumer,
+        args=(bootstrap, KAFKA_TOPIC, id_queue, result_holder, "exec"),
+    )
+    consumer_thread.start()
 
-        created_id = _create_reading(
-            BASE_URL_EXEC,
-            "Readings API User",
-            77,
-            "sqs happy path",
-            oauth_access_token,
-        )
-        id_queue.put(created_id)
+    created_id = _create_reading(
+        BASE_URL_EXEC,
+        "Readings API User",
+        77,
+        "sqs happy path",
+        oauth_access_token,
+    )
+    id_queue.put(created_id)
 
-        consumer_thread.join(timeout=10)
-        assert len(result_holder) == 1, "consumer should have completed"
-        consumed = result_holder[0]
-        if isinstance(consumed, Exception):
-            raise consumed
-        assert consumed["id"] == created_id
-        assert consumed["user_name"] == "Readings API User"
-        assert consumed["value"] == 77
-        assert consumed.get("comment") == "sqs happy path"
+    consumer_thread.join(timeout=10)
+    assert len(result_holder) == 1, "consumer should have completed"
+    consumed = result_holder[0]
+    if isinstance(consumed, Exception):
+        raise consumed
+    assert consumed["id"] == created_id
+    assert consumed["user_name"] == "Readings API User"
+    assert consumed["value"] == 77
+    assert consumed.get("comment") == "sqs happy path"
 
-        readings = _get_readings(BASE_URL_EXEC, oauth_access_token)
-        found = next((r for r in readings if r["id"] == created_id), None)
-        assert found is not None, "should find newly created reading"
-        assert found["id"] == created_id
-        assert found["user_name"] == "Readings API User"
-        assert found["value"] == 77
-        assert found.get("comment") == "sqs happy path"
-
-    _body(arena)
+    readings = _get_readings(BASE_URL_EXEC, oauth_access_token)
+    found = next((r for r in readings if r["id"] == created_id), None)
+    assert found is not None, "should find newly created reading"
+    assert found["id"] == created_id
+    assert found["user_name"] == "Readings API User"
+    assert found["value"] == 77
+    assert found.get("comment") == "sqs happy path"
 
 
-def test_create_multiple_readings_are_listed(arena, validation_db_playbook, oauth_access_token):
-    @playbook(validation_db_playbook)
-    def _body(arena):
-        id1 = _create_reading(BASE_URL_EXEC, "Bending", 1, "", oauth_access_token)
-        id2 = _create_reading(
-            BASE_URL_EXEC,
-            "joe",
-            2,
-            "We're going to need a bigger ship",
-            oauth_access_token,
-        )
-        readings = _get_readings(BASE_URL_EXEC, oauth_access_token)
-        ids = {r["id"] for r in readings}
-        assert id1 in ids
-        assert id2 in ids
-
-    _body(arena)
+@playbook(ValidationDbPlaybook)
+def test_create_multiple_readings_are_listed(arena, oauth_access_token):
+    id1 = _create_reading(BASE_URL_EXEC, "Bending", 1, "", oauth_access_token)
+    id2 = _create_reading(
+        BASE_URL_EXEC,
+        "joe",
+        2,
+        "We're going to need a bigger ship",
+        oauth_access_token,
+    )
+    readings = _get_readings(BASE_URL_EXEC, oauth_access_token)
+    ids = {r["id"] for r in readings}
+    assert id1 in ids
+    assert id2 in ids
 
 
 def test_post_reading_returns_500_when_calibration_api_returns_500(
-    arena, calibration_identifier, oauth_access_token
+    arena, calibration_outage_playbook, oauth_access_token
 ):
-    from arena_pytest import ActiveHttpPlaybookBuilder
-
-    outage = (
-        ActiveHttpPlaybookBuilder(calibration_identifier)
-            .with_mapping(
-                method="POST",
-                url_path=CALIBRATION_VALIDATE_PATH,
-                status=500,
-                priority=1,
-                expect_called=1,
-            )
-            .build(arena)
-    )
-
-    with outage:
+    with calibration_outage_playbook.run(arena):
         r = requests.post(
             f"{BASE_URL_EXEC}/readings",
             json={"user_name": "Outage Test User", "value": 99, "comment": None},
@@ -135,92 +129,211 @@ def test_post_reading_returns_500_when_calibration_api_returns_500(
     assert found["value"] == 17
 
 
+@playbook(CalibrationOutagePlaybook)
+@playbook(ValidationDbPlaybook)
 def test_post_reading_returns_500_when_calibration_api_overridden_by_playbook(
-    arena, calibration_outage_playbook, validation_db_playbook, oauth_access_token
+    arena, oauth_access_token
 ):
-    @playbook(calibration_outage_playbook, validation_db_playbook)
-    def _body(arena):
-        r = requests.post(
-            f"{BASE_URL_EXEC}/readings",
-            json={"user_name": "Decorator Outage", "value": 1, "comment": None},
-            headers=_auth_headers(oauth_access_token),
-            timeout=10,
-        )
-        assert r.status_code == 500, (
-            f"expected 500 while decorator-scoped calibration outage is active, "
-            f"got {r.status_code}: {r.text}"
-        )
+    r = requests.post(
+        f"{BASE_URL_EXEC}/readings",
+        json={"user_name": "Marker Outage", "value": 1, "comment": None},
+        headers=_auth_headers(oauth_access_token),
+        timeout=10,
+    )
+    assert r.status_code == 500, (
+        f"expected 500 while marker-scoped calibration outage is active, "
+        f"got {r.status_code}: {r.text}"
+    )
 
-    _body(arena)
 
+def test_post_reading_returns_200_after_marker_scope_exits(arena, oauth_access_token):
     recovered_id = _create_reading(
-        BASE_URL_EXEC, "Decorator Recovery", 2, None, oauth_access_token
+        BASE_URL_EXEC, "Marker Recovery", 2, None, oauth_access_token
     )
     readings = _get_readings(BASE_URL_EXEC, oauth_access_token)
     assert any(r["id"] == recovered_id for r in readings)
 
 
+@playbook(ValidationDbPlaybook)
 def test_create_reading_with_validation_db_scoped_playbook(
-    arena, validation_db_playbook, oauth_access_token
+    arena, oauth_access_token
 ):
-    @playbook(validation_db_playbook)
-    def _body(arena):
-        created_id = _create_reading(
-            BASE_URL_EXEC,
-            "Validation DB Scoped",
-            7,
-            "mssql scope",
-            oauth_access_token,
-        )
-        readings = _get_readings(BASE_URL_EXEC, oauth_access_token)
-        assert any(r["id"] == created_id for r in readings)
-
-    _body(arena)
+    created_id = _create_reading(
+        BASE_URL_EXEC,
+        "Validation DB Scoped",
+        7,
+        "mssql scope",
+        oauth_access_token,
+    )
+    readings = _get_readings(BASE_URL_EXEC, oauth_access_token)
+    assert any(r["id"] == created_id for r in readings)
 
 
-@pytest.fixture
-def outage_and_db_reset(arena, calibration_outage_playbook, validation_db_playbook):
-    with active_playbooks(arena, calibration_outage_playbook, validation_db_playbook):
-        yield
-
-
-def test_post_reading_returns_500_under_scoped_playbook_stack(arena, outage_and_db_reset, oauth_access_token):
+@playbook(CalibrationOutagePlaybook)
+@playbook(ValidationDbPlaybook)
+def test_post_reading_returns_500_under_scoped_playbook_stack(arena, oauth_access_token):
     r = requests.post(
         f"{BASE_URL_EXEC}/readings",
-        json={"user_name": "Fixture Outage", "value": 1, "comment": None},
+        json={"user_name": "Marker Stack Outage", "value": 1, "comment": None},
         headers=_auth_headers(oauth_access_token),
         timeout=10,
     )
     assert r.status_code == 500, (
-        f"expected 500 while fixture-scoped outage is active, "
+        f"expected 500 while marker-stack outage is active, "
         f"got {r.status_code}: {r.text}"
     )
 
 
-def test_http_playbook_scope_exit_exact_call_expectation_unmet_raises(arena, calibration_identifier):
-    from arena_pytest import ActiveHttpPlaybookBuilder
+def test_active_http_playbook_verify_count_mismatch_raises(
+    arena, calibration_outage_playbook
+):
+    with calibration_outage_playbook.run(arena) as active:
+        with pytest.raises(ArenaBindingError):
+            active.verify("POST", CALIBRATION_VALIDATE_PATH, 1)
 
-    unused = (
-        ActiveHttpPlaybookBuilder(calibration_identifier)
-            .with_mapping(
-                method="POST",
-                url_path=CALIBRATION_VALIDATE_PATH,
-                status=500,
-                priority=1,
-                expect_called=1,
-            )
-            .build(arena)
+
+def test_active_http_playbook_verify_at_least_succeeds_with_traffic(
+    arena, calibration_outage_playbook, oauth_access_token
+):
+    with calibration_outage_playbook.run(arena) as active:
+        requests.post(
+            f"{BASE_URL_EXEC}/readings",
+            json={"user_name": "Verify At Least", "value": 3, "comment": None},
+            headers=_auth_headers(oauth_access_token),
+            timeout=10,
+        )
+        active.verify_at_least("POST", CALIBRATION_VALIDATE_PATH, 1)
+
+
+def test_active_http_playbook_failed_verify_drop_does_not_raise(
+    arena, calibration_outage_playbook
+):
+    with calibration_outage_playbook.run(arena) as active:
+        with pytest.raises(ArenaBindingError):
+            active.verify("POST", CALIBRATION_VALIDATE_PATH, 1)
+
+
+def test_active_http_playbook_verify_at_least_without_traffic_raises(
+    arena, calibration_outage_playbook
+):
+    with calibration_outage_playbook.run(arena) as active:
+        with pytest.raises(ArenaBindingError):
+            active.verify_at_least("POST", CALIBRATION_VALIDATE_PATH, 1)
+
+
+def _open_http_playbook_ffi_arena():
+    port = ephemeral_tcp_port()
+    dep = HttpDependencyBuilder("ffi-open-verify").with_port(port).build()
+    config = json.dumps(
+        {
+            "match_name": "ffi-http-match",
+            "dependencies": [dep._for_ffi()],
+        }
     )
+    ffi = load_ffi()
+    arena_h = open_arena(ffi, b"ffi-http-arena", config)
+    return ffi, arena_h, dep, port
 
-    with pytest.raises(AssertionError, match="expected POST .* to be called exactly 1"):
-        with unused:
-            pass
+
+def test_http_playbook_ffi_open_verify_at_least_with_traffic():
+    ffi, arena_h, dep, port = _open_http_playbook_ffi_arena()
+    dep_id = dep.identifier
+    try:
+        open_spec = json.dumps(
+            {
+                "dependency_identifier": dep_id,
+                "mappings": [
+                    {
+                        "method": "GET",
+                        "url_path": "/api/ffi/playbook",
+                        "response": {"status": 200, "json_body": {"ok": True}},
+                    }
+                ],
+            }
+        )
+        pb_h = http_playbook_open(ffi, arena_h, open_spec)
+        url = f"http://127.0.0.1:{port}/api/ffi/playbook"
+        assert requests.get(url, timeout=10).status_code == 200
+        verify_spec = json.dumps(
+            {
+                "method": "GET",
+                "url_path": "/api/ffi/playbook",
+                "minimum_count": 1,
+            }
+        )
+        http_playbook_verify(ffi, pb_h, verify_spec)
+        active_playbook_drop(ffi, pb_h)
+    finally:
+        close_arena(ffi, arena_h)
 
 
+def test_http_playbook_ffi_verify_expected_count_without_traffic_raises():
+    ffi, arena_h, dep, _port = _open_http_playbook_ffi_arena()
+    dep_id = dep.identifier
+    try:
+        open_spec = json.dumps(
+            {
+                "dependency_identifier": dep_id,
+                "mappings": [
+                    {
+                        "method": "GET",
+                        "url_path": "/api/ffi/playbook",
+                        "response": {"status": 200, "json_body": {"ok": True}},
+                    }
+                ],
+            }
+        )
+        pb_h = http_playbook_open(ffi, arena_h, open_spec)
+        verify_spec = json.dumps(
+            {
+                "method": "GET",
+                "url_path": "/api/ffi/playbook",
+                "expected_count": 1,
+            }
+        )
+        with pytest.raises(ArenaBindingError):
+            http_playbook_verify(ffi, pb_h, verify_spec)
+        active_playbook_drop(ffi, pb_h)
+    finally:
+        close_arena(ffi, arena_h)
+
+
+def test_http_playbook_ffi_verify_both_count_fields_raises():
+    ffi, arena_h, dep, _port = _open_http_playbook_ffi_arena()
+    dep_id = dep.identifier
+    try:
+        open_spec = json.dumps(
+            {
+                "dependency_identifier": dep_id,
+                "mappings": [
+                    {
+                        "method": "GET",
+                        "url_path": "/api/ffi/playbook",
+                        "response": {"status": 200, "json_body": {"ok": True}},
+                    }
+                ],
+            }
+        )
+        pb_h = http_playbook_open(ffi, arena_h, open_spec)
+        verify_spec = json.dumps(
+            {
+                "method": "GET",
+                "url_path": "/api/ffi/playbook",
+                "expected_count": 1,
+                "minimum_count": 1,
+            }
+        )
+        with pytest.raises(ArenaBindingError):
+            http_playbook_verify(ffi, pb_h, verify_spec)
+        active_playbook_drop(ffi, pb_h)
+    finally:
+        close_arena(ffi, arena_h)
+
+
+@playbook(ValidationDbPlaybook)
 def test_containerized_app_create_reading_publishes_kafka_event(
     docker_web_enabled,
     arena_docker,
-    validation_db_playbook,
     oauth_access_token,
 ):
     if not docker_web_enabled:
@@ -229,46 +342,42 @@ def test_containerized_app_create_reading_publishes_kafka_event(
             "(JWT issuer cannot be reached from a bridge-network container)."
         )
 
-    @playbook(validation_db_playbook)
-    def _body(arena):
-        bootstrap = f"localhost:{KAFKA_PORT}"
-        id_queue: queue.Queue[int] = queue.Queue()
-        result_holder: list[Any] = []
+    bootstrap = f"localhost:{KAFKA_PORT}"
+    id_queue: queue.Queue[int] = queue.Queue()
+    result_holder: list[Any] = []
 
-        consumer_thread = threading.Thread(
-            target=_run_reading_created_consumer,
-            args=(bootstrap, KAFKA_TOPIC, id_queue, result_holder, "docker"),
-        )
-        consumer_thread.start()
+    consumer_thread = threading.Thread(
+        target=_run_reading_created_consumer,
+        args=(bootstrap, KAFKA_TOPIC, id_queue, result_holder, "docker"),
+    )
+    consumer_thread.start()
 
-        created_id = _create_reading(
-            BASE_URL_DOCKER,
-            "Docker Test User",
-            42,
-            "test comment",
-            oauth_access_token,
-        )
-        id_queue.put(created_id)
+    created_id = _create_reading(
+        BASE_URL_DOCKER,
+        "Docker Test User",
+        42,
+        "test comment",
+        oauth_access_token,
+    )
+    id_queue.put(created_id)
 
-        consumer_thread.join(timeout=10)
-        assert len(result_holder) == 1, "consumer should have completed"
-        consumed = result_holder[0]
-        if isinstance(consumed, Exception):
-            raise consumed
-        assert consumed["id"] == created_id
-        assert consumed["user_name"] == "Docker Test User"
-        assert consumed["value"] == 42
-        assert consumed.get("comment") == "test comment"
+    consumer_thread.join(timeout=10)
+    assert len(result_holder) == 1, "consumer should have completed"
+    consumed = result_holder[0]
+    if isinstance(consumed, Exception):
+        raise consumed
+    assert consumed["id"] == created_id
+    assert consumed["user_name"] == "Docker Test User"
+    assert consumed["value"] == 42
+    assert consumed.get("comment") == "test comment"
 
-        readings = _get_readings(BASE_URL_DOCKER, oauth_access_token)
-        found = next((r for r in readings if r["id"] == created_id), None)
-        assert found is not None, "should find newly created reading"
-        assert found["id"] == created_id
-        assert found["user_name"] == "Docker Test User"
-        assert found["value"] == 42
-        assert found.get("comment") == "test comment"
-
-    _body(arena_docker)
+    readings = _get_readings(BASE_URL_DOCKER, oauth_access_token)
+    found = next((r for r in readings if r["id"] == created_id), None)
+    assert found is not None, "should find newly created reading"
+    assert found["id"] == created_id
+    assert found["user_name"] == "Docker Test User"
+    assert found["value"] == 42
+    assert found.get("comment") == "test comment"
 
 
 def _get_readings(base_url: str, access_token: str) -> list:
@@ -299,7 +408,6 @@ def _create_reading(
 
 
 def _new_readings_kafka_consumer(bootstrap: str, topic: str, group_prefix: str) -> Any:
-    """Kafka consumer subscribed to the readings topic (one consumer per test process)."""
     from kafka import KafkaConsumer
 
     return KafkaConsumer(
@@ -317,7 +425,6 @@ def _run_reading_created_consumer(
     result_holder: list,
     group_prefix: str,
 ) -> None:
-    """Thread body: poll Kafka until we see ReadingCreatedEvent for the id from id_queue."""
     try:
         event = _consume_reading_created_event(bootstrap, topic, id_queue, group_prefix)
         result_holder.append(event)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 import pytest
 import pytest_asyncio
@@ -13,6 +13,16 @@ from arena_pytest.ffi._ffi import (
     hard_reset as ffi_hard_reset,
     load_ffi,
     soft_reset as ffi_soft_reset,
+)
+from arena_pytest.playbook import (
+    PLAYBOOK_MARKER,
+    ActivePlaybook,
+    _activate_classes,
+    _class_marker_classes,
+    _drop_actives,
+    _matches_from_closed_arena,
+    _module_marker_classes,
+    _own_marker_classes,
 )
 
 
@@ -77,3 +87,80 @@ async def arena(closed_arena) -> OpenArena:
         pytest.fail(f"arena_open failed: {e}", pytrace=False)
     yield open_arena_obj
     await open_arena_obj.close()
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers",
+        f"{PLAYBOOK_MARKER}(klass): open one playbook identified by its Playbook "
+        "subclass for the test, class, or module scope; stack multiple "
+        "@playbook(...) decorators for more than one.",
+    )
+
+
+_FUNCTION_ACTIVES_ATTR = "_arena_pytest_function_actives"
+
+
+def _item_request(item: pytest.Item) -> pytest.FixtureRequest:
+    request = getattr(item, "_request", None)
+    if request is None:
+        raise pytest.UsageError(
+            "@pytest.mark.playbook requires a pytest test function with the "
+            "'arena' fixture available"
+        )
+    return request
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    classes = _own_marker_classes(item)
+    if not classes:
+        return
+    request = _item_request(item)
+    arena_obj = request.getfixturevalue("arena")
+    matches = _matches_from_closed_arena(request.getfixturevalue("closed_arena"))
+    actives = _activate_classes(arena_obj, matches, classes)
+    setattr(item, _FUNCTION_ACTIVES_ATTR, actives)
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_teardown(item: pytest.Item, nextitem: Optional[pytest.Item]) -> None:
+    actives: Optional[List[ActivePlaybook]] = getattr(item, _FUNCTION_ACTIVES_ATTR, None)
+    if not actives:
+        return
+    setattr(item, _FUNCTION_ACTIVES_ATTR, None)
+    _drop_actives(actives)
+
+
+@pytest.fixture(scope="class", autouse=True)
+def _playbook_class_scope(request: pytest.FixtureRequest):
+    cls = getattr(request, "cls", None)
+    classes = _class_marker_classes(cls)
+    if not classes:
+        yield
+        return
+    arena_obj = request.getfixturevalue("arena")
+    closed = request.getfixturevalue("closed_arena")
+    matches = _matches_from_closed_arena(closed)
+    actives = _activate_classes(arena_obj, matches, classes)
+    try:
+        yield
+    finally:
+        _drop_actives(actives)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _playbook_module_scope(request: pytest.FixtureRequest):
+    module = getattr(request, "module", None)
+    classes = _module_marker_classes(module)
+    if not classes:
+        yield
+        return
+    arena_obj = request.getfixturevalue("arena")
+    closed = request.getfixturevalue("closed_arena")
+    matches = _matches_from_closed_arena(closed)
+    actives = _activate_classes(arena_obj, matches, classes)
+    try:
+        yield
+    finally:
+        _drop_actives(actives)

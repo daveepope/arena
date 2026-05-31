@@ -182,38 +182,49 @@ public final class ArenaBindings {
     }
   }
 
-  public static Pointer httpPlaybookBegin(Pointer arena, String specJson) {
+  public static Pointer matchPlaybookRun(Pointer arena, String identifier) {
     ArenaNativeLib lib = lib();
     PointerByReference err = new PointerByReference();
-    Pointer pb = lib.arena_http_playbook_open(arena, specJson, err);
-    if (pb == null || Pointer.nativeValue(pb) == 0) {
+    Pointer h = lib.arena_match_playbook_run(arena, identifier, err);
+    if (h == null || Pointer.nativeValue(h) == 0) {
       String msg = takeErr(err);
-      throw new ArenaBindingError(msg != null ? msg : "arena_http_playbook_open returned null");
+      throw new ArenaBindingError(msg != null ? msg : "arena_match_playbook_run returned null");
     }
-    return pb;
+    return h;
   }
 
-  public static void httpPlaybookFinish(Pointer pb) {
-    if (pb == null || Pointer.nativeValue(pb) == 0) {
+  public static void activePlaybookDrop(Pointer handle) {
+    if (handle == null || Pointer.nativeValue(handle) == 0) {
       return;
     }
     PointerByReference err = new PointerByReference();
-    int raw = lib().arena_http_playbook_close(pb, err);
+    int raw = lib().arena_active_playbook_drop(handle, err);
     String msg = takeErr(err);
     ArenaStatus st;
     try {
       st = ArenaStatus.fromInt(raw);
     } catch (IllegalArgumentException e) {
-      throw new ArenaBindingError(msg != null ? msg : "http_playbook_finish unknown status " + raw);
+      throw new ArenaBindingError(msg != null ? msg : "active_playbook_drop unknown status " + raw);
     }
     if (st != ArenaStatus.OK) {
-      throw new ArenaBindingError(msg != null ? msg : "http_playbook_finish failed: " + st, st);
+      throw new ArenaBindingError(msg != null ? msg : "active_playbook_drop failed: " + st, st);
     }
   }
 
-  public static void httpPlaybookVerify(Pointer pb, String specJson) {
+  public static Pointer httpPlaybookOpen(Pointer arena, String specJson) {
+    ArenaNativeLib lib = lib();
     PointerByReference err = new PointerByReference();
-    int raw = lib().arena_http_playbook_verify(pb, specJson, err);
+    Pointer h = lib.arena_http_playbook_open(arena, specJson, err);
+    if (h == null || Pointer.nativeValue(h) == 0) {
+      String msg = takeErr(err);
+      throw new ArenaBindingError(msg != null ? msg : "arena_http_playbook_open returned null");
+    }
+    return h;
+  }
+
+  public static void httpPlaybookVerify(Pointer handle, String specJson) {
+    PointerByReference err = new PointerByReference();
+    int raw = lib().arena_http_playbook_verify(handle, specJson, err);
     String msg = takeErr(err);
     ArenaStatus st;
     try {
@@ -226,38 +237,9 @@ public final class ArenaBindings {
     }
   }
 
-  public static Pointer mssqlPlaybookBegin(Pointer arena, String specJson) {
-    ArenaNativeLib lib = lib();
+  public static void mssqlPlaybookVerify(Pointer handle, String specJson) {
     PointerByReference err = new PointerByReference();
-    Pointer pb = lib.arena_mssql_playbook_open(arena, specJson, err);
-    if (pb == null || Pointer.nativeValue(pb) == 0) {
-      String msg = takeErr(err);
-      throw new ArenaBindingError(msg != null ? msg : "arena_mssql_playbook_open returned null");
-    }
-    return pb;
-  }
-
-  public static void mssqlPlaybookFinish(Pointer pb) {
-    if (pb == null || Pointer.nativeValue(pb) == 0) {
-      return;
-    }
-    PointerByReference err = new PointerByReference();
-    int raw = lib().arena_mssql_playbook_close(pb, err);
-    String msg = takeErr(err);
-    ArenaStatus st;
-    try {
-      st = ArenaStatus.fromInt(raw);
-    } catch (IllegalArgumentException e) {
-      throw new ArenaBindingError(msg != null ? msg : "mssql_playbook_finish unknown status " + raw);
-    }
-    if (st != ArenaStatus.OK) {
-      throw new ArenaBindingError(msg != null ? msg : "mssql_playbook_finish failed: " + st, st);
-    }
-  }
-
-  public static void mssqlPlaybookVerify(Pointer pb, String specJson) {
-    PointerByReference err = new PointerByReference();
-    int raw = lib().arena_mssql_playbook_verify(pb, specJson, err);
+    int raw = lib().arena_mssql_playbook_verify(handle, specJson, err);
     String msg = takeErr(err);
     ArenaStatus st;
     try {
@@ -267,35 +249,6 @@ public final class ArenaBindings {
     }
     if (st != ArenaStatus.OK) {
       throw new ArenaBindingError(msg != null ? msg : "mssql_playbook_verify failed: " + st, st);
-    }
-  }
-
-  public static Pointer localstackPlaybookBegin(Pointer arena, String specJson) {
-    ArenaNativeLib lib = lib();
-    PointerByReference err = new PointerByReference();
-    Pointer pb = lib.arena_localstack_playbook_open(arena, specJson, err);
-    if (pb == null || Pointer.nativeValue(pb) == 0) {
-      String msg = takeErr(err);
-      throw new ArenaBindingError(msg != null ? msg : "arena_localstack_playbook_open returned null");
-    }
-    return pb;
-  }
-
-  public static void localstackPlaybookFinish(Pointer pb) {
-    if (pb == null || Pointer.nativeValue(pb) == 0) {
-      return;
-    }
-    PointerByReference err = new PointerByReference();
-    int raw = lib().arena_localstack_playbook_close(pb, err);
-    String msg = takeErr(err);
-    ArenaStatus st;
-    try {
-      st = ArenaStatus.fromInt(raw);
-    } catch (IllegalArgumentException e) {
-      throw new ArenaBindingError(msg != null ? msg : "localstack_playbook_finish unknown status " + raw);
-    }
-    if (st != ArenaStatus.OK) {
-      throw new ArenaBindingError(msg != null ? msg : "localstack_playbook_finish failed: " + st, st);
     }
   }
 }

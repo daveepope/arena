@@ -7,33 +7,19 @@ use arena_http::{
 };
 use serde::Deserialize;
 
-use crate::error::{clear_error, write_error};
+use crate::active_playbook::{ActivePlaybookInner, ArenaActivePlaybookHandle};
 use crate::closed_arena::OpenArenaRuntimeState;
+use crate::error::{clear_error, write_error};
+use crate::panic_payload::panic_message;
 use crate::strings::c_str_to_string;
 use crate::{ArenaStatus, OpenArenaHandle};
 
-#[repr(C)]
-pub struct ArenaHttpPlaybookHandle {
-    _private: [u8; 0],
-}
-
-struct PlaybookInner {
-    runtime_handle: tokio::runtime::Handle,
-    active: Option<ActivePlaybook>,
-}
-
-impl PlaybookInner {
-    fn into_raw(self) -> *mut ArenaHttpPlaybookHandle {
-        Box::into_raw(Box::new(self)) as *mut ArenaHttpPlaybookHandle
-    }
-
-    unsafe fn from_raw(ptr: *mut ArenaHttpPlaybookHandle) -> Box<PlaybookInner> {
-        unsafe { Box::from_raw(ptr as *mut PlaybookInner) }
-    }
-
-    unsafe fn as_ref<'a>(ptr: *mut ArenaHttpPlaybookHandle) -> &'a PlaybookInner {
-        unsafe { &*(ptr as *const PlaybookInner) }
-    }
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum ExpectSpec {
+    Exactly { count: u64 },
+    AtLeast { count: u64 },
+    Never,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,14 +40,6 @@ struct MappingSpec {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-enum ExpectSpec {
-    Exactly { count: u64 },
-    AtLeast { count: u64 },
-    Never,
-}
-
-#[derive(Debug, Deserialize)]
 struct ResponseSpec {
     #[serde(default = "default_status")]
     status: u16,
@@ -75,10 +53,14 @@ fn default_status() -> u16 {
 
 #[derive(Debug, Deserialize)]
 struct VerifySpec {
-    dependency_identifier: String,
+    #[serde(default)]
+    dependency_identifier: Option<String>,
     method: String,
     url_path: String,
-    expected_count: u64,
+    #[serde(default)]
+    expected_count: Option<u64>,
+    #[serde(default)]
+    minimum_count: Option<u64>,
 }
 
 fn response_def(spec: &ResponseSpec) -> ResponseDefinition {
@@ -180,7 +162,7 @@ pub extern "C" fn arena_http_playbook_open(
     arena_handle: *mut OpenArenaHandle,
     spec: *const c_char,
     err_out: *mut *mut c_char,
-) -> *mut ArenaHttpPlaybookHandle {
+) -> *mut ArenaActivePlaybookHandle {
     unsafe { clear_error(err_out) };
 
     if arena_handle.is_null() {
@@ -228,24 +210,24 @@ pub extern "C" fn arena_http_playbook_open(
         return std::ptr::null_mut();
     }
 
-    let outcome = catch_unwind(AssertUnwindSafe(|| -> Result<PlaybookInner, String> {
+    let outcome = catch_unwind(AssertUnwindSafe(|| -> Result<ActivePlaybookInner, String> {
         let arena_runtime = unsafe { OpenArenaRuntimeState::as_ref(arena_handle) };
         let runtime_handle = arena_runtime.runtime.handle().clone();
 
         let seq =
             with_http_dependency(arena_runtime, &parsed.dependency_identifier, |http| {
-            let mut seq = first_sequence(http, &parsed.mappings[0])?;
-            for m in parsed.mappings.iter().skip(1) {
-                seq = append_mapping(seq, m)?;
-            }
-            Ok::<PlaybookSequenceBuilder, String>(seq)
-        })??;
+                let mut seq = first_sequence(http, &parsed.mappings[0])?;
+                for m in parsed.mappings.iter().skip(1) {
+                    seq = append_mapping(seq, m)?;
+                }
+                Ok::<PlaybookSequenceBuilder, String>(seq)
+            })??;
 
         let active = runtime_handle.block_on(async move { seq.run().await });
 
-        Ok(PlaybookInner {
+        Ok(ActivePlaybookInner {
             runtime_handle,
-            active: Some(active),
+            active: Some(Box::new(active)),
         })
     }));
 
@@ -269,32 +251,41 @@ pub extern "C" fn arena_http_playbook_open(
     }
 }
 
-#[no_mangle]
-pub extern "C" fn arena_http_playbook_close(
-    handle: *mut ArenaHttpPlaybookHandle,
-    err_out: *mut *mut c_char,
-) -> ArenaStatus {
-    unsafe { clear_error(err_out) };
-    if handle.is_null() {
-        return ArenaStatus::Ok;
+fn run_http_verify(
+    handle: *mut ArenaActivePlaybookHandle,
+    parsed: VerifySpec,
+) -> Result<(), String> {
+    let count_modes = parsed.expected_count.is_some() as u8 + parsed.minimum_count.is_some() as u8;
+    if count_modes != 1 {
+        return Err(
+            "verify spec requires exactly one of expected_count or minimum_count".to_string(),
+        );
     }
-    let outcome = catch_unwind(AssertUnwindSafe(|| {
-        let _dropped = unsafe { PlaybookInner::from_raw(handle) };
-    }));
-    match outcome {
-        Ok(()) => ArenaStatus::Ok,
-        Err(payload) => {
-            let msg = panic_message(&payload);
-            tracing::error!(error = %msg, op = "http_playbook_close", "playbook close failed");
-            unsafe { write_error(err_out, format!("arena_http_playbook_close: {msg}")) };
-            ArenaStatus::Failed
+
+    let criteria = criteria_for(&parsed.method, &parsed.url_path)?;
+    let inner = unsafe { ActivePlaybookInner::as_ref(handle) };
+    let active = inner
+        .active
+        .as_ref()
+        .ok_or_else(|| "playbook is already dropped".to_string())?;
+    let http_active = active
+        .as_any()
+        .downcast_ref::<ActivePlaybook>()
+        .ok_or_else(|| "playbook handle is not an HTTP playbook".to_string())?;
+
+    inner.runtime_handle.block_on(async {
+        if let Some(expected) = parsed.expected_count {
+            http_active.verify(expected, criteria).await;
+        } else if let Some(minimum) = parsed.minimum_count {
+            http_active.verify_at_least(minimum, criteria).await;
         }
-    }
+    });
+    Ok(())
 }
 
 #[no_mangle]
 pub extern "C" fn arena_http_playbook_verify(
-    handle: *mut ArenaHttpPlaybookHandle,
+    handle: *mut ArenaActivePlaybookHandle,
     verify_spec: *const c_char,
     err_out: *mut *mut c_char,
 ) -> ArenaStatus {
@@ -346,25 +337,8 @@ pub extern "C" fn arena_http_playbook_verify(
     };
     let _ = parsed.dependency_identifier;
 
-    let criteria = match criteria_for(&parsed.method, &parsed.url_path) {
-        Ok(c) => c,
-        Err(e) => {
-            unsafe { write_error(err_out, format!("arena_http_playbook_verify: {e}")) };
-            return ArenaStatus::InvalidArgument;
-        }
-    };
-
-    let outcome = catch_unwind(AssertUnwindSafe(|| {
-        let inner = unsafe { PlaybookInner::as_ref(handle) };
-        let active = match inner.active.as_ref() {
-            Some(a) => a,
-            None => return Err("playbook is already closed".to_string()),
-        };
-        inner.runtime_handle.block_on(async {
-            active.verify(parsed.expected_count, criteria).await;
-        });
-        Ok(())
-    }));
+    let outcome =
+        catch_unwind(AssertUnwindSafe(|| run_http_verify(handle, parsed).map_err(|msg| msg)));
 
     match outcome {
         Ok(Ok(())) => ArenaStatus::Ok,
@@ -378,15 +352,5 @@ pub extern "C" fn arena_http_playbook_verify(
             unsafe { write_error(err_out, format!("arena_http_playbook_verify: {msg}")) };
             ArenaStatus::Failed
         }
-    }
-}
-
-fn panic_message(payload: &Box<dyn std::any::Any + Send>) -> String {
-    if let Some(s) = payload.downcast_ref::<&'static str>() {
-        (*s).to_string()
-    } else if let Some(s) = payload.downcast_ref::<String>() {
-        s.clone()
-    } else {
-        "unknown panic payload".to_string()
     }
 }

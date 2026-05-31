@@ -1,90 +1,207 @@
 package arena.junit.playbook;
 
+import arena.junit.ClosedArenaExtension;
 import arena.junit.OpenArena;
+
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import org.junit.jupiter.api.extension.AfterAllCallback;
+import org.junit.jupiter.api.extension.BeforeAllCallback;
+import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
-import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
 
-final class PlaybookInvocationExtension implements InvocationInterceptor {
+public final class PlaybookInvocationExtension
+    implements BeforeAllCallback,
+        BeforeEachCallback,
+        AfterAllCallback,
+        InvocationInterceptor {
+
+  private static final ExtensionContext.Namespace NS =
+      ExtensionContext.Namespace.create("arena.junit.playbook.scope");
+
+  private static final String CLASS_SCOPE_KEY = "classScope";
+  private static final String CLASS_SCOPE_ATTEMPTED = "classScopeAttempted";
+
+  @Override
+  public void beforeAll(ExtensionContext context) {
+    Class<?> testClass = context.getRequiredTestClass();
+    Class<? extends Playbook>[] classes = classesFrom(testClass);
+    if (classes.length == 0) {
+      return;
+    }
+    tryOpenClassScope(context, classes);
+  }
+
+  @Override
+  public void beforeEach(ExtensionContext context) {
+    Class<?> testClass = context.getRequiredTestClass();
+    Class<? extends Playbook>[] classes = classesFrom(testClass);
+    if (classes.length == 0) {
+      return;
+    }
+    ExtensionContext classContext = context.getParent().orElse(context.getRoot());
+    ExtensionContext.Store store = classContext.getStore(NS);
+    if (store.get(CLASS_SCOPE_KEY) != null) {
+      return;
+    }
+    tryOpenClassScope(classContext, classes);
+    if (store.get(CLASS_SCOPE_KEY) == null) {
+      throw new IllegalStateException(
+          "@Playbook: unable to open class-scope playbooks for "
+              + testClass.getName()
+              + " (open arena not initialized)");
+    }
+  }
+
+  @Override
+  public void afterAll(ExtensionContext context) {
+    ExtensionContext.Store store = context.getStore(NS);
+    PlaybookScope scope = store.remove(CLASS_SCOPE_KEY, PlaybookScope.class);
+    if (scope != null) {
+      scope.close();
+    }
+  }
 
   @Override
   public void interceptTestMethod(
       Invocation<Void> invocation,
-      ReflectiveInvocationContext<java.lang.reflect.Method> invocationContext,
+      ReflectiveInvocationContext<Method> invocationContext,
       ExtensionContext extensionContext)
       throws Throwable {
-    ArenaPlaybooks ann =
-        invocationContext.getExecutable().getAnnotation(ArenaPlaybooks.class);
-    if (ann == null) {
+    Class<? extends Playbook>[] classes = classesFrom(invocationContext.getExecutable());
+    if (classes.length == 0) {
       invocation.proceed();
       return;
     }
-    Class<? extends ArenaPlaybookSupplier>[] types = ann.value();
-    if (types.length == 0) {
+    OpenArena arena = resolveOpenArena(extensionContext);
+    PlaybookScope scope = openScope(arena, classes);
+    try {
       invocation.proceed();
-      return;
-    }
-    OpenArena arena = resolveArena(extensionContext);
-    List<Playbook> list = new ArrayList<>();
-    for (Class<? extends ArenaPlaybookSupplier> t : types) {
-      ArenaPlaybookSupplier sup = instantiateSupplier(t);
-      list.addAll(Arrays.asList(sup.supply(extensionContext)));
-    }
-    Playbook[] arr = list.toArray(Playbook[]::new);
-    try (ActivePlaybooks scope = ActivePlaybooks.open(arena, arr)) {
-      invocation.proceed();
+    } finally {
+      scope.close();
     }
   }
 
-  private static ArenaPlaybookSupplier instantiateSupplier(Class<? extends ArenaPlaybookSupplier> c)
-      throws Exception {
-    if (c.isEnum()) {
-      Object[] cs = c.getEnumConstants();
-      if (cs == null || cs.length != 1) {
-        throw new IllegalStateException(
-            "ArenaPlaybookSupplier enum must declare exactly one constant: " + c.getName());
+  private static void tryOpenClassScope(
+      ExtensionContext classContext, Class<? extends Playbook>[] classes) {
+    ExtensionContext.Store store = classContext.getStore(NS);
+    if (store.get(CLASS_SCOPE_KEY) != null) {
+      return;
+    }
+    OpenArena arena;
+    try {
+      arena = resolveOpenArena(classContext);
+    } catch (Exception ignored) {
+      store.put(CLASS_SCOPE_ATTEMPTED, Boolean.TRUE);
+      return;
+    }
+    if (arena == null || arena.handle() == null) {
+      store.put(CLASS_SCOPE_ATTEMPTED, Boolean.TRUE);
+      return;
+    }
+    PlaybookScope scope = openScope(arena, classes);
+    store.put(CLASS_SCOPE_KEY, scope);
+  }
+
+  private static Class<? extends Playbook>[] classesFrom(AnnotatedElement element) {
+    arena.junit.Playbook[] anns = element.getAnnotationsByType(arena.junit.Playbook.class);
+    if (anns.length == 0) {
+      return new Class[0];
+    }
+    Class<? extends Playbook>[] out = new Class[anns.length];
+    for (int i = 0; i < anns.length; i++) {
+      out[i] = anns[i].value();
+    }
+    return out;
+  }
+
+  private static PlaybookScope openScope(OpenArena arena, Class<? extends Playbook>[] classes) {
+    List<ActivePlaybook> opened = new ArrayList<>();
+    try {
+      for (Class<? extends Playbook> klass : classes) {
+        Playbook pb = arena.playbook(klass);
+        if (pb == null) {
+          throw new IllegalStateException(
+              "@Playbook: no playbook of class "
+                  + klass.getName()
+                  + " is registered on any match");
+        }
+        Boolean execOnDependencyStart = arena.playbookExecOnDependencyStart(klass);
+        if (Boolean.TRUE.equals(execOnDependencyStart)) {
+          throw new IllegalStateException(
+              "@Playbook: playbook "
+                  + klass.getName()
+                  + " was registered with execOnDependencyStart=true and cannot be scoped per-test");
+        }
+        opened.add(pb.run(arena));
       }
-      return (ArenaPlaybookSupplier) cs[0];
+    } catch (RuntimeException e) {
+      closeAll(opened);
+      throw e;
     }
-    return c.getDeclaredConstructor().newInstance();
+    return new PlaybookScope(opened);
   }
 
-  private static OpenArena resolveArena(ExtensionContext ctx) throws Exception {
+  private static void closeAll(List<ActivePlaybook> opened) {
+    for (int i = opened.size() - 1; i >= 0; i--) {
+      try {
+        opened.get(i).close();
+      } catch (RuntimeException ignored) {
+      }
+    }
+  }
+
+  private static OpenArena resolveOpenArena(ExtensionContext ctx) throws Exception {
     Object instance = ctx.getTestInstance().orElse(null);
     Class<?> testClass = ctx.getRequiredTestClass();
-    List<Field> matches = new ArrayList<>();
+    List<Field> fields = new ArrayList<>();
     for (Class<?> c = testClass; c != null && c != Object.class; c = c.getSuperclass()) {
       for (Field f : c.getDeclaredFields()) {
         if (f.isAnnotationPresent(RegisterExtension.class)
-            && ArenaSession.class.isAssignableFrom(f.getType())) {
-          matches.add(f);
+            && ClosedArenaExtension.class.isAssignableFrom(f.getType())) {
+          fields.add(f);
         }
       }
     }
-    if (matches.isEmpty()) {
+    if (fields.isEmpty()) {
       throw new IllegalStateException(
-          "@ArenaPlaybooks requires exactly one @RegisterExtension field whose type implements "
-              + ArenaSession.class.getSimpleName());
+          "@Playbook requires exactly one @RegisterExtension field whose type extends "
+              + ClosedArenaExtension.class.getSimpleName());
     }
-    if (matches.size() > 1) {
+    if (fields.size() > 1) {
       throw new IllegalStateException(
-          "@ArenaPlaybooks: multiple @RegisterExtension ArenaSession fields on "
+          "@Playbook: multiple @RegisterExtension ClosedArenaExtension fields on "
               + testClass.getName());
     }
-    Field f = matches.get(0);
+    Field f = fields.get(0);
     f.setAccessible(true);
     Object ext =
-        Modifier.isStatic(f.getModifiers()) ? f.get(null) : (instance != null ? f.get(instance) : null);
+        Modifier.isStatic(f.getModifiers())
+            ? f.get(null)
+            : (instance != null ? f.get(instance) : null);
     if (ext == null) {
       throw new IllegalStateException(
-          "@ArenaPlaybooks: ArenaSession extension field not initialized: " + f.getName());
+          "@Playbook: ClosedArenaExtension field not initialized: " + f.getName());
     }
-    return ((ArenaSession) ext).arena();
+    return ((ClosedArenaExtension) ext).openArena();
+  }
+
+  static final class PlaybookScope {
+    private final List<ActivePlaybook> opened;
+
+    PlaybookScope(List<ActivePlaybook> opened) {
+      this.opened = opened;
+    }
+
+    void close() {
+      closeAll(opened);
+    }
   }
 }

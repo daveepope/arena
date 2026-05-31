@@ -1,6 +1,7 @@
 package arena.junit.playbook;
 
 import arena.junit.OpenArena;
+import arena.junit.ffi.ArenaBindings;
 import arena.junit.support.ArenaJson;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -69,11 +70,12 @@ public final class ActiveHttpPlaybookBuilder {
     return withMapping(method, urlPath, status, null, null, null, null, false);
   }
 
-  public ActiveHttpPlaybookBuilder withMapping(String method, String urlPath, int status, Object jsonBody) {
+  public ActiveHttpPlaybookBuilder withMapping(
+      String method, String urlPath, int status, Object jsonBody) {
     return withMapping(method, urlPath, status, jsonBody, null, null, null, false);
   }
 
-  public ActiveHttpPlaybook build(OpenArena arena) {
+  public ActiveHttpPlaybook open(OpenArena arena) {
     if (mappings.isEmpty()) {
       throw new IllegalArgumentException(
           "ActiveHttpPlaybookBuilder requires at least one mapping");
@@ -82,6 +84,15 @@ public final class ActiveHttpPlaybookBuilder {
     for (ObjectNode m : mappings) {
       arr.add(m.deepCopy());
     }
-    return new ActiveHttpPlaybook(arena, dependencyIdentifier, arr);
+    ObjectNode spec = ArenaJson.object();
+    spec.put("dependency_identifier", dependencyIdentifier);
+    spec.set("mappings", arr);
+    try {
+      Pointer handle =
+          ArenaBindings.httpPlaybookOpen(arena.handle(), ArenaJson.MAPPER.writeValueAsString(spec));
+      return new ActiveHttpPlaybook(handle);
+    } catch (Exception e) {
+      throw new arena.junit.ffi.ArenaBindingError(e.getMessage());
+    }
   }
 }
