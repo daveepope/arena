@@ -23,8 +23,6 @@ Bazel build is used to build and runs tests in parallel and streams logs during 
 - Bazel (via [Bazelisk](https://github.com/bazelbuild/bazelisk) is recommended)
 - Docker
 
-> Note: hosted GitHub macOS runners don't provide a Docker daemon, so CI's macOS leg skips tests tagged **`requires_docker`** using **`--test_tag_filters=-requires_docker`**. Linux CI and machines with Docker run the full suite.
-
 ## Agent instructions (AI / editors)
 
 - **`AGENTS.md` is the source of truth** for project agent rules (coding assistants, CI context, etc.).

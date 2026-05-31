@@ -7,15 +7,86 @@ on:
     branches: [ "master" ]
 
 jobs:
-  build_and_test:
-    name: Build and test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
+    outputs:
+      bazel: ${{ steps.filter.outputs.bazel }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            bazel:
+              - '**/*'
+              - '!**/*.md'
+              - '!AGENTS.md'
+              - '!CLAUDE.md'
+              - '!.cursor/**'
+
+  docs_only:
+    name: Docs / agent rules only
+    needs: changes
+    if: needs.changes.outputs.bazel != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - run: echo "No Bazel-relevant changes; build and test skipped."
+
+  verify_cargo_bazel_lock:
+    name: Verify Cargo.Bazel.lock
+    needs: changes
+    if: needs.changes.outputs.bazel == 'true'
+    runs-on: ubuntu-latest
+    env:
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: rust_crates
+        with:
+          filters: |
+            rust_crates:
+              - 'Cargo.toml'
+              - 'Cargo.Bazel.lock'
+              - '**/Cargo.toml'
+              - 'MODULE.bazel'
+
+      - name: Setup Bazel
+        if: steps.rust_crates.outputs.rust_crates == 'true'
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-ubuntu
+          repository-cache: true
+
+      - name: Repin and verify lockfile
+        if: steps.rust_crates.outputs.rust_crates == 'true'
+        run: |
+          CARGO_BAZEL_REPIN=1 bazel build //... --config=ci
+          if ! git diff --quiet Cargo.Bazel.lock; then
+            echo "Cargo.Bazel.lock is out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //..."
+            git diff Cargo.Bazel.lock
+            exit 1
+          fi
+
+  build:
+    name: Build
+    needs: changes
+    if: needs.changes.outputs.bazel == 'true'
+    runs-on: ubuntu-latest
+    env:
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -23,30 +94,141 @@ jobs:
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
           bazelisk-cache: true
-          disk-cache: build-test-publish-arena-${{ matrix.os }}
+          disk-cache: build-test-publish-arena-ubuntu
           repository-cache: true
 
       - name: Build
-        run: CARGO_BAZEL_REPIN=true bazel build //...
+        run: bazel build //... --config=ci
 
-      - name: Run all tests
-        if: runner.os == 'Linux'
-        timeout-minutes: 30
-        run: bazel test //... --test_output=streamed
+  test_no_docker:
+    name: Test (no Docker)
+    needs: [changes, build]
+    if: needs.changes.outputs.bazel == 'true'
+    runs-on: ubuntu-latest
+    env:
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Run tests (excluding Docker)
-        if: runner.os == 'macOS'
-        run: bazel test //... --test_tag_filters=-requires_docker --test_output=streamed
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-ubuntu
+          repository-cache: true
+
+      - name: Run tests
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-requires_docker
+
+  test_docker:
+    name: Test (Docker)
+    needs: [changes, build]
+    if: needs.changes.outputs.bazel == 'true'
+    runs-on: ubuntu-latest-8-cores
+    env:
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+    permissions:
+      contents: read
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-ubuntu
+          repository-cache: true
+
+      - name: Run Docker tests
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=requires_docker
+
+  test_macos_intel:
+    name: Test (macOS Intel, all tests)
+    needs: changes
+    if: needs.changes.outputs.bazel == 'true'
+    runs-on: macos-15-intel
+    env:
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+    permissions:
+      contents: read
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Docker
+        uses: douglascamata/setup-docker-macos-action@v1.1.0
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-macos-intel
+          repository-cache: true
+
+      - name: Build and run all tests
+        run: |
+          bazel build //... --config=ci
+          bazel test //... --config=ci --build_tests_only
+
+  test_macos_arm64:
+    name: Test (macOS arm64)
+    needs: changes
+    if: needs.changes.outputs.bazel == 'true'
+    runs-on: macos-latest
+    env:
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+    permissions:
+      contents: read
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-macos-arm64
+          repository-cache: true
+
+      - name: Build and run tests
+        run: |
+          bazel build //... --config=ci
+          bazel test //... --config=ci --build_tests_only --test_tag_filters=-requires_docker
+
+  wheel:
+    name: Build wheel (TestPyPI)
+    needs: [changes, test_no_docker, test_docker, test_macos_intel, test_macos_arm64]
+    if: >-
+      ${{
+        needs.changes.outputs.bazel == 'true' &&
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      }}
+    runs-on: ubuntu-latest
+    env:
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-ubuntu
+          repository-cache: true
 
       - name: Unique version for TestPyPI
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         env:
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           python3 <<'PY'
           import os, pathlib, re, tomllib
 
-          # PyPI forbids local versions (+gabc123). Use PEP 440 dev release instead.
           run_id = os.environ.get("GITHUB_RUN_ID", "0")
           pyproject = pathlib.Path("arena-pytest/pyproject.toml")
           data = tomllib.loads(pyproject.read_text())
@@ -72,25 +254,23 @@ jobs:
           print(f"Patched arena-pytest version to {unique} (TestPyPI)")
           PY
 
-      - name: Build wheel for TestPyPI
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+      - name: Build wheel
         run: |
           rm -f bazel-bin/arena-pytest/arena_pytest-*.whl
-          bazel build //arena-pytest:arena_pytest_wheel
+          bazel build //arena-pytest:arena_pytest_wheel --config=ci
           rm -f bazel-bin/arena-pytest/arena_pytest-*-py3-none-any.whl || true
           ls -la bazel-bin/arena-pytest/*.whl
 
       - name: Upload wheel artifact
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/upload-artifact@v4
         with:
-          name: arena-pytest-wheel-${{ matrix.os }}
+          name: arena-pytest-wheel-linux
           path: bazel-bin/arena-pytest/*.whl
           if-no-files-found: error
 
   publish_testpypi:
     name: Publish TestPyPI
-    needs: build_and_test
+    needs: wheel
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
