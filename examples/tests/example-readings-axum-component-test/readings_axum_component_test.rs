@@ -3,7 +3,6 @@ mod http;
 mod playbooks;
 mod readings_arena_config;
 
-use arena_http::HttpDependency;
 use arena_kafka::KafkaDependency;
 use arena_mssql::MssqlDependency;
 use arena_oauth::OauthDependency;
@@ -12,7 +11,7 @@ use std::time::Duration;
 use crate::playbooks::calibration_outage_managed_id;
 use crate::arena::{
     exec_web_app_port, oauth_server_tls_cert_pem, readings_axum_component_runtime,
-    shared_arena, CALIBRATION_ID, KAFKA_ID, MSSQL_ID, OAUTH_ID, SCENARIO_LOCK,
+    shared_arena, KAFKA_ID, MSSQL_ID, OAUTH_ID, SCENARIO_LOCK,
 };
 use crate::http::{
     consume_reading_created_event, create_reading, fetch_example_access_token,

@@ -162,6 +162,7 @@ py_test(
         "//arena-ffi:arena_ffi_shared",
     ],
     deps = [
+        ":readings_ephemeral_test_runtime",
         "//arena-pytest:arena_pytest_lib",
         "@pip//pytest",
         "@pip//pytest_asyncio",

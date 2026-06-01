@@ -5,6 +5,14 @@ use tiberius::{Client, Config};
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
+fn ephemeral_tcp_port() -> u16 {
+    std::net::TcpListener::bind("127.0.0.1:0")
+        .expect("bind ephemeral tcp port")
+        .local_addr()
+        .expect("local_addr")
+        .port()
+}
+
 fn init_test_logging() {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
@@ -169,7 +177,8 @@ async fn playbook_scenario(mssql: &MssqlDependency) -> Result<(), String> {
 async fn mssql_dependency_component_test() {
     init_test_logging();
 
-    let mut mssql = MssqlDependency::builder("")
+    let mut mssql = MssqlDependency::builder("mssql-component")
+        .with_port(ephemeral_tcp_port())
         .with_startup_sql_scripts(vec![r#"
             IF OBJECT_ID(N'dbo.widgets', N'U') IS NULL
             CREATE TABLE dbo.widgets (
