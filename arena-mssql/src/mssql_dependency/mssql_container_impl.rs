@@ -149,7 +149,7 @@ impl MssqlImpl for MssqlContainerImpl {
     }
 }
 
-pub(crate) fn build_ado_connection_string(
+pub fn build_ado_connection_string(
     host: &str,
     port: u16,
     database_name: &str,

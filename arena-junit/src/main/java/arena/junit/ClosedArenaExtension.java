@@ -1,5 +1,6 @@
 package arena.junit;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -10,6 +11,8 @@ public abstract class ClosedArenaExtension implements BeforeAllCallback, AfterAl
       ExtensionContext.Namespace.create("arena.junit.closed");
 
   private static volatile OpenArena CURRENT;
+  private static volatile OpenArena SHUTDOWN_HOOK_ARENA;
+  private static final AtomicBoolean SHUTDOWN_HOOK_REGISTERED = new AtomicBoolean(false);
 
   protected abstract ClosedArena buildClosedArena() throws Exception;
 
@@ -26,6 +29,22 @@ public abstract class ClosedArenaExtension implements BeforeAllCallback, AfterAl
     return a;
   }
 
+  private static void registerShutdownHookOnce() {
+    if (!SHUTDOWN_HOOK_REGISTERED.compareAndSet(false, true)) {
+      return;
+    }
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread(
+                () -> {
+                  OpenArena arena = SHUTDOWN_HOOK_ARENA;
+                  if (arena != null) {
+                    arena.close();
+                  }
+                },
+                "arena-junit-closed-arena-shutdown"));
+  }
+
   @Override
   public void beforeAll(ExtensionContext context) throws Exception {
     ExtensionContext root = context.getRoot();
@@ -39,9 +58,11 @@ public abstract class ClosedArenaExtension implements BeforeAllCallback, AfterAl
       if (h.openArena == null) {
         h.openArena = buildClosedArena().open();
         afterOpen(h.openArena);
+        registerShutdownHookOnce();
       }
       h.refs++;
       CURRENT = h.openArena;
+      SHUTDOWN_HOOK_ARENA = h.openArena;
     }
   }
 
@@ -60,6 +81,7 @@ public abstract class ClosedArenaExtension implements BeforeAllCallback, AfterAl
         h.openArena.close();
         h.openArena = null;
         CURRENT = null;
+        SHUTDOWN_HOOK_ARENA = null;
       }
     }
   }

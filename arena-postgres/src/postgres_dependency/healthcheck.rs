@@ -28,10 +28,6 @@ fn run_with_retry_blocking(
     timeout_ms: u64,
 ) -> Result<(), String> {
     let timeout_duration = Duration::from_millis(timeout_ms);
-
-    #[cfg(test)]
-    let poll_every = Duration::from_millis(1);
-    #[cfg(not(test))]
     let poll_every = Duration::from_millis(100);
 
     let start = Instant::now();

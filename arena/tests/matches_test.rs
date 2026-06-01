@@ -4,7 +4,9 @@ use arena::playbook::{ActivePlaybook, Playbook};
 use arena::Dependency;
 use async_trait::async_trait;
 use futures::future::{select, Either};
+use futures::FutureExt;
 use std::any::Any;
+use std::panic::AssertUnwindSafe;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::Barrier;
@@ -12,6 +14,7 @@ use tokio::sync::Barrier;
 struct StubDependency {
     identifier: String,
     started: Arc<Mutex<bool>>,
+    stop_log: Arc<Mutex<Vec<String>>>,
 }
 
 #[async_trait]
@@ -30,7 +33,35 @@ impl RunnableDependency for StubDependency {
     }
     async fn stop(&mut self) {
         *self.started.lock().unwrap() = false;
+        self.stop_log
+            .lock()
+            .unwrap()
+            .push(self.identifier.clone());
     }
+    fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
+    async fn soft_reset(&self) {}
+    async fn hard_reset(&mut self) {}
+}
+
+struct PanicOnStartDependency {
+    identifier: String,
+}
+
+#[async_trait]
+impl RunnableDependency for PanicOnStartDependency {
+    fn identifier(&self) -> &str {
+        &self.identifier
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+    async fn start(&mut self) {
+        panic!("dependency '{}' start failed", self.identifier);
+    }
+    async fn stop(&mut self) {}
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
     async fn soft_reset(&self) {}
     async fn hard_reset(&mut self) {}
@@ -123,6 +154,7 @@ async fn register_playbook_exec_on_start_runs_after_deps_in_parallel() {
     let dep = StubDependency {
         identifier: "dep-1".to_string(),
         started: dep_started.clone(),
+        stop_log: Arc::new(Mutex::new(Vec::new())),
     };
 
     let run_log = Arc::new(Mutex::new(Vec::<String>::new()));
@@ -179,6 +211,7 @@ async fn register_playbook_exec_on_start_false_skips_run() {
     let dep = StubDependency {
         identifier: "dep-1".to_string(),
         started: Arc::new(Mutex::new(false)),
+        stop_log: Arc::new(Mutex::new(Vec::new())),
     };
 
     let pb = PanicOnRunPlaybook {
@@ -200,6 +233,7 @@ async fn run_playbook_known_id_returns_active() {
     let dep = StubDependency {
         identifier: "dep-1".to_string(),
         started: dep_started.clone(),
+        stop_log: Arc::new(Mutex::new(Vec::new())),
     };
 
     let run_log = Arc::new(Mutex::new(Vec::<String>::new()));
@@ -238,6 +272,7 @@ async fn run_playbook_unknown_id_returns_none() {
     let dep = StubDependency {
         identifier: "dep-1".to_string(),
         started: Arc::new(Mutex::new(false)),
+        stop_log: Arc::new(Mutex::new(Vec::new())),
     };
 
     let mut a_match = Match::new("test-match", vec![Box::new(dep)], vec![]);
@@ -247,4 +282,29 @@ async fn run_playbook_unknown_id_returns_none() {
     assert!(active.is_none());
 
     a_match.stop().await;
+}
+
+#[tokio::test]
+async fn start_later_dep_panic_stops_earlier_started_deps() {
+    let _ = tracing_subscriber::fmt().with_test_writer().try_init();
+
+    let stop_log = Arc::new(Mutex::new(Vec::<String>::new()));
+    let dep_ok = StubDependency {
+        identifier: "dep-ok".to_string(),
+        started: Arc::new(Mutex::new(false)),
+        stop_log: stop_log.clone(),
+    };
+    let dep_fail = PanicOnStartDependency {
+        identifier: "dep-fail".to_string(),
+    };
+
+    let mut a_match = Match::new(
+        "rollback-match",
+        vec![Box::new(dep_ok), Box::new(dep_fail)],
+        vec![],
+    );
+
+    let outcome = AssertUnwindSafe(a_match.start()).catch_unwind().await;
+    assert!(outcome.is_err());
+    assert_eq!(stop_log.lock().unwrap().clone(), vec!["dep-ok".to_string()]);
 }

@@ -44,10 +44,6 @@ async fn run_with_retry(
     attempt_budget: Option<Duration>,
 ) -> Result<(), String> {
     let overall = Duration::from_millis(overall_timeout_ms);
-
-    #[cfg(test)]
-    let poll_every = Duration::from_millis(1);
-    #[cfg(not(test))]
     let poll_every = Duration::from_millis(250);
 
     tracing::info!(

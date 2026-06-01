@@ -181,10 +181,6 @@ fn run_with_retry(
 
     ops.create_topic(bootstrap, &topic)?;
     let consumer = ops.create_consumer(bootstrap, &topic)?;
-
-    #[cfg(test)]
-    let poll_every = Duration::from_millis(1);
-    #[cfg(not(test))]
     let poll_every = Duration::from_millis(50);
 
     let start = Instant::now();

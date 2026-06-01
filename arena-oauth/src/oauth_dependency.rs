@@ -21,6 +21,8 @@ pub struct OauthDependency {
     listen: OauthListenAddr,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
     running: bool,
+    needs_teardown: bool,
+    children_started: bool,
     keys: RsaKeyPair,
     scopes_supported: Vec<String>,
     token_ttl_secs: u64,
@@ -59,6 +61,8 @@ impl OauthDependency {
             listen,
             dependencies,
             running: false,
+            needs_teardown: false,
+            children_started: false,
             keys,
             scopes_supported,
             token_ttl_secs,
@@ -119,12 +123,18 @@ impl RunnableDependency for OauthDependency {
         tracing::debug!(dependency = %self.identifier, phase = "start_begin", "starting");
         let sw = Instant::now();
 
-        for dep in self.dependencies.iter_mut().flatten() {
-            dep.start().await;
+        if let Some(children) = self.dependencies.as_mut() {
+            if !children.is_empty() {
+                self.children_started = true;
+                for dep in children.iter_mut() {
+                    dep.start().await;
+                }
+            }
         }
 
         let tls_for_server = self.tls_pair_for_listen();
 
+        self.needs_teardown = true;
         self.oauth_server
             .start(
                 &self.identifier,
@@ -148,17 +158,26 @@ impl RunnableDependency for OauthDependency {
     }
 
     async fn stop(&mut self) {
+        self.oauth_server.stop().await;
+        self.needs_teardown = false;
+
         if !self.running {
+            if self.children_started {
+                for dep in self.dependencies.iter_mut().flatten().rev() {
+                    dep.stop().await;
+                }
+                self.children_started = false;
+            }
             return;
         }
 
         tracing::debug!(dependency = %self.identifier, phase = "stop_begin", "stopping");
-        self.oauth_server.stop().await;
 
         for dep in self.dependencies.iter_mut().flatten().rev() {
             dep.stop().await;
         }
 
+        self.children_started = false;
         self.running = false;
         tracing::debug!(dependency = %self.identifier, phase = "stopped", "stopped");
     }
@@ -186,13 +205,14 @@ impl RunnableDependency for OauthDependency {
 
 impl Drop for OauthDependency {
     fn drop(&mut self) {
-        if !self.running {
-            return;
+        if self.running {
+            tracing::warn!(
+                dependency = %self.identifier,
+                "drop while oauth server running; forcing stop"
+            );
+            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
+        } else if self.needs_teardown || self.children_started {
+            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
         }
-        tracing::warn!(
-            dependency = %self.identifier,
-            "drop while oauth server running; forcing stop"
-        );
-        futures::executor::block_on(<Self as RunnableDependency>::stop(self));
     }
 }

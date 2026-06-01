@@ -159,13 +159,8 @@ async def test_localstack_playbook_purges_queue(
             f"expected messages visible before playbook exit, got {depth}"
         )
 
-
-@pytest.mark.asyncio
-async def test_localstack_queue_is_empty_after_playbook(arena, localstack_dep):
     boto3 = pytest.importorskip("boto3")
-    localstack = localstack_dep
-    endpoint = localstack.endpoint_url("127.0.0.1")
-
+    endpoint = localstack_dep.endpoint_url("127.0.0.1")
     sqs = boto3.client(
         "sqs", region_name=REGION, endpoint_url=endpoint, **DUMMY_CREDS
     )

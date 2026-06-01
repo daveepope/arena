@@ -4,7 +4,21 @@ use super::dependency::RunnableDependency;
 use super::playbook::{ActivePlaybook, Playbook};
 use async_trait::async_trait;
 use futures::future::join_all;
+use futures::FutureExt;
+use std::panic::{AssertUnwindSafe, resume_unwind};
 use std::time::Instant;
+
+async fn stop_dependencies(deps: &mut [Dependency]) {
+    for dep in deps.iter_mut().rev() {
+        dep.stop().await;
+    }
+}
+
+async fn stop_components(comps: &mut [Component]) {
+    for comp in comps.iter_mut().rev() {
+        comp.stop().await;
+    }
+}
 
 #[async_trait]
 pub trait MatchTrait: Send + Sync {
@@ -53,6 +67,12 @@ impl Match {
         self.playbooks.push((playbook, exec_on_dependency_start));
         self
     }
+
+    async fn rollback_after_failed_start(&mut self) {
+        stop_components(&mut self.components).await;
+        self.active_playbooks.clear();
+        stop_dependencies(&mut self.dependencies).await;
+    }
 }
 
 #[async_trait]
@@ -78,23 +98,46 @@ impl MatchTrait for Match {
             );
         }
         let sw_deps_batch = Instant::now();
-        let mut started = join_all(deps.into_iter().enumerate().map(|(i, mut dep)| {
+        let outcomes = join_all(deps.into_iter().enumerate().map(|(i, mut dep)| {
             let match_label = match_label.clone();
             async move {
                 let id = dep.identifier().to_string();
                 let sw_one = Instant::now();
-                dep.start().await;
-                tracing::info!(
-                    match_name = %match_label,
-                    dependency = %id,
-                    elapsed = ?sw_one.elapsed(),
-                    phase = "dependency_start_complete",
-                    "dependency started"
-                );
-                (i, dep)
+                let outcome = AssertUnwindSafe(async {
+                    dep.start().await;
+                    dep
+                })
+                .catch_unwind()
+                .await;
+                (i, id, match_label, sw_one, outcome)
             }
         }))
         .await;
+
+        let mut dep_panics = Vec::new();
+        let mut started = Vec::with_capacity(dep_count);
+        for (i, id, match_label, sw_one, outcome) in outcomes {
+            match outcome {
+                Ok(dep) => {
+                    tracing::info!(
+                        match_name = %match_label,
+                        dependency = %id,
+                        elapsed = ?sw_one.elapsed(),
+                        phase = "dependency_start_complete",
+                        "dependency started"
+                    );
+                    started.push((i, dep));
+                }
+                Err(payload) => dep_panics.push(payload),
+            }
+        }
+
+        if !dep_panics.is_empty() {
+            started.sort_by_key(|(i, _)| *i);
+            self.dependencies = started.into_iter().map(|(_, dep)| dep).collect();
+            self.rollback_after_failed_start().await;
+            resume_unwind(dep_panics.into_iter().next().unwrap());
+        }
 
         started.sort_by_key(|(i, _)| *i);
         self.dependencies = started.into_iter().map(|(_, dep)| dep).collect();
@@ -125,25 +168,47 @@ impl MatchTrait for Match {
             let sw_pb = Instant::now();
             let deps_ref: &[Dependency] = &self.dependencies;
             let match_label_for_pb = self.name.clone();
-            let actives = join_all((0..startup.len()).map(|idx| {
+            let outcomes = join_all((0..startup.len()).map(|idx| {
                 let pb = startup[idx];
                 let id = pb.identifier().to_string();
                 let match_label_for_pb = match_label_for_pb.clone();
                 async move {
                     let sw_one = Instant::now();
-                    let active = pb.run(deps_ref).await;
-                    tracing::info!(
-                        match_name = %match_label_for_pb,
-                        playbook = %id,
-                        elapsed = ?sw_one.elapsed(),
-                        phase = "playbook_run_complete",
-                        "playbook applied"
-                    );
-                    active
+                    let outcome = AssertUnwindSafe(async {
+                        pb.run(deps_ref).await
+                    })
+                    .catch_unwind()
+                    .await;
+                    (id, match_label_for_pb, sw_one, outcome)
                 }
             }))
             .await;
-            self.active_playbooks.extend(actives);
+
+            let mut pb_panics = Vec::new();
+            let mut actives = Vec::with_capacity(outcomes.len());
+            for (id, match_label_for_pb, sw_one, outcome) in outcomes {
+                match outcome {
+                    Ok(active) => {
+                        tracing::info!(
+                            match_name = %match_label_for_pb,
+                            playbook = %id,
+                            elapsed = ?sw_one.elapsed(),
+                            phase = "playbook_run_complete",
+                            "playbook applied"
+                        );
+                        actives.push(active);
+                    }
+                    Err(payload) => pb_panics.push(payload),
+                }
+            }
+
+            if !pb_panics.is_empty() {
+                self.active_playbooks = actives;
+                self.rollback_after_failed_start().await;
+                resume_unwind(pb_panics.into_iter().next().unwrap());
+            }
+
+            self.active_playbooks = actives;
             tracing::info!(
                 match_name = %self.name,
                 elapsed = ?sw_pb.elapsed(),
@@ -163,23 +228,45 @@ impl MatchTrait for Match {
         }
         let sw_comps_batch = Instant::now();
         let comps = std::mem::take(&mut self.components);
-
-        let mut started_comps = join_all(comps.into_iter().enumerate().map(|(i, mut comp)| {
+        let outcomes = join_all(comps.into_iter().enumerate().map(|(i, mut comp)| {
             let match_label = match_label.clone();
             async move {
                 let sw_one = Instant::now();
-                comp.start().await;
-                tracing::info!(
-                    match_name = %match_label,
-                    component_index = i,
-                    elapsed = ?sw_one.elapsed(),
-                    phase = "component_start_complete",
-                    "component started"
-                );
-                (i, comp)
+                let outcome = AssertUnwindSafe(async {
+                    comp.start().await;
+                    comp
+                })
+                .catch_unwind()
+                .await;
+                (i, match_label, sw_one, outcome)
             }
         }))
         .await;
+
+        let mut comp_panics = Vec::new();
+        let mut started_comps = Vec::with_capacity(comp_count);
+        for (i, match_label, sw_one, outcome) in outcomes {
+            match outcome {
+                Ok(comp) => {
+                    tracing::info!(
+                        match_name = %match_label,
+                        component_index = i,
+                        elapsed = ?sw_one.elapsed(),
+                        phase = "component_start_complete",
+                        "component started"
+                    );
+                    started_comps.push((i, comp));
+                }
+                Err(payload) => comp_panics.push(payload),
+            }
+        }
+
+        if !comp_panics.is_empty() {
+            started_comps.sort_by_key(|(i, _)| *i);
+            self.components = started_comps.into_iter().map(|(_, comp)| comp).collect();
+            self.rollback_after_failed_start().await;
+            resume_unwind(comp_panics.into_iter().next().unwrap());
+        }
 
         started_comps.sort_by_key(|(i, _)| *i);
         self.components = started_comps.into_iter().map(|(_, comp)| comp).collect();
@@ -205,6 +292,7 @@ impl MatchTrait for Match {
 
     async fn stop(&mut self) {
         if !self.started {
+            self.rollback_after_failed_start().await;
             return;
         }
 
