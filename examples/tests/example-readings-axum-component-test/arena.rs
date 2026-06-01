@@ -1,12 +1,11 @@
 use arena::{ClosedArena, Component, Dependency, Match, MatchTrait, OpenArena};
 use arena_examples::http_healthcheck::HttpReadinessCheck;
 use arena_executable_component::executable_component::ExecutableComponent;
-use arena_http::{ok_json, HttpDependency, ManagedHttpPlaybook};
+use arena_http::HttpDependency;
 use arena_kafka::{KafkaDependency, KafkaFlavor};
-use arena_mssql::{ManagedMssqlPlaybook, MssqlDependency};
+use arena_mssql::MssqlDependency;
 use arena_oauth::OauthDependency;
 use arena_postgres::PostgresDependency;
-use serde_json::json;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -212,32 +211,31 @@ pub fn setup_exec_component() -> Component {
     Box::new(builder.build())
 }
 
-pub fn calibration_default_playbook() -> ManagedHttpPlaybook {
-    let calibration_id = CALIBRATION_ID
-        .get()
-        .expect("calibration id initialized")
-        .to_string();
-    ManagedHttpPlaybook::new("readings-api-calibration-default", calibration_id, |pb| {
-        pb.post("/api/v1/validate")
-            .will_return(ok_json(json!({ "valid": true })))
-            .expect_called_at_least(1)
-            .into_playbook()
-    })
-}
+use crate::playbooks::{
+    calibration_default_playbook, calibration_outage_playbook, reset_validation_db_playbook,
+};
 
 pub async fn create_arena() -> OpenArena {
     let dependencies = setup_dependencies();
     let mssql_id = MSSQL_ID.get().expect("mssql id initialized").clone();
+    let calibration_id = CALIBRATION_ID
+        .get()
+        .expect("calibration id initialized")
+        .clone();
     let exec_component = setup_exec_component();
     let components: Vec<Component> = vec![exec_component];
 
     let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new(
         Match::new("readings-api-happy-path", dependencies, components)
-            .register_playbook(Box::new(calibration_default_playbook()), true)
             .register_playbook(
-                ManagedMssqlPlaybook::new("readings-api-validation-db-scoped", mssql_id).into_box(),
+                Box::new(calibration_default_playbook(calibration_id.clone())),
                 true,
-            ),
+            )
+            .register_playbook(
+                Box::new(calibration_outage_playbook(calibration_id)),
+                false,
+            )
+            .register_playbook(reset_validation_db_playbook(mssql_id).into_box(), false),
     )];
     let closed_arena = ClosedArena::new("readings-api-arena".to_string(), matches);
 

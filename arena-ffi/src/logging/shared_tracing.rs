@@ -207,11 +207,7 @@ fn dispatcher_impl_allowlists_allows_delivery(
 
 pub(crate) fn ensure_shared_tracing_installed() {
     SHARED_DISPATCHER.call_once(|| {
-        let env_filter = if let Ok(f) = EnvFilter::try_from_default_env() {
-            f
-        } else {
-            EnvFilter::new("info")
-        };
+        let env_filter = EnvFilter::new("info");
         let (filter_layer, reload_handle) = reload::Layer::new(env_filter);
         let registry = tracing_subscriber::registry()
             .with(filter_layer)

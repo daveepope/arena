@@ -51,6 +51,15 @@ compile_pip_requirements(
 )
 
 py_library(
+    name = "readings_arena_config_py",
+    srcs = ["tests/readings_arena_config.py"],
+    imports = ["tests"],
+    data = [":readings_arena_config"],
+    deps = [":readings_ephemeral_test_runtime"],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
     name = "example_readings_fastapi_web_app_lib",
     srcs = glob(
         ["src/example_readings_fastapi_web_app/**/*.py"],
@@ -146,10 +155,9 @@ rust_binary(
 py_test(
     name = "pytest_localstack_component_test",
     size = "small",
-    srcs = [
-        "tests/example-arena-pytest-localstack-test/test_localstack.py",
-    ],
+    srcs = glob(["tests/example-arena-pytest-localstack-test/**/*.py"]),
     main = "tests/example-arena-pytest-localstack-test/test_localstack.py",
+    imports = ["tests/example-arena-pytest-localstack-test"],
     data = [
         "//arena-ffi:arena_ffi_shared",
     ],
@@ -167,19 +175,18 @@ py_test(
 py_test(
     name = "pytest_readings_fastapi_component_test",
     size = "small",
-    srcs = [
-        "tests/example-readings-fastapi-pytest-component-test/conftest.py",
-        "tests/example-readings-fastapi-pytest-component-test/readings_fastapi_component_test.py",
-        "tests/example-readings-fastapi-pytest-component-test/readings_playbooks.py",
-    ],
+    srcs = glob(["tests/example-readings-fastapi-pytest-component-test/**/*.py"]),
     main = "tests/example-readings-fastapi-pytest-component-test/readings_fastapi_component_test.py",
+    imports = ["tests/example-readings-fastapi-pytest-component-test"],
     data = [
         "//arena-ffi:arena_ffi_shared",
         "//examples:example-readings-fastapi-web-app",
         "//examples:instrument_reading_db_schema",
+        "//examples:readings_arena_config",
         "//examples:validation_db_schema",
     ],
     deps = [
+        ":readings_arena_config_py",
         ":readings_ephemeral_test_runtime",
         "//arena-pytest:arena_pytest_lib",
         "@pip//pytest",
@@ -209,7 +216,10 @@ rust_test(
         "resources/instrument_reading_db_schema.sql",
         "resources/validation_db_schema.sql",
     ],
-    data = [":example-readings-axum-web-app"],
+    data = [
+        ":example-readings-axum-web-app",
+        ":readings_arena_config",
+    ],
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,
@@ -309,6 +319,7 @@ java_test(
         ":example-readings-spring-boot-web-app",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
+        ":readings_arena_config",
         ":validation_db_schema",
     ],
     jvm_flags = ["-Djna.nosys=true"],

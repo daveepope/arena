@@ -12,10 +12,10 @@ import requests
 
 from arena_pytest import playbook
 
-from readings_playbooks import LocalstackSessionPlaybook, ValidationDbPlaybook
+from playbooks import LocalstackSessionPlaybook, ResetValidationDbPlaybook
 
 
-@playbook(ValidationDbPlaybook)
+@playbook(ResetValidationDbPlaybook)
 @playbook(LocalstackSessionPlaybook)
 @pytest.mark.asyncio
 async def test_fastapi_readings_happy_path_sqs_event_and_list(readings_fastapi_ctx):

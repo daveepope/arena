@@ -50,10 +50,11 @@ from arena_pytest import (
 
 from readings_ephemeral_test_runtime import RUNTIME
 
-from readings_playbooks import (
+from playbooks import (
     CalibrationDefaultPlaybook,
+    CalibrationOutagePlaybook,
     LocalstackSessionPlaybook,
-    ValidationDbPlaybook,
+    ResetValidationDbPlaybook,
 )
 
 WEB_APP_PORT = RUNTIME.exec_web_app_port
@@ -320,8 +321,9 @@ def closed_arena() -> ClosedArena:
             CalibrationDefaultPlaybook(calibration.identifier),
             exec_on_dependency_start=True,
         )
+        .register_playbook(CalibrationOutagePlaybook(calibration.identifier))
         .register_playbook(LocalstackSessionPlaybook(localstack.identifier))
-        .register_playbook(ValidationDbPlaybook(mssql.identifier))
+        .register_playbook(ResetValidationDbPlaybook(mssql.identifier))
         .build()
     )
 

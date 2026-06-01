@@ -14,8 +14,8 @@ import arena.junit.Playbook;
 import arena.junit.ffi.ArenaBindingError;
 import arena.junit.playbook.ActiveHttpPlaybook;
 import arena.junit.readings.fixture.ReadingsArenaFixture;
-import arena.junit.readings.playbook.ReadingsCalibrationOutagePlaybook;
-import arena.junit.readings.playbook.ReadingsValidationDbPlaybook;
+import arena.junit.readings.playbook.CalibrationOutagePlaybook;
+import arena.junit.readings.playbook.ResetValidationDbPlaybook;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.net.URI;
@@ -33,7 +33,7 @@ final class ReadingsAxumCalibrationWorkflowComponentTest {
   static final ReadingsArenaFixture readingsArena = new ReadingsArenaFixture();
 
   @Test
-  @Playbook(ReadingsCalibrationOutagePlaybook.class)
+  @Playbook(CalibrationOutagePlaybook.class)
   void postReading_calibrationApiReturns500_propagates500() throws Exception {
     HttpClient c = readingsClient();
     String token = readingsArena.accessToken();
@@ -62,8 +62,8 @@ final class ReadingsAxumCalibrationWorkflowComponentTest {
   }
 
   @Test
-  @Playbook(ReadingsCalibrationOutagePlaybook.class)
-  @Playbook(ReadingsValidationDbPlaybook.class)
+  @Playbook(CalibrationOutagePlaybook.class)
+  @Playbook(ResetValidationDbPlaybook.class)
   void postReading_outageAndValidationDbScopes_propagates500() throws Exception {
     HttpClient c = readingsClient();
     String token = readingsArena.accessToken();
@@ -84,7 +84,7 @@ final class ReadingsAxumCalibrationWorkflowComponentTest {
   @Test
   void verify_calibrationOutageWithoutTraffic_throwsBindingError() {
     arena.junit.playbook.Playbook pb =
-        readingsArena.openArena().playbook(ReadingsCalibrationOutagePlaybook.class);
+        readingsArena.openArena().playbook(CalibrationOutagePlaybook.class);
     try (ActiveHttpPlaybook active = (ActiveHttpPlaybook) pb.run(readingsArena.openArena())) {
       assertThrows(
           ArenaBindingError.class,

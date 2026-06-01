@@ -96,6 +96,7 @@ PLAYBOOK_CALIBRATION_DEFAULT = _PB_NAMES["calibration_default"]
 PLAYBOOK_CALIBRATION_OUTAGE_MANAGED = _PB_NAMES["calibration_outage_managed"]
 PLAYBOOK_CALIBRATION_OUTAGE_FIXTURE_SCOPE = _PB_NAMES["calibration_outage_fixture_scope"]
 PLAYBOOK_VALIDATION_DB_SCOPED = _PB_NAMES["validation_db_scoped"]
+PLAYBOOK_LOCALSTACK_SESSION = _PB_NAMES["localstack_session"]
 
 MSSQL_CONNECTION_STRING_LOCAL = (
     f"Server=tcp:localhost,{MSSQL_PORT};Database={MSSQL_DB_NAME};"

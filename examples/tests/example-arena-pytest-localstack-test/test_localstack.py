@@ -9,6 +9,8 @@ import uuid
 import pytest
 import pytest_asyncio
 
+from playbooks import LocalstackSessionPurgePlaybook
+
 from arena_pytest import (
     ArenaLogLevel,
     ClosedArena,
@@ -17,7 +19,6 @@ from arena_pytest import (
     LambdaSpec,
     LambdaTarget,
     LocalstackDependencyBuilder,
-    ManagedLocalstackPlaybook,
     MatchBuilder,
     SqsQueueTarget,
 )
@@ -33,17 +34,6 @@ REGION = "us-east-1"
 DUMMY_CREDS = {"aws_access_key_id": "test", "aws_secret_access_key": "test"}
 
 LOCALSTACK_ID = f"ls-{uuid.uuid4().hex[:8]}"
-MANAGED_LOCALSTACK_PLAYBOOK_ID = "localstack-session-purge"
-
-
-class LocalstackSessionPurgePlaybook(ManagedLocalstackPlaybook):
-    def __init__(self, dependency_identifier: str):
-        super().__init__(
-            identifier=MANAGED_LOCALSTACK_PLAYBOOK_ID,
-            dependency_identifier=dependency_identifier,
-        )
-
-
 def _write_lambda_source(base_dir) -> str:
     src = base_dir / "lambda_src"
     src.mkdir()

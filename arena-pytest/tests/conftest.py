@@ -23,10 +23,10 @@ def _arena_plugin_already_registered_via_entry_point() -> bool:
 if not _arena_plugin_already_registered_via_entry_point():
     pytest_plugins = ("arena_pytest.arena",)
 
-from readings_playbooks import (
+from playbooks import (
     CalibrationDefaultPlaybook,
     CalibrationOutagePlaybook,
-    ValidationDbPlaybook,
+    ResetValidationDbPlaybook,
 )
 
 from readings_arena_config import (
@@ -392,7 +392,7 @@ def closed_arena() -> ClosedArena:
         CalibrationOutagePlaybook(calibration_http.identifier),
     )
     a_match = a_match.register_playbook(
-        ValidationDbPlaybook(mssql.identifier),
+        ResetValidationDbPlaybook(mssql.identifier),
     )
     for c in components:
         a_match = a_match.add_component(c)

@@ -4,6 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import arena.examples.readings.playbooks.CalibrationDefaultPlaybook;
+import arena.examples.readings.playbooks.CalibrationOutagePlaybook;
+import arena.examples.readings.playbooks.LocalstackSessionPlaybook;
+import arena.examples.readings.playbooks.ResetValidationDbPlaybook;
 import arena.examples.readings.testruntime.ReadingsEphemeralTestRuntime;
 import arena.junit.ClosedArena;
 import arena.junit.ClosedArenaExtension;
@@ -150,11 +154,14 @@ public final class ReadingsArenaFixture extends ClosedArenaExtension {
     HttpDependency calibration =
         new HttpDependencyBuilder("readings-api-calibration").withPort(CALIBRATION_HOST_PORT).build();
 
-    ReadingsPlaybooks.CalibrationDefaultPlaybook calibrationPlaybook =
-        new ReadingsPlaybooks.CalibrationDefaultPlaybook(calibration.identifier());
+    CalibrationDefaultPlaybook calibrationPlaybook =
+        new CalibrationDefaultPlaybook(calibration.identifier());
 
-    ReadingsPlaybooks.ValidationDbPlaybook validationDbPlaybook =
-        new ReadingsPlaybooks.ValidationDbPlaybook(mssql.identifier());
+    CalibrationOutagePlaybook calibrationOutagePlaybook =
+        new CalibrationOutagePlaybook(calibration.identifier());
+
+    ResetValidationDbPlaybook resetValidationDbPlaybook =
+        new ResetValidationDbPlaybook(mssql.identifier());
 
     String lsId = "ls-readings-api-" + UUID.randomUUID().toString().substring(0, 8);
     LocalstackDependency localstack =
@@ -173,8 +180,8 @@ public final class ReadingsArenaFixture extends ClosedArenaExtension {
                     EVENT_BUS_NAME))
             .build();
 
-    ReadingsPlaybooks.LocalstackSessionPlaybook localstackSessionPlaybook =
-        new ReadingsPlaybooks.LocalstackSessionPlaybook(localstack.identifier());
+    LocalstackSessionPlaybook localstackSessionPlaybook =
+        new LocalstackSessionPlaybook(localstack.identifier());
 
     localstackEndpoint = "http://127.0.0.1:" + LOCALSTACK_HOST_PORT;
 
@@ -228,8 +235,9 @@ public final class ReadingsArenaFixture extends ClosedArenaExtension {
             .addDependency(localstack)
             .addComponent(exec.build())
             .registerPlaybook(calibrationPlaybook, true)
+            .registerPlaybook(calibrationOutagePlaybook, false)
             .registerPlaybook(localstackSessionPlaybook, false)
-            .registerPlaybook(validationDbPlaybook, false)
+            .registerPlaybook(resetValidationDbPlaybook, false)
             .build();
 
     ClosedArena closed =

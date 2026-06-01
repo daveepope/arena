@@ -23,9 +23,9 @@ import arena.junit.oauth.OauthDependencyBuilder;
 import arena.junit.oauth.OauthIssuerHosts;
 import arena.junit.oauth.OauthLoopbackTls;
 import arena.junit.readiness.HttpReadinessCheck;
-import arena.junit.readings.playbook.ReadingsCalibrationDefaultPlaybook;
-import arena.junit.readings.playbook.ReadingsCalibrationOutagePlaybook;
-import arena.junit.readings.playbook.ReadingsValidationDbPlaybook;
+import arena.junit.readings.playbook.CalibrationDefaultPlaybook;
+import arena.junit.readings.playbook.CalibrationOutagePlaybook;
+import arena.junit.readings.playbook.ResetValidationDbPlaybook;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -118,12 +118,12 @@ public final class ReadingsArenaFixture extends ClosedArenaExtension {
             .withContainerName(ReadingsArenaConfig.CALIBRATION_CONTAINER_NAME)
             .build();
     calibrationIdentifier = calibration.identifier();
-    ReadingsCalibrationDefaultPlaybook calibrationPlaybook =
-        new ReadingsCalibrationDefaultPlaybook(calibration.identifier());
-    ReadingsCalibrationOutagePlaybook calibrationOutagePlaybook =
-        new ReadingsCalibrationOutagePlaybook(calibration.identifier());
-    ReadingsValidationDbPlaybook validationDbPlaybook =
-        new ReadingsValidationDbPlaybook(mssql.identifier());
+    CalibrationDefaultPlaybook calibrationPlaybook =
+        new CalibrationDefaultPlaybook(calibration.identifier());
+    CalibrationOutagePlaybook calibrationOutagePlaybook =
+        new CalibrationOutagePlaybook(calibration.identifier());
+    ResetValidationDbPlaybook resetValidationDbPlaybook =
+        new ResetValidationDbPlaybook(mssql.identifier());
     String bin = ReadingsArenaConfig.findAxumBinary();
     boolean bazel = System.getenv("RUNFILES_DIR") != null;
     ExecutableComponentBuilder execB =
@@ -156,7 +156,7 @@ public final class ReadingsArenaFixture extends ClosedArenaExtension {
             .addComponent(exec)
             .registerPlaybook(calibrationPlaybook, true)
             .registerPlaybook(calibrationOutagePlaybook, false)
-            .registerPlaybook(validationDbPlaybook, false);
+            .registerPlaybook(resetValidationDbPlaybook, false);
     containerizedWebEnabled = false;
     if (OauthIssuerHosts.oauthIssuerHostIsNonLoopback()) {
       Path ctxPath = ReadingsArenaConfig.prepareDockerImageContext(bin);

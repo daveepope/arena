@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import arena.junit.Playbook;
 import arena.junit.readings.fixture.ReadingsArenaFixture;
-import arena.junit.readings.playbook.ReadingsValidationDbPlaybook;
+import arena.junit.readings.playbook.ResetValidationDbPlaybook;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.net.http.HttpClient;
 import java.util.ArrayList;
@@ -29,7 +29,7 @@ final class ReadingsAxumExecWorkflowComponentTest {
   static final ReadingsArenaFixture readingsArena = new ReadingsArenaFixture();
 
   @Test
-  @Playbook(ReadingsValidationDbPlaybook.class)
+  @Playbook(ResetValidationDbPlaybook.class)
   void createReadingPublishesKafkaEventAndListsViaHttp() throws Exception {
     HttpClient c = readingsClient();
     String token = readingsArena.accessToken();
@@ -67,7 +67,7 @@ final class ReadingsAxumExecWorkflowComponentTest {
   }
 
   @Test
-  @Playbook(ReadingsValidationDbPlaybook.class)
+  @Playbook(ResetValidationDbPlaybook.class)
   void createMultipleReadingsAreListed() throws Exception {
     HttpClient c = readingsClient();
     String token = readingsArena.accessToken();

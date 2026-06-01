@@ -1,12 +1,15 @@
 mod arena;
 mod http;
+mod playbooks;
+mod readings_arena_config;
 
-use arena_http::{server_error, HttpDependency};
+use arena_http::HttpDependency;
 use arena_kafka::KafkaDependency;
 use arena_mssql::MssqlDependency;
 use arena_oauth::OauthDependency;
 use std::time::Duration;
 
+use crate::playbooks::calibration_outage_managed_id;
 use crate::arena::{
     exec_web_app_port, oauth_server_tls_cert_pem, readings_axum_component_runtime,
     shared_arena, CALIBRATION_ID, KAFKA_ID, MSSQL_ID, OAUTH_ID, SCENARIO_LOCK,
@@ -105,19 +108,11 @@ fn readings_axum_exec_calibration_outage_returns_error() {
         let arena = shared_arena().await;
         let _scenario = SCENARIO_LOCK.lock().await;
 
-        let calibration = arena
-            .dependency(CALIBRATION_ID.get().expect("calibration id initialized"))
-            .and_then(|d| d.as_any().downcast_ref::<HttpDependency>())
-            .expect("calibration service should be available");
-
         {
-            let _outage = calibration
-                .playbook()
-                .post("/api/v1/validate")
-                .with_priority(1)
-                .will_return(server_error())
-                .run()
-                .await;
+            let _outage = arena
+                .run_playbook(calibration_outage_managed_id())
+                .await
+                .expect("calibration outage playbook should be registered");
 
             let token = fetch_example_access_token().await;
             let url = format!("http://127.0.0.1:{}/readings", exec_web_app_port());

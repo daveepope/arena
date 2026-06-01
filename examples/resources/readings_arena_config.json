@@ -28,7 +28,8 @@
     "calibration_default": "readings-api-calibration-default",
     "calibration_outage_managed": "readings-api-calibration-outage-managed",
     "calibration_outage_fixture_scope": "readings-api-calibration-outage-fixture-scope",
-    "validation_db_scoped": "readings-api-validation-db-scoped"
+    "validation_db_scoped": "readings-api-validation-db-scoped",
+    "localstack_session": "readings-api-localstack-session"
   },
   "ports": {
     "exec_web_app": 3010,

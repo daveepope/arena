@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import arena.junit.Playbook;
 import arena.junit.readings.fixture.ReadingsArenaConfig;
 import arena.junit.readings.fixture.ReadingsArenaFixture;
-import arena.junit.readings.playbook.ReadingsValidationDbPlaybook;
+import arena.junit.readings.playbook.ResetValidationDbPlaybook;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.net.http.HttpClient;
 import java.util.ArrayList;
@@ -29,7 +29,7 @@ final class ReadingsAxumContainerizedWorkflowComponentTest {
   static final ReadingsArenaFixture readingsArena = new ReadingsArenaFixture();
 
   @Test
-  @Playbook(ReadingsValidationDbPlaybook.class)
+  @Playbook(ResetValidationDbPlaybook.class)
   void containerizedAppCreateReadingPublishesKafkaEvent() throws Exception {
     assumeTrue(readingsArena.containerizedWebEnabled());
     HttpClient c = ReadingsArenaConfig.readingsClient();

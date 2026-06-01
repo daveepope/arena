@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import arena.examples.readings.playbooks.LocalstackSessionPlaybook;
+import arena.examples.readings.playbooks.ResetValidationDbPlaybook;
 import arena.junit.Playbook;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -25,8 +27,8 @@ public final class ReadingsComponentTest {
   static final ReadingsArenaFixture readings = new ReadingsArenaFixture();
 
   @Test
-  @Playbook(ReadingsPlaybooks.ValidationDbPlaybook.class)
-  @Playbook(ReadingsPlaybooks.LocalstackSessionPlaybook.class)
+  @Playbook(ResetValidationDbPlaybook.class)
+  @Playbook(LocalstackSessionPlaybook.class)
   void postReadingsAuthorizedSameReadingOnQueueAndListedByGet() throws Exception {
     Map<String, String> credsMap = readings.awsDummyCredentials();
     var creds =

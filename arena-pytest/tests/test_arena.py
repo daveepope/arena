@@ -25,9 +25,9 @@ from arena_pytest.ffi._ffi import (
     open_arena,
 )
 
-from readings_playbooks import (
+from playbooks import (
     CalibrationOutagePlaybook,
-    ValidationDbPlaybook,
+    ResetValidationDbPlaybook,
 )
 from readings_arena_config import (
     CALIBRATION_VALIDATE_PATH,
@@ -47,7 +47,7 @@ def _auth_headers(access_token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {access_token}"}
 
 
-@playbook(ValidationDbPlaybook)
+@playbook(ResetValidationDbPlaybook)
 def test_create_reading_publishes_kafka_event_and_lists_via_http(
     arena, oauth_access_token
 ):
@@ -89,7 +89,7 @@ def test_create_reading_publishes_kafka_event_and_lists_via_http(
     assert found.get("comment") == "sqs happy path"
 
 
-@playbook(ValidationDbPlaybook)
+@playbook(ResetValidationDbPlaybook)
 def test_create_multiple_readings_are_listed(arena, oauth_access_token):
     id1 = _create_reading(BASE_URL_EXEC, "Bending", 1, "", oauth_access_token)
     id2 = _create_reading(
@@ -130,7 +130,7 @@ def test_post_reading_returns_500_when_calibration_api_returns_500(
 
 
 @playbook(CalibrationOutagePlaybook)
-@playbook(ValidationDbPlaybook)
+@playbook(ResetValidationDbPlaybook)
 def test_post_reading_returns_500_when_calibration_api_overridden_by_playbook(
     arena, oauth_access_token
 ):
@@ -154,7 +154,7 @@ def test_post_reading_returns_200_after_marker_scope_exits(arena, oauth_access_t
     assert any(r["id"] == recovered_id for r in readings)
 
 
-@playbook(ValidationDbPlaybook)
+@playbook(ResetValidationDbPlaybook)
 def test_create_reading_with_validation_db_scoped_playbook(
     arena, oauth_access_token
 ):
@@ -170,7 +170,7 @@ def test_create_reading_with_validation_db_scoped_playbook(
 
 
 @playbook(CalibrationOutagePlaybook)
-@playbook(ValidationDbPlaybook)
+@playbook(ResetValidationDbPlaybook)
 def test_post_reading_returns_500_under_scoped_playbook_stack(arena, oauth_access_token):
     r = requests.post(
         f"{BASE_URL_EXEC}/readings",
@@ -330,7 +330,7 @@ def test_http_playbook_ffi_verify_both_count_fields_raises():
         close_arena(ffi, arena_h)
 
 
-@playbook(ValidationDbPlaybook)
+@playbook(ResetValidationDbPlaybook)
 def test_containerized_app_create_reading_publishes_kafka_event(
     docker_web_enabled,
     arena_docker,
