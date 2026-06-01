@@ -185,17 +185,17 @@ def test_post_reading_returns_500_under_scoped_playbook_stack(arena, oauth_acces
 
 
 def test_active_http_playbook_verify_count_mismatch_raises(
-    arena, calibration_outage_playbook
+    arena, calibration_outage_verify_probe_playbook
 ):
-    with calibration_outage_playbook.run(arena) as active:
+    with calibration_outage_verify_probe_playbook.run(arena) as active:
         with pytest.raises(ArenaBindingError):
             active.verify("POST", CALIBRATION_VALIDATE_PATH, 1)
 
 
 def test_active_http_playbook_verify_at_least_succeeds_with_traffic(
-    arena, calibration_outage_playbook, oauth_access_token
+    arena, calibration_outage_verify_probe_playbook, oauth_access_token
 ):
-    with calibration_outage_playbook.run(arena) as active:
+    with calibration_outage_verify_probe_playbook.run(arena) as active:
         requests.post(
             f"{BASE_URL_EXEC}/readings",
             json={"user_name": "Verify At Least", "value": 3, "comment": None},
@@ -206,17 +206,17 @@ def test_active_http_playbook_verify_at_least_succeeds_with_traffic(
 
 
 def test_active_http_playbook_failed_verify_drop_does_not_raise(
-    arena, calibration_outage_playbook
+    arena, calibration_outage_verify_probe_playbook
 ):
-    with calibration_outage_playbook.run(arena) as active:
+    with calibration_outage_verify_probe_playbook.run(arena) as active:
         with pytest.raises(ArenaBindingError):
             active.verify("POST", CALIBRATION_VALIDATE_PATH, 1)
 
 
 def test_active_http_playbook_verify_at_least_without_traffic_raises(
-    arena, calibration_outage_playbook
+    arena, calibration_outage_verify_probe_playbook
 ):
-    with calibration_outage_playbook.run(arena) as active:
+    with calibration_outage_verify_probe_playbook.run(arena) as active:
         with pytest.raises(ArenaBindingError):
             active.verify_at_least("POST", CALIBRATION_VALIDATE_PATH, 1)
 

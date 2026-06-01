@@ -23,9 +23,13 @@ def _arena_plugin_already_registered_via_entry_point() -> bool:
 if not _arena_plugin_already_registered_via_entry_point():
     pytest_plugins = ("arena_pytest.arena",)
 
+from playbooks.calibration_outage_verify_probe import (
+    PLAYBOOK_CALIBRATION_OUTAGE_VERIFY_PROBE,
+)
 from playbooks import (
     CalibrationDefaultPlaybook,
     CalibrationOutagePlaybook,
+    CalibrationOutageVerifyProbePlaybook,
     ResetValidationDbPlaybook,
 )
 
@@ -98,6 +102,7 @@ _DISPATCHER_IMPLEMENTATION_DEPENDENCY_LOG_IDS = (
     PLAYBOOK_CALIBRATION_DEFAULT,
     PLAYBOOK_CALIBRATION_OUTAGE_MANAGED,
     PLAYBOOK_VALIDATION_DB_SCOPED,
+    PLAYBOOK_CALIBRATION_OUTAGE_VERIFY_PROBE,
 )
 
 _DISPATCHER_IMPLEMENTATION_COMPONENT_LOG_IDS = (
@@ -256,6 +261,11 @@ def calibration_outage_playbook(closed_arena):
     return closed_arena._matches[0].playbook(CalibrationOutagePlaybook)
 
 
+@pytest.fixture(scope="session")
+def calibration_outage_verify_probe_playbook(closed_arena):
+    return closed_arena._matches[0].playbook(CalibrationOutageVerifyProbePlaybook)
+
+
 def _build_exec_component(oauth_ca_pem: str) -> object:
     web_app_binary = _find_web_app_binary()
     healthcheck_url = f"http://127.0.0.1:{EXEC_WEB_APP_PORT}/health"
@@ -390,6 +400,9 @@ def closed_arena() -> ClosedArena:
     )
     a_match = a_match.register_playbook(
         CalibrationOutagePlaybook(calibration_http.identifier),
+    )
+    a_match = a_match.register_playbook(
+        CalibrationOutageVerifyProbePlaybook(calibration_http.identifier),
     )
     a_match = a_match.register_playbook(
         ResetValidationDbPlaybook(mssql.identifier),

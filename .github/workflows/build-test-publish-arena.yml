@@ -94,10 +94,7 @@ jobs:
           disk-cache: build-test-publish-arena-ubuntu-24.04
           repository-cache: true
 
-      - name: Build
-        run: bazel build //... --config=ci
-
-      - name: Test
+      - name: Build and test
         run: bazel test //... --config=ci --build_tests_only
 
   coverage_ubuntu_24_04:
@@ -153,10 +150,7 @@ jobs:
           disk-cache: build-test-publish-arena-macos-intel
           repository-cache: true
 
-      - name: Build
-        run: bazel build //... --config=ci
-
-      - name: Test
+      - name: Build and test
         run: bazel test //... --config=ci --build_tests_only
 
   test_macos_arm64:
@@ -177,10 +171,7 @@ jobs:
           disk-cache: build-test-publish-arena-macos-arm64
           repository-cache: true
 
-      - name: Build
-        run: bazel build //... --config=ci
-
-      - name: Test
+      - name: Build and test
         run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-requires_docker
 
   wheel:
