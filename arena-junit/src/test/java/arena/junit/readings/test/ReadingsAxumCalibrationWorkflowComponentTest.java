@@ -15,6 +15,7 @@ import arena.junit.ffi.ArenaBindingError;
 import arena.junit.playbook.ActiveHttpPlaybook;
 import arena.junit.readings.fixture.ReadingsArenaFixture;
 import arena.junit.readings.playbook.CalibrationOutagePlaybook;
+import arena.junit.readings.playbook.CalibrationOutageVerifyProbePlaybook;
 import arena.junit.readings.playbook.ResetValidationDbPlaybook;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -84,7 +85,9 @@ final class ReadingsAxumCalibrationWorkflowComponentTest {
   @Test
   void verify_calibrationOutageWithoutTraffic_throwsBindingError() {
     arena.junit.playbook.Playbook pb =
-        readingsArena.openArena().playbook(CalibrationOutagePlaybook.class);
+        readingsArena
+            .openArena()
+            .playbook(CalibrationOutageVerifyProbePlaybook.class);
     try (ActiveHttpPlaybook active = (ActiveHttpPlaybook) pb.run(readingsArena.openArena())) {
       assertThrows(
           ArenaBindingError.class,

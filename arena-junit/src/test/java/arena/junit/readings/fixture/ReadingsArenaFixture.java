@@ -25,6 +25,7 @@ import arena.junit.oauth.OauthLoopbackTls;
 import arena.junit.readiness.HttpReadinessCheck;
 import arena.junit.readings.playbook.CalibrationDefaultPlaybook;
 import arena.junit.readings.playbook.CalibrationOutagePlaybook;
+import arena.junit.readings.playbook.CalibrationOutageVerifyProbePlaybook;
 import arena.junit.readings.playbook.ResetValidationDbPlaybook;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -122,6 +123,8 @@ public final class ReadingsArenaFixture extends ClosedArenaExtension {
         new CalibrationDefaultPlaybook(calibration.identifier());
     CalibrationOutagePlaybook calibrationOutagePlaybook =
         new CalibrationOutagePlaybook(calibration.identifier());
+    CalibrationOutageVerifyProbePlaybook calibrationOutageVerifyProbePlaybook =
+        new CalibrationOutageVerifyProbePlaybook(calibration.identifier());
     ResetValidationDbPlaybook resetValidationDbPlaybook =
         new ResetValidationDbPlaybook(mssql.identifier());
     String bin = ReadingsArenaConfig.findAxumBinary();
@@ -156,6 +159,7 @@ public final class ReadingsArenaFixture extends ClosedArenaExtension {
             .addComponent(exec)
             .registerPlaybook(calibrationPlaybook, true)
             .registerPlaybook(calibrationOutagePlaybook, false)
+            .registerPlaybook(calibrationOutageVerifyProbePlaybook, false)
             .registerPlaybook(resetValidationDbPlaybook, false);
     containerizedWebEnabled = false;
     if (OauthIssuerHosts.oauthIssuerHostIsNonLoopback()) {
