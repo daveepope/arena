@@ -9,7 +9,7 @@ on:
 jobs:
   changes:
     name: Detect changes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
@@ -32,17 +32,17 @@ jobs:
     name: Docs / agent rules only
     needs: changes
     if: needs.changes.outputs.bazel != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
       - run: echo "No Bazel-relevant changes; build and test skipped."
 
   verify_cargo_bazel_lock:
-    name: Verify Cargo.Bazel.lock
+    name: Verify Cargo.Bazel.lock (Ubuntu 24.04)
     needs: changes
     if: needs.changes.outputs.bazel == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -63,7 +63,7 @@ jobs:
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
           bazelisk-cache: true
-          disk-cache: build-test-publish-arena-ubuntu
+          disk-cache: build-test-publish-arena-ubuntu-24.04
           repository-cache: true
 
       - name: Repin and verify lockfile
@@ -76,11 +76,11 @@ jobs:
             exit 1
           fi
 
-  test_linux:
-    name: Test Linux
+  test_ubuntu_24_04:
+    name: Test Ubuntu 24.04
     needs: changes
     if: needs.changes.outputs.bazel == 'true'
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 60
@@ -91,7 +91,7 @@ jobs:
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
           bazelisk-cache: true
-          disk-cache: build-test-publish-arena-ubuntu
+          disk-cache: build-test-publish-arena-ubuntu-24.04
           repository-cache: true
 
       - name: Build
@@ -100,11 +100,11 @@ jobs:
       - name: Test
         run: bazel test //... --config=ci --build_tests_only
 
-  coverage:
-    name: Coverage
+  coverage_ubuntu_24_04:
+    name: Coverage Ubuntu 24.04
     needs: changes
     if: needs.changes.outputs.bazel == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 30
@@ -115,7 +115,7 @@ jobs:
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
           bazelisk-cache: true
-          disk-cache: build-test-publish-arena-ubuntu
+          disk-cache: build-test-publish-arena-ubuntu-24.04
           repository-cache: true
 
       - name: Coverage
@@ -128,8 +128,8 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: lcov.info
-          flags: linux
-          name: arena-linux
+          flags: ubuntu-24.04
+          name: arena-ubuntu-24.04
           fail_ci_if_error: false
 
   test_macos_intel:
@@ -184,15 +184,15 @@ jobs:
         run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-requires_docker
 
   wheel:
-    name: Build wheel
-    needs: [changes, test_linux, test_macos_intel, test_macos_arm64]
+    name: Build wheel (Ubuntu 24.04)
+    needs: [changes, test_ubuntu_24_04, test_macos_intel, test_macos_arm64]
     if: >-
       ${{
         needs.changes.outputs.bazel == 'true' &&
         github.event_name == 'pull_request' &&
         github.event.pull_request.head.repo.full_name == github.repository
       }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -202,7 +202,7 @@ jobs:
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
           bazelisk-cache: true
-          disk-cache: build-test-publish-arena-ubuntu
+          disk-cache: build-test-publish-arena-ubuntu-24.04
           repository-cache: true
 
       - name: Unique version for TestPyPI
@@ -247,15 +247,15 @@ jobs:
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
         with:
-          name: arena-pytest-wheel-linux
+          name: arena-pytest-wheel-ubuntu-24.04
           path: bazel-bin/arena-pytest/*.whl
           if-no-files-found: error
 
   publish_testpypi:
-    name: Publish TestPyPI
+    name: Publish TestPyPI (Ubuntu 24.04)
     needs: wheel
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write
