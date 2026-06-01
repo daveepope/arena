@@ -43,8 +43,6 @@ jobs:
     needs: changes
     if: needs.changes.outputs.bazel == 'true'
     runs-on: ubuntu-latest
-    env:
-      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
     permissions:
       contents: read
     steps:
@@ -78,15 +76,14 @@ jobs:
             exit 1
           fi
 
-  build:
-    name: Build
+  test_linux:
+    name: Test Linux
     needs: changes
     if: needs.changes.outputs.bazel == 'true'
-    runs-on: ubuntu-latest
-    env:
-      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+    runs-on: ubuntu-latest-8-cores
     permissions:
       contents: read
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -100,15 +97,17 @@ jobs:
       - name: Build
         run: bazel build //... --config=ci
 
-  test_no_docker:
-    name: Test (no Docker)
-    needs: [changes, build]
+      - name: Test
+        run: bazel test //... --config=ci --build_tests_only
+
+  coverage:
+    name: Coverage
+    needs: changes
     if: needs.changes.outputs.bazel == 'true'
     runs-on: ubuntu-latest
-    env:
-      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
     permissions:
       contents: read
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -119,46 +118,32 @@ jobs:
           disk-cache: build-test-publish-arena-ubuntu
           repository-cache: true
 
-      - name: Run tests
-        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-requires_docker
+      - name: Coverage
+        run: |
+          bazel coverage //... --config=coverage --build_tests_only --test_tag_filters=-requires_docker
+          cp "$(bazel info output_path)/_coverage/_coverage_report.dat" lcov.info
 
-  test_docker:
-    name: Test (Docker)
-    needs: [changes, build]
-    if: needs.changes.outputs.bazel == 'true'
-    runs-on: ubuntu-latest-8-cores
-    env:
-      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-    permissions:
-      contents: read
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.14.0
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
         with:
-          bazelisk-cache: true
-          disk-cache: build-test-publish-arena-ubuntu
-          repository-cache: true
-
-      - name: Run Docker tests
-        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=requires_docker
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          flags: linux
+          name: arena-linux
+          fail_ci_if_error: false
 
   test_macos_intel:
-    name: Test (macOS Intel, all tests)
+    name: Test macOS Intel
     needs: changes
     if: needs.changes.outputs.bazel == 'true'
     runs-on: macos-15-intel
-    env:
-      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
     permissions:
       contents: read
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Docker
+      - name: Setup Colima
         uses: douglascamata/setup-docker-macos-action@v1.1.0
 
       - name: Setup Bazel
@@ -168,18 +153,17 @@ jobs:
           disk-cache: build-test-publish-arena-macos-intel
           repository-cache: true
 
-      - name: Build and run all tests
-        run: |
-          bazel build //... --config=ci
-          bazel test //... --config=ci --build_tests_only
+      - name: Build
+        run: bazel build //... --config=ci
+
+      - name: Test
+        run: bazel test //... --config=ci --build_tests_only
 
   test_macos_arm64:
-    name: Test (macOS arm64)
+    name: Test macOS ARM64
     needs: changes
     if: needs.changes.outputs.bazel == 'true'
     runs-on: macos-latest
-    env:
-      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
     permissions:
       contents: read
     timeout-minutes: 60
@@ -193,14 +177,15 @@ jobs:
           disk-cache: build-test-publish-arena-macos-arm64
           repository-cache: true
 
-      - name: Build and run tests
-        run: |
-          bazel build //... --config=ci
-          bazel test //... --config=ci --build_tests_only --test_tag_filters=-requires_docker
+      - name: Build
+        run: bazel build //... --config=ci
+
+      - name: Test
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-requires_docker
 
   wheel:
-    name: Build wheel (TestPyPI)
-    needs: [changes, test_no_docker, test_docker, test_macos_intel, test_macos_arm64]
+    name: Build wheel
+    needs: [changes, test_linux, test_macos_intel, test_macos_arm64]
     if: >-
       ${{
         needs.changes.outputs.bazel == 'true' &&
@@ -208,8 +193,6 @@ jobs:
         github.event.pull_request.head.repo.full_name == github.repository
       }}
     runs-on: ubuntu-latest
-    env:
-      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
     permissions:
       contents: read
     steps:
