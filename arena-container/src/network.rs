@@ -5,8 +5,14 @@ use bollard::Docker;
 ///
 /// If the network already exists this is a no-op.
 /// If it does not exist it will be created as a `bridge` network.
+fn docker_client() -> Option<Docker> {
+    Docker::connect_with_defaults().ok()
+}
+
 pub async fn ensure_network_exists(name: &str) {
-    let docker = Docker::connect_with_defaults().expect("failed to connect to Docker daemon");
+    let Some(docker) = docker_client() else {
+        panic!("failed to connect to Docker daemon");
+    };
 
     match docker
         .inspect_network(
@@ -55,7 +61,10 @@ pub async fn ensure_network_exists(name: &str) {
 /// Removes a Docker network by name. Silently ignores errors (e.g. network
 /// doesn't exist or still has connected containers).
 pub async fn remove_network(name: &str) {
-    let docker = Docker::connect_with_defaults().expect("failed to connect to Docker daemon");
+    let Some(docker) = docker_client() else {
+        tracing::debug!(network = %name, "docker unavailable; skip network remove");
+        return;
+    };
 
     match docker.remove_network(name).await {
         Ok(_) => tracing::debug!(network = %name, "network removed"),

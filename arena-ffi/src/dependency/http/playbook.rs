@@ -140,10 +140,7 @@ fn with_http_dependency<F, R>(
 where
     F: FnOnce(&HttpDependency) -> R,
 {
-    let guard = runtime_state
-        .state
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let guard = runtime_state.state.blocking_lock();
     let arena = guard
         .as_ref()
         .ok_or_else(|| "arena is already closed".to_string())?;

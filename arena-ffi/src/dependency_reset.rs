@@ -32,25 +32,22 @@ pub extern "C" fn arena_hard_reset(
 }
 
 fn reset_dependency(runtime_state: &OpenArenaRuntimeState, identifier: &str, kind: ResetKind) -> ArenaStatus {
-    let mut guard = runtime_state
-        .state
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let arena = match guard.as_mut() {
-        Some(a) => a,
-        None => return ArenaStatus::Failed,
-    };
-    let dep = match arena.dependency_mut(identifier) {
-        Some(d) => d,
-        None => return ArenaStatus::NotFound,
-    };
     runtime_state.runtime.block_on(async {
+        let mut guard = runtime_state.state.lock().await;
+        let arena = match guard.as_mut() {
+            Some(a) => a,
+            None => return ArenaStatus::Failed,
+        };
+        let dep = match arena.dependency_mut(identifier) {
+            Some(d) => d,
+            None => return ArenaStatus::NotFound,
+        };
         match kind {
             ResetKind::Soft => dep.soft_reset().await,
             ResetKind::Hard => dep.hard_reset().await,
         }
-    });
-    ArenaStatus::Ok
+        ArenaStatus::Ok
+    })
 }
 
 fn run_reset(

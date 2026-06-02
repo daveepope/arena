@@ -75,17 +75,16 @@ pub extern "C" fn arena_match_playbook_run(
         let arena_runtime = unsafe { OpenArenaRuntimeState::as_ref(arena_handle) };
         let runtime_handle = arena_runtime.runtime.handle().clone();
 
-        let guard = arena_runtime
-            .state
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let arena = guard
-            .as_ref()
-            .ok_or_else(|| "arena is already closed".to_string())?;
-
-        let active = runtime_handle
-            .block_on(arena.run_playbook(&id_str))
-            .ok_or_else(|| format!("playbook '{id_str}' is not registered on any match"))?;
+        let active = runtime_handle.block_on(async {
+            let guard = arena_runtime.state.lock().await;
+            let arena = guard
+                .as_ref()
+                .ok_or_else(|| "arena is already closed".to_string())?;
+            arena
+                .run_playbook(&id_str)
+                .await
+                .ok_or_else(|| format!("playbook '{id_str}' is not registered on any match"))
+        })?;
 
         Ok(ActivePlaybookInner {
             runtime_handle,

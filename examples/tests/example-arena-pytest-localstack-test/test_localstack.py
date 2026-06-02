@@ -21,7 +21,6 @@ from arena_pytest import (
 )
 
 LOCALSTACK_HOST_PORT = ephemeral_tcp_port()
-LOCALSTACK_NETWORK = f"arena-pytest-localstack-network-{uuid.uuid4().hex[:8]}"
 QUEUE_NAME = "arena-events-queue"
 REGION = "us-east-1"
 DUMMY_CREDS = {"aws_access_key_id": "test", "aws_secret_access_key": "test"}
@@ -79,7 +78,6 @@ async def _localstack_session():
 
     a_match = (
         MatchBuilder("localstack-e2e")
-        .with_network(LOCALSTACK_NETWORK)
         .add_dependency(localstack)
         .register_playbook(session_purge_playbook)
         .build()
@@ -88,11 +86,13 @@ async def _localstack_session():
     closed = ClosedArena(
         "Localstack E2E Arena", [a_match], log_level=ArenaLogLevel.WARN
     )
-    arena = await closed.open()
+    arena = None
     try:
+        arena = await closed.open()
         yield arena, localstack, session_purge_playbook
     finally:
-        await arena.close()
+        if arena is not None:
+            await arena.close()
 
 
 @pytest.fixture(scope="module")
@@ -179,4 +179,16 @@ async def test_localstack_playbook_purges_queue(
 
 
 if __name__ == "__main__":
-    sys.exit(pytest.main([os.path.dirname(os.path.abspath(__file__)), "-v", "-s"]))
+    sys.exit(
+        pytest.main(
+            [
+                os.path.dirname(os.path.abspath(__file__)),
+                "-v",
+                "-s",
+                "-o",
+                "asyncio_mode=auto",
+                "-o",
+                "asyncio_default_fixture_loop_scope=session",
+            ]
+        )
+    )

@@ -96,6 +96,10 @@ def pytest_configure(config: pytest.Config) -> None:
         "subclass for the test, class, or module scope; stack multiple "
         "@playbook(...) decorators for more than one.",
     )
+    if config.getini("asyncio_mode") in (None, "strict", "STRICT"):
+        config._inicache["asyncio_mode"] = "auto"
+    if not config.getini("asyncio_default_fixture_loop_scope"):
+        config._inicache["asyncio_default_fixture_loop_scope"] = "session"
 
 
 _FUNCTION_ACTIVES_ATTR = "_arena_pytest_function_actives"

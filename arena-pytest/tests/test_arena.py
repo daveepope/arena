@@ -37,7 +37,7 @@ from readings_arena_config import (
     KAFKA_PORT,
     KAFKA_TOPIC,
 )
-from readings_ephemeral_test_runtime import ephemeral_tcp_port
+from readings_ephemeral_test_runtime import RUNTIME, ephemeral_tcp_port
 
 BASE_URL_EXEC = f"http://127.0.0.1:{EXEC_WEB_APP_PORT}"
 BASE_URL_DOCKER = f"http://127.0.0.1:{DOCKER_WEB_HOST_PORT}"
@@ -222,112 +222,125 @@ def test_active_http_playbook_verify_at_least_without_traffic_raises(
 
 
 def _open_http_playbook_ffi_arena():
-    port = ephemeral_tcp_port()
-    dep = HttpDependencyBuilder("ffi-open-verify").with_port(port).build()
-    config = json.dumps(
+    ffi = load_ffi()
+    ports = [RUNTIME.localstack_host_port]
+    for _ in range(4):
+        ports.append(ephemeral_tcp_port())
+    last_err = None
+    for port in ports:
+        dep = HttpDependencyBuilder("ffi-open-verify").with_port(port).build()
+        config = json.dumps(
+            {
+                "match_name": "ffi-http-match",
+                "dependencies": [dep._for_ffi()],
+            }
+        )
+        try:
+            arena_h = open_arena(ffi, b"ffi-http-arena", config)
+            return ffi, arena_h, dep, port
+        except ArenaBindingError as err:
+            last_err = err
+            msg = str(err)
+            if "ports are not available" not in msg and "StartContainer" not in msg:
+                raise
+    raise last_err
+
+
+@pytest.fixture(scope="module")
+def _ffi_http_playbook_arena():
+    ffi, arena_h, dep, port = _open_http_playbook_ffi_arena()
+    try:
+        yield ffi, arena_h, dep, port
+    finally:
+        close_arena(ffi, arena_h)
+
+
+def test_http_playbook_ffi_open_verify_at_least_with_traffic(_ffi_http_playbook_arena):
+    ffi, arena_h, dep, port = _ffi_http_playbook_arena
+    dep_id = dep.identifier
+    open_spec = json.dumps(
         {
-            "match_name": "ffi-http-match",
-            "dependencies": [dep._for_ffi()],
+            "dependency_identifier": dep_id,
+            "mappings": [
+                {
+                    "method": "GET",
+                    "url_path": "/api/ffi/playbook",
+                    "response": {"status": 200, "json_body": {"ok": True}},
+                }
+            ],
         }
     )
-    ffi = load_ffi()
-    arena_h = open_arena(ffi, b"ffi-http-arena", config)
-    return ffi, arena_h, dep, port
+    pb_h = http_playbook_open(ffi, arena_h, open_spec)
+    url = f"http://127.0.0.1:{port}/api/ffi/playbook"
+    assert requests.get(url, timeout=10).status_code == 200
+    verify_spec = json.dumps(
+        {
+            "method": "GET",
+            "url_path": "/api/ffi/playbook",
+            "minimum_count": 1,
+        }
+    )
+    http_playbook_verify(ffi, pb_h, verify_spec)
+    active_playbook_drop(ffi, pb_h)
 
 
-def test_http_playbook_ffi_open_verify_at_least_with_traffic():
-    ffi, arena_h, dep, port = _open_http_playbook_ffi_arena()
+def test_http_playbook_ffi_verify_expected_count_without_traffic_raises(
+    _ffi_http_playbook_arena,
+):
+    ffi, arena_h, dep, _port = _ffi_http_playbook_arena
     dep_id = dep.identifier
-    try:
-        open_spec = json.dumps(
-            {
-                "dependency_identifier": dep_id,
-                "mappings": [
-                    {
-                        "method": "GET",
-                        "url_path": "/api/ffi/playbook",
-                        "response": {"status": 200, "json_body": {"ok": True}},
-                    }
-                ],
-            }
-        )
-        pb_h = http_playbook_open(ffi, arena_h, open_spec)
-        url = f"http://127.0.0.1:{port}/api/ffi/playbook"
-        assert requests.get(url, timeout=10).status_code == 200
-        verify_spec = json.dumps(
-            {
-                "method": "GET",
-                "url_path": "/api/ffi/playbook",
-                "minimum_count": 1,
-            }
-        )
+    open_spec = json.dumps(
+        {
+            "dependency_identifier": dep_id,
+            "mappings": [
+                {
+                    "method": "GET",
+                    "url_path": "/api/ffi/playbook",
+                    "response": {"status": 200, "json_body": {"ok": True}},
+                }
+            ],
+        }
+    )
+    pb_h = http_playbook_open(ffi, arena_h, open_spec)
+    verify_spec = json.dumps(
+        {
+            "method": "GET",
+            "url_path": "/api/ffi/playbook",
+            "expected_count": 1,
+        }
+    )
+    with pytest.raises(ArenaBindingError):
         http_playbook_verify(ffi, pb_h, verify_spec)
-        active_playbook_drop(ffi, pb_h)
-    finally:
-        close_arena(ffi, arena_h)
+    active_playbook_drop(ffi, pb_h)
 
 
-def test_http_playbook_ffi_verify_expected_count_without_traffic_raises():
-    ffi, arena_h, dep, _port = _open_http_playbook_ffi_arena()
+def test_http_playbook_ffi_verify_both_count_fields_raises(_ffi_http_playbook_arena):
+    ffi, arena_h, dep, _port = _ffi_http_playbook_arena
     dep_id = dep.identifier
-    try:
-        open_spec = json.dumps(
-            {
-                "dependency_identifier": dep_id,
-                "mappings": [
-                    {
-                        "method": "GET",
-                        "url_path": "/api/ffi/playbook",
-                        "response": {"status": 200, "json_body": {"ok": True}},
-                    }
-                ],
-            }
-        )
-        pb_h = http_playbook_open(ffi, arena_h, open_spec)
-        verify_spec = json.dumps(
-            {
-                "method": "GET",
-                "url_path": "/api/ffi/playbook",
-                "expected_count": 1,
-            }
-        )
-        with pytest.raises(ArenaBindingError):
-            http_playbook_verify(ffi, pb_h, verify_spec)
-        active_playbook_drop(ffi, pb_h)
-    finally:
-        close_arena(ffi, arena_h)
-
-
-def test_http_playbook_ffi_verify_both_count_fields_raises():
-    ffi, arena_h, dep, _port = _open_http_playbook_ffi_arena()
-    dep_id = dep.identifier
-    try:
-        open_spec = json.dumps(
-            {
-                "dependency_identifier": dep_id,
-                "mappings": [
-                    {
-                        "method": "GET",
-                        "url_path": "/api/ffi/playbook",
-                        "response": {"status": 200, "json_body": {"ok": True}},
-                    }
-                ],
-            }
-        )
-        pb_h = http_playbook_open(ffi, arena_h, open_spec)
-        verify_spec = json.dumps(
-            {
-                "method": "GET",
-                "url_path": "/api/ffi/playbook",
-                "expected_count": 1,
-                "minimum_count": 1,
-            }
-        )
-        with pytest.raises(ArenaBindingError):
-            http_playbook_verify(ffi, pb_h, verify_spec)
-        active_playbook_drop(ffi, pb_h)
-    finally:
-        close_arena(ffi, arena_h)
+    open_spec = json.dumps(
+        {
+            "dependency_identifier": dep_id,
+            "mappings": [
+                {
+                    "method": "GET",
+                    "url_path": "/api/ffi/playbook",
+                    "response": {"status": 200, "json_body": {"ok": True}},
+                }
+            ],
+        }
+    )
+    pb_h = http_playbook_open(ffi, arena_h, open_spec)
+    verify_spec = json.dumps(
+        {
+            "method": "GET",
+            "url_path": "/api/ffi/playbook",
+            "expected_count": 1,
+            "minimum_count": 1,
+        }
+    )
+    with pytest.raises(ArenaBindingError):
+        http_playbook_verify(ffi, pb_h, verify_spec)
+    active_playbook_drop(ffi, pb_h)
 
 
 @playbook(ResetValidationDbPlaybook)
@@ -456,4 +469,16 @@ def _consume_reading_created_event(
 
 
 if __name__ == "__main__":
-    sys.exit(pytest.main([os.path.dirname(os.path.abspath(__file__)), "-v", "-s"]))
+    sys.exit(
+        pytest.main(
+            [
+                os.path.dirname(os.path.abspath(__file__)),
+                "-v",
+                "-s",
+                "-o",
+                "asyncio_mode=auto",
+                "-o",
+                "asyncio_default_fixture_loop_scope=session",
+            ]
+        )
+    )

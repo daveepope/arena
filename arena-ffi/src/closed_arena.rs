@@ -1,9 +1,9 @@
 use std::os::raw::c_char;
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::sync::Mutex;
 
 use arena::{ClosedArena, OpenArena};
 use tokio::runtime::Runtime;
+use tokio::sync::Mutex;
 
 use crate::matches::build_match_async;
 

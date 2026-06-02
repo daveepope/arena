@@ -9,7 +9,10 @@ use bollard::Docker;
 ///
 /// If the container does not exist this is a silent no-op.
 pub async fn try_remove_existing_container(name: &str) {
-    let docker = Docker::connect_with_defaults().expect("failed to connect to Docker daemon");
+    let Some(docker) = Docker::connect_with_defaults().ok() else {
+        tracing::debug!(container = %name, "docker unavailable; skip container remove");
+        return;
+    };
 
     let remove_options = RemoveContainerOptionsBuilder::default().force(true).build();
 

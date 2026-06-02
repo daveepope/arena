@@ -413,7 +413,7 @@ def closed_arena() -> ClosedArena:
     return ClosedArena(
         CLOSED_ARENA_NAME,
         [a_match.build()],
-        log_level=ArenaLogLevel.DEBUG,
+        log_level=ArenaLogLevel.WARN,
         logger=_LOG,
         log_component_ids=_DISPATCHER_IMPLEMENTATION_COMPONENT_LOG_IDS,
         log_dependency_ids=_DISPATCHER_IMPLEMENTATION_DEPENDENCY_LOG_IDS,
