@@ -58,7 +58,7 @@ dependencies = [
 
 [[package]]
 name = "arena"
-version = "0.4.0-beta.1"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "arena-container"
-version = "0.4.0-beta.1"
+version = "1.0.0"
 dependencies = [
  "bollard",
  "tracing",
@@ -79,7 +79,7 @@ dependencies = [
 
 [[package]]
 name = "arena-containerized-component"
-version = "0.4.0-beta.1"
+version = "1.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -95,7 +95,7 @@ dependencies = [
 
 [[package]]
 name = "arena-examples"
-version = "0.4.0-beta.1"
+version = "1.0.0"
 dependencies = [
  "arena",
  "arena-containerized-component",
@@ -124,7 +124,7 @@ dependencies = [
 
 [[package]]
 name = "arena-executable-component"
-version = "0.4.0-beta.1"
+version = "1.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -138,7 +138,7 @@ dependencies = [
 
 [[package]]
 name = "arena-ffi"
-version = "0.4.0-beta.1"
+version = "1.0.0"
 dependencies = [
  "arc-swap",
  "arena",
@@ -161,7 +161,7 @@ dependencies = [
 
 [[package]]
 name = "arena-http"
-version = "0.4.0-beta.1"
+version = "1.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -179,7 +179,7 @@ dependencies = [
 
 [[package]]
 name = "arena-kafka"
-version = "0.4.0-beta.1"
+version = "1.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -195,7 +195,7 @@ dependencies = [
 
 [[package]]
 name = "arena-localstack"
-version = "0.4.0-beta.1"
+version = "1.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -219,7 +219,7 @@ dependencies = [
 
 [[package]]
 name = "arena-mssql"
-version = "0.4.0-beta.1"
+version = "1.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -235,7 +235,7 @@ dependencies = [
 
 [[package]]
 name = "arena-oauth"
-version = "0.4.0-beta.1"
+version = "1.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -260,7 +260,7 @@ dependencies = [
 
 [[package]]
 name = "arena-postgres"
-version = "0.4.0-beta.1"
+version = "1.0.0"
 dependencies = [
  "arena",
  "arena-container",

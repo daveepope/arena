@@ -1,8 +1,16 @@
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_java//java:defs.bzl", "java_library", "java_test")
+
+copy_file(
+    name = "arena_version_resource",
+    src = "//:VERSION",
+    out = "src/main/resources/arena-version.txt",
+)
 
 java_library(
     name = "arena_junit_lib",
     srcs = glob(["src/main/java/**/*.java"]),
+    resources = [":arena_version_resource"],
     javacopts = [
         "--release",
         "21",

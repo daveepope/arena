@@ -93,7 +93,7 @@ From the repository root:
 bazel build //arena-pytest:arena_pytest_wheel
 ```
 
-The wheel is under `bazel-bin/arena-pytest/`. The filename is **platform-specific** (it includes the Rust FFI shared library next to `arena_pytest/`), e.g. `arena_pytest-0.4.0b1-py3-none-manylinux2014_x86_64.whl` on Linux x86_64. Build on each OS/arch you want to publish and upload **each** wheel to PyPI.
+The wheel is under `bazel-bin/arena-pytest/`. The filename is **platform-specific** (it includes the Rust FFI shared library next to `arena_pytest/`), e.g. `arena_pytest-1.0.0-py3-none-manylinux2014_x86_64.whl` on Linux x86_64. Build on each OS/arch you want to publish and upload **each** wheel to PyPI.
 
 Try it in another project:
 
@@ -111,7 +111,7 @@ If `pip` sees two wheels for the same version, remove old files under `bazel-bin
 
 ## Publish to PyPI
 
-Bump **`version`** in both `BUILD` (`ARENA_PYTEST_VERSION` / `py_wheel`) and `pyproject.toml` before a release. Keep `arena-pytest/LICENSE` aligned with the repository root `LICENSE`, then rebuild the wheel.
+Each PR to `master` gets an automatic release bump from `master`’s `VERSION` (default **patch**). Add a PR label **`semver:minor`** or **`semver:major`** for larger bumps; CI commits `VERSION`, `Cargo.toml`, and `MODULE.bazel`. `bazel test //...` runs `//scripts:version_sync_test` if those drift. Keep `arena-pytest/LICENSE` aligned with the repository root `LICENSE`.
 
 ### 1. Smoke test (install the wheel locally, no upload)
 

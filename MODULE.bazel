@@ -1,6 +1,6 @@
 module(
     name = "arena",
-    version = "0.4.0-beta.1",
+    version = "1.0.0",
 )
 
 bazel_dep(name = "rules_python", version = "0.34.0")
@@ -9,6 +9,9 @@ bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "rules_java", version = "7.12.2")
 bazel_dep(name = "rules_jvm_external", version = "6.6")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
+
+arena_version_ext = use_extension("//tools:arena_version.bzl", "arena_version")
+use_repo(arena_version_ext, "arena_version")
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 

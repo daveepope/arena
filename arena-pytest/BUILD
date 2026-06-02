@@ -1,13 +1,13 @@
+load("@arena_version//:defs.bzl", "ARENA_VERSION")
+load("//tools:version_sync.bzl", "sync_arena_version")
 load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("@rules_python//python:packaging.bzl", "py_wheel")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 
-ARENA_PYTEST_VERSION = "0.4.0b1"
-
 # Keep in sync with classifiers in arena-pytest/pyproject.toml (Bazel wheel METADATA).
 ARENA_PYTEST_CLASSIFIERS = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Framework :: Pytest",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
@@ -163,10 +163,15 @@ py_test(
     python_version = "PY3",
     visibility = ["//visibility:public"],
 )
+sync_arena_version(
+    name = "sync_version_before_wheel",
+    stamp = "version_sync.stamp",
+)
+
 py_wheel(
     name = "arena_pytest_wheel",
     distribution = "arena-pytest",
-    version = ARENA_PYTEST_VERSION,
+    version = ARENA_VERSION,
     python_tag = "py3",
     python_requires = ">=3.9",
     abi = "none",

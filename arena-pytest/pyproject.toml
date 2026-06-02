@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "arena-pytest"
-version = "0.4.0b1"
+dynamic = ["version"]
 description = "pytest API and fixtures for Arena (via the C FFI)"
 readme = "DESCRIPTION.md"
 license = "MIT"
@@ -13,7 +13,7 @@ requires-python = ">=3.9"
 authors = [{ name = "The Arena Authors" }]
 keywords = ["arena", "pytest", "plugin", "testing", "ffi", "integration"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Framework :: Pytest",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
@@ -43,6 +43,9 @@ Changelog = "https://github.com/daveepope/arena/releases"
 
 [project.optional-dependencies]
 dev = []
+
+[tool.setuptools.dynamic]
+version = {file = "../VERSION"}
 
 [tool.setuptools.packages.find]
 where = ["src"]

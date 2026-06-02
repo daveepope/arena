@@ -5,8 +5,41 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
+  bump_release_version:
+    name: Bump release VERSION (PR)
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Fetch master
+        run: git fetch origin master
+
+      - name: Bump VERSION from master
+        run: python3 scripts/bump_release_version.py
+
+      - name: Commit release version
+        run: |
+          if git diff --quiet VERSION Cargo.toml MODULE.bazel; then
+            echo "VERSION already set for this release"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION Cargo.toml MODULE.bazel
+          git commit -m "chore: bump release VERSION for master"
+          git push
+
   changes:
     name: Detect changes
     runs-on: ubuntu-24.04
@@ -40,8 +73,11 @@ jobs:
 
   verify_cargo_bazel_lock:
     name: Verify Cargo.Bazel.lock (Ubuntu 24.04)
-    needs: changes
-    if: needs.changes.outputs.bazel == 'true'
+    needs: [changes, bump_release_version]
+    if: >-
+      always() &&
+      needs.changes.outputs.bazel == 'true' &&
+      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -66,6 +102,10 @@ jobs:
           disk-cache: build-test-publish-arena-ubuntu-24.04
           repository-cache: true
 
+      - name: Verify VERSION sync
+        if: steps.rust_crates.outputs.rust_crates == 'true'
+        run: bazel test //scripts:version_sync_test --config=ci
+
       - name: Repin and verify lockfile
         if: steps.rust_crates.outputs.rust_crates == 'true'
         run: |
@@ -78,8 +118,10 @@ jobs:
 
   test_ubuntu_24_04:
     name: Test Ubuntu 24.04
-    needs: changes
-    if: needs.changes.outputs.bazel == 'true'
+    needs: [changes, bump_release_version]
+    if: >-
+      needs.changes.outputs.bazel == 'true' &&
+      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -99,8 +141,10 @@ jobs:
 
   coverage_ubuntu_24_04:
     name: Coverage Ubuntu 24.04
-    needs: changes
-    if: needs.changes.outputs.bazel == 'true'
+    needs: [changes, bump_release_version]
+    if: >-
+      needs.changes.outputs.bazel == 'true' &&
+      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -131,8 +175,10 @@ jobs:
 
   test_macos_intel:
     name: Test macOS Intel
-    needs: changes
-    if: needs.changes.outputs.bazel == 'true'
+    needs: [changes, bump_release_version]
+    if: >-
+      needs.changes.outputs.bazel == 'true' &&
+      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped')
     runs-on: macos-15-intel
     permissions:
       contents: read
@@ -155,8 +201,10 @@ jobs:
 
   test_macos_arm64:
     name: Test macOS ARM64
-    needs: changes
-    if: needs.changes.outputs.bazel == 'true'
+    needs: [changes, bump_release_version]
+    if: >-
+      needs.changes.outputs.bazel == 'true' &&
+      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped')
     runs-on: macos-latest
     permissions:
       contents: read
@@ -176,12 +224,21 @@ jobs:
 
   wheel:
     name: Build wheel (Ubuntu 24.04)
-    needs: [changes, test_ubuntu_24_04, test_macos_intel, test_macos_arm64]
+    needs: [changes, bump_release_version, test_ubuntu_24_04, test_macos_intel, test_macos_arm64]
     if: >-
       ${{
         needs.changes.outputs.bazel == 'true' &&
-        github.event_name == 'pull_request' &&
-        github.event.pull_request.head.repo.full_name == github.repository
+        (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped') &&
+        (
+          (
+            github.event_name == 'pull_request' &&
+            github.event.pull_request.head.repo.full_name == github.repository
+          ) ||
+          (
+            github.event_name == 'push' &&
+            github.ref == 'refs/heads/master'
+          )
+        )
       }}
     runs-on: ubuntu-24.04
     permissions:
@@ -197,41 +254,25 @@ jobs:
           repository-cache: true
 
       - name: Unique version for TestPyPI
+        if: github.event_name == 'pull_request'
         env:
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           python3 <<'PY'
-          import os, pathlib, re, tomllib
+          import os, pathlib
 
           run_id = os.environ.get("GITHUB_RUN_ID", "0")
-          pyproject = pathlib.Path("arena-pytest/pyproject.toml")
-          data = tomllib.loads(pyproject.read_text())
-          base = data["project"]["version"]
+          version_file = pathlib.Path("VERSION")
+          base = version_file.read_text().strip()
           unique = f"{base}.dev{run_id}"
-          text = pyproject.read_text()
-          text = re.sub(
-              r'^version = "[^"]+"',
-              f'version = "{unique}"',
-              text,
-              count=1,
-              flags=re.MULTILINE,
-          )
-          pyproject.write_text(text)
-          build = pathlib.Path("arena-pytest/BUILD").read_text()
-          build = re.sub(
-              r'ARENA_PYTEST_VERSION = "[^"]+"',
-              f'ARENA_PYTEST_VERSION = "{unique}"',
-              build,
-              count=1,
-          )
-          pathlib.Path("arena-pytest/BUILD").write_text(build)
-          print(f"Patched arena-pytest version to {unique} (TestPyPI)")
+          version_file.write_text(unique + "\n")
+          print(f"Patched VERSION to {unique} (TestPyPI)")
           PY
 
       - name: Build wheel
         run: |
           rm -f bazel-bin/arena-pytest/arena_pytest-*.whl
-          bazel build //arena-pytest:arena_pytest_wheel --config=ci
+          bazel build //arena-pytest:sync_version_before_wheel //arena-pytest:arena_pytest_wheel --config=ci
           rm -f bazel-bin/arena-pytest/arena_pytest-*-py3-none-any.whl || true
           ls -la bazel-bin/arena-pytest/*.whl
 
@@ -265,3 +306,27 @@ jobs:
           verbose: true
           print-hash: true
           repository-url: https://test.pypi.org/legacy/
+
+  publish_pypi:
+    name: Publish PyPI (Ubuntu 24.04)
+    needs: wheel
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: arena-pytest-wheel-*
+          merge-multiple: true
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          verbose: true
+          print-hash: true
+          skip-existing: true
