@@ -99,16 +99,31 @@ def bump_release_version(version: str, level: str) -> str:
     raise ValueError(f"unsupported semver level {level!r}")
 
 
+def resolve_semver_level_from_pr_title(title: str) -> str | None:
+    lowered = title.lower()
+    for token, level in (
+        ("[semver:major]", "major"),
+        ("[semver:minor]", "minor"),
+        ("[semver:patch]", "patch"),
+    ):
+        if token in lowered:
+            return level
+    return None
+
+
 def resolve_semver_level_from_event(event_path: Path) -> str:
     payload = json.loads(event_path.read_text(encoding="utf-8"))
-    labels = [
-        label["name"]
-        for label in payload.get("pull_request", {}).get("labels", [])
-    ]
+    pull_request = payload.get("pull_request", {})
+    labels = [label["name"] for label in pull_request.get("labels", [])]
     if "semver:major" in labels:
         return "major"
     if "semver:minor" in labels:
         return "minor"
+    if "semver:patch" in labels:
+        return "patch"
+    from_title = resolve_semver_level_from_pr_title(pull_request.get("title", ""))
+    if from_title is not None:
+        return from_title
     return "patch"
 
 
