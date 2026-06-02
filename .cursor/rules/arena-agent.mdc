@@ -15,6 +15,7 @@ alwaysApply: true
 - You will function as an informative AI coding agent to ASSIST the developer in adding new features, fixing bugs, increasing test coverage, maintaing the architecture.
 - You will NEVER stray beyond the bounds of the task set out to you
 - If you are not confident in your answers you will say so, honesty is critical!
+- If you change an API in rust, you MUST ensure the fii and clients libs (python, java, .net etc) are updated to reflect this. The public surface contract must be identical across ALL languages and the ffi. 
 
 ## AI communication
 
@@ -57,6 +58,9 @@ alwaysApply: true
 
 ## Tests (unit and component)
 
+- **Component and `requires_docker` tests must finish in seconds**, not tens of seconds. That is the expected norm on a healthy machine with a warm container runtime. If a test routinely approaches the Bazel **`small`** timeout (~60s), treat that as a **real defect** in the test or setup — not as “CI being slow” or “parallel Docker load”.
+- **Do not hack failing or slow tests.** Forbidden “fixes” include: bumping Bazel **`size`** to **`medium`** / **`large`** to mask timeouts; blaming **parallel CI** or **Docker contention** without fixing the test; adding **retries**, **`flaky_test_attempts`**, or vague **resilience**; stretching **readiness**, **healthcheck**, or **sleep** budgets so a hang “passes”; **`--test_timeout`** / runner timeout tweaks instead of making the test fast and bounded; serializing the whole suite unless the developer explicitly asks for that tradeoff.
+- **Fix the cause.** Prefer **unit tests** (no container) when the behavior under test does not require a running dependency. Avoid **redundant container startups** (e.g. multiple full stacks or repeated spins for pure formatting/config checks). **Reuse one arena/fixture** per target where the suite shares dependencies. **Tear down** containers and networks on failure so later tests are not starved. Keep internal wait budgets **below** the Bazel test timeout so failures surface as **clear assertion/readiness errors**, not opaque **`TIMEOUT`** at 60s.
 - Keep **test functions small**; use **descriptive test names** that state intent.
 - Put **setup** and **teardown** in **small private functions** with clear names (without using banned words in those names); reuse them instead of duplicating large blocks.
 - Organize test modules and files in an **idiomatic manner dependending on the langaue** (for example rust uses private setup functions near tests, logical grouping, `mod` structure as appropriate).
@@ -64,13 +68,19 @@ alwaysApply: true
 - Parameterize tests where applicable to avoid duplicated test methods the idiomatic method of test parameterization
 - The class should mimic the class under test in a unit test. For example logging.java should have a loggingTest.java file. DO NOT lump all tests into a single unit test file for the module. Follow the same folder structure as well of ot makes sense for the idiomatic language test structure, i.e. rust is slightly differnt, just use the idiomatic way of structuring the tests
 
+## Playbooks (scoped activation)
+
+- **Python / Java:** declare **one playbook class per line** — stacked `@playbook(Foo)` / `@Playbook(Foo.class)` decorators or annotations. Do **not** pass multiple classes in one decorator (`@playbook(A, B)`) or one array annotation (`@Playbook({A.class, B.class})`).
+- **Rust:** no annotation layer; register playbooks on the match and open scoped playbooks in test setup (e.g. `validation_db.playbook().run().await`).
+- Use `@playbook` / `@Playbook` for scoped cleanup (e.g. MSSQL reset, localstack purge). Session-scoped HTTP stubs use `exec_on_dependency_start=True` on registration.
+
 ## Build and verification (Bazel)
 
 - This is a **Bazel-first** repo: **prefer Bazel** over Cargo or other build tools for authoritative checks.
 - When a **feature is complete**, run **`bazel build`** and **`bazel test`** (workspace- or target-appropriate scope).
 - After **`cargo check`** (or during iteration), still validate with **Bazel** before considering work done. Do not run pip, nuget, maven, nvm commands directly on the host, everything should be built via Bazel.
 - For **Python lockfiles**: edit **`arena-pytest/requirements.txt`** then run **`bazel run //arena-pytest:pip_requirements.update`** and **`bazel test //arena-pytest:pip_requirements_test`**. For **example apps** under `examples/`, edit **`examples/requirements.txt`** then run **`bazel run //examples:pip_requirements.update`** and **`bazel test //examples:pip_requirements_test`**. Do not run pip or pip-compile on the host for those workflows.
-- Tests that **need a Docker daemon** (Testcontainers, etc.) must declare **`tags = ["requires_docker"]`** on their **`rust_test`** / **`py_test`** target. CI on **macOS** skips those with **`--test_tag_filters=-requires_docker`** because hosted runners have no Docker; **Linux** runs them. If you have no Docker locally, use the same filter.
+- Tests that **need a container runtime** must declare **`tags = ["requires_docker"]`** on their **`rust_test`** / **`py_test`** target. PR CI runs the full suite on **Linux** (split across two jobs) and on **`macos-15-intel`** (Colima via **`setup-docker-macos-action`**). **`macos-latest`** runs build and non-`requires_docker` tests for Apple Silicon coverage. If you have no container runtime locally, use **`--test_tag_filters=-requires_docker`**.
 
 ## FFI layer
 

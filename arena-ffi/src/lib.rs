@@ -1,5 +1,6 @@
 pub mod dependency;
 
+mod active_playbook;
 mod closed_arena;
 mod dependency_reset;
 mod error;
@@ -18,6 +19,9 @@ mod matches;
 mod postgres_dependency;
 mod runtime_args;
 
+pub use active_playbook::{
+    arena_active_playbook_drop, arena_match_playbook_run, ArenaActivePlaybookHandle,
+};
 pub use closed_arena::{arena_open, OpenArenaHandle};
 pub use dependency_reset::{arena_hard_reset, arena_soft_reset};
 pub use error::ArenaStatus;
@@ -30,14 +34,5 @@ pub use logging::{
 };
 pub use open_arena::arena_close;
 pub use strings::arena_free_string;
-pub use dependency::http::{
-    arena_http_playbook_close, arena_http_playbook_open, arena_http_playbook_verify,
-    ArenaHttpPlaybookHandle,
-};
-pub use dependency::localstack::{
-    arena_localstack_playbook_close, arena_localstack_playbook_open, ArenaLocalstackPlaybookHandle,
-};
-pub use dependency::mssql::{
-    arena_mssql_playbook_close, arena_mssql_playbook_open, arena_mssql_playbook_verify,
-    ArenaMssqlPlaybookHandle,
-};
+pub use dependency::http::{arena_http_playbook_open, arena_http_playbook_verify};
+pub use dependency::mssql::arena_mssql_playbook_verify;

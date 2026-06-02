@@ -22,13 +22,21 @@ from arena_pytest.exec.executable_component import (
     ExecutableComponent,
     ExecutableComponentBuilder,
 )
-from arena_pytest.dep.http import (
+from arena_pytest.playbook import (
     ActiveHttpPlaybook,
+    ActiveLocalstackPlaybook,
+    ActiveMssqlPlaybook,
+    ActivePlaybook,
+    Playbook,
+    playbook,
+)
+from arena_pytest.dep.http import (
     ActiveHttpPlaybookBuilder,
     HttpDependency,
     HttpDependencyBuilder,
+    HttpMappingExpect,
+    HttpPlaybookBuilder,
     ManagedHttpPlaybook,
-    ManagedHttpPlaybookBuilder,
 )
 from arena_pytest.dep.kafka import (
     KAFKA_INTERNAL_DOCKER_PORT,
@@ -48,16 +56,12 @@ from arena_pytest.dep.localstack import (
     LambdaTarget,
     LocalstackDependency,
     LocalstackDependencyBuilder,
-    ActiveLocalstackPlaybook,
     ManagedLocalstackPlaybook,
-    ManagedLocalstackPlaybookBuilder,
     QueueSpec,
     SqsQueueTarget,
 )
 from arena_pytest.dep.mssql import (
-    ActiveMssqlPlaybook,
     ManagedMssqlPlaybook,
-    ManagedMssqlPlaybookBuilder,
     MssqlDependency,
     MssqlDependencyBuilder,
     MssqlEncryption,
@@ -70,7 +74,6 @@ from arena_pytest.oauth import (
     oauth_issuer_host_is_non_loopback,
     oauth_loopback_tls_pem_pair,
 )
-from arena_pytest.playbook import active_playbooks, playbook
 from arena_pytest.dep.postgres import PostgresDependency, PostgresDependencyBuilder
 from arena_pytest.readiness import HttpReadinessCheck, ReadinessCheck
 
@@ -90,12 +93,16 @@ __all__ = [
     "ExecutableComponentBuilder",
     "HttpDependency",
     "HttpDependencyBuilder",
-    "ActiveHttpPlaybook",
+    "HttpMappingExpect",
     "ActiveHttpPlaybookBuilder",
+    "HttpPlaybookBuilder",
+    "ActiveHttpPlaybook",
+    "ActiveLocalstackPlaybook",
+    "ActiveMssqlPlaybook",
+    "ActivePlaybook",
     "ManagedHttpPlaybook",
-    "ManagedHttpPlaybookBuilder",
     "ManagedMssqlPlaybook",
-    "ManagedMssqlPlaybookBuilder",
+    "Playbook",
     "KAFKA_INTERNAL_DOCKER_PORT",
     "KafkaDependency",
     "KafkaDependencyBuilder",
@@ -111,15 +118,12 @@ __all__ = [
     "LambdaTarget",
     "LocalstackDependency",
     "LocalstackDependencyBuilder",
-    "ActiveLocalstackPlaybook",
     "ManagedLocalstackPlaybook",
-    "ManagedLocalstackPlaybookBuilder",
     "QueueSpec",
     "SqsQueueTarget",
     "MssqlDependency",
     "MssqlDependencyBuilder",
     "MssqlEncryption",
-    "ActiveMssqlPlaybook",
     "DEFAULT_OAUTH_PORT",
     "OAUTH_ISSUER",
     "OauthDependency",
@@ -130,10 +134,9 @@ __all__ = [
     "PostgresDependencyBuilder",
     "HttpReadinessCheck",
     "ReadinessCheck",
-    "active_playbooks",
     "arena",
     "arena_ffi",
-    "closed_arena",
     "playbook",
+    "closed_arena",
     "OpenArena",
 ]

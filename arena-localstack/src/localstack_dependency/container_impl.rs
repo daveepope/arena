@@ -55,7 +55,7 @@ fn tcp_healthcheck(port: u16) -> Healthcheck {
     Healthcheck::cmd_shell(format!("bash -lc 'echo > /dev/tcp/127.0.0.1/{port}'"))
         .with_interval(Duration::from_millis(250))
         .with_timeout(Duration::from_secs(1))
-        .with_retries(120u32)
+        .with_retries(48u32)
 }
 
 pub(crate) struct LocalstackContainerImpl {
@@ -95,10 +95,12 @@ impl LocalstackImpl for LocalstackContainerImpl {
 
         let healthcheck = tcp_healthcheck(LOCALSTACK_INTERNAL_DOCKER_PORT);
 
+        let host_port = if port > 0 { port } else { 0 };
+
         let mut request = LocalStack::default()
             .with_name(image_name)
             .with_tag(image_tag)
-            .with_mapped_port(port, DEFAULT_CONTAINER_PORT)
+            .with_mapped_port(host_port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)
             .with_container_name(container_name)
             .with_env_var("LS_LOG", "error")

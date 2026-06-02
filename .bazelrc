@@ -1,7 +1,22 @@
-test --test_output=streamed
 test --test_verbose_timeout_warnings
 test --test_env=RUST_LOG=info
+test --test_output=streamed
 common --java_runtime_version=remotejdk_21
 common --tool_java_runtime_version=remotejdk_21
 common --java_header_compilation=false
 common:rust_libtest_nocapture --test_arg=--nocapture
+
+common:ci --test_output=errors
+common:ci --test_summary=short
+common:ci --flaky_test_attempts=1
+common:ci --show_progress_rate_limit=10
+common:ci --test_env=RUST_LOG=warn
+common:ci --show_timestamps
+common:ci --verbose_failures
+build:ci --keep_going
+
+coverage --combined_report=lcov
+coverage --strategy=CoverageReport=local
+
+common:coverage --config=ci
+common:coverage --test_env=RUST_LOG=info

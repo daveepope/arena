@@ -19,7 +19,7 @@ java_library(
 java_test(
     name = "arena_junit_readings_unit_test",
     size = "small",
-    srcs = ["src/test/java/arena/junit/readings/ReadingsHttpPlaybookRegistrationTest.java"],
+    srcs = ["src/test/java/arena/junit/readings/test/ReadingsHttpPlaybookRegistrationTest.java"],
     javacopts = [
         "--release",
         "21",
@@ -28,7 +28,7 @@ java_test(
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
         "--include-engine=junit-jupiter",
-        "--select-class=arena.junit.readings.ReadingsHttpPlaybookRegistrationTest",
+        "--select-class=arena.junit.readings.test.ReadingsHttpPlaybookRegistrationTest",
     ],
     runtime_deps = [
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
@@ -46,8 +46,8 @@ java_test(
     name = "arena_junit_readings_test",
     size = "small",
     srcs = glob(
-        ["src/test/java/arena/junit/readings/*.java"],
-        exclude = ["src/test/java/arena/junit/readings/ReadingsHttpPlaybookRegistrationTest.java"],
+        ["src/test/java/arena/junit/readings/**/*.java"],
+        exclude = ["src/test/java/arena/junit/readings/test/ReadingsHttpPlaybookRegistrationTest.java"],
     ),
     javacopts = [
         "--release",
@@ -57,7 +57,7 @@ java_test(
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
         "--include-engine=junit-jupiter",
-        "--select-package=arena.junit.readings",
+        "--select-package=arena.junit.readings.test",
     ],
     tags = ["requires_docker"],
     runtime_deps = [
@@ -67,6 +67,7 @@ java_test(
     ],
     deps = [
         ":arena_junit_lib",
+        "//examples:readings_ephemeral_test_runtime_java",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
         "@arena_java_maven//:net_java_dev_jna_jna",
         "@arena_java_maven//:org_apache_kafka_kafka_clients",
@@ -79,6 +80,45 @@ java_test(
         "//examples:example-readings-axum-web-app",
         "//examples:instrument_reading_db_schema",
         "//examples:validation_db_schema",
+    ],
+    jvm_flags = ["-Djna.nosys=true"],
+)
+
+java_test(
+    name = "arena_junit_playbook_test",
+    size = "small",
+    srcs = [
+        "src/test/java/arena/junit/ActiveHttpPlaybookVerifyTest.java",
+        "src/test/java/arena/junit/ClosedArenaExtensionLifecycleTest.java",
+        "src/test/java/arena/junit/PlaybookInvocationExtensionTest.java",
+    ],
+    javacopts = [
+        "--release",
+        "21",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.ClosedArenaExtensionLifecycleTest",
+        "--select-class=arena.junit.PlaybookInvocationExtensionTest",
+        "--select-class=arena.junit.ActiveHttpPlaybookVerifyTest",
+    ],
+    tags = ["requires_docker"],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "//examples:readings_ephemeral_test_runtime_java",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:net_java_dev_jna_jna",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+    data = [
+        "//arena-ffi:arena_ffi_shared",
     ],
     jvm_flags = ["-Djna.nosys=true"],
 )

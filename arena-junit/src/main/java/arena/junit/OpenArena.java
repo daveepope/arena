@@ -4,18 +4,47 @@ import com.sun.jna.Pointer;
 import arena.junit.ffi.ArenaBindings;
 import arena.junit.ffi.ArenaLogbackFlush;
 import arena.junit.ffi.ArenaStatus;
+import arena.junit.match.Match;
+import arena.junit.playbook.Playbook;
+import java.util.List;
 
 public final class OpenArena {
   private Pointer handle;
   private volatile long dispatcherLoggingTargetToken;
+  private final List<Match> matches;
 
-  OpenArena(Pointer handle, long dispatcherLoggingTargetToken) {
+  OpenArena(Pointer handle, long dispatcherLoggingTargetToken, List<Match> matches) {
     this.handle = handle;
     this.dispatcherLoggingTargetToken = dispatcherLoggingTargetToken;
+    this.matches = List.copyOf(matches);
   }
 
   public Pointer handle() {
     return handle;
+  }
+
+  public List<Match> matches() {
+    return matches;
+  }
+
+  public Playbook playbook(Class<? extends Playbook> klass) {
+    for (Match m : matches) {
+      Playbook pb = m.playbook(klass);
+      if (pb != null) {
+        return pb;
+      }
+    }
+    return null;
+  }
+
+  public Boolean playbookExecOnDependencyStart(Class<? extends Playbook> klass) {
+    for (Match m : matches) {
+      Boolean flag = m.execOnDependencyStart(klass);
+      if (flag != null) {
+        return flag;
+      }
+    }
+    return null;
   }
 
   public void close() {

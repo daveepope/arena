@@ -466,18 +466,25 @@ def load_ffi() -> Optional[ArenaNativeLib]:
     lib.arena_oauth_loopback_tls_pem_json.argtypes = [ctypes.POINTER(ctypes.c_void_p)]
     lib.arena_oauth_loopback_tls_pem_json.restype = ctypes.c_void_p
 
+    lib.arena_match_playbook_run.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    lib.arena_match_playbook_run.restype = ctypes.c_void_p
+
+    lib.arena_active_playbook_drop.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    lib.arena_active_playbook_drop.restype = ctypes.c_int
+
     lib.arena_http_playbook_open.argtypes = [
         ctypes.c_void_p,
         ctypes.c_char_p,
         ctypes.POINTER(ctypes.c_void_p),
     ]
     lib.arena_http_playbook_open.restype = ctypes.c_void_p
-
-    lib.arena_http_playbook_close.argtypes = [
-        ctypes.c_void_p,
-        ctypes.POINTER(ctypes.c_void_p),
-    ]
-    lib.arena_http_playbook_close.restype = ctypes.c_int
 
     lib.arena_http_playbook_verify.argtypes = [
         ctypes.c_void_p,
@@ -486,38 +493,12 @@ def load_ffi() -> Optional[ArenaNativeLib]:
     ]
     lib.arena_http_playbook_verify.restype = ctypes.c_int
 
-    lib.arena_mssql_playbook_open.argtypes = [
-        ctypes.c_void_p,
-        ctypes.c_char_p,
-        ctypes.POINTER(ctypes.c_void_p),
-    ]
-    lib.arena_mssql_playbook_open.restype = ctypes.c_void_p
-
-    lib.arena_mssql_playbook_close.argtypes = [
-        ctypes.c_void_p,
-        ctypes.POINTER(ctypes.c_void_p),
-    ]
-    lib.arena_mssql_playbook_close.restype = ctypes.c_int
-
     lib.arena_mssql_playbook_verify.argtypes = [
         ctypes.c_void_p,
         ctypes.c_char_p,
         ctypes.POINTER(ctypes.c_void_p),
     ]
     lib.arena_mssql_playbook_verify.restype = ctypes.c_int
-
-    lib.arena_localstack_playbook_open.argtypes = [
-        ctypes.c_void_p,
-        ctypes.c_char_p,
-        ctypes.POINTER(ctypes.c_void_p),
-    ]
-    lib.arena_localstack_playbook_open.restype = ctypes.c_void_p
-
-    lib.arena_localstack_playbook_close.argtypes = [
-        ctypes.c_void_p,
-        ctypes.POINTER(ctypes.c_void_p),
-    ]
-    lib.arena_localstack_playbook_close.restype = ctypes.c_int
 
     return ArenaNativeLib(lib=lib)
 
@@ -590,17 +571,45 @@ def hard_reset(ffi: ArenaNativeLib, handle: int, dependency_identifier: str) -> 
     _reset(ffi, ffi.lib.arena_hard_reset, handle, dependency_identifier)
 
 
-def http_playbook_begin(
+def match_playbook_run(
     ffi: ArenaNativeLib,
     arena_handle: int,
-    spec_json: str,
+    identifier: str,
 ) -> int:
     if not arena_handle:
-        raise ArenaBindingError("http_playbook_begin called on closed arena")
+        raise ArenaBindingError("match_playbook_run called on closed arena")
+    err = ctypes.c_void_p()
+    pb_handle = ffi.lib.arena_match_playbook_run(
+        arena_handle,
+        identifier.encode("utf-8"),
+        ctypes.byref(err),
+    )
+    message = _take_err(err, ffi)
+    if not pb_handle:
+        raise ArenaBindingError(message or "arena_match_playbook_run returned null")
+    return pb_handle
+
+
+def active_playbook_drop(ffi: ArenaNativeLib, handle: int) -> None:
+    if not handle:
+        return
+    err = ctypes.c_void_p()
+    raw = ffi.lib.arena_active_playbook_drop(handle, ctypes.byref(err))
+    message = _take_err(err, ffi)
+    _ffi_expect_ok(raw, message, "active_playbook_drop")
+
+
+def http_playbook_open(
+    ffi: ArenaNativeLib,
+    arena_handle: int,
+    open_spec_json: str,
+) -> int:
+    if not arena_handle:
+        raise ArenaBindingError("http_playbook_open called on closed arena")
     err = ctypes.c_void_p()
     pb_handle = ffi.lib.arena_http_playbook_open(
         arena_handle,
-        spec_json.encode("utf-8"),
+        open_spec_json.encode("utf-8"),
         ctypes.byref(err),
     )
     message = _take_err(err, ffi)
@@ -609,27 +618,18 @@ def http_playbook_begin(
     return pb_handle
 
 
-def http_playbook_finish(ffi: ArenaNativeLib, pb_handle: int) -> None:
-    if not pb_handle:
-        return
-    err = ctypes.c_void_p()
-    raw = ffi.lib.arena_http_playbook_close(pb_handle, ctypes.byref(err))
-    message = _take_err(err, ffi)
-    _ffi_expect_ok(raw, message, "http_playbook_finish")
-
-
 def http_playbook_verify(
     ffi: ArenaNativeLib,
-    pb_handle: int,
+    handle: int,
     verify_spec_json: str,
 ) -> None:
-    if not pb_handle:
+    if not handle:
         raise ArenaBindingError(
-            "http_playbook_verify called without begun playbook scope (http_playbook_begin first)"
+            "http_playbook_verify called without an active playbook handle"
         )
     err = ctypes.c_void_p()
     raw = ffi.lib.arena_http_playbook_verify(
-        pb_handle,
+        handle,
         verify_spec_json.encode("utf-8"),
         ctypes.byref(err),
     )
@@ -637,74 +637,18 @@ def http_playbook_verify(
     _ffi_expect_ok(raw, message, "http_playbook_verify")
 
 
-def mssql_playbook_begin(
-    ffi: ArenaNativeLib,
-    arena_handle: int,
-    spec_json: str,
-) -> int:
-    if not arena_handle:
-        raise ArenaBindingError("mssql_playbook_begin called on closed arena")
-    err = ctypes.c_void_p()
-    pb_handle = ffi.lib.arena_mssql_playbook_open(
-        arena_handle,
-        spec_json.encode("utf-8"),
-        ctypes.byref(err),
-    )
-    message = _take_err(err, ffi)
-    if not pb_handle:
-        raise ArenaBindingError(message or "arena_mssql_playbook_open returned null")
-    return pb_handle
-
-
-def mssql_playbook_finish(ffi: ArenaNativeLib, pb_handle: int) -> None:
-    if not pb_handle:
-        return
-    err = ctypes.c_void_p()
-    raw = ffi.lib.arena_mssql_playbook_close(pb_handle, ctypes.byref(err))
-    message = _take_err(err, ffi)
-    _ffi_expect_ok(raw, message, "mssql_playbook_finish")
-
-
-def localstack_playbook_begin(
-    ffi: ArenaNativeLib,
-    arena_handle: int,
-    spec_json: str,
-) -> int:
-    if not arena_handle:
-        raise ArenaBindingError("localstack_playbook_begin called on closed arena")
-    err = ctypes.c_void_p()
-    pb_handle = ffi.lib.arena_localstack_playbook_open(
-        arena_handle,
-        spec_json.encode("utf-8"),
-        ctypes.byref(err),
-    )
-    message = _take_err(err, ffi)
-    if not pb_handle:
-        raise ArenaBindingError(message or "arena_localstack_playbook_open returned null")
-    return pb_handle
-
-
-def localstack_playbook_finish(ffi: ArenaNativeLib, pb_handle: int) -> None:
-    if not pb_handle:
-        return
-    err = ctypes.c_void_p()
-    raw = ffi.lib.arena_localstack_playbook_close(pb_handle, ctypes.byref(err))
-    message = _take_err(err, ffi)
-    _ffi_expect_ok(raw, message, "localstack_playbook_finish")
-
-
 def mssql_playbook_verify(
     ffi: ArenaNativeLib,
-    pb_handle: int,
+    handle: int,
     verify_spec_json: str,
 ) -> None:
-    if not pb_handle:
+    if not handle:
         raise ArenaBindingError(
-            "mssql_playbook_verify called without begun playbook scope (mssql_playbook_begin first)"
+            "mssql_playbook_verify called without an active playbook handle"
         )
     err = ctypes.c_void_p()
     raw = ffi.lib.arena_mssql_playbook_verify(
-        pb_handle,
+        handle,
         verify_spec_json.encode("utf-8"),
         ctypes.byref(err),
     )

@@ -63,7 +63,7 @@ pub struct LocalstackDependencyBuilder {
 }
 
 impl LocalstackDependencyBuilder {
-    const DEFAULT_PORT: u16 = 4566;
+    const AUTO_HOST_PORT: u16 = 0;
     const DEFAULT_IMAGE_NAME: &'static str = "localstack/localstack";
     const DEFAULT_IMAGE_TAG: &'static str = "4.5";
 
@@ -215,7 +215,7 @@ impl LocalstackDependencyBuilder {
             Box::new(LocalstackContainerImpl::new(network)) as Box<dyn LocalstackImpl>
         });
 
-        let port = port.unwrap_or(Self::DEFAULT_PORT);
+        let port = port.unwrap_or(Self::AUTO_HOST_PORT);
         let image_name = image_name.unwrap_or_else(|| Self::DEFAULT_IMAGE_NAME.to_string());
         let image_tag = image_tag.unwrap_or_else(|| Self::DEFAULT_IMAGE_TAG.to_string());
 

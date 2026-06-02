@@ -111,11 +111,7 @@ py_library(
 py_test(
     name = "arena_pytest_test",
     size = "small",
-    srcs = [
-        "tests/conftest.py",
-        "tests/readings_arena_config.py",
-        "tests/test_arena.py",
-    ],
+    srcs = glob(["tests/playbooks/**/*.py", "tests/conftest.py", "tests/readings_arena_config.py", "tests/test_arena.py"]),
     main = "tests/test_arena.py",
     data = [
         "//arena-ffi:arena_ffi_shared",
@@ -126,12 +122,30 @@ py_test(
     ],
     deps = [
         ":arena_pytest_lib",
+        "//examples:readings_ephemeral_test_runtime",
         "@pip//kafka_python_ng",
         "@pip//pytest",
         "@pip//pytest_asyncio",
         "@pip//requests",
     ],
     tags = ["requires_docker"],
+    python_version = "PY3",
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "arena_pytest_playbook_unit_test",
+    size = "small",
+    srcs = [
+        "tests/test_playbook_hooks.py",
+        "tests/test_playbook_unit.py",
+    ],
+    main = "tests/test_playbook_unit.py",
+    deps = [
+        ":arena_pytest_lib",
+        "//examples:readings_ephemeral_test_runtime",
+        "@pip//pytest",
+    ],
     python_version = "PY3",
     visibility = ["//visibility:public"],
 )

@@ -31,21 +31,15 @@ interface ArenaNativeLib extends Library {
 
   Pointer arena_oauth_loopback_tls_pem_json(PointerByReference errOut);
 
+  Pointer arena_match_playbook_run(Pointer arena, String identifier, PointerByReference errOut);
+
+  int arena_active_playbook_drop(Pointer handle, PointerByReference errOut);
+
   Pointer arena_http_playbook_open(Pointer arena, String specJson, PointerByReference errOut);
 
-  int arena_http_playbook_close(Pointer playbook, PointerByReference errOut);
+  int arena_http_playbook_verify(Pointer handle, String specJson, PointerByReference errOut);
 
-  int arena_http_playbook_verify(Pointer playbook, String specJson, PointerByReference errOut);
-
-  Pointer arena_mssql_playbook_open(Pointer arena, String specJson, PointerByReference errOut);
-
-  int arena_mssql_playbook_close(Pointer playbook, PointerByReference errOut);
-
-  int arena_mssql_playbook_verify(Pointer playbook, String specJson, PointerByReference errOut);
-
-  Pointer arena_localstack_playbook_open(Pointer arena, String specJson, PointerByReference errOut);
-
-  int arena_localstack_playbook_close(Pointer playbook, PointerByReference errOut);
+  int arena_mssql_playbook_verify(Pointer handle, String specJson, PointerByReference errOut);
 }
 
 final class ArenaNativeHolder {

@@ -66,8 +66,22 @@ impl ReadinessCheck for FakeReadinessCheck {
     }
 }
 
+struct FailingReadinessCheck;
+
+#[async_trait]
+impl ReadinessCheck for FailingReadinessCheck {
+    async fn is_ready(
+        &self,
+        _identifier: &str,
+        _connection_string: &str,
+        _timeout_ms: u64,
+    ) -> Result<(), String> {
+        Err("readiness failed".to_string())
+    }
+}
+
 #[tokio::test]
-async fn postgres_dependency_lifecycle() {
+async fn start_stop_happy_path_records_events() {
     let events = Arc::new(Mutex::new(Vec::<Event>::new()));
     let last_identifier = Arc::new(Mutex::new(None::<String>));
     let last_connection_string = Arc::new(Mutex::new(None::<String>));
@@ -114,4 +128,28 @@ async fn postgres_dependency_lifecycle() {
         Some("postgres://127.0.0.1:5432/fake")
     );
     assert_eq!(*last_timeout_ms.lock().unwrap(), Some(10_000));
+}
+
+#[tokio::test]
+async fn start_readiness_err_panics_after_impl_start() {
+    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
+    let mut dep = PostgresDependency::builder("postgres")
+        .with_impl(FakePostgresImpl {
+            conn_str: None,
+            events: events.clone(),
+        })
+        .with_readiness_check(FailingReadinessCheck)
+        .build();
+
+    let outcome = std::panic::AssertUnwindSafe(async {
+        dep.start().await;
+    })
+    .catch_unwind()
+    .await;
+
+    assert!(outcome.is_err());
+    assert_eq!(
+        events.lock().unwrap().as_slice(),
+        &[Event::PostgresStart]
+    );
 }

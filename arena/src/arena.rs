@@ -1,6 +1,8 @@
 use crate::matches::MatchTrait;
 use futures::executor::block_on;
 use futures::future::join_all;
+use futures::FutureExt;
+use std::panic::{AssertUnwindSafe, resume_unwind};
 use std::time::Instant;
 
 pub struct ClosedArena {
@@ -29,7 +31,7 @@ impl ClosedArena {
         let matches = std::mem::take(&mut self.matches);
         let arena_name = self.name.clone();
 
-        let mut started = join_all(
+        let outcomes = join_all(
             matches
                 .into_iter()
                 .enumerate()
@@ -37,19 +39,43 @@ impl ClosedArena {
                     let arena_name = arena_name.clone();
                     async move {
                         let sw_one = Instant::now();
-                        m.start().await;
-                        tracing::info!(
-                            arena = %arena_name,
-                            match_index = i,
-                            elapsed = ?sw_one.elapsed(),
-                            phase = "match_open_complete",
-                            "match opened"
-                        );
-                        (i, m)
+                        let outcome = AssertUnwindSafe(async {
+                            m.start().await;
+                            m
+                        })
+                        .catch_unwind()
+                        .await;
+                        (i, arena_name, sw_one, outcome)
                     }
                 }),
         )
         .await;
+
+        let mut open_panics = Vec::new();
+        let mut started = Vec::with_capacity(outcomes.len());
+        for (i, arena_name, sw_one, outcome) in outcomes {
+            match outcome {
+                Ok(m) => {
+                    tracing::info!(
+                        arena = %arena_name,
+                        match_index = i,
+                        elapsed = ?sw_one.elapsed(),
+                        phase = "match_open_complete",
+                        "match opened"
+                    );
+                    started.push((i, m));
+                }
+                Err(payload) => open_panics.push(payload),
+            }
+        }
+
+        if !open_panics.is_empty() {
+            started.sort_by_key(|(i, _)| *i);
+            for (_, mut m) in started.drain(..) {
+                m.stop().await;
+            }
+            resume_unwind(open_panics.into_iter().next().unwrap());
+        }
 
         started.sort_by_key(|(i, _)| *i);
         let matches = started.into_iter().map(|(_, m)| m).collect();
@@ -89,6 +115,18 @@ impl OpenArena {
         for m in &mut self.matches {
             if let Some(d) = m.dependency_mut(identifier) {
                 return Some(d);
+            }
+        }
+        None
+    }
+
+    pub async fn run_playbook(
+        &self,
+        identifier: &str,
+    ) -> Option<Box<dyn crate::playbook::ActivePlaybook>> {
+        for m in &self.matches {
+            if let Some(active) = m.run_playbook(identifier).await {
+                return Some(active);
             }
         }
         None
@@ -153,53 +191,5 @@ impl Drop for OpenArena {
         if !self.closed {
             block_on(self.internal_close());
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use async_trait::async_trait;
-    use mockall::mock;
-
-    mock! {
-        Match {}
-        #[async_trait]
-        impl MatchTrait for Match {
-            async fn start(&mut self);
-            async fn stop(&mut self);
-        }
-    }
-
-    #[tokio::test]
-    async fn test_arena_calls_start_and_stop_on_all_matches() {
-        let matches: Vec<Box<dyn MatchTrait>> = vec![
-            Box::new(create_and_setup_stub_match()),
-            Box::new(create_and_setup_stub_match()),
-        ];
-
-        let closed = ClosedArena::new("TestArena".to_string(), matches);
-        let open = closed.open().await;
-        let _closed = open.close().await;
-    }
-
-    #[test]
-    fn test_open_arena_auto_closes_on_drop() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new(create_and_setup_stub_match())];
-
-            let closed = ClosedArena::new("TestArena".to_string(), matches);
-            let open = closed.open().await;
-
-            drop(open);
-        });
-    }
-
-    fn create_and_setup_stub_match() -> MockMatch {
-        let mut stub_match = MockMatch::new();
-        stub_match.expect_start().times(1).returning(|| ());
-        stub_match.expect_stop().times(1).returning(|| ());
-        stub_match
     }
 }

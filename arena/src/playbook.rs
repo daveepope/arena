@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use std::any::Any;
 
 use crate::dependency::Dependency;
 
@@ -11,4 +12,6 @@ pub trait Playbook: Send + Sync {
 
 pub trait ActivePlaybook: Send + Sync {
     fn identifier(&self) -> &str;
+
+    fn as_any(&self) -> &dyn Any;
 }

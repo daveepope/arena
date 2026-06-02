@@ -22,6 +22,19 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+py_library(
+    name = "readings_ephemeral_test_runtime",
+    srcs = ["tests/readings_ephemeral_test_runtime.py"],
+    imports = ["tests"],
+    visibility = ["//visibility:public"],
+)
+
+java_library(
+    name = "readings_ephemeral_test_runtime_java",
+    srcs = ["tests/java/arena/examples/readings/testruntime/ReadingsEphemeralTestRuntime.java"],
+    visibility = ["//visibility:public"],
+)
+
 exports_files(
     [
         "requirements.txt",
@@ -35,6 +48,15 @@ compile_pip_requirements(
     src = "requirements.txt",
     requirements_txt = "requirements_lock.txt",
     generate_hashes = False,
+)
+
+py_library(
+    name = "readings_arena_config_py",
+    srcs = ["tests/readings_arena_config.py"],
+    imports = ["tests"],
+    data = [":readings_arena_config"],
+    deps = [":readings_ephemeral_test_runtime"],
+    visibility = ["//visibility:public"],
 )
 
 py_library(
@@ -133,14 +155,14 @@ rust_binary(
 py_test(
     name = "pytest_localstack_component_test",
     size = "small",
-    srcs = [
-        "tests/example-arena-pytest-localstack-test/test_localstack.py",
-    ],
+    srcs = glob(["tests/example-arena-pytest-localstack-test/**/*.py"]),
     main = "tests/example-arena-pytest-localstack-test/test_localstack.py",
+    imports = ["tests/example-arena-pytest-localstack-test"],
     data = [
         "//arena-ffi:arena_ffi_shared",
     ],
     deps = [
+        ":readings_ephemeral_test_runtime",
         "//arena-pytest:arena_pytest_lib",
         "@pip//pytest",
         "@pip//pytest_asyncio",
@@ -154,18 +176,19 @@ py_test(
 py_test(
     name = "pytest_readings_fastapi_component_test",
     size = "small",
-    srcs = [
-        "tests/example-readings-fastapi-pytest-component-test/conftest.py",
-        "tests/example-readings-fastapi-pytest-component-test/readings_fastapi_component_test.py",
-    ],
+    srcs = glob(["tests/example-readings-fastapi-pytest-component-test/**/*.py"]),
     main = "tests/example-readings-fastapi-pytest-component-test/readings_fastapi_component_test.py",
+    imports = ["tests/example-readings-fastapi-pytest-component-test"],
     data = [
         "//arena-ffi:arena_ffi_shared",
         "//examples:example-readings-fastapi-web-app",
         "//examples:instrument_reading_db_schema",
+        "//examples:readings_arena_config",
         "//examples:validation_db_schema",
     ],
     deps = [
+        ":readings_arena_config_py",
+        ":readings_ephemeral_test_runtime",
         "//arena-pytest:arena_pytest_lib",
         "@pip//pytest",
         "@pip//pytest_asyncio",
@@ -194,7 +217,10 @@ rust_test(
         "resources/instrument_reading_db_schema.sql",
         "resources/validation_db_schema.sql",
     ],
-    data = [":example-readings-axum-web-app"],
+    data = [
+        ":example-readings-axum-web-app",
+        ":readings_arena_config",
+    ],
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,
@@ -294,6 +320,7 @@ java_test(
         ":example-readings-spring-boot-web-app",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
+        ":readings_arena_config",
         ":validation_db_schema",
     ],
     jvm_flags = ["-Djna.nosys=true"],
@@ -304,6 +331,7 @@ java_test(
         "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
     ],
     deps = [
+        ":readings_ephemeral_test_runtime_java",
         "//arena-junit:arena_junit_lib",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
         "@arena_java_maven//:org_apache_kafka_kafka_clients",

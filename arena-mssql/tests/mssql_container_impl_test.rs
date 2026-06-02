@@ -1,63 +1,37 @@
-use arena::dependency::RunnableDependency;
-use arena_mssql::{MssqlDependency, MssqlEncryption};
+use arena_mssql::{build_ado_connection_string, MssqlEncryption};
 
-async fn started_dependency(encryption: Option<MssqlEncryption>) -> MssqlDependency {
-    let mut builder = MssqlDependency::builder("");
-    if let Some(mode) = encryption {
-        builder = builder.with_encryption(mode);
-    }
-    let mut dep = builder.build();
-    dep.start().await;
-    dep
+#[test]
+fn build_ado_connection_string_off_includes_danger_plaintext() {
+    let conn = build_ado_connection_string("db.example", 1433, "appdb", "sa", "pw", MssqlEncryption::Off);
+    assert!(conn.contains("TrustServerCertificate=True;"));
+    assert!(conn.contains("encrypt=DANGER_PLAINTEXT;"));
 }
 
-fn assert_contains(label: &str, conn_str: &str, needle: &str) {
-    assert!(
-        conn_str.contains(needle),
-        "[{label}] expected connection string to contain {needle:?}, got: {conn_str}"
+#[test]
+fn build_ado_connection_string_on_omits_encrypt_clause() {
+    let conn = build_ado_connection_string("db.example", 1433, "appdb", "sa", "pw", MssqlEncryption::On);
+    assert!(conn.contains("TrustServerCertificate=True;"));
+    assert!(!conn.to_ascii_lowercase().contains("encrypt="));
+}
+
+#[test]
+fn build_ado_connection_string_default_off_matches_admin_shape() {
+    let conn = build_ado_connection_string(
+        "127.0.0.1",
+        1433,
+        "validationDb",
+        "sa",
+        "secret",
+        MssqlEncryption::Off,
     );
-}
-
-fn assert_not_contains(label: &str, conn_str: &str, needle: &str) {
-    assert!(
-        !conn_str.to_ascii_lowercase().contains(needle),
-        "[{label}] expected connection string NOT to contain {needle:?}, got: {conn_str}"
+    let admin = build_ado_connection_string(
+        "127.0.0.1",
+        1433,
+        "master",
+        "sa",
+        "secret",
+        MssqlEncryption::Off,
     );
-}
-
-#[tokio::test]
-async fn connection_string_default_appends_danger_plaintext_clause() {
-    let mut dep = started_dependency(None).await;
-
-    let conn = dep
-        .connection_string()
-        .expect("connection string after start")
-        .to_string();
-    let admin = dep
-        .admin_connection_string()
-        .expect("admin connection string after start")
-        .to_string();
-
-    assert_contains("default", &conn, "encrypt=DANGER_PLAINTEXT;");
-    assert_contains("default", &admin, "encrypt=DANGER_PLAINTEXT;");
-
-    dep.stop().await;
-
-    let mut dep = started_dependency(Some(MssqlEncryption::Off)).await;
-    let conn = dep
-        .connection_string()
-        .expect("connection string after start")
-        .to_string();
-    assert_contains("off", &conn, "TrustServerCertificate=True;");
-    assert_contains("off", &conn, "encrypt=DANGER_PLAINTEXT;");
-    dep.stop().await;
-
-    let mut dep = started_dependency(Some(MssqlEncryption::On)).await;
-    let conn = dep
-        .connection_string()
-        .expect("connection string after start")
-        .to_string();
-    assert_contains("on", &conn, "TrustServerCertificate=True;");
-    assert_not_contains("on", &conn, "encrypt=");
-    dep.stop().await;
+    assert!(conn.contains("encrypt=DANGER_PLAINTEXT;"));
+    assert!(admin.contains("encrypt=DANGER_PLAINTEXT;"));
 }

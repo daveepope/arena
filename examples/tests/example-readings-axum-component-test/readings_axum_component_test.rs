@@ -1,15 +1,17 @@
 mod arena;
 mod http;
+mod playbooks;
+mod readings_arena_config;
 
-use arena_http::{server_error, HttpDependency};
 use arena_kafka::KafkaDependency;
 use arena_mssql::MssqlDependency;
 use arena_oauth::OauthDependency;
 use std::time::Duration;
 
+use crate::playbooks::calibration_outage_managed_id;
 use crate::arena::{
-    oauth_server_tls_cert_pem, readings_axum_component_runtime, shared_arena, CALIBRATION_ID,
-    EXEC_WEB_APP_PORT, KAFKA_ID, MSSQL_ID, OAUTH_ID, SCENARIO_LOCK,
+    exec_web_app_port, oauth_server_tls_cert_pem, readings_axum_component_runtime,
+    shared_arena, KAFKA_ID, MSSQL_ID, OAUTH_ID, SCENARIO_LOCK,
 };
 use crate::http::{
     consume_reading_created_event, create_reading, fetch_example_access_token,
@@ -58,7 +60,7 @@ fn readings_axum_exec_creates_reading_consumes_and_gets_reading() {
         });
 
         let created_id = create_reading(
-            EXEC_WEB_APP_PORT,
+            exec_web_app_port(),
             "Readings API User",
             77,
             Some("sqs happy path".to_string()),
@@ -78,7 +80,7 @@ fn readings_axum_exec_creates_reading_consumes_and_gets_reading() {
         assert_eq!(consumed.value, 77);
         assert_eq!(consumed.comment.as_deref(), Some("sqs happy path"));
 
-        let readings = get_readings(EXEC_WEB_APP_PORT).await;
+        let readings = get_readings(exec_web_app_port()).await;
         let found = readings
             .iter()
             .find(|r| r.id == created_id)
@@ -105,22 +107,14 @@ fn readings_axum_exec_calibration_outage_returns_error() {
         let arena = shared_arena().await;
         let _scenario = SCENARIO_LOCK.lock().await;
 
-        let calibration = arena
-            .dependency(CALIBRATION_ID.get().expect("calibration id initialized"))
-            .and_then(|d| d.as_any().downcast_ref::<HttpDependency>())
-            .expect("calibration service should be available");
-
         {
-            let _outage = calibration
-                .playbook()
-                .post("/api/v1/validate")
-                .with_priority(1)
-                .will_return(server_error())
-                .run()
-                .await;
+            let _outage = arena
+                .run_playbook(calibration_outage_managed_id())
+                .await
+                .expect("calibration outage playbook should be registered");
 
             let token = fetch_example_access_token().await;
-            let url = format!("http://127.0.0.1:{}/readings", EXEC_WEB_APP_PORT);
+            let url = format!("http://127.0.0.1:{}/readings", exec_web_app_port());
             let client = build_http_client_trusting_oauth_ca(oauth_server_tls_cert_pem());
             let response = client
                 .post(&url)
@@ -142,14 +136,14 @@ fn readings_axum_exec_calibration_outage_returns_error() {
         }
 
         let recovered_id = create_reading(
-            EXEC_WEB_APP_PORT,
+            exec_web_app_port(),
             "Recovery Test User",
             17,
             Some("post-outage".to_string()),
         )
         .await;
 
-        let readings = get_readings(EXEC_WEB_APP_PORT).await;
+        let readings = get_readings(exec_web_app_port()).await;
         let found = readings
             .iter()
             .find(|r| r.id == recovered_id)
@@ -166,7 +160,7 @@ fn readings_axum_exec_readings_returns_401_when_access_token_scopes_insufficient
         let _scenario = SCENARIO_LOCK.lock().await;
 
         let token = fetch_example_access_token_with_scope(Some("openid profile")).await;
-        let url = format!("http://127.0.0.1:{}/readings", EXEC_WEB_APP_PORT);
+        let url = format!("http://127.0.0.1:{}/readings", exec_web_app_port());
         let client = build_http_client_trusting_oauth_ca(oauth_server_tls_cert_pem());
         let response = client
             .get(&url)
@@ -189,7 +183,7 @@ fn readings_axum_exec_readings_returns_401_when_bearer_token_invalid() {
         let _arena = shared_arena().await;
         let _scenario = SCENARIO_LOCK.lock().await;
 
-        let url = format!("http://127.0.0.1:{}/readings", EXEC_WEB_APP_PORT);
+        let url = format!("http://127.0.0.1:{}/readings", exec_web_app_port());
         let client = build_http_client_trusting_oauth_ca(oauth_server_tls_cert_pem());
         let response = client
             .get(&url)

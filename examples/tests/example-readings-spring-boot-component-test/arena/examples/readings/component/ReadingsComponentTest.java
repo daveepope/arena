@@ -4,14 +4,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import arena.junit.playbook.ArenaPlaybooks;
+import arena.examples.readings.playbooks.LocalstackSessionPlaybook;
+import arena.examples.readings.playbooks.ResetValidationDbPlaybook;
+import arena.junit.Playbook;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -25,13 +26,9 @@ public final class ReadingsComponentTest {
   @RegisterExtension
   static final ReadingsArenaFixture readings = new ReadingsArenaFixture();
 
-  @AfterAll
-  static void stopReadingsArenaAfterClass() {
-    readings.stopReadingsArena();
-  }
-
   @Test
-  @ArenaPlaybooks(ReadingsDefaultPlaybooks.class)
+  @Playbook(ResetValidationDbPlaybook.class)
+  @Playbook(LocalstackSessionPlaybook.class)
   void postReadingsAuthorizedSameReadingOnQueueAndListedByGet() throws Exception {
     Map<String, String> credsMap = readings.awsDummyCredentials();
     var creds =

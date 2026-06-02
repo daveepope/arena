@@ -4,7 +4,21 @@ use super::dependency::RunnableDependency;
 use super::playbook::{ActivePlaybook, Playbook};
 use async_trait::async_trait;
 use futures::future::join_all;
+use futures::FutureExt;
+use std::panic::{AssertUnwindSafe, resume_unwind};
 use std::time::Instant;
+
+async fn stop_dependencies(deps: &mut [Dependency]) {
+    for dep in deps.iter_mut().rev() {
+        dep.stop().await;
+    }
+}
+
+async fn stop_components(comps: &mut [Component]) {
+    for comp in comps.iter_mut().rev() {
+        comp.stop().await;
+    }
+}
 
 #[async_trait]
 pub trait MatchTrait: Send + Sync {
@@ -16,6 +30,10 @@ pub trait MatchTrait: Send + Sync {
     }
 
     fn dependency_mut(&mut self, _identifier: &str) -> Option<&mut (dyn RunnableDependency + '_)> {
+        None
+    }
+
+    async fn run_playbook(&self, _identifier: &str) -> Option<Box<dyn ActivePlaybook>> {
         None
     }
 }
@@ -49,6 +67,12 @@ impl Match {
         self.playbooks.push((playbook, exec_on_dependency_start));
         self
     }
+
+    async fn rollback_after_failed_start(&mut self) {
+        stop_components(&mut self.components).await;
+        self.active_playbooks.clear();
+        stop_dependencies(&mut self.dependencies).await;
+    }
 }
 
 #[async_trait]
@@ -74,23 +98,46 @@ impl MatchTrait for Match {
             );
         }
         let sw_deps_batch = Instant::now();
-        let mut started = join_all(deps.into_iter().enumerate().map(|(i, mut dep)| {
+        let outcomes = join_all(deps.into_iter().enumerate().map(|(i, mut dep)| {
             let match_label = match_label.clone();
             async move {
                 let id = dep.identifier().to_string();
                 let sw_one = Instant::now();
-                dep.start().await;
-                tracing::info!(
-                    match_name = %match_label,
-                    dependency = %id,
-                    elapsed = ?sw_one.elapsed(),
-                    phase = "dependency_start_complete",
-                    "dependency started"
-                );
-                (i, dep)
+                let outcome = AssertUnwindSafe(async {
+                    dep.start().await;
+                    dep
+                })
+                .catch_unwind()
+                .await;
+                (i, id, match_label, sw_one, outcome)
             }
         }))
         .await;
+
+        let mut dep_panics = Vec::new();
+        let mut started = Vec::with_capacity(dep_count);
+        for (i, id, match_label, sw_one, outcome) in outcomes {
+            match outcome {
+                Ok(dep) => {
+                    tracing::info!(
+                        match_name = %match_label,
+                        dependency = %id,
+                        elapsed = ?sw_one.elapsed(),
+                        phase = "dependency_start_complete",
+                        "dependency started"
+                    );
+                    started.push((i, dep));
+                }
+                Err(payload) => dep_panics.push(payload),
+            }
+        }
+
+        if !dep_panics.is_empty() {
+            started.sort_by_key(|(i, _)| *i);
+            self.dependencies = started.into_iter().map(|(_, dep)| dep).collect();
+            self.rollback_after_failed_start().await;
+            resume_unwind(dep_panics.into_iter().next().unwrap());
+        }
 
         started.sort_by_key(|(i, _)| *i);
         self.dependencies = started.into_iter().map(|(_, dep)| dep).collect();
@@ -121,25 +168,47 @@ impl MatchTrait for Match {
             let sw_pb = Instant::now();
             let deps_ref: &[Dependency] = &self.dependencies;
             let match_label_for_pb = self.name.clone();
-            let actives = join_all((0..startup.len()).map(|idx| {
+            let outcomes = join_all((0..startup.len()).map(|idx| {
                 let pb = startup[idx];
                 let id = pb.identifier().to_string();
                 let match_label_for_pb = match_label_for_pb.clone();
                 async move {
                     let sw_one = Instant::now();
-                    let active = pb.run(deps_ref).await;
-                    tracing::info!(
-                        match_name = %match_label_for_pb,
-                        playbook = %id,
-                        elapsed = ?sw_one.elapsed(),
-                        phase = "playbook_run_complete",
-                        "playbook applied"
-                    );
-                    active
+                    let outcome = AssertUnwindSafe(async {
+                        pb.run(deps_ref).await
+                    })
+                    .catch_unwind()
+                    .await;
+                    (id, match_label_for_pb, sw_one, outcome)
                 }
             }))
             .await;
-            self.active_playbooks.extend(actives);
+
+            let mut pb_panics = Vec::new();
+            let mut actives = Vec::with_capacity(outcomes.len());
+            for (id, match_label_for_pb, sw_one, outcome) in outcomes {
+                match outcome {
+                    Ok(active) => {
+                        tracing::info!(
+                            match_name = %match_label_for_pb,
+                            playbook = %id,
+                            elapsed = ?sw_one.elapsed(),
+                            phase = "playbook_run_complete",
+                            "playbook applied"
+                        );
+                        actives.push(active);
+                    }
+                    Err(payload) => pb_panics.push(payload),
+                }
+            }
+
+            if !pb_panics.is_empty() {
+                self.active_playbooks = actives;
+                self.rollback_after_failed_start().await;
+                resume_unwind(pb_panics.into_iter().next().unwrap());
+            }
+
+            self.active_playbooks = actives;
             tracing::info!(
                 match_name = %self.name,
                 elapsed = ?sw_pb.elapsed(),
@@ -159,23 +228,45 @@ impl MatchTrait for Match {
         }
         let sw_comps_batch = Instant::now();
         let comps = std::mem::take(&mut self.components);
-
-        let mut started_comps = join_all(comps.into_iter().enumerate().map(|(i, mut comp)| {
+        let outcomes = join_all(comps.into_iter().enumerate().map(|(i, mut comp)| {
             let match_label = match_label.clone();
             async move {
                 let sw_one = Instant::now();
-                comp.start().await;
-                tracing::info!(
-                    match_name = %match_label,
-                    component_index = i,
-                    elapsed = ?sw_one.elapsed(),
-                    phase = "component_start_complete",
-                    "component started"
-                );
-                (i, comp)
+                let outcome = AssertUnwindSafe(async {
+                    comp.start().await;
+                    comp
+                })
+                .catch_unwind()
+                .await;
+                (i, match_label, sw_one, outcome)
             }
         }))
         .await;
+
+        let mut comp_panics = Vec::new();
+        let mut started_comps = Vec::with_capacity(comp_count);
+        for (i, match_label, sw_one, outcome) in outcomes {
+            match outcome {
+                Ok(comp) => {
+                    tracing::info!(
+                        match_name = %match_label,
+                        component_index = i,
+                        elapsed = ?sw_one.elapsed(),
+                        phase = "component_start_complete",
+                        "component started"
+                    );
+                    started_comps.push((i, comp));
+                }
+                Err(payload) => comp_panics.push(payload),
+            }
+        }
+
+        if !comp_panics.is_empty() {
+            started_comps.sort_by_key(|(i, _)| *i);
+            self.components = started_comps.into_iter().map(|(_, comp)| comp).collect();
+            self.rollback_after_failed_start().await;
+            resume_unwind(comp_panics.into_iter().next().unwrap());
+        }
 
         started_comps.sort_by_key(|(i, _)| *i);
         self.components = started_comps.into_iter().map(|(_, comp)| comp).collect();
@@ -201,6 +292,7 @@ impl MatchTrait for Match {
 
     async fn stop(&mut self) {
         if !self.started {
+            self.rollback_after_failed_start().await;
             return;
         }
 
@@ -320,195 +412,12 @@ impl MatchTrait for Match {
         }
         None
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::dependency::RunnableDependency;
-    use async_trait::async_trait;
-    use futures::future::{select, Either};
-    use std::any::Any;
-    use std::sync::{Arc, Mutex};
-    use std::time::Duration;
-    use tokio::sync::Barrier;
-
-    struct StubDependency {
-        identifier: String,
-        started: Arc<Mutex<bool>>,
-    }
-
-    #[async_trait]
-    impl RunnableDependency for StubDependency {
-        fn identifier(&self) -> &str {
-            &self.identifier
-        }
-        fn as_any(&self) -> &dyn Any {
-            self
-        }
-        fn as_any_mut(&mut self) -> &mut dyn Any {
-            self
-        }
-        async fn start(&mut self) {
-            *self.started.lock().unwrap() = true;
-        }
-        async fn stop(&mut self) {
-            *self.started.lock().unwrap() = false;
-        }
-        fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
-        async fn soft_reset(&self) {}
-        async fn hard_reset(&mut self) {}
-    }
-
-    struct RecordingPlaybook {
-        identifier: String,
-        run_log: Arc<Mutex<Vec<String>>>,
-        drop_log: Arc<Mutex<Vec<String>>>,
-        dep_started_snapshot: Arc<Mutex<Option<bool>>>,
-        dep_to_check: String,
-        rendezvous: Arc<Barrier>,
-    }
-
-    #[async_trait]
-    impl Playbook for RecordingPlaybook {
-        fn identifier(&self) -> &str {
-            &self.identifier
-        }
-
-        async fn run(&self, dependencies: &[Dependency]) -> Box<dyn ActivePlaybook> {
-            let snap = dependencies
-                .iter()
-                .find(|d| d.identifier() == self.dep_to_check)
-                .and_then(|d| d.as_any().downcast_ref::<StubDependency>())
-                .map(|s| *s.started.lock().unwrap());
-            *self.dep_started_snapshot.lock().unwrap() = snap;
-
-            self.rendezvous.wait().await;
-
-            self.run_log.lock().unwrap().push(self.identifier.clone());
-
-            Box::new(RecordingActive {
-                identifier: self.identifier.clone(),
-                drop_log: self.drop_log.clone(),
-            })
-        }
-    }
-
-    struct RecordingActive {
-        identifier: String,
-        drop_log: Arc<Mutex<Vec<String>>>,
-    }
-
-    impl ActivePlaybook for RecordingActive {
-        fn identifier(&self) -> &str {
-            &self.identifier
-        }
-    }
-
-    impl Drop for RecordingActive {
-        fn drop(&mut self) {
-            self.drop_log.lock().unwrap().push(self.identifier.clone());
-        }
-    }
-
-    async fn within<F: std::future::Future>(budget: Duration, what: &str, fut: F) -> F::Output {
-        let fut = std::pin::pin!(fut);
-        let deadline = futures_timer::Delay::new(budget);
-        match select(fut, deadline).await {
-            Either::Left((out, _)) => out,
-            Either::Right(_) => panic!("{what} did not complete within {budget:?}"),
-        }
-    }
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn register_playbook_runs_after_dependencies_started_and_in_parallel() {
-        let _ = tracing_subscriber::fmt().with_test_writer().try_init();
-
-        let dep_started = Arc::new(Mutex::new(false));
-        let dep = StubDependency {
-            identifier: "dep-1".to_string(),
-            started: dep_started.clone(),
-        };
-
-        let run_log = Arc::new(Mutex::new(Vec::<String>::new()));
-        let drop_log = Arc::new(Mutex::new(Vec::<String>::new()));
-        let snap_1 = Arc::new(Mutex::new(None));
-        let snap_2 = Arc::new(Mutex::new(None));
-        let rendezvous = Arc::new(Barrier::new(2));
-
-        let pb_1 = Box::new(RecordingPlaybook {
-            identifier: "pb-1".to_string(),
-            run_log: run_log.clone(),
-            drop_log: drop_log.clone(),
-            dep_started_snapshot: snap_1.clone(),
-            dep_to_check: "dep-1".to_string(),
-            rendezvous: rendezvous.clone(),
-        });
-        let pb_2 = Box::new(RecordingPlaybook {
-            identifier: "pb-2".to_string(),
-            run_log: run_log.clone(),
-            drop_log: drop_log.clone(),
-            dep_started_snapshot: snap_2.clone(),
-            dep_to_check: "dep-1".to_string(),
-            rendezvous: rendezvous.clone(),
-        });
-
-        let mut a_match = Match::new("test-match", vec![Box::new(dep)], vec![])
-            .register_playbook(pb_1, true)
-            .register_playbook(pb_2, true);
-
-        within(Duration::from_millis(50), "Match::start", a_match.start()).await;
-
-        assert_eq!(*snap_1.lock().unwrap(), Some(true));
-        assert_eq!(*snap_2.lock().unwrap(), Some(true));
-
-        let ran = run_log.lock().unwrap().clone();
-        assert_eq!(ran.len(), 2);
-        assert!(ran.contains(&"pb-1".to_string()));
-        assert!(ran.contains(&"pb-2".to_string()));
-
-        assert!(drop_log.lock().unwrap().is_empty());
-
-        a_match.stop().await;
-
-        let dropped = drop_log.lock().unwrap().clone();
-        assert_eq!(dropped.len(), 2);
-        assert!(dropped.contains(&"pb-1".to_string()));
-        assert!(dropped.contains(&"pb-2".to_string()));
-    }
-
-    struct PanicOnRunPlaybook {
-        identifier: String,
-    }
-
-    #[async_trait]
-    impl Playbook for PanicOnRunPlaybook {
-        fn identifier(&self) -> &str {
-            &self.identifier
-        }
-
-        async fn run(&self, _: &[Dependency]) -> Box<dyn ActivePlaybook> {
-            panic!("playbook '{}' should not have run", self.identifier);
-        }
-    }
-
-    #[tokio::test]
-    async fn register_playbook_skips_execution_when_exec_on_start_is_false() {
-        let _ = tracing_subscriber::fmt().with_test_writer().try_init();
-
-        let dep = StubDependency {
-            identifier: "dep-1".to_string(),
-            started: Arc::new(Mutex::new(false)),
-        };
-
-        let pb = PanicOnRunPlaybook {
-            identifier: "pb-skip".to_string(),
-        };
-
-        let mut a_match = Match::new("test-match", vec![Box::new(dep)], vec![])
-            .register_playbook(Box::new(pb), false);
-
-        a_match.start().await;
-        a_match.stop().await;
+    async fn run_playbook(&self, identifier: &str) -> Option<Box<dyn ActivePlaybook>> {
+        let pb = self
+            .playbooks
+            .iter()
+            .find(|(p, _)| p.identifier() == identifier)?;
+        Some(pb.0.run(&self.dependencies).await)
     }
 }

@@ -26,6 +26,8 @@ pub struct KafkaDependency {
     port: u16,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
     running: bool,
+    needs_teardown: bool,
+    children_started: bool,
     image_name: String,
     image_tag: String,
     container_name: Option<String>,
@@ -53,6 +55,8 @@ impl KafkaDependency {
             image_tag,
             container_name,
             running: false,
+            needs_teardown: false,
+            children_started: false,
             readiness_check: Box::new(DefaultKafkaReadinessCheck),
             topics,
         }
@@ -174,8 +178,13 @@ impl RunnableDependency for KafkaDependency {
         tracing::debug!(dependency = %self.identifier, phase = "start_begin", "starting");
         let sw = Instant::now();
 
-        for dep in self.dependencies.iter_mut().flatten() {
-            dep.start().await;
+        if let Some(children) = self.dependencies.as_mut() {
+            if !children.is_empty() {
+                self.children_started = true;
+                for dep in children.iter_mut() {
+                    dep.start().await;
+                }
+            }
         }
 
         let image_name = self.image_name.clone();
@@ -186,6 +195,7 @@ impl RunnableDependency for KafkaDependency {
             .unwrap_or_else(|| self.set_container_name());
 
         let sw_container = Instant::now();
+        self.needs_teardown = true;
         self.kafka_impl
             .start(self.port, &image_name, &image_tag, &container_name)
             .await;
@@ -214,19 +224,27 @@ impl RunnableDependency for KafkaDependency {
     }
 
     async fn stop(&mut self) {
+        self.kafka_impl.stop().await;
+        self.needs_teardown = false;
+
         if !self.running {
+            if self.children_started {
+                for dep in self.dependencies.iter_mut().flatten().rev() {
+                    dep.stop().await;
+                }
+                self.children_started = false;
+            }
             return;
         }
 
         tracing::debug!(dependency = %self.identifier, phase = "stop_begin", "stopping");
         let sw = Instant::now();
 
-        self.kafka_impl.stop().await;
-
         for dep in self.dependencies.iter_mut().flatten().rev() {
             dep.stop().await;
         }
 
+        self.children_started = false;
         self.running = false;
         tracing::debug!(
             dependency = %self.identifier,
@@ -298,13 +316,14 @@ impl RunnableDependency for KafkaDependency {
 
 impl Drop for KafkaDependency {
     fn drop(&mut self) {
-        if !self.running {
-            return;
+        if self.running {
+            tracing::warn!(
+                dependency = %self.identifier,
+                "drop while running; forcing stop"
+            );
+            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
+        } else if self.needs_teardown || self.children_started {
+            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
         }
-        tracing::warn!(
-            dependency = %self.identifier,
-            "drop while running; forcing stop"
-        );
-        futures::executor::block_on(<Self as RunnableDependency>::stop(self));
     }
 }

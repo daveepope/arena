@@ -1,0 +1,20 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+    patch:
+      default:
+        target: auto
+
+flag_management:
+  default_rules:
+    - flags:
+        - linux
+      paths:
+        - "**"
+
+ignore:
+  - "bazel-*/**"
+  - "external/**"
+  - "third_party/**"

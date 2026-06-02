@@ -7,6 +7,14 @@ use aws_credential_types::Credentials;
 use aws_sdk_sqs as sqs;
 use futures::FutureExt;
 
+fn ephemeral_tcp_port() -> u16 {
+    std::net::TcpListener::bind("127.0.0.1:0")
+        .expect("bind ephemeral tcp port")
+        .local_addr()
+        .expect("local_addr")
+        .port()
+}
+
 const ACCESS_KEY: &str = "test";
 const SECRET_KEY: &str = "test";
 const REGION: &str = "us-east-1";
@@ -52,12 +60,19 @@ impl TestContext {
             .as_millis();
         let queue_name = format!("arena-component-test-{ts}");
 
-        let mut localstack = LocalstackDependency::builder("")
+        let mut localstack = LocalstackDependency::builder("localstack-component")
+            .with_port(ephemeral_tcp_port())
             .with_service("sqs")
             .with_queue(&queue_name)
             .build();
 
-        localstack.start().await;
+        let start_outcome = std::panic::AssertUnwindSafe(async { localstack.start().await })
+            .catch_unwind()
+            .await;
+        if let Err(panic_payload) = start_outcome {
+            localstack.stop().await;
+            std::panic::resume_unwind(panic_payload);
+        }
 
         let endpoint = match localstack.endpoint_url() {
             Some(v) => v.to_string(),

@@ -81,6 +81,7 @@ use_repo(arena_java_maven, "arena_java_maven")
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
     python_version = "3.12",
+    configure_coverage_tool = True,
 )
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
 pip.parse(

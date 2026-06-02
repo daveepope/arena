@@ -1,5 +1,5 @@
 {
-  "checksum": "ff3c7b16ae486b11175e5a5fbce09d8d28581254ed6cb4e6423309147711e570",
+  "checksum": "8185f5eb6f708ec6f55ebff85b975889d43ac498b0da34eb696f9f50e4fca44c",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -508,7 +508,7 @@
               "target": "futures"
             },
             {
-              "id": "tar 0.4.45",
+              "id": "tar 0.4.46",
               "target": "tar"
             },
             {
@@ -8653,7 +8653,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ]
@@ -15191,7 +15191,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.60.2",
                 "target": "windows_sys",
                 "alias": "windows"
               }
@@ -21346,7 +21346,7 @@
                 "alias": "libc_errno"
               },
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ]
@@ -23563,7 +23563,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.60.2",
                 "target": "windows_sys"
               }
             ]
@@ -24165,14 +24165,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "tar 0.4.45": {
+    "tar 0.4.46": {
       "name": "tar",
-      "version": "0.4.45",
-      "package_url": "https://github.com/alexcrichton/tar-rs",
+      "version": "0.4.46",
+      "package_url": "https://github.com/composefs/tar-rs",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/tar/0.4.45/download",
-          "sha256": "22692a6476a21fa75fdfc11d452fda482af402c008cdbaf3476414e122040973"
+          "url": "https://static.crates.io/crates/tar/0.4.46/download",
+          "sha256": "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
         }
       },
       "targets": [
@@ -24242,7 +24242,7 @@
           }
         },
         "edition": "2021",
-        "version": "0.4.45"
+        "version": "0.4.46"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -24311,7 +24311,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ]
@@ -29637,6 +29637,24 @@
         "compile_data_glob": [
           "**"
         ],
+        "crate_features": {
+          "common": [
+            "Win32",
+            "Win32_Foundation",
+            "Win32_Networking",
+            "Win32_Networking_WinSock",
+            "Win32_Security",
+            "Win32_Storage",
+            "Win32_Storage_FileSystem",
+            "Win32_System",
+            "Win32_System_Console",
+            "Win32_System_IO",
+            "Win32_System_Threading",
+            "Win32_System_WindowsProgramming",
+            "default"
+          ],
+          "selects": {}
+        },
         "deps": {
           "common": [
             {
@@ -33195,7 +33213,7 @@
     "serde 1.0.228",
     "serde_json 1.0.149",
     "serde_urlencoded 0.7.1",
-    "tar 0.4.45",
+    "tar 0.4.46",
     "testcontainers-modules 0.15.0",
     "tiberius 0.12.3",
     "tokio 1.52.1",

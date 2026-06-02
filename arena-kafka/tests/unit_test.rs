@@ -2,6 +2,7 @@ use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
 use arena_kafka::{KafkaDependency, KafkaImpl};
 use async_trait::async_trait;
+use futures::FutureExt;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,6 +32,7 @@ impl KafkaImpl for FakeKafkaImpl {
         _image_tag: &str,
         _container_name: &str,
     ) {
+        self.bootstrap = Some("127.0.0.1:9092".to_string());
         self.events.lock().unwrap().push(Event::KafkaStart);
     }
 
@@ -104,8 +106,22 @@ impl RunnableDependency for FakeDep {
     async fn hard_reset(&mut self) {}
 }
 
+struct FailingReadinessCheck;
+
+#[async_trait]
+impl ReadinessCheck for FailingReadinessCheck {
+    async fn is_ready(
+        &self,
+        _identifier: &str,
+        _bootstrap_servers: &str,
+        _timeout_ms: u64,
+    ) -> Result<(), String> {
+        Err("readiness failed".to_string())
+    }
+}
+
 #[tokio::test]
-async fn kafka_dependency_lifecycle() {
+async fn start_stop_happy_path_records_events() {
     let events = Arc::new(Mutex::new(Vec::<Event>::new()));
 
     let deps: Vec<Box<dyn RunnableDependency>> = vec![
@@ -154,4 +170,27 @@ async fn kafka_dependency_lifecycle() {
             Event::DepStop("dep-a"),
         ]
     );
+}
+
+#[tokio::test]
+async fn start_readiness_err_panics_after_impl_start() {
+    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
+    let mut dep = KafkaDependency::builder("kafka")
+        .with_impl(FakeKafkaImpl {
+            bootstrap: None,
+            events: events.clone(),
+        })
+        .with_port(0)
+        .with_image_tag("x")
+        .with_readiness_check(FailingReadinessCheck)
+        .build();
+
+    let outcome = std::panic::AssertUnwindSafe(async {
+        dep.start().await;
+    })
+    .catch_unwind()
+    .await;
+
+    assert!(outcome.is_err());
+    assert_eq!(events.lock().unwrap().as_slice(), &[Event::KafkaStart]);
 }

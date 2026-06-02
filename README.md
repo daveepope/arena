@@ -23,8 +23,6 @@ Bazel build is used to build and runs tests in parallel and streams logs during 
 - Bazel (via [Bazelisk](https://github.com/bazelbuild/bazelisk) is recommended)
 - Docker
 
-> Note: hosted GitHub macOS runners don't provide a Docker daemon, so CI's macOS leg skips tests tagged **`requires_docker`** using **`--test_tag_filters=-requires_docker`**. Linux CI and machines with Docker run the full suite.
-
 ## Agent instructions (AI / editors)
 
 - **`AGENTS.md` is the source of truth** for project agent rules (coding assistants, CI context, etc.).
@@ -92,35 +90,6 @@ open.close().await;
 
 You can also use `with_source_path` / `with_build_tool` on the builder so Arena builds the binary before starting it (see `examples/`).
 
-#### HTTP playbooks (Rust)
-
-`arena-http` and `arena-mssql` both ship a centralized **playbook** API with a lifetime scope, so per-scenario setup and teardown happen implicitly. Calling `.run().await` returns an `ActivePlaybook`: setup runs eagerly (HTTP mappings registered, MSSQL tables reset), and teardown runs automatically when the value is dropped (HTTP mappings removed and `expect_called(...)` expectations verified; MSSQL tables reset again so the next scenario starts clean). Bind the active playbook to a scoped variable and let scope exit do the cleanup.
-
-When a scenario needs a dependency to behave differently (e.g. an outage, a bad response), grab the `HttpDependency` from the open arena and run a **playbook**. Mappings registered by the playbook are scoped to its lifetime and automatically removed on drop; expectations declared via `.expect_called(...)` are verified on drop and panic if unmet.
-
-```rust
-use arena_http::{HttpDependency, server_error};
-
-let calibration = open
-    .dependency("calibration")
-    .and_then(|d| d.as_any().downcast_ref::<HttpDependency>())
-    .expect("calibration available");
-
-{
-    let _outage = calibration
-        .playbook()
-        .post("/api/v1/validate")
-            .with_priority(1)
-            .will_return(server_error())
-            .expect_called(1)
-        .run()
-        .await;
-
-    // requests to /api/v1/validate now get 500 — exercise the failure path.
-}
-// _outage dropped here: mapping removed, expectation verified.
-```
-
 ### Python (arena-pytest)
 
 ```python
@@ -175,31 +144,38 @@ await open_arena.close()
 
 As in Rust, you can point at source plus `with_build_tool(...)` instead of a prebuilt path when you want Arena to compile the component first.
 
-#### HTTP playbooks (Python)
+## Playbooks
 
-The Python client mirrors the Rust playbook API. Use `HttpPlaybookBuilder` with an open arena and a `with` block for scoped setup and teardown; unmet `expect_called` expectations raise `AssertionError` on exit. The example below uses an `arena` pytest fixture, which is one convenient way to get an open arena, but any open arena works.
+A **playbook** is a named, scoped behavior attached to a dependency in your sandbox. It describes how that dependency should act for the lifetime of the playbook — for example, baseline HTTP responses for a downstream service, resetting MSSQL tables when a scenario begins and ends, or purging localstack resources between scenarios. Playbooks are part of Arena’s lifecycle model: you open them when a scenario needs them and close them when that scenario is done, so the sandbox returns to a known baseline.
 
-```python
-from arena_pytest import HttpPlaybookBuilder
+When a playbook is **active**, Arena applies its setup on open and its teardown on close (explicit close, scope exit, or arena shutdown). Some dependency types can also verify that expected interaction occurred during the playbook’s lifetime when the playbook declares those rules.
 
-def test_calibration_outage_returns_500(arena):
-    outage = (
-        HttpPlaybookBuilder("calibration")
-        .with_mapping(
-            method="POST",
-            url_path="/api/v1/validate",
-            status=500,
-            priority=1,
-            expect_called=1,
-        )
-        .build(arena)
-    )
+### Managed playbooks
 
-    with outage:
-        r = requests.post("http://127.0.0.1:3001/readings", json={...})
-        assert r.status_code == 500
-    # outage context exits: mapping removed, expectation verified.
-```
+A **managed playbook** is a playbook whose behavior is declared up front as a manifest (mappings, table resets, purge rules, and similar). You **register** managed playbooks on a **match** when you build the sandbox. Arena applies the manifest when the playbook opens and **cleans up after itself when it closes** — mappings removed, tables reset, queues purged, and so on — so you do not hand-roll teardown. That automatic setup and teardown is what **managed** means.
+
+Define sandbox-specific playbooks by **extending** the managed base for the dependency type (`ManagedHttpPlaybook`, `ManagedMssqlPlaybook`, `ManagedLocalstackPlaybook`, and similar in Python and Java). In Rust, build the same manifests with the `Managed*Playbook` types from the dependency crates. Register the instance on the match; Arena executes it through the core runtime.
+
+Register with **`exec_on_dependency_start`** (Python/Java) or the second argument to **`register_playbook`** (Rust):
+
+- **`true`** — run when the dependency starts and stay active for the sandbox session (typical for default dependency behavior, such as a baseline HTTP stub for the whole run).
+- **`false`** — register only; open when you need a shorter-lived scenario.
+
+**Rust** — pass `Box<dyn Playbook>` from `ManagedHttpPlaybook`, `ManagedMssqlPlaybook`, or sibling types to `Match::register_playbook`.
+
+**Python** — subclass a `Managed*Playbook` type and pass an instance to `MatchBuilder.register_playbook`.
+
+**Java** — subclass a `Managed*Playbook` type and pass an instance to `MatchBuilder.registerPlaybook`.
+
+### Scoped activation
+
+For playbooks registered with **`exec_on_dependency_start=false`**, open them only for the period that scenario should apply:
+
+- **Rust** — obtain the dependency from the open arena, call `.playbook().run().await`, and hold the active playbook until scope ends.
+- **Python** — stack `@playbook(YourPlaybook)` decorators on the callable that should run under that behavior (one playbook class per line).
+- **Java** — stack `@Playbook(YourPlaybook.class)` annotations the same way (one class per line).
+
+Session-default and scoped playbooks can coexist on one match. Scoped playbooks tear down when they close so the next scenario starts from a clean sandbox state.
 
 ## License
 
