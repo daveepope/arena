@@ -111,7 +111,7 @@ If `pip` sees two wheels for the same version, remove old files under `bazel-bin
 
 ## Publish to PyPI
 
-Each PR to `master` gets an automatic release bump from `master`’s `VERSION` (default **patch**). For a larger bump, add PR label **`semver:minor`** or **`semver:major`** (CI creates those labels on first run), or put **`[semver:minor]`** / **`[semver:major]`** in the PR title. CI commits `VERSION`, `Cargo.toml`, and `MODULE.bazel`. Keep `arena-pytest/LICENSE` aligned with the repository root `LICENSE`.
+Each PR to `master` gets an automatic release bump from `master`’s `VERSION`. Use PR labels **`semver:patch`** (default if none set), **`semver:minor`**, or **`semver:major`**; CI creates those labels on first workflow run. CI commits `VERSION`, `Cargo.toml`, and `MODULE.bazel`. Keep `arena-pytest/LICENSE` aligned with the repository root `LICENSE`.
 
 ### 1. Smoke test (install the wheel locally, no upload)
 
