@@ -73,8 +73,16 @@ def sync_workspace_version(root: Path) -> list[str]:
     return changed
 
 
+def normalize_workspace_version(version: str) -> str:
+    match = re.match(r"(\d+)\.(\d+)\.(\d+)", version.strip())
+    if not match:
+        raise ValueError(f"workspace version must start with MAJOR.MINOR.PATCH, got {version!r}")
+    return f"{match.group(1)}.{match.group(2)}.{match.group(3)}"
+
+
 def parse_release_version(version: str) -> tuple[int, int, int]:
-    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", version.strip())
+    normalized = normalize_workspace_version(version)
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", normalized)
     if not match:
         raise ValueError(f"VERSION must be MAJOR.MINOR.PATCH, got {version!r}")
     return int(match.group(1)), int(match.group(2)), int(match.group(3))
@@ -104,21 +112,53 @@ def resolve_semver_level_from_event(event_path: Path) -> str:
     return "patch"
 
 
-def read_version_from_git_ref(root: Path, ref: str) -> str:
+def _git_show(root: Path, ref: str, path: str) -> str | None:
     result = subprocess.run(
-        ["git", "show", f"{ref}:VERSION"],
+        ["git", "show", f"{ref}:{path}"],
         cwd=root,
-        check=True,
         capture_output=True,
         text=True,
     )
-    version = result.stdout.strip()
-    if not version:
-        raise ValueError(f"VERSION is empty at {ref}")
-    return version
+    if result.returncode != 0:
+        return None
+    return result.stdout
+
+
+def version_file_at_ref(root: Path, ref: str) -> bool:
+    result = subprocess.run(
+        ["git", "cat-file", "-e", f"{ref}:VERSION"],
+        cwd=root,
+        capture_output=True,
+    )
+    return result.returncode == 0
+
+
+def read_version_from_git_ref(root: Path, ref: str) -> str:
+    text = _git_show(root, ref, "VERSION")
+    if text is not None:
+        version = text.strip()
+        if version:
+            return version
+    cargo = _git_show(root, ref, "Cargo.toml")
+    if cargo is None:
+        raise RuntimeError(f"could not read VERSION or Cargo.toml at {ref}")
+    match = re.search(r'^version = "([^"]+)"\s*$', cargo, re.MULTILINE)
+    if not match:
+        raise RuntimeError(f"could not read [workspace.package] version from Cargo.toml at {ref}")
+    return normalize_workspace_version(match.group(1))
 
 
 def prepare_release_version(root: Path, master_ref: str, level: str) -> tuple[str, list[str]]:
+    if not version_file_at_ref(root, master_ref):
+        version_path = root / "VERSION"
+        if not version_path.is_file():
+            raise RuntimeError(
+                f"{master_ref} has no VERSION; add VERSION on the branch for the first stable release"
+            )
+        version = read_version(root)
+        changed = sync_workspace_version(root)
+        return version, changed
+
     base = read_version_from_git_ref(root, master_ref)
     target = bump_release_version(base, level)
     version_path = root / "VERSION"
