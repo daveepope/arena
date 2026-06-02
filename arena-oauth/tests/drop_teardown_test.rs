@@ -68,5 +68,6 @@ async fn start_child_panic_then_drop_does_not_panic() {
     .catch_unwind()
     .await;
     assert!(start_outcome.is_err());
+    dep.stop().await;
     drop(dep);
 }

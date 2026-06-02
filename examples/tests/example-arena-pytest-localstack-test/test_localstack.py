@@ -11,7 +11,7 @@ import pytest_asyncio
 
 from playbooks import LocalstackSessionPurgePlaybook
 
-from readings_ephemeral_test_runtime import ephemeral_tcp_port
+from readings_ephemeral_test_runtime import ReadingsEphemeralTestRuntime, ephemeral_tcp_port
 
 from arena_pytest import (
     ArenaLogLevel,
@@ -26,6 +26,8 @@ REGION = "us-east-1"
 DUMMY_CREDS = {"aws_access_key_id": "test", "aws_secret_access_key": "test"}
 
 LOCALSTACK_ID = f"ls-{uuid.uuid4().hex[:8]}"
+RUNTIME = ReadingsEphemeralTestRuntime()
+NETWORK_NAME = RUNTIME.network_name("arena-network")
 
 
 def _wait_for_sqs_message(
@@ -78,6 +80,7 @@ async def _localstack_session():
 
     a_match = (
         MatchBuilder("localstack-e2e")
+        .with_network(NETWORK_NAME)
         .add_dependency(localstack)
         .register_playbook(session_purge_playbook)
         .build()
