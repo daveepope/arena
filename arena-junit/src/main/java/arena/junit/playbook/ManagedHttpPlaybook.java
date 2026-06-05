@@ -8,7 +8,9 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.jna.Pointer;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 public class ManagedHttpPlaybook implements Playbook, PlaybookRegistration {
 
@@ -64,22 +66,84 @@ public class ManagedHttpPlaybook implements Playbook, PlaybookRegistration {
 
   private final String identifier;
   private final String dependencyIdentifier;
-  private final List<Mapping> mappings;
+  private final List<ObjectNode> mappingNodes;
 
   protected ManagedHttpPlaybook(
-      String identifier, String dependencyIdentifier, List<Mapping> mappings) {
+      String identifier, String dependencyIdentifier, Iterable<Mapping> mappings) {
+    this(identifier, dependencyIdentifier, mappingNodesFromLegacy(mappings));
+  }
+
+  protected ManagedHttpPlaybook(
+      String identifier, String dependencyIdentifier, HttpSequenceBuilder sequence) {
+    this(identifier, dependencyIdentifier, sequence.intoPlaybook().mappingsForFfi());
+  }
+
+  protected ManagedHttpPlaybook(
+      String identifier, String dependencyIdentifier, HttpPlaybookBuilder builder) {
+    this(identifier, dependencyIdentifier, builder.mappingsForFfi());
+  }
+
+  private ManagedHttpPlaybook(
+      String identifier, String dependencyIdentifier, List<ObjectNode> mappingNodes) {
     if (identifier == null || identifier.isEmpty()) {
       throw new IllegalArgumentException("ManagedHttpPlaybook requires an identifier");
     }
     if (dependencyIdentifier == null || dependencyIdentifier.isEmpty()) {
       throw new IllegalArgumentException("ManagedHttpPlaybook requires a dependency identifier");
     }
-    if (mappings == null || mappings.isEmpty()) {
+    if (mappingNodes == null || mappingNodes.isEmpty()) {
       throw new IllegalArgumentException("ManagedHttpPlaybook requires at least one mapping");
     }
     this.identifier = identifier;
     this.dependencyIdentifier = dependencyIdentifier;
-    this.mappings = List.copyOf(mappings);
+    this.mappingNodes = List.copyOf(mappingNodes);
+  }
+
+  private static List<ObjectNode> mappingNodesFromLegacy(Iterable<Mapping> mappings) {
+    if (mappings == null) {
+      throw new IllegalArgumentException("ManagedHttpPlaybook requires at least one mapping");
+    }
+    List<ObjectNode> nodes = new ArrayList<>();
+    for (Mapping m : mappings) {
+      ObjectNode mn = ArenaJson.object();
+      mn.put("method", m.method().toUpperCase());
+      mn.put("url_path", m.urlPath());
+      mn.put("status", m.status());
+      if (m.jsonBody() != null) {
+        mn.set("json_body", ArenaJson.MAPPER.valueToTree(m.jsonBody()));
+      }
+      if (m.expect() != null) {
+        ObjectNode en = ArenaJson.object();
+        en.put("kind", m.expect().kind());
+        if (m.expect().count() != null) {
+          en.put("count", m.expect().count());
+        }
+        mn.set("expect", en);
+      }
+      nodes.add(mn);
+    }
+    if (nodes.isEmpty()) {
+      throw new IllegalArgumentException("ManagedHttpPlaybook requires at least one mapping");
+    }
+    return nodes;
+  }
+
+  public static ManagedHttpPlaybook fromBuilder(
+      String identifier,
+      String dependencyIdentifier,
+      Function<HttpPlaybookBuilder, ?> build) {
+    HttpPlaybookBuilder builder = new HttpPlaybookBuilder(dependencyIdentifier);
+    Object result = build.apply(builder);
+    HttpPlaybookBuilder built;
+    if (result instanceof HttpSequenceBuilder seq) {
+      built = seq.intoPlaybook();
+    } else if (result instanceof HttpPlaybookBuilder playbookBuilder) {
+      built = playbookBuilder;
+    } else {
+      throw new IllegalArgumentException(
+          "HTTP playbook builder function must return HttpPlaybookBuilder or HttpSequenceBuilder");
+    }
+    return new ManagedHttpPlaybook(identifier, dependencyIdentifier, built.mappingsForFfi());
   }
 
   @Override
@@ -98,23 +162,8 @@ public class ManagedHttpPlaybook implements Playbook, PlaybookRegistration {
     n.put("kind", "http");
     n.put("dependency_identifier", dependencyIdentifier);
     ArrayNode arr = ArenaJson.array();
-    for (Mapping m : mappings) {
-      ObjectNode mn = ArenaJson.object();
-      mn.put("method", m.method().toUpperCase());
-      mn.put("url_path", m.urlPath());
-      mn.put("status", m.status());
-      if (m.jsonBody() != null) {
-        mn.set("json_body", ArenaJson.MAPPER.valueToTree(m.jsonBody()));
-      }
-      if (m.expect() != null) {
-        ObjectNode en = ArenaJson.object();
-        en.put("kind", m.expect().kind());
-        if (m.expect().count() != null) {
-          en.put("count", m.expect().count());
-        }
-        mn.set("expect", en);
-      }
-      arr.add(mn);
+    for (ObjectNode m : mappingNodes) {
+      arr.add(m.deepCopy());
     }
     n.set("mappings", arr);
     return n;

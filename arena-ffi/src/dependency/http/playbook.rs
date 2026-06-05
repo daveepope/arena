@@ -3,52 +3,22 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use arena_http::{
     delete_requested_for, get_requested_for, post_requested_for, put_requested_for, ActivePlaybook,
-    HttpDependency, PlaybookSequenceBuilder, RequestCriteria, ResponseDefinition,
+    HttpDependency, RequestCriteria,
 };
 use serde::Deserialize;
 
 use crate::active_playbook::{ActivePlaybookInner, ArenaActivePlaybookHandle};
 use crate::closed_arena::OpenArenaRuntimeState;
+use crate::dependency::http::mapping::{build_playbook_from_mappings, MappingSpec};
 use crate::error::{clear_error, write_error};
 use crate::panic_payload::panic_message;
 use crate::strings::c_str_to_string;
 use crate::{ArenaStatus, OpenArenaHandle};
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-enum ExpectSpec {
-    Exactly { count: u64 },
-    AtLeast { count: u64 },
-    Never,
-}
-
 #[derive(Debug, Deserialize)]
 struct PlaybookSpec {
     dependency_identifier: String,
     mappings: Vec<MappingSpec>,
-}
-
-#[derive(Debug, Deserialize)]
-struct MappingSpec {
-    method: String,
-    url_path: String,
-    #[serde(default)]
-    priority: Option<u32>,
-    response: ResponseSpec,
-    #[serde(default)]
-    expect: Option<ExpectSpec>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ResponseSpec {
-    #[serde(default = "default_status")]
-    status: u16,
-    #[serde(default)]
-    json_body: Option<serde_json::Value>,
-}
-
-fn default_status() -> u16 {
-    200
 }
 
 #[derive(Debug, Deserialize)]
@@ -61,65 +31,6 @@ struct VerifySpec {
     expected_count: Option<u64>,
     #[serde(default)]
     minimum_count: Option<u64>,
-}
-
-fn response_def(spec: &ResponseSpec) -> ResponseDefinition {
-    let mut r = ResponseDefinition::new(spec.status);
-    if let Some(ref body) = spec.json_body {
-        r = r.with_json_body(body.clone());
-    }
-    r
-}
-
-fn apply_expect(
-    seq: PlaybookSequenceBuilder,
-    expect: &Option<ExpectSpec>,
-) -> PlaybookSequenceBuilder {
-    match expect {
-        Some(ExpectSpec::Exactly { count }) => seq.expect_called(*count),
-        Some(ExpectSpec::AtLeast { count }) => seq.expect_called_at_least(*count),
-        Some(ExpectSpec::Never) => seq.expect_never_called(),
-        None => seq,
-    }
-}
-
-fn first_sequence(
-    http: &HttpDependency,
-    m: &MappingSpec,
-) -> Result<PlaybookSequenceBuilder, String> {
-    let resp = response_def(&m.response);
-    let playbook = http.playbook();
-    let builder = match m.method.to_ascii_uppercase().as_str() {
-        "GET" => playbook.get(&m.url_path),
-        "POST" => playbook.post(&m.url_path),
-        "PUT" => playbook.put(&m.url_path),
-        "DELETE" => playbook.delete(&m.url_path),
-        other => return Err(format!("unsupported HTTP method: {other}")),
-    };
-    let builder = match m.priority {
-        Some(p) => builder.with_priority(p),
-        None => builder,
-    };
-    Ok(apply_expect(builder.will_return(resp), &m.expect))
-}
-
-fn append_mapping(
-    seq: PlaybookSequenceBuilder,
-    m: &MappingSpec,
-) -> Result<PlaybookSequenceBuilder, String> {
-    let resp = response_def(&m.response);
-    let builder = match m.method.to_ascii_uppercase().as_str() {
-        "GET" => seq.get(&m.url_path),
-        "POST" => seq.post(&m.url_path),
-        "PUT" => seq.put(&m.url_path),
-        "DELETE" => seq.delete(&m.url_path),
-        other => return Err(format!("unsupported HTTP method: {other}")),
-    };
-    let builder = match m.priority {
-        Some(p) => builder.with_priority(p),
-        None => builder,
-    };
-    Ok(apply_expect(builder.will_return(resp), &m.expect))
 }
 
 fn criteria_for(method: &str, url_path: &str) -> Result<RequestCriteria, String> {
@@ -211,16 +122,11 @@ pub extern "C" fn arena_http_playbook_open(
         let arena_runtime = unsafe { OpenArenaRuntimeState::as_ref(arena_handle) };
         let runtime_handle = arena_runtime.runtime.handle().clone();
 
-        let seq =
-            with_http_dependency(arena_runtime, &parsed.dependency_identifier, |http| {
-                let mut seq = first_sequence(http, &parsed.mappings[0])?;
-                for m in parsed.mappings.iter().skip(1) {
-                    seq = append_mapping(seq, m)?;
-                }
-                Ok::<PlaybookSequenceBuilder, String>(seq)
-            })??;
+        let playbook = with_http_dependency(arena_runtime, &parsed.dependency_identifier, |http| {
+            build_playbook_from_mappings(http.playbook(), &parsed.mappings)
+        })??;
 
-        let active = runtime_handle.block_on(async move { seq.run().await });
+        let active = runtime_handle.block_on(async move { playbook.run().await });
 
         Ok(ActivePlaybookInner {
             runtime_handle,

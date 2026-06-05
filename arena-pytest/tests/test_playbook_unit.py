@@ -107,5 +107,156 @@ def test_active_playbook_drop_without_body_failure_reraises_binding_error(monkey
         active.__exit__(None, None, None)
 
 
+def test_http_playbook_builder_scenario_mapping_serializes_expected_fields():
+    from arena_pytest.dep.http import HttpPlaybookBuilder, ok_json
+
+    mappings = (
+        HttpPlaybookBuilder("dep-id")
+        .get("/api/x")
+        .in_scenario("flow")
+        .will_return(ok_json({"step": 1}))
+        .post("/api/y")
+        .when_state_is("ready")
+        .will_set_state_to("done")
+        .will_return(ok_json({"ok": True}))
+        .into_playbook()
+        .mappings_for_ffi()
+    )
+    assert mappings[0]["scenario_name"] == "flow"
+    assert mappings[1]["when_state_is"] == "ready"
+    assert mappings[1]["will_set_state_to"] == "done"
+
+
+def test_legacy_with_mapping_builds_response_spec():
+    from arena_pytest.dep.http import ActiveHttpPlaybookBuilder
+
+    builder = ActiveHttpPlaybookBuilder("dep-id")
+    builder.with_mapping("POST", "/api/x", 500, expect_called_at_least=1)
+    mappings = builder._builder.mappings_for_ffi()
+    assert mappings[0]["method"] == "POST"
+    assert mappings[0]["response"]["status"] == 500
+    assert mappings[0]["expect"]["kind"] == "at_least"
+
+
+def test_legacy_managed_dict_mapping_serializes_flat_status():
+    from arena_pytest import ManagedHttpPlaybook
+
+    playbook = ManagedHttpPlaybook(
+        identifier="legacy-playbook",
+        dependency_identifier="dep-id",
+        mappings=[{
+            "method": "POST",
+            "url_path": "/api/x",
+            "status": 500,
+        }],
+    )
+    row = playbook._for_ffi()["mappings"][0]
+    assert row["status"] == 500
+
+
+def test_http_playbook_builder_then_return_serializes_responses_array():
+    from arena_pytest.dep.http import HttpPlaybookBuilder, ok_json, server_error, status
+
+    mappings = (
+        HttpPlaybookBuilder("dep-id")
+        .get("/api/x")
+        .will_return(server_error())
+        .then_return(status(503))
+        .then_return(ok_json({"ok": True}))
+        .into_playbook()
+        .mappings_for_ffi()
+    )
+    row = mappings[0]
+    assert "response" not in row
+    assert row["responses"][0]["status"] == 500
+    assert row["responses"][1]["status"] == 503
+    assert row["responses"][2]["json_body"]["ok"] is True
+
+
+def test_http_playbook_builder_will_return_in_sequence_serializes_responses_array():
+    from arena_pytest.dep.http import HttpPlaybookBuilder, ok_json, server_error, status
+
+    mappings = (
+        HttpPlaybookBuilder("dep-id")
+        .get("/api/x")
+        .will_return_in_sequence([server_error(), status(503), ok_json({"ok": True})])
+        .mappings_for_ffi()
+    )
+    row = mappings[0]
+    assert row["responses"][0]["status"] == 500
+    assert row["responses"][2]["json_body"]["ok"] is True
+
+
+def test_http_playbook_builder_request_match_fields_serialize_headers_and_body_patterns():
+    from arena_pytest.dep.http import HttpHeaderPattern, HttpPlaybookBuilder, ok_json
+
+    mappings = (
+        HttpPlaybookBuilder("dep-id")
+        .post("/api/x")
+        .with_header("Authorization", HttpHeaderPattern.matching("Bearer .+"))
+        .with_request_body({"command": "ignition"})
+        .with_request_body_containing("ignite")
+        .with_priority(2)
+        .will_return(ok_json({"accepted": True}))
+        .into_playbook()
+        .mappings_for_ffi()
+    )
+    row = mappings[0]
+    assert row["priority"] == 2
+    assert row["headers"]["Authorization"]["matches"] == "Bearer .+"
+    assert row["body_patterns"][0]["equal_to_json"] == '{"command": "ignition"}'
+    assert row["body_patterns"][1]["contains"] == "ignite"
+
+
+def test_http_response_delay_and_headers_serialize_in_mapping_spec():
+    from arena_pytest.dep.http import HttpPlaybookBuilder, created
+
+    mappings = (
+        HttpPlaybookBuilder("dep-id")
+        .post("/api/x")
+        .will_return(
+            created()
+            .with_header("Location", "/api/x/1")
+            .with_fixed_delay_ms(30)
+            .with_uniform_random_delay_ms(5, 15)
+        )
+        .into_playbook()
+        .mappings_for_ffi()
+    )
+    response = mappings[0]["response"]
+    assert response["status"] == 201
+    assert response["headers"]["Location"] == "/api/x/1"
+    assert response["fixed_delay_ms"] == 30
+    assert response["delay_distribution"]["type"] == "uniform"
+
+
+def test_http_playbook_builder_expect_called_serializes_expect_exactly():
+    from arena_pytest.dep.http import HttpPlaybookBuilder, ok_json
+
+    mappings = (
+        HttpPlaybookBuilder("dep-id")
+        .post("/api/x")
+        .will_return(ok_json({"ok": True}))
+        .expect_called(2)
+        .into_playbook()
+        .mappings_for_ffi()
+    )
+    assert mappings[0]["expect"] == {"kind": "exactly", "count": 2}
+
+
+def test_managed_http_playbook_from_builder_preserves_fluent_mappings():
+    from arena_pytest import ManagedHttpPlaybook
+    from arena_pytest.dep.http import HttpPlaybookBuilder, ok_json
+
+    playbook = ManagedHttpPlaybook.from_builder(
+        "pb-from-builder",
+        "dep-id",
+        lambda b: b.get("/api/x").will_return(ok_json({"ok": True})),
+    )
+    row = playbook._for_ffi()["mappings"][0]
+    assert row["method"] == "GET"
+    assert row["response"]["json_body"]["ok"] is True
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([os.path.dirname(os.path.abspath(__file__)), "-v", "-s"]))

@@ -3,6 +3,9 @@ package arena.junit.readings.test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import arena.junit.playbook.ActiveHttpPlaybookBuilder;
+import arena.junit.playbook.HttpPlaybookBuilder;
+import arena.junit.playbook.HttpResponse;
 import arena.junit.playbook.ManagedHttpPlaybook;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -19,7 +22,9 @@ final class ReadingsHttpPlaybookRegistrationTest {
       super(
           "pb-reg",
           "dep-http",
-          List.of(mapping("POST", "/api/v1/validate", 200, Map.of("valid", true))));
+          new HttpPlaybookBuilder("dep-http")
+              .post("/api/v1/validate")
+              .willReturn(HttpResponse.okJson(Map.of("valid", true))));
     }
   }
 
@@ -35,8 +40,9 @@ final class ReadingsHttpPlaybookRegistrationTest {
     ObjectNode row = (ObjectNode) mappings.get(0);
     assertEquals("POST", row.path("method").asText());
     assertEquals("/api/v1/validate", row.path("url_path").asText());
-    assertEquals(200, row.path("status").asInt());
-    assertTrue(row.has("json_body"));
+    ObjectNode response = (ObjectNode) row.path("response");
+    assertEquals(200, response.path("status").asInt());
+    assertTrue(response.has("json_body"));
   }
 
   @Test
@@ -58,13 +64,41 @@ final class ReadingsHttpPlaybookRegistrationTest {
       super(
           "pb-expect",
           "dep-http",
-          List.of(
-              mapping(
-                  "POST",
-                  "/api/v1/validate",
-                  200,
-                  Map.of("valid", true),
-                  Expect.calledAtLeast(1))));
+          new HttpPlaybookBuilder("dep-http")
+              .post("/api/v1/validate")
+              .willReturn(HttpResponse.okJson(Map.of("valid", true)))
+              .expectCalledAtLeast(1));
     }
+  }
+
+  static final class LegacyValidationPlaybook extends ManagedHttpPlaybook {
+    LegacyValidationPlaybook() {
+      super(
+          "pb-legacy",
+          "dep-http",
+          List.of(mapping("POST", "/api/v1/validate", 200, Map.of("valid", true))));
+    }
+  }
+
+  @Test
+  void legacyWithMapping_buildsResponseSpec() {
+    ActiveHttpPlaybookBuilder builder = new ActiveHttpPlaybookBuilder("dep-http");
+    builder.withMapping("POST", "/api/x", 500, null, null, null, 1, false);
+    ObjectNode row = builder.mappingsForFfi().getFirst();
+    assertEquals(500, row.path("response").path("status").asInt());
+    assertEquals("at_least", row.path("expect").path("kind").asText());
+  }
+
+  @Test
+  void legacyMapping_forRegisteredFfi_serializesFlatStatusShape() {
+    ObjectNode row =
+        (ObjectNode)
+            ((ArrayNode)
+                    new LegacyValidationPlaybook()
+                        .forRegisteredFfi()
+                        .path("mappings"))
+                .get(0);
+    assertEquals(200, row.path("status").asInt());
+    assertTrue(row.has("json_body"));
   }
 }

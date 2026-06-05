@@ -1,10 +1,10 @@
 use arena::Playbook;
-use arena_http::{
-    ManagedHttpPlaybook, Playbook as HttpPlaybook, PlaybookSequenceBuilder, ResponseDefinition,
-};
+use arena_http::{ManagedHttpPlaybook, Playbook as HttpPlaybook};
 use arena_localstack::ManagedLocalstackPlaybook;
 use arena_mssql::ManagedMssqlPlaybook;
 use serde::Deserialize;
+
+use crate::dependency::http::mapping::{build_playbook_from_mappings, MappingSpec};
 
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct ManagedPlaybookConfig {
@@ -30,31 +30,7 @@ pub(crate) enum PlaybookKindConfig {
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct HttpPlaybookConfig {
     pub dependency_identifier: String,
-    pub mappings: Vec<HttpMapping>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-enum ExpectSpec {
-    Exactly { count: u64 },
-    AtLeast { count: u64 },
-    Never,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub(crate) struct HttpMapping {
-    pub method: String,
-    pub url_path: String,
-    #[serde(default = "default_status")]
-    pub status: u16,
-    #[serde(default)]
-    pub json_body: Option<serde_json::Value>,
-    #[serde(default)]
-    expect: Option<ExpectSpec>,
-}
-
-fn default_status() -> u16 {
-    200
+    pub mappings: Vec<MappingSpec>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -85,56 +61,7 @@ pub(crate) fn build(config: ManagedPlaybookConfig) -> Box<dyn Playbook> {
     }
 }
 
-fn response_for(m: &HttpMapping) -> ResponseDefinition {
-    let mut r = ResponseDefinition::new(m.status);
-    if let Some(ref body) = m.json_body {
-        r = r.with_json_body(body.clone());
-    }
-    r
-}
-
-fn build_http_playbook(pb: HttpPlaybook, mappings: &[HttpMapping]) -> HttpPlaybook {
-    assert!(
-        !mappings.is_empty(),
-        "http playbook registration requires at least one mapping"
-    );
-
-    let mut seq = first_sequence(pb, &mappings[0]);
-    for m in mappings.iter().skip(1) {
-        seq = append_mapping(seq, m);
-    }
-    seq.into_playbook()
-}
-
-fn apply_expect(seq: PlaybookSequenceBuilder, expect: &Option<ExpectSpec>) -> PlaybookSequenceBuilder {
-    match expect {
-        Some(ExpectSpec::Exactly { count }) => seq.expect_called(*count),
-        Some(ExpectSpec::AtLeast { count }) => seq.expect_called_at_least(*count),
-        Some(ExpectSpec::Never) => seq.expect_never_called(),
-        None => seq,
-    }
-}
-
-fn first_sequence(pb: HttpPlaybook, m: &HttpMapping) -> PlaybookSequenceBuilder {
-    let resp = response_for(m);
-    let seq = match m.method.to_ascii_uppercase().as_str() {
-        "GET" => pb.get(&m.url_path).will_return(resp),
-        "POST" => pb.post(&m.url_path).will_return(resp),
-        "PUT" => pb.put(&m.url_path).will_return(resp),
-        "DELETE" => pb.delete(&m.url_path).will_return(resp),
-        other => panic!("unsupported HTTP method in playbook registration: {other}"),
-    };
-    apply_expect(seq, &m.expect)
-}
-
-fn append_mapping(seq: PlaybookSequenceBuilder, m: &HttpMapping) -> PlaybookSequenceBuilder {
-    let resp = response_for(m);
-    let seq = match m.method.to_ascii_uppercase().as_str() {
-        "GET" => seq.get(&m.url_path).will_return(resp),
-        "POST" => seq.post(&m.url_path).will_return(resp),
-        "PUT" => seq.put(&m.url_path).will_return(resp),
-        "DELETE" => seq.delete(&m.url_path).will_return(resp),
-        other => panic!("unsupported HTTP method in playbook registration: {other}"),
-    };
-    apply_expect(seq, &m.expect)
+fn build_http_playbook(pb: HttpPlaybook, mappings: &[MappingSpec]) -> HttpPlaybook {
+    build_playbook_from_mappings(pb, mappings)
+        .unwrap_or_else(|e| panic!("http playbook registration failed: {e}"))
 }

@@ -35,6 +35,32 @@ rust_shared_library(
 )
 
 rust_test(
+    name = "ffi_mapping_unit_test",
+    crate = ":arena_ffi",
+    size = "small",
+    edition = "2021",
+    deps = _ARENA_FFI_DEPS,
+    proc_macro_deps = _ARENA_FFI_PROC_MACRO_DEPS,
+)
+
+rust_test(
+    name = "ffi_http_mapping_spec_test",
+    srcs = ["tests/playbook/http_mapping_spec.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
     name = "ffi_playbook_validation_test",
     srcs = ["tests/playbook/http_playbook_ffi_validation.rs"],
     size = "small",

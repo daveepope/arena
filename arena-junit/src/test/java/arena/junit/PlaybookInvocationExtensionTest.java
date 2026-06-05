@@ -11,6 +11,8 @@ import arena.junit.match.MatchBuilder;
 import arena.junit.oauth.OauthDependency;
 import arena.junit.oauth.OauthDependencyBuilder;
 import arena.junit.oauth.OauthLoopbackTls;
+import arena.junit.playbook.HttpPlaybookBuilder;
+import arena.junit.playbook.HttpResponse;
 import arena.junit.playbook.ManagedHttpPlaybook;
 import arena.junit.playbook.Playbook;
 import java.util.List;
@@ -67,13 +69,10 @@ final class PlaybookInvocationExtensionTest {
       super(
           "playbook-ext-session-default",
           dependencyIdentifier,
-          List.of(
-              mapping(
-                  "POST",
-                  CALIBRATION_VALIDATE_PATH,
-                  200,
-                  Map.of("valid", true),
-                  Expect.calledAtLeast(1))));
+          new HttpPlaybookBuilder(dependencyIdentifier)
+              .post(CALIBRATION_VALIDATE_PATH)
+              .willReturn(HttpResponse.okJson(Map.of("valid", true)))
+              .expectCalledAtLeast(1));
     }
   }
 
@@ -82,13 +81,10 @@ final class PlaybookInvocationExtensionTest {
       super(
           "playbook-ext-scoped-outage",
           dependencyIdentifier,
-          List.of(
-              mapping(
-                  "POST",
-                  CALIBRATION_VALIDATE_PATH,
-                  500,
-                  null,
-                  Expect.calledAtLeast(1))));
+          new HttpPlaybookBuilder(dependencyIdentifier)
+              .post(CALIBRATION_VALIDATE_PATH)
+              .willReturn(HttpResponse.serverError())
+              .expectCalledAtLeast(1));
     }
   }
 
@@ -97,13 +93,10 @@ final class PlaybookInvocationExtensionTest {
       super(
           "playbook-ext-scoped-reset",
           dependencyIdentifier,
-          List.of(
-              mapping(
-                  "GET",
-                  "/api/v1/health",
-                  200,
-                  Map.of("ok", true),
-                  Expect.neverCalled())));
+          new HttpPlaybookBuilder(dependencyIdentifier)
+              .get("/api/v1/health")
+              .willReturn(HttpResponse.okJson(Map.of("ok", true)))
+              .expectNeverCalled());
     }
   }
 

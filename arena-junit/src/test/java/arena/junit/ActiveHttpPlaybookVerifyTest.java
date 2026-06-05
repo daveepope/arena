@@ -13,6 +13,7 @@ import arena.junit.oauth.OauthDependency;
 import arena.junit.oauth.OauthDependencyBuilder;
 import arena.junit.oauth.OauthLoopbackTls;
 import arena.junit.playbook.ActiveHttpPlaybook;
+import arena.junit.playbook.HttpPlaybookBuilder;
 import arena.junit.playbook.ManagedHttpPlaybook;
 import arena.junit.playbook.Playbook;
 import java.net.URI;
@@ -60,13 +61,10 @@ final class ActiveHttpPlaybookVerifyTest {
       super(
           "verify-playbook",
           dependencyIdentifier,
-          List.of(
-              mapping(
-                  "POST",
-                  CALIBRATION_VALIDATE_PATH,
-                  200,
-                  Map.of("valid", true),
-                  Expect.calledAtLeast(1))));
+          new HttpPlaybookBuilder(dependencyIdentifier)
+              .post(CALIBRATION_VALIDATE_PATH)
+              .willReturn(arena.junit.playbook.HttpResponse.okJson(Map.of("valid", true)))
+              .expectCalledAtLeast(1));
     }
   }
 

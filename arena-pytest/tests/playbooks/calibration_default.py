@@ -1,4 +1,4 @@
-from arena_pytest import HttpMappingExpect, ManagedHttpPlaybook
+from arena_pytest import HttpPlaybookBuilder, ManagedHttpPlaybook, ok_json
 
 from readings_arena_config import (
     CALIBRATION_VALIDATE_PATH,
@@ -8,16 +8,16 @@ from readings_arena_config import (
 
 class CalibrationDefaultPlaybook(ManagedHttpPlaybook):
     def __init__(self, dependency_identifier: str):
+        mappings = (
+            HttpPlaybookBuilder(dependency_identifier)
+            .post(CALIBRATION_VALIDATE_PATH)
+            .will_return(ok_json({"valid": True}))
+            .expect_called_at_least(1)
+            .into_playbook()
+            .mappings_for_ffi()
+        )
         super().__init__(
             identifier=PLAYBOOK_CALIBRATION_DEFAULT,
             dependency_identifier=dependency_identifier,
-            mappings=[
-                {
-                    "method": "POST",
-                    "url_path": CALIBRATION_VALIDATE_PATH,
-                    "status": 200,
-                    "json_body": {"valid": True},
-                    "expect": HttpMappingExpect.called_at_least(1),
-                }
-            ],
+            mappings=mappings,
         )
