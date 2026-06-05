@@ -130,8 +130,9 @@ def test_http_playbook_builder_scenario_mapping_serializes_expected_fields():
 def test_legacy_with_mapping_builds_response_spec():
     from arena_pytest.dep.http import ActiveHttpPlaybookBuilder
 
-    builder = ActiveHttpPlaybookBuilder("dep-id")
-    builder.with_mapping("POST", "/api/x", 500, expect_called_at_least=1)
+    with pytest.warns(DeprecationWarning):
+        builder = ActiveHttpPlaybookBuilder("dep-id")
+        builder.with_mapping("POST", "/api/x", 500, expect_called_at_least=1)
     mappings = builder._builder.mappings_for_ffi()
     assert mappings[0]["method"] == "POST"
     assert mappings[0]["response"]["status"] == 500
@@ -141,15 +142,16 @@ def test_legacy_with_mapping_builds_response_spec():
 def test_legacy_managed_dict_mapping_serializes_flat_status():
     from arena_pytest import ManagedHttpPlaybook
 
-    playbook = ManagedHttpPlaybook(
-        identifier="legacy-playbook",
-        dependency_identifier="dep-id",
-        mappings=[{
-            "method": "POST",
-            "url_path": "/api/x",
-            "status": 500,
-        }],
-    )
+    with pytest.warns(DeprecationWarning):
+        playbook = ManagedHttpPlaybook(
+            identifier="legacy-playbook",
+            dependency_identifier="dep-id",
+            mappings=[{
+                "method": "POST",
+                "url_path": "/api/x",
+                "status": 500,
+            }],
+        )
     row = playbook._for_ffi()["mappings"][0]
     assert row["status"] == 500
 
@@ -256,6 +258,28 @@ def test_managed_http_playbook_from_builder_preserves_fluent_mappings():
     row = playbook._for_ffi()["mappings"][0]
     assert row["method"] == "GET"
     assert row["response"]["json_body"]["ok"] is True
+
+
+def test_managed_http_playbook_builder_ctor_does_not_emit_deprecation_warning():
+    import warnings
+
+    from arena_pytest import ManagedHttpPlaybook
+    from arena_pytest.dep.http import HttpPlaybookBuilder, ok_json
+
+    with warnings.catch_warnings(record=True) as recorded:
+        warnings.simplefilter("always", DeprecationWarning)
+        ManagedHttpPlaybook(
+            identifier="pb-builder-ctor",
+            dependency_identifier="dep-id",
+            builder=(
+                HttpPlaybookBuilder("dep-id")
+                .get("/api/x")
+                .will_return(ok_json({"ok": True}))
+            ),
+        )
+    assert not any(
+        w.category is DeprecationWarning for w in recorded
+    )
 
 
 if __name__ == "__main__":

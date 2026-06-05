@@ -5,6 +5,10 @@ import arena.junit.OpenArena;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
 
+/**
+ * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER}
+ */
+@Deprecated
 public final class ActiveHttpPlaybookBuilder {
   private final HttpPlaybookBuilder builder;
 
@@ -12,6 +16,10 @@ public final class ActiveHttpPlaybookBuilder {
     this.builder = new HttpPlaybookBuilder(dependencyIdentifier);
   }
 
+  /**
+   * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER_MAPPING_METHODS}
+   */
+  @Deprecated
   public ActiveHttpPlaybookBuilder withMapping(
       String method,
       String urlPath,
@@ -57,10 +65,18 @@ public final class ActiveHttpPlaybookBuilder {
     return this;
   }
 
+  /**
+   * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER_MAPPING_METHODS}
+   */
+  @Deprecated
   public ActiveHttpPlaybookBuilder withMapping(String method, String urlPath, int status) {
     return withMapping(method, urlPath, status, null, null, null, null, false);
   }
 
+  /**
+   * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER_MAPPING_METHODS}
+   */
+  @Deprecated
   public ActiveHttpPlaybookBuilder withMapping(
       String method, String urlPath, int status, Object jsonBody) {
     return withMapping(method, urlPath, status, jsonBody, null, null, null, false);

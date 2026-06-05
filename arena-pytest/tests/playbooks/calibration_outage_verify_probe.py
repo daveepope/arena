@@ -11,15 +11,12 @@ PLAYBOOK_CALIBRATION_OUTAGE_VERIFY_PROBE = (
 
 class CalibrationOutageVerifyProbePlaybook(ManagedHttpPlaybook):
     def __init__(self, dependency_identifier: str):
-        mappings = (
-            HttpPlaybookBuilder(dependency_identifier)
-            .post(CALIBRATION_VALIDATE_PATH)
-            .will_return(server_error())
-            .into_playbook()
-            .mappings_for_ffi()
-        )
         super().__init__(
             identifier=PLAYBOOK_CALIBRATION_OUTAGE_VERIFY_PROBE,
             dependency_identifier=dependency_identifier,
-            mappings=mappings,
+            builder=(
+                HttpPlaybookBuilder(dependency_identifier)
+                .post(CALIBRATION_VALIDATE_PATH)
+                .will_return(server_error())
+            ),
         )

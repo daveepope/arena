@@ -14,6 +14,10 @@ import java.util.function.Function;
 
 public class ManagedHttpPlaybook implements Playbook, PlaybookRegistration {
 
+  /**
+   * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER}
+   */
+  @Deprecated
   public record Expect(String kind, Long count) {
     public static Expect called(long count) {
       return new Expect("exactly", count);
@@ -28,6 +32,10 @@ public class ManagedHttpPlaybook implements Playbook, PlaybookRegistration {
     }
   }
 
+  /**
+   * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER}
+   */
+  @Deprecated
   public record Mapping(String method, String urlPath, int status, Object jsonBody, Expect expect) {
     public Mapping {
       if (method == null || method.isEmpty()) {
@@ -47,19 +55,35 @@ public class ManagedHttpPlaybook implements Playbook, PlaybookRegistration {
     }
   }
 
+  /**
+   * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER}
+   */
+  @Deprecated
   public static Mapping mapping(String method, String urlPath, int status) {
     return new Mapping(method, urlPath, status);
   }
 
+  /**
+   * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER}
+   */
+  @Deprecated
   public static Mapping mapping(String method, String urlPath, int status, Object jsonBody) {
     return new Mapping(method, urlPath, status, jsonBody);
   }
 
+  /**
+   * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER}
+   */
+  @Deprecated
   public static Mapping mapping(
       String method, String urlPath, int status, Object jsonBody, Expect expect) {
     return new Mapping(method, urlPath, status, jsonBody, expect);
   }
 
+  /**
+   * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER}
+   */
+  @Deprecated
   public static Mapping mapping(String method, String urlPath, int status, Expect expect) {
     return new Mapping(method, urlPath, status, null, expect);
   }
@@ -68,6 +92,10 @@ public class ManagedHttpPlaybook implements Playbook, PlaybookRegistration {
   private final String dependencyIdentifier;
   private final List<ObjectNode> mappingNodes;
 
+  /**
+   * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_MANAGED_FLAT_MAPPINGS}
+   */
+  @Deprecated
   protected ManagedHttpPlaybook(
       String identifier, String dependencyIdentifier, Iterable<Mapping> mappings) {
     this(identifier, dependencyIdentifier, mappingNodesFromLegacy(mappings));

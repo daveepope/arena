@@ -34,8 +34,14 @@ pub struct MappingSpec {
     pub response: Option<ResponseSpec>,
     #[serde(default)]
     pub responses: Option<Vec<ResponseSpec>>,
+    #[deprecated(
+        note = "This API is deprecated and will be removed in a future release. Use response or responses instead."
+    )]
     #[serde(default)]
     pub status: Option<u16>,
+    #[deprecated(
+        note = "This API is deprecated and will be removed in a future release. Use response or responses instead."
+    )]
     #[serde(default)]
     pub json_body: Option<serde_json::Value>,
     #[serde(default)]
@@ -85,6 +91,7 @@ fn default_status() -> u16 {
 }
 
 impl MappingSpec {
+    #[allow(deprecated)]
     pub fn resolved_responses(&self) -> Result<Vec<ResponseSpec>, String> {
         if let Some(ref responses) = self.responses {
             if responses.is_empty() {

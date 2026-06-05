@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Union
 
 from arena_pytest.ffi._ffi import http_playbook_open, match_playbook_run
@@ -9,6 +10,22 @@ from arena_pytest.support._identifier import build as _build_identifier
 
 if TYPE_CHECKING:
     from arena_pytest.arena import OpenArena
+
+
+_HTTP_PLAYBOOK_BUILDER_DEPRECATION = (
+    "This API is deprecated and will be removed in a future release. "
+    "Use HttpPlaybookBuilder instead."
+)
+_HTTP_PLAYBOOK_BUILDER_MAPPING_METHODS_DEPRECATION = (
+    "This API is deprecated and will be removed in a future release. "
+    "Use HttpPlaybookBuilder mapping methods instead."
+)
+_HTTP_PLAYBOOK_MANAGED_FLAT_MAPPINGS_DEPRECATION = (
+    "This API is deprecated and will be removed in a future release. "
+    "Use HttpPlaybookBuilder with ManagedHttpPlaybook instead."
+)
+def _deprecation_warning(message: str) -> None:
+    warnings.warn(message, DeprecationWarning, stacklevel=3)
 
 
 class HttpMappingExpect:
@@ -352,15 +369,38 @@ class ManagedHttpPlaybook(Playbook):
         *,
         identifier: str,
         dependency_identifier: str,
-        mappings: List[Dict[str, Any]],
+        mappings: Optional[List[Dict[str, Any]]] = None,
+        builder: Optional[
+            Union[HttpPlaybookBuilder, HttpSequenceBuilder]
+        ] = None,
     ):
-        if not mappings:
-            raise ValueError(
-                "ManagedHttpPlaybook requires at least one mapping"
+        if builder is not None:
+            if mappings is not None:
+                raise ValueError(
+                    "ManagedHttpPlaybook accepts either mappings or builder, not both"
+                )
+            built: HttpPlaybookBuilder
+            if isinstance(builder, HttpSequenceBuilder):
+                built = builder.into_playbook()
+            elif isinstance(builder, HttpPlaybookBuilder):
+                built = builder
+            else:
+                raise TypeError(
+                    "ManagedHttpPlaybook builder must be HttpPlaybookBuilder "
+                    "or HttpSequenceBuilder"
+                )
+            self._configure(
+                identifier,
+                dependency_identifier,
+                built.mappings_for_ffi(),
             )
-        self._identifier = identifier
-        self._dependency_identifier = dependency_identifier
-        self._mappings = [dict(m) for m in mappings]
+        elif mappings is not None:
+            _deprecation_warning(_HTTP_PLAYBOOK_MANAGED_FLAT_MAPPINGS_DEPRECATION)
+            self._configure(identifier, dependency_identifier, mappings)
+        else:
+            raise ValueError(
+                "ManagedHttpPlaybook requires either mappings or builder"
+            )
 
     @classmethod
     def from_builder(
@@ -372,11 +412,27 @@ class ManagedHttpPlaybook(Playbook):
         built = build(HttpPlaybookBuilder(dependency_identifier))
         if isinstance(built, HttpSequenceBuilder):
             built = built.into_playbook()
-        return cls(
-            identifier=identifier,
-            dependency_identifier=dependency_identifier,
-            mappings=built.mappings_for_ffi(),
+        playbook = cls.__new__(cls)
+        playbook._configure(
+            identifier,
+            dependency_identifier,
+            built.mappings_for_ffi(),
         )
+        return playbook
+
+    def _configure(
+        self,
+        identifier: str,
+        dependency_identifier: str,
+        mappings: List[Dict[str, Any]],
+    ) -> None:
+        if not mappings:
+            raise ValueError(
+                "ManagedHttpPlaybook requires at least one mapping"
+            )
+        self._identifier = identifier
+        self._dependency_identifier = dependency_identifier
+        self._mappings = [dict(m) for m in mappings]
 
     def identifier(self) -> str:
         return self._identifier
@@ -400,6 +456,7 @@ class ManagedHttpPlaybook(Playbook):
 
 class ActiveHttpPlaybookBuilder:
     def __init__(self, dependency_identifier: str):
+        _deprecation_warning(_HTTP_PLAYBOOK_BUILDER_DEPRECATION)
         self._builder = HttpPlaybookBuilder(dependency_identifier)
 
     def with_mapping(
@@ -413,6 +470,7 @@ class ActiveHttpPlaybookBuilder:
         expect_called_at_least: Optional[int] = None,
         expect_never_called: bool = False,
     ) -> "ActiveHttpPlaybookBuilder":
+        _deprecation_warning(_HTTP_PLAYBOOK_BUILDER_MAPPING_METHODS_DEPRECATION)
         expects_set = [
             expect_called is not None,
             expect_called_at_least is not None,
