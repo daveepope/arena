@@ -1,4 +1,4 @@
-from arena_pytest import HttpMappingExpect, ManagedHttpPlaybook
+from arena_pytest import HttpPlaybookBuilder, ManagedHttpPlaybook, server_error
 
 from readings_arena_config import (
     CALIBRATION_VALIDATE_PATH,
@@ -11,12 +11,10 @@ class CalibrationOutagePlaybook(ManagedHttpPlaybook):
         super().__init__(
             identifier=PLAYBOOK_CALIBRATION_OUTAGE_MANAGED,
             dependency_identifier=dependency_identifier,
-            mappings=[
-                {
-                    "method": "POST",
-                    "url_path": CALIBRATION_VALIDATE_PATH,
-                    "status": 500,
-                    "expect": HttpMappingExpect.called_at_least(1),
-                }
-            ],
+            builder=(
+                HttpPlaybookBuilder(dependency_identifier)
+                .post(CALIBRATION_VALIDATE_PATH)
+                .will_return(server_error())
+                .expect_called_at_least(1)
+            ),
         )

@@ -1,20 +1,18 @@
 package arena.junit.readings.playbook;
 
+import arena.junit.playbook.HttpPlaybookBuilder;
+import arena.junit.playbook.HttpResponse;
 import arena.junit.playbook.ManagedHttpPlaybook;
 import arena.junit.readings.fixture.ReadingsArenaConfig;
-
-import java.util.List;
 
 public final class CalibrationOutagePlaybook extends ManagedHttpPlaybook {
   public CalibrationOutagePlaybook(String dependencyIdentifier) {
     super(
         ReadingsArenaConfig.PLAYBOOK_CALIBRATION_OUTAGE_MANAGED,
         dependencyIdentifier,
-        List.of(
-            mapping(
-                "POST",
-                ReadingsArenaConfig.CALIBRATION_VALIDATE_PATH,
-                500,
-                Expect.calledAtLeast(1))));
+        new HttpPlaybookBuilder(dependencyIdentifier)
+            .post(ReadingsArenaConfig.CALIBRATION_VALIDATE_PATH)
+            .willReturn(HttpResponse.serverError())
+            .expectCalledAtLeast(1));
   }
 }

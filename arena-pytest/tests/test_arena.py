@@ -15,7 +15,7 @@ import pytest
 import requests
 
 from arena_pytest import ArenaBindingError, playbook
-from arena_pytest.dep.http import HttpDependencyBuilder
+from arena_pytest.dep.http import HttpDependencyBuilder, HttpPlaybookBuilder, ok_json
 from arena_pytest.ffi._ffi import (
     active_playbook_drop,
     close_arena,
@@ -255,21 +255,24 @@ def _ffi_http_playbook_arena():
         close_arena(ffi, arena_h)
 
 
+def _ffi_http_playbook_open_spec(dependency_identifier: str) -> str:
+    mappings = (
+        HttpPlaybookBuilder(dependency_identifier)
+        .get("/api/ffi/playbook")
+        .will_return(ok_json({"ok": True}))
+        .into_playbook()
+        .mappings_for_ffi()
+    )
+    return json.dumps({
+        "dependency_identifier": dependency_identifier,
+        "mappings": mappings,
+    })
+
+
 def test_http_playbook_ffi_open_verify_at_least_with_traffic(_ffi_http_playbook_arena):
     ffi, arena_h, dep, port = _ffi_http_playbook_arena
     dep_id = dep.identifier
-    open_spec = json.dumps(
-        {
-            "dependency_identifier": dep_id,
-            "mappings": [
-                {
-                    "method": "GET",
-                    "url_path": "/api/ffi/playbook",
-                    "response": {"status": 200, "json_body": {"ok": True}},
-                }
-            ],
-        }
-    )
+    open_spec = _ffi_http_playbook_open_spec(dep_id)
     pb_h = http_playbook_open(ffi, arena_h, open_spec)
     url = f"http://127.0.0.1:{port}/api/ffi/playbook"
     assert requests.get(url, timeout=10).status_code == 200
@@ -289,18 +292,7 @@ def test_http_playbook_ffi_verify_expected_count_without_traffic_raises(
 ):
     ffi, arena_h, dep, _port = _ffi_http_playbook_arena
     dep_id = dep.identifier
-    open_spec = json.dumps(
-        {
-            "dependency_identifier": dep_id,
-            "mappings": [
-                {
-                    "method": "GET",
-                    "url_path": "/api/ffi/playbook",
-                    "response": {"status": 200, "json_body": {"ok": True}},
-                }
-            ],
-        }
-    )
+    open_spec = _ffi_http_playbook_open_spec(dep_id)
     pb_h = http_playbook_open(ffi, arena_h, open_spec)
     verify_spec = json.dumps(
         {
@@ -317,18 +309,7 @@ def test_http_playbook_ffi_verify_expected_count_without_traffic_raises(
 def test_http_playbook_ffi_verify_both_count_fields_raises(_ffi_http_playbook_arena):
     ffi, arena_h, dep, _port = _ffi_http_playbook_arena
     dep_id = dep.identifier
-    open_spec = json.dumps(
-        {
-            "dependency_identifier": dep_id,
-            "mappings": [
-                {
-                    "method": "GET",
-                    "url_path": "/api/ffi/playbook",
-                    "response": {"status": 200, "json_body": {"ok": True}},
-                }
-            ],
-        }
-    )
+    open_spec = _ffi_http_playbook_open_spec(dep_id)
     pb_h = http_playbook_open(ffi, arena_h, open_spec)
     verify_spec = json.dumps(
         {

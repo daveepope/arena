@@ -1,23 +1,25 @@
 package arena.junit.playbook;
 
 import arena.junit.OpenArena;
-import arena.junit.ffi.ArenaBindings;
-import arena.junit.support.ArenaJson;
 
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.sun.jna.Pointer;
-import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER}
+ */
+@Deprecated
 public final class ActiveHttpPlaybookBuilder {
-  private final String dependencyIdentifier;
-  private final List<ObjectNode> mappings = new ArrayList<>();
+  private final HttpPlaybookBuilder builder;
 
   public ActiveHttpPlaybookBuilder(String dependencyIdentifier) {
-    this.dependencyIdentifier = dependencyIdentifier;
+    this.builder = new HttpPlaybookBuilder(dependencyIdentifier);
   }
 
+  /**
+   * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER_MAPPING_METHODS}
+   */
+  @Deprecated
   public ActiveHttpPlaybookBuilder withMapping(
       String method,
       String urlPath,
@@ -27,18 +29,6 @@ public final class ActiveHttpPlaybookBuilder {
       Integer expectCalled,
       Integer expectCalledAtLeast,
       boolean expectNeverCalled) {
-    ObjectNode response = ArenaJson.object();
-    response.put("status", status);
-    if (jsonBody != null) {
-      response.set("json_body", ArenaJson.MAPPER.valueToTree(jsonBody));
-    }
-    ObjectNode m = ArenaJson.object();
-    m.put("method", method.toUpperCase());
-    m.put("url_path", urlPath);
-    m.set("response", response);
-    if (priority != null) {
-      m.put("priority", priority.intValue());
-    }
     int expectSet =
         (expectCalled != null ? 1 : 0)
             + (expectCalledAtLeast != null ? 1 : 0)
@@ -47,52 +37,56 @@ public final class ActiveHttpPlaybookBuilder {
       throw new IllegalArgumentException(
           "withMapping accepts at most one of: expectCalled, expectCalledAtLeast, expectNeverCalled");
     }
-    if (expectCalled != null) {
-      ObjectNode ex = ArenaJson.object();
-      ex.put("kind", "exactly");
-      ex.put("count", expectCalled.intValue());
-      m.set("expect", ex);
-    } else if (expectCalledAtLeast != null) {
-      ObjectNode ex = ArenaJson.object();
-      ex.put("kind", "at_least");
-      ex.put("count", expectCalledAtLeast.intValue());
-      m.set("expect", ex);
-    } else if (expectNeverCalled) {
-      ObjectNode ex = ArenaJson.object();
-      ex.put("kind", "never");
-      m.set("expect", ex);
+
+    HttpMappingBuilder mapping =
+        switch (method.toUpperCase()) {
+          case "GET" -> builder.get(urlPath);
+          case "POST" -> builder.post(urlPath);
+          case "PUT" -> builder.put(urlPath);
+          case "DELETE" -> builder.delete(urlPath);
+          default ->
+              throw new IllegalArgumentException("unsupported HTTP method in withMapping: " + method);
+        };
+    if (priority != null) {
+      mapping = mapping.withPriority(priority.intValue());
     }
-    mappings.add(m);
+    HttpSequenceBuilder seq =
+        jsonBody != null
+            ? mapping.willReturn(status, jsonBody)
+            : mapping.willReturn(status);
+    if (expectCalled != null) {
+      seq = seq.expectCalled(expectCalled.longValue());
+    } else if (expectCalledAtLeast != null) {
+      seq = seq.expectCalledAtLeast(expectCalledAtLeast.longValue());
+    } else if (expectNeverCalled) {
+      seq = seq.expectNeverCalled();
+    }
+    seq.intoPlaybook();
     return this;
   }
 
+  /**
+   * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER_MAPPING_METHODS}
+   */
+  @Deprecated
   public ActiveHttpPlaybookBuilder withMapping(String method, String urlPath, int status) {
     return withMapping(method, urlPath, status, null, null, null, null, false);
   }
 
+  /**
+   * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER_MAPPING_METHODS}
+   */
+  @Deprecated
   public ActiveHttpPlaybookBuilder withMapping(
       String method, String urlPath, int status, Object jsonBody) {
     return withMapping(method, urlPath, status, jsonBody, null, null, null, false);
   }
 
   public ActiveHttpPlaybook open(OpenArena arena) {
-    if (mappings.isEmpty()) {
-      throw new IllegalArgumentException(
-          "ActiveHttpPlaybookBuilder requires at least one mapping");
-    }
-    ArrayNode arr = ArenaJson.array();
-    for (ObjectNode m : mappings) {
-      arr.add(m.deepCopy());
-    }
-    ObjectNode spec = ArenaJson.object();
-    spec.put("dependency_identifier", dependencyIdentifier);
-    spec.set("mappings", arr);
-    try {
-      Pointer handle =
-          ArenaBindings.httpPlaybookOpen(arena.handle(), ArenaJson.MAPPER.writeValueAsString(spec));
-      return new ActiveHttpPlaybook(handle);
-    } catch (Exception e) {
-      throw new arena.junit.ffi.ArenaBindingError(e.getMessage());
-    }
+    return builder.open(arena);
+  }
+
+  public List<ObjectNode> mappingsForFfi() {
+    return builder.mappingsForFfi();
   }
 }

@@ -111,7 +111,13 @@ py_library(
 py_test(
     name = "arena_pytest_test",
     size = "small",
-    srcs = glob(["tests/playbooks/**/*.py", "tests/conftest.py", "tests/readings_arena_config.py", "tests/test_arena.py"]),
+    srcs = glob([
+        "tests/playbooks/**/*.py",
+        "tests/conftest.py",
+        "tests/readings_arena_config.py",
+        "tests/test_arena.py",
+        "tests/test_http_playbook_fluent.py",
+    ]),
     main = "tests/test_arena.py",
     data = [
         "//arena-ffi:arena_ffi_shared",
