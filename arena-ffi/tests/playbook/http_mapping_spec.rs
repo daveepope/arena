@@ -1,4 +1,4 @@
-use arena_ffi::dependency::http::mapping::MappingSpec;
+use arena_ffi::dependency::http::mapping::{response_def, MappingSpec, ResponseSpec};
 
 #[test]
 fn mapping_spec_deserializes_delay_distribution() {
@@ -176,6 +176,62 @@ fn mapping_spec_body_equal_to_json_deserializes() {
         raw["body_patterns"][0]["equal_to_json"],
         "{\"command\":\"ignition\"}"
     );
+}
+
+#[test]
+fn mapping_spec_flat_managed_status_resolves_single_response() {
+    let json = r#"{
+        "method": "POST",
+        "url_path": "/api/x",
+        "status": 500,
+        "json_body": { "err": true }
+    }"#;
+    let spec: MappingSpec = serde_json::from_str(json).unwrap();
+    let responses = spec.resolved_responses().unwrap();
+    assert_eq!(responses.len(), 1);
+    assert_eq!(responses[0].status, 500);
+}
+
+#[test]
+fn response_def_delay_and_headers_serializes_expected_shape() {
+    let spec: ResponseSpec = serde_json::from_str(
+        r#"{
+            "status": 201,
+            "headers": { "Location": "/api/x/1" },
+            "fixed_delay_ms": 40
+        }"#,
+    )
+    .unwrap();
+    let def = response_def(&spec);
+    let json = serde_json::to_value(&def).unwrap();
+    assert_eq!(json.get("status").and_then(|v| v.as_u64()), Some(201));
+    assert_eq!(
+        json.get("fixedDelayMilliseconds")
+            .and_then(|v| v.as_u64()),
+        Some(40)
+    );
+    assert_eq!(
+        json.get("headers")
+            .and_then(|v| v.get("Location"))
+            .and_then(|v| v.as_str()),
+        Some("/api/x/1")
+    );
+}
+
+#[test]
+fn response_def_uniform_delay_serializes_expected_shape() {
+    let spec: ResponseSpec = serde_json::from_str(
+        r#"{
+            "status": 200,
+            "delay_distribution": { "type": "uniform", "lower": 5, "upper": 15 }
+        }"#,
+    )
+    .unwrap();
+    let def = response_def(&spec);
+    let json = serde_json::to_value(&def).unwrap();
+    assert_eq!(json["delayDistribution"]["type"], "uniform");
+    assert_eq!(json["delayDistribution"]["lower"], 5);
+    assert_eq!(json["delayDistribution"]["upper"], 15);
 }
 
 #[test]

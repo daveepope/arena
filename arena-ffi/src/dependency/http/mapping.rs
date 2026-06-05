@@ -115,7 +115,7 @@ impl MappingSpec {
     }
 }
 
-pub(crate) fn response_def(spec: &ResponseSpec) -> ResponseDefinition {
+pub fn response_def(spec: &ResponseSpec) -> ResponseDefinition {
     let mut r = ResponseDefinition::new(spec.status);
     if let Some(ref body) = spec.json_body {
         r = r.with_json_body(body.clone());
@@ -259,72 +259,5 @@ pub fn build_playbook_from_mappings(
     match state {
         BuildState::Playbook(pb) => Ok(pb),
         BuildState::Sequence(seq) => Ok(seq.into_playbook()),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn mapping_spec_deserializes_flat_managed_status() {
-        let json = r#"{
-            "method": "POST",
-            "url_path": "/api/x",
-            "status": 500,
-            "json_body": { "err": true }
-        }"#;
-        let spec: MappingSpec = serde_json::from_str(json).unwrap();
-        let responses = spec.resolved_responses().unwrap();
-        assert_eq!(responses.len(), 1);
-        assert_eq!(responses[0].status, 500);
-    }
-
-    #[test]
-    fn response_def_fixed_delay_and_headers_apply_to_definition() {
-        let spec = ResponseSpec {
-            status: 201,
-            json_body: None,
-            headers: Some(HashMap::from([(
-                "Location".to_string(),
-                "/api/x/1".to_string(),
-            )])),
-            fixed_delay_ms: Some(40),
-            delay_distribution: None,
-        };
-        let def = response_def(&spec);
-        let json = serde_json::to_value(&def).unwrap();
-        assert_eq!(json.get("status").and_then(|v| v.as_u64()), Some(201));
-        assert_eq!(
-            json.get("fixedDelayMilliseconds")
-                .and_then(|v| v.as_u64()),
-            Some(40)
-        );
-        assert_eq!(
-            json.get("headers")
-                .and_then(|v| v.get("Location"))
-                .and_then(|v| v.as_str()),
-            Some("/api/x/1")
-        );
-    }
-
-    #[test]
-    fn response_def_uniform_delay_distribution_applies_to_definition() {
-        let spec = ResponseSpec {
-            status: 200,
-            json_body: None,
-            headers: None,
-            fixed_delay_ms: None,
-            delay_distribution: Some(DelayDistributionSpec {
-                distribution_type: "uniform".to_string(),
-                lower: 5,
-                upper: 15,
-            }),
-        };
-        let def = response_def(&spec);
-        let json = serde_json::to_value(&def).unwrap();
-        assert_eq!(json["delayDistribution"]["type"], "uniform");
-        assert_eq!(json["delayDistribution"]["lower"], 5);
-        assert_eq!(json["delayDistribution"]["upper"], 15);
     }
 }
