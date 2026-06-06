@@ -28,6 +28,8 @@ pub struct TestRuntime {
     pub exec_web_app_port: u16,
     pub mssql_port: u16,
     pub network_name: String,
+    pub closed_arena_name: String,
+    pub match_name: String,
 }
 
 fn ephemeral_tcp_port() -> u16 {
@@ -39,11 +41,13 @@ fn ephemeral_tcp_port() -> u16 {
 }
 
 fn run_suffix() -> String {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time")
-        .subsec_nanos();
-    format!("{:x}-{:x}", std::process::id(), nanos)
+    format!(
+        "{:x}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos()
+    )
 }
 
 static TEST_RUNTIME: OnceLock<TestRuntime> = OnceLock::new();
@@ -51,6 +55,7 @@ static TEST_RUNTIME: OnceLock<TestRuntime> = OnceLock::new();
 pub fn test_runtime() -> &'static TestRuntime {
     TEST_RUNTIME.get_or_init(|| {
         let oauth_port = ephemeral_tcp_port();
+        let run_suffix = run_suffix();
         TestRuntime {
             oauth_issuer: format!("https://127.0.0.1:{oauth_port}"),
             oauth_port,
@@ -59,7 +64,9 @@ pub fn test_runtime() -> &'static TestRuntime {
             calibration_http_port: ephemeral_tcp_port(),
             exec_web_app_port: ephemeral_tcp_port(),
             mssql_port: ephemeral_tcp_port(),
-            network_name: format!("arena-example-api-network-{}", run_suffix()),
+            network_name: format!("arena-example-api-network-{run_suffix}"),
+            closed_arena_name: format!("example-api-arena-{run_suffix}"),
+            match_name: format!("example-api-happy-path-{run_suffix}"),
         }
     })
 }
@@ -226,8 +233,9 @@ pub async fn create_arena() -> OpenArena {
     let exec_component = setup_exec_component();
     let components: Vec<Component> = vec![exec_component];
 
+    let rt = test_runtime();
     let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new(
-        Match::new("example-api-happy-path", dependencies, components)
+        Match::new(&rt.match_name, dependencies, components)
             .register_playbook(
                 Box::new(calibration_api_happy_path_playbook(calibration_id.clone())),
                 true,
@@ -242,7 +250,7 @@ pub async fn create_arena() -> OpenArena {
             )
             .register_playbook(reset_validation_db_playbook(mssql_id).into_box(), false),
     )];
-    let closed_arena = ClosedArena::new("example-api-arena".to_string(), matches);
+    let closed_arena = ClosedArena::new(rt.closed_arena_name.clone(), matches);
 
     closed_arena.open().await
 }

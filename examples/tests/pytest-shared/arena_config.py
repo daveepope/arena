@@ -54,8 +54,8 @@ _PB_NAMES = _DATA["playbook_names"]
 
 NETWORK_NAME = RUNTIME.network_name(_DATA["network_name"])
 DOCKER_IMAGE_TAG = _DATA["docker_image_tag"]
-CLOSED_ARENA_NAME = _DATA["closed_arena_name"]
-MATCH_NAME = _DATA["match_name"]
+CLOSED_ARENA_NAME = RUNTIME.container_name(_DATA["closed_arena_name"])
+MATCH_NAME = RUNTIME.container_name(_DATA["match_name"])
 TEMP_DIRECTORY_PREFIX = _DATA["temp_directory_prefix"]
 KAFKA_CONSUMER_GROUP_LABEL = _DATA["kafka_consumer_group_label"]
 POSTGRES_IMAGE = _DATA["postgres_image"]

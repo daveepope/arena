@@ -20,10 +20,7 @@ public final class EphemeralTestRuntime {
   public final String oauthIssuer;
 
   private EphemeralTestRuntime() {
-    runSuffix =
-        Long.toHexString(ProcessHandle.current().pid())
-            + "-"
-            + UUID.randomUUID().toString().substring(0, 8);
+    runSuffix = UUID.randomUUID().toString().replace("-", "");
     execWebAppPort = ephemeralTcpPort();
     dockerWebHostPort = ephemeralTcpPort();
     kafkaPort = ephemeralTcpPort();

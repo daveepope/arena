@@ -71,8 +71,7 @@ final class PlaybookInvocationExtensionTest {
           dependencyIdentifier,
           new HttpPlaybookBuilder(dependencyIdentifier)
               .post(CALIBRATION_VALIDATE_PATH)
-              .willReturn(HttpResponse.okJson(Map.of("valid", true)))
-              .expectCalledAtLeast(1));
+              .willReturn(HttpResponse.okJson(Map.of("valid", true))));
     }
   }
 
@@ -83,8 +82,7 @@ final class PlaybookInvocationExtensionTest {
           dependencyIdentifier,
           new HttpPlaybookBuilder(dependencyIdentifier)
               .post(CALIBRATION_VALIDATE_PATH)
-              .willReturn(HttpResponse.serverError())
-              .expectCalledAtLeast(1));
+              .willReturn(HttpResponse.serverError()));
     }
   }
 

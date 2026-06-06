@@ -187,7 +187,7 @@ public final class ArenaFixture extends ClosedArenaExtension {
                 HttpReadinessCheck.create(), "http://127.0.0.1:" + WEB_APP_PORT + "/health");
 
     Match match =
-        new MatchBuilder("example-api-happy-path")
+        new MatchBuilder(RT.containerName("example-api-happy-path"))
             .withNetwork(NETWORK_NAME)
             .addDependency(oauth)
             .addDependency(postgres)
@@ -202,7 +202,7 @@ public final class ArenaFixture extends ClosedArenaExtension {
             .build();
 
     return new ClosedArena(
-        "example-api-arena",
+        RT.containerName("example-api-arena"),
         List.of(match),
         ArenaLogLevel.WARN,
         LOG,

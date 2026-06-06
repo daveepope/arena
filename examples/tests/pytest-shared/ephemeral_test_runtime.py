@@ -10,7 +10,7 @@ def ephemeral_tcp_port() -> int:
 
 
 def run_suffix() -> str:
-    return f"{os.getpid():x}-{uuid.uuid4().hex[:8]}"
+    return uuid.uuid4().hex
 
 
 class EphemeralTestRuntime:
