@@ -49,7 +49,7 @@ pub async fn ensure_network_exists(name: &str) {
             {
                 tracing::debug!(
                     network = %name,
-                    "network created concurrently by another caller"
+                    "network already created"
                 );
             } else {
                 panic!("failed to create docker network '{}': {}", name, e);
