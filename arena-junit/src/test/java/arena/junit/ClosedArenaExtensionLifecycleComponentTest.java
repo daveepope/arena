@@ -20,7 +20,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-final class ClosedArenaExtensionLifecycleTest {
+final class ClosedArenaExtensionLifecycleComponentTest {
 
   private static final EphemeralTestRuntime RT = EphemeralTestRuntime.get();
 

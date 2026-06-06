@@ -96,11 +96,11 @@ java_test(
 )
 
 java_test(
-    name = "arena_junit_playbook_extension_test",
-    size = "small",
+    name = "arena_junit_playbook_extension_component_test",
+    size = "medium",
     srcs = [
-        "src/test/java/arena/junit/ClosedArenaExtensionLifecycleTest.java",
-        "src/test/java/arena/junit/PlaybookInvocationExtensionTest.java",
+        "src/test/java/arena/junit/ClosedArenaExtensionLifecycleComponentTest.java",
+        "src/test/java/arena/junit/PlaybookInvocationExtensionComponentTest.java",
     ],
     javacopts = [
         "--release",
@@ -110,8 +110,8 @@ java_test(
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
         "--include-engine=junit-jupiter",
-        "--select-class=arena.junit.ClosedArenaExtensionLifecycleTest",
-        "--select-class=arena.junit.PlaybookInvocationExtensionTest",
+        "--select-class=arena.junit.ClosedArenaExtensionLifecycleComponentTest",
+        "--select-class=arena.junit.PlaybookInvocationExtensionComponentTest",
     ],
     tags = ["component_test"],
     runtime_deps = [

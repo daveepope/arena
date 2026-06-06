@@ -27,7 +27,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-final class PlaybookInvocationExtensionTest {
+final class PlaybookInvocationExtensionComponentTest {
 
   private static final EphemeralTestRuntime RT = EphemeralTestRuntime.get();
   private static final String CALIBRATION_VALIDATE_PATH = "/api/v1/validate";
