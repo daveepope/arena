@@ -53,7 +53,7 @@
 
 ## Tests (unit and component)
 
-- **Component and `requires_docker` tests must finish in seconds**, not tens of seconds. That is the expected norm on a healthy machine with a warm container runtime. If a test routinely approaches the Bazel **`small`** timeout (~60s), treat that as a **real defect** in the test or setup — not as “CI being slow” or “parallel Docker load”.
+- **Component tests must finish in seconds**, not tens of seconds. That is the expected norm on a healthy machine with a warm container runtime. If a test routinely approaches the Bazel **`small`** timeout (~60s), treat that as a **real defect** in the test or setup — not as “CI being slow” or “parallel Docker load”.
 - **Do not hack failing or slow tests.** Forbidden “fixes” include: bumping Bazel **`size`** to **`medium`** / **`large`** to mask timeouts; blaming **parallel CI** or **Docker contention** without fixing the test; adding **retries**, **`flaky_test_attempts`**, or vague **resilience**; stretching **readiness**, **healthcheck**, or **sleep** budgets so a hang “passes”; **`--test_timeout`** / runner timeout tweaks instead of making the test fast and bounded; serializing the whole suite unless the developer explicitly asks for that tradeoff.
 - **Fix the cause.** Prefer **unit tests** (no container) when the behavior under test does not require a running dependency. Avoid **redundant container startups** (e.g. multiple full stacks or repeated spins for pure formatting/config checks). **Reuse one arena/fixture** per target where the suite shares dependencies. **Tear down** containers and networks on failure so later tests are not starved. Keep internal wait budgets **below** the Bazel test timeout so failures surface as **clear assertion/readiness errors**, not opaque **`TIMEOUT`** at 60s.
 - Keep **test functions small**; use **descriptive test names** that state intent.
@@ -68,6 +68,9 @@
 - **Python / Java:** declare **one playbook class per line** — stacked `@playbook(Foo)` / `@Playbook(Foo.class)` decorators or annotations. Do **not** pass multiple classes in one decorator (`@playbook(A, B)`) or one array annotation (`@Playbook({A.class, B.class})`).
 - **Rust:** no annotation layer; register playbooks on the match and open scoped playbooks in test setup (e.g. `validation_db.playbook().run().await`).
 - Use `@playbook` / `@Playbook` for scoped cleanup (e.g. MSSQL reset, localstack purge). Session-scoped HTTP stubs use `exec_on_dependency_start=True` on registration.
+- **Component tests stay isolated:** per-test scenario context comes **only** from stacked `@playbook` / `@Playbook` on the test (Rust may call `run_playbook` in the test body). Do **not** open playbooks manually in Python/Java tests. Do **not** inject environment or capability flags into test signatures (e.g. `docker_web_enabled`) and branch with `pytest.skip` inside the test body. Do **not** reach into `closed_arena._matches` or pass `closed_arena` / `arena` into tests to wire playbooks.
+- **Session HTTP in component tests:** use one authenticated client for the suite (pytest `api_client` fixture with the bearer header set; JUnit/static client on the fixture extension; Rust module HTTP client with token fetched once). Do **not** pass `oauth_access_token` (or equivalent) through test signatures or API helpers.
+- **Fluent HTTP sequence/scenario proofs** (e.g. `then_return` fail-then-succeed chains) belong in **examples** application scenarios on the shared calibration path, not in `arena-pytest` or other client-library component tests. Keep builder serialization in client **unit** tests only.
 
 ## Build and verification (Bazel)
 
@@ -75,7 +78,7 @@
 - When a **feature is complete**, run **`bazel build`** and **`bazel test`** (workspace- or target-appropriate scope).
 - After **`cargo check`** (or during iteration), still validate with **Bazel** before considering work done. Do not run pip, nuget, maven, nvm commands directly on the host, everything should be built via Bazel.
 - For **Python lockfiles**: edit **`arena-pytest/requirements.txt`** then run **`bazel run //arena-pytest:pip_requirements.update`** and **`bazel test //arena-pytest:pip_requirements_test`**. For **example apps** under `examples/`, edit **`examples/requirements.txt`** then run **`bazel run //examples:pip_requirements.update`** and **`bazel test //examples:pip_requirements_test`**. Do not run pip or pip-compile on the host for those workflows.
-- Tests that **need a container runtime** must declare **`tags = ["requires_docker"]`** on their **`rust_test`** / **`py_test`** target. PR CI runs the full suite on **Linux** (split across two jobs) and on **`macos-15-intel`** (Colima via **`setup-docker-macos-action`**). **`macos-latest`** runs build and non-`requires_docker` tests for Apple Silicon coverage. If you have no container runtime locally, use **`--test_tag_filters=-requires_docker`**.
+- Container-backed **component tests** must declare **`tags = ["component_test"]`** on their **`rust_test`** / **`py_test`** / **`java_test`** target. PR CI runs the full suite on **Linux** (split across two jobs) and on **`macos-15-intel`** (Colima via **`setup-docker-macos-action`**). **`macos-latest`** runs build and non-`component_test` tests for Apple Silicon coverage. If you have no container runtime locally, use **`--test_tag_filters=-component_test`**.
 
 ## FFI layer
 

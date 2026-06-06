@@ -43,8 +43,8 @@ jsonwebtoken = { workspace = true }
 oauth2 = { workspace = true }
 
 [[test]]
-name = "example-readings-axum-component-test"
-path = "tests/example-readings-axum-component-test/readings_axum_component_test.rs"
+name = "example-axum-component-test"
+path = "tests/example-axum-component-test/axum_component_test.rs"
 
 [dev-dependencies]
 ctor = { workspace = true }

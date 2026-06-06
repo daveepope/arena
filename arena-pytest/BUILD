@@ -109,66 +109,20 @@ py_library(
 )
 
 py_test(
-    name = "arena_pytest_test",
+    name = "arena_pytest_unit_test",
     size = "small",
-    srcs = glob([
-        "tests/playbooks/**/*.py",
-        "tests/conftest.py",
-        "tests/readings_arena_config.py",
-        "tests/test_arena.py",
-        "tests/test_http_playbook_fluent.py",
-    ]),
-    main = "tests/test_arena.py",
-    data = [
-        "//arena-ffi:arena_ffi_shared",
-        "//examples:readings_arena_config",
-        "//examples:instrument_reading_db_schema",
-        "//examples:validation_db_schema",
-        "//examples:example-readings-axum-web-app",
-    ],
-    deps = [
-        ":arena_pytest_lib",
-        "//examples:readings_ephemeral_test_runtime",
-        "@pip//kafka_python_ng",
-        "@pip//pytest",
-        "@pip//pytest_asyncio",
-        "@pip//requests",
-    ],
-    tags = ["requires_docker"],
-    python_version = "PY3",
-    visibility = ["//visibility:public"],
-)
-
-py_test(
-    name = "arena_pytest_playbook_unit_test",
-    size = "small",
-    srcs = [
-        "tests/test_playbook_hooks.py",
-        "tests/test_playbook_unit.py",
-    ],
-    main = "tests/test_playbook_unit.py",
-    deps = [
-        ":arena_pytest_lib",
-        "//examples:readings_ephemeral_test_runtime",
-        "@pip//pytest",
-    ],
-    python_version = "PY3",
-    visibility = ["//visibility:public"],
-)
-
-py_test(
-    name = "arena_pytest_dispatcher_host_logging_test",
-    size = "small",
-    srcs = ["tests/test_dispatcher_logging_bindings.py"],
-    main = "tests/test_dispatcher_logging_bindings.py",
+    srcs = glob(["tests/unit/*.py"]),
+    main = "tests/unit/playbook_unit_test.py",
     data = ["//arena-ffi:arena_ffi_shared"],
     deps = [
         ":arena_pytest_lib",
+        "//examples:ephemeral_test_runtime",
         "@pip//pytest",
     ],
     python_version = "PY3",
     visibility = ["//visibility:public"],
 )
+
 py_wheel(
     name = "arena_pytest_wheel",
     distribution = "arena-pytest",

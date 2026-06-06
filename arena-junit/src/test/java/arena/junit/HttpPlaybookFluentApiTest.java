@@ -3,7 +3,7 @@ package arena.junit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import arena.examples.readings.testruntime.ReadingsEphemeralTestRuntime;
+import arena.examples.testruntime.EphemeralTestRuntime;
 import arena.junit.dep.HttpDependency;
 import arena.junit.dep.HttpDependencyBuilder;
 import arena.junit.match.Match;
@@ -23,7 +23,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 final class HttpPlaybookFluentApiTest {
 
-  private static final ReadingsEphemeralTestRuntime RT = ReadingsEphemeralTestRuntime.get();
+  private static final EphemeralTestRuntime RT = EphemeralTestRuntime.get();
   private static String dependencyIdentifier;
   private static int httpPort;
 

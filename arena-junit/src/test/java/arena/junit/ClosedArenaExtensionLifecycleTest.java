@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import arena.examples.readings.testruntime.ReadingsEphemeralTestRuntime;
+import arena.examples.testruntime.EphemeralTestRuntime;
 import arena.junit.dep.HttpDependency;
 import arena.junit.dep.HttpDependencyBuilder;
 import arena.junit.match.Match;
@@ -22,7 +22,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 final class ClosedArenaExtensionLifecycleTest {
 
-  private static final ReadingsEphemeralTestRuntime RT = ReadingsEphemeralTestRuntime.get();
+  private static final EphemeralTestRuntime RT = EphemeralTestRuntime.get();
 
   static final class OauthLifecycleFixture extends ClosedArenaExtension {
     static int buildCount;

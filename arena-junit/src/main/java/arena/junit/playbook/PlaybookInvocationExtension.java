@@ -10,24 +10,27 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.extension.AfterAllCallback;
+import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
-import org.junit.jupiter.api.extension.InvocationInterceptor;
+import org.junit.jupiter.api.extension.ParameterContext;
+import org.junit.jupiter.api.extension.ParameterResolver;
 import org.junit.jupiter.api.extension.RegisterExtension;
-import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
 
 public final class PlaybookInvocationExtension
     implements BeforeAllCallback,
         BeforeEachCallback,
+        AfterEachCallback,
         AfterAllCallback,
-        InvocationInterceptor {
+        ParameterResolver {
 
   private static final ExtensionContext.Namespace NS =
       ExtensionContext.Namespace.create("arena.junit.playbook.scope");
 
   private static final String CLASS_SCOPE_KEY = "classScope";
   private static final String CLASS_SCOPE_ATTEMPTED = "classScopeAttempted";
+  private static final String METHOD_SCOPE_KEY = "methodScope";
 
   @Override
   public void beforeAll(ExtensionContext context) {
@@ -41,6 +44,16 @@ public final class PlaybookInvocationExtension
 
   @Override
   public void beforeEach(ExtensionContext context) {
+    Method testMethod = context.getTestMethod().orElse(null);
+    if (testMethod != null) {
+      Class<? extends Playbook>[] methodClasses = classesFrom(testMethod);
+      if (methodClasses.length > 0) {
+        OpenArena arena = resolveOpenArena(context);
+        PlaybookScope scope = openScope(arena, methodClasses);
+        context.getStore(NS).put(METHOD_SCOPE_KEY, scope);
+        return;
+      }
+    }
     Class<?> testClass = context.getRequiredTestClass();
     Class<? extends Playbook>[] classes = classesFrom(testClass);
     if (classes.length == 0) {
@@ -61,6 +74,14 @@ public final class PlaybookInvocationExtension
   }
 
   @Override
+  public void afterEach(ExtensionContext context) {
+    PlaybookScope methodScope = context.getStore(NS).remove(METHOD_SCOPE_KEY, PlaybookScope.class);
+    if (methodScope != null) {
+      methodScope.close();
+    }
+  }
+
+  @Override
   public void afterAll(ExtensionContext context) {
     ExtensionContext.Store store = context.getStore(NS);
     PlaybookScope scope = store.remove(CLASS_SCOPE_KEY, PlaybookScope.class);
@@ -70,23 +91,30 @@ public final class PlaybookInvocationExtension
   }
 
   @Override
-  public void interceptTestMethod(
-      Invocation<Void> invocation,
-      ReflectiveInvocationContext<Method> invocationContext,
-      ExtensionContext extensionContext)
-      throws Throwable {
-    Class<? extends Playbook>[] classes = classesFrom(invocationContext.getExecutable());
-    if (classes.length == 0) {
-      invocation.proceed();
-      return;
+  public boolean supportsParameter(
+      ParameterContext parameterContext, ExtensionContext extensionContext) {
+    return ActiveHttpPlaybook.class.isAssignableFrom(parameterContext.getParameter().getType());
+  }
+
+  @Override
+  public Object resolveParameter(
+      ParameterContext parameterContext, ExtensionContext extensionContext) {
+    PlaybookScope scope = extensionContext.getStore(NS).get(METHOD_SCOPE_KEY, PlaybookScope.class);
+    if (scope == null) {
+      throw new IllegalStateException(
+          "ActiveHttpPlaybook parameter requires stacked @Playbook on the test method");
     }
-    OpenArena arena = resolveOpenArena(extensionContext);
-    PlaybookScope scope = openScope(arena, classes);
-    try {
-      invocation.proceed();
-    } finally {
-      scope.close();
+    List<ActiveHttpPlaybook> httpActives = new ArrayList<>();
+    for (ActivePlaybook active : scope.actives()) {
+      if (active instanceof ActiveHttpPlaybook http) {
+        httpActives.add(http);
+      }
     }
+    if (httpActives.size() != 1) {
+      throw new IllegalStateException(
+          "expected exactly one ActiveHttpPlaybook from stacked @Playbook markers");
+    }
+    return httpActives.getFirst();
   }
 
   private static void tryOpenClassScope(
@@ -158,7 +186,7 @@ public final class PlaybookInvocationExtension
     }
   }
 
-  private static OpenArena resolveOpenArena(ExtensionContext ctx) throws Exception {
+  private static OpenArena resolveOpenArena(ExtensionContext ctx) {
     Object instance = ctx.getTestInstance().orElse(null);
     Class<?> testClass = ctx.getRequiredTestClass();
     List<Field> fields = new ArrayList<>();
@@ -182,10 +210,15 @@ public final class PlaybookInvocationExtension
     }
     Field f = fields.get(0);
     f.setAccessible(true);
-    Object ext =
-        Modifier.isStatic(f.getModifiers())
-            ? f.get(null)
-            : (instance != null ? f.get(instance) : null);
+    Object ext;
+    try {
+      ext =
+          Modifier.isStatic(f.getModifiers())
+              ? f.get(null)
+              : (instance != null ? f.get(instance) : null);
+    } catch (IllegalAccessException e) {
+      throw new IllegalStateException("@Playbook: failed to read ClosedArenaExtension field", e);
+    }
     if (ext == null) {
       throw new IllegalStateException(
           "@Playbook: ClosedArenaExtension field not initialized: " + f.getName());
@@ -202,6 +235,10 @@ public final class PlaybookInvocationExtension
 
     void close() {
       closeAll(opened);
+    }
+
+    List<ActivePlaybook> actives() {
+      return opened;
     }
   }
 }

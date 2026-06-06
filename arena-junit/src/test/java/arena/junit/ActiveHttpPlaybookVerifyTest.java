@@ -3,7 +3,7 @@ package arena.junit;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import arena.examples.readings.testruntime.ReadingsEphemeralTestRuntime;
+import arena.examples.testruntime.EphemeralTestRuntime;
 import arena.junit.dep.HttpDependency;
 import arena.junit.dep.HttpDependencyBuilder;
 import arena.junit.ffi.ArenaBindingError;
@@ -27,7 +27,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 final class ActiveHttpPlaybookVerifyTest {
 
-  private static final ReadingsEphemeralTestRuntime RT = ReadingsEphemeralTestRuntime.get();
+  private static final EphemeralTestRuntime RT = EphemeralTestRuntime.get();
   private static final String CALIBRATION_VALIDATE_PATH = "/api/v1/validate";
 
   static final class VerifyArenaFixture extends ClosedArenaExtension {

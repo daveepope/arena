@@ -105,6 +105,11 @@ def pytest_configure(config: pytest.Config) -> None:
 _FUNCTION_ACTIVES_ATTR = "_arena_pytest_function_actives"
 
 
+def active_playbooks_for_item(item: pytest.Item) -> List[ActivePlaybook]:
+    actives: Optional[List[ActivePlaybook]] = getattr(item, _FUNCTION_ACTIVES_ATTR, None)
+    return list(actives) if actives else []
+
+
 def _item_request(item: pytest.Item) -> pytest.FixtureRequest:
     request = getattr(item, "_request", None)
     if request is None:

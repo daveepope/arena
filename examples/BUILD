@@ -17,21 +17,33 @@ filegroup(
 )
 
 filegroup(
-    name = "readings_arena_config",
-    srcs = ["resources/readings_arena_config.json"],
+    name = "arena_config",
+    srcs = ["resources/arena_config.json"],
     visibility = ["//visibility:public"],
 )
 
 py_library(
-    name = "readings_ephemeral_test_runtime",
-    srcs = ["tests/readings_ephemeral_test_runtime.py"],
-    imports = ["tests"],
+    name = "ephemeral_test_runtime",
+    srcs = ["tests/pytest-shared/ephemeral_test_runtime.py"],
+    imports = ["tests/pytest-shared"],
     visibility = ["//visibility:public"],
 )
 
 java_library(
-    name = "readings_ephemeral_test_runtime_java",
-    srcs = ["tests/java/arena/examples/readings/testruntime/ReadingsEphemeralTestRuntime.java"],
+    name = "junit_shared",
+    srcs = glob(["tests/junit-shared/**/*.java"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//arena-junit:arena_junit_lib",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+    ],
+)
+
+java_library(
+    name = "ephemeral_test_runtime_java",
+    srcs = [
+        "tests/junit-shared/arena/examples/testruntime/EphemeralTestRuntime.java",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -51,11 +63,27 @@ compile_pip_requirements(
 )
 
 py_library(
-    name = "readings_arena_config_py",
-    srcs = ["tests/readings_arena_config.py"],
-    imports = ["tests"],
-    data = [":readings_arena_config"],
-    deps = [":readings_ephemeral_test_runtime"],
+    name = "arena_config_py",
+    srcs = ["tests/pytest-shared/arena_config.py"],
+    imports = ["tests/pytest-shared"],
+    data = [":arena_config"],
+    deps = [":ephemeral_test_runtime"],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
+    name = "pytest_shared",
+    srcs = [
+        "tests/pytest-shared/api_http.py",
+        "tests/pytest-shared/playbook_fixtures.py",
+        "tests/pytest-shared/playbooks.py",
+    ],
+    imports = ["tests/pytest-shared"],
+    deps = [
+        ":arena_config_py",
+        "//arena-pytest:arena_pytest_lib",
+        "@pip//requests",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -153,42 +181,55 @@ rust_binary(
 )
 
 py_test(
-    name = "pytest_localstack_component_test",
+    name = "pytest_axum_component_test",
     size = "small",
-    srcs = glob(["tests/example-arena-pytest-localstack-test/**/*.py"]),
-    main = "tests/example-arena-pytest-localstack-test/test_localstack.py",
-    imports = ["tests/example-arena-pytest-localstack-test"],
+    srcs = glob(["tests/example-axum-pytest-component-test/**/*.py"]),
+    main = "tests/example-axum-pytest-component-test/axum_component_test.py",
+    imports = [
+        "tests/example-axum-pytest-component-test",
+        "tests/pytest-shared",
+    ],
     data = [
         "//arena-ffi:arena_ffi_shared",
+        "//examples:example-readings-axum-web-app",
+        "//examples:instrument_reading_db_schema",
+        "//examples:arena_config",
+        "//examples:validation_db_schema",
     ],
     deps = [
-        ":readings_ephemeral_test_runtime",
+        ":pytest_shared",
         "//arena-pytest:arena_pytest_lib",
+        "@pip//kafka_python_ng",
         "@pip//pytest",
         "@pip//pytest_asyncio",
-        "@pip_examples//boto3",
+        "@pip//requests",
     ],
-    tags = ["requires_docker"],
+    tags = [
+        "component_test",
+        "example_component",
+    ],
     python_version = "PY3",
     visibility = ["//visibility:public"],
 )
 
 py_test(
-    name = "pytest_readings_fastapi_component_test",
+    name = "pytest_fastapi_component_test",
     size = "small",
-    srcs = glob(["tests/example-readings-fastapi-pytest-component-test/**/*.py"]),
-    main = "tests/example-readings-fastapi-pytest-component-test/readings_fastapi_component_test.py",
-    imports = ["tests/example-readings-fastapi-pytest-component-test"],
+    srcs = glob(["tests/example-fastapi-pytest-component-test/**/*.py"]),
+    main = "tests/example-fastapi-pytest-component-test/fastapi_component_test.py",
+    imports = [
+        "tests/example-fastapi-pytest-component-test",
+        "tests/pytest-shared",
+    ],
     data = [
         "//arena-ffi:arena_ffi_shared",
         "//examples:example-readings-fastapi-web-app",
         "//examples:instrument_reading_db_schema",
-        "//examples:readings_arena_config",
+        "//examples:arena_config",
         "//examples:validation_db_schema",
     ],
     deps = [
-        ":readings_arena_config_py",
-        ":readings_ephemeral_test_runtime",
+        ":pytest_shared",
         "//arena-pytest:arena_pytest_lib",
         "@pip//pytest",
         "@pip//pytest_asyncio",
@@ -196,22 +237,22 @@ py_test(
         "@pip_examples//boto3",
     ],
     tags = [
-        "requires_docker",
-        "exclusive",
+        "component_test",
+        "example_component",
     ],
     python_version = "PY3",
     visibility = ["//visibility:public"],
 )
 
 rust_test(
-    name = "example-readings-axum-component-test",
-    srcs = glob(["tests/example-readings-axum-component-test/**/*.rs"]),
-    crate_root = "tests/example-readings-axum-component-test/readings_axum_component_test.rs",
+    name = "example-axum-component-test",
+    srcs = glob(["tests/example-axum-component-test/**/*.rs"]),
+    crate_root = "tests/example-axum-component-test/axum_component_test.rs",
     size = "small",
     edition = "2021",
     tags = [
-        "requires_docker",
-        "exclusive",
+        "component_test",
+        "example_component",
     ],
     compile_data = [
         "resources/instrument_reading_db_schema.sql",
@@ -219,7 +260,7 @@ rust_test(
     ],
     data = [
         ":example-readings-axum-web-app",
-        ":readings_arena_config",
+        ":arena_config",
     ],
     deps = all_crate_deps(
         normal = True,
@@ -292,49 +333,49 @@ java_binary(
 )
 
 java_library(
-    name = "example_readings_spring_boot_component_test_logging_resources",
-    resources = glob(["tests/example-readings-spring-boot-component-test/resources/**"]),
-    resource_strip_prefix = "examples/tests/example-readings-spring-boot-component-test/resources",
+    name = "example_spring_boot_component_test_logging_resources",
+    resources = glob(["tests/example-spring-boot-component-test/resources/**"]),
+    resource_strip_prefix = "examples/tests/example-spring-boot-component-test/resources",
     visibility = ["//visibility:private"],
 )
 
 java_test(
-    name = "example-readings-spring-boot-component-test",
+    name = "example-spring-boot-component-test",
     size = "small",
-    srcs = glob(["tests/example-readings-spring-boot-component-test/**/*.java"]),
+    srcs = glob(["tests/example-spring-boot-component-test/**/*.java"]),
     javacopts = [
         "--release",
         "21",
     ],
     tags = [
-        "requires_docker",
-        "exclusive",
+        "component_test",
+        "example_component",
     ],
     use_testrunner = False,
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
         "--include-engine=junit-jupiter",
-        "--select-package=arena.examples.readings.component",
+        "--select-package=arena.examples.component",
     ],
     data = [
         ":example-readings-spring-boot-web-app",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
-        ":readings_arena_config",
+        ":arena_config",
         ":validation_db_schema",
     ],
     jvm_flags = ["-Djna.nosys=true"],
     runtime_deps = [
-        ":example_readings_spring_boot_component_test_logging_resources",
+        ":example_spring_boot_component_test_logging_resources",
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
         "@arena_java_maven//:org_junit_platform_junit_platform_console",
         "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
     ],
     deps = [
-        ":readings_ephemeral_test_runtime_java",
+        ":ephemeral_test_runtime_java",
+        ":junit_shared",
         "//arena-junit:arena_junit_lib",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
-        "@arena_java_maven//:org_apache_kafka_kafka_clients",
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
         "@arena_java_maven//:org_slf4j_slf4j_api",
         "@arena_java_maven//:org_springframework_boot_spring_boot_starter_logging",
@@ -343,4 +384,59 @@ java_test(
         "@arena_java_maven//:software_amazon_awssdk_sqs",
         "@arena_java_maven//:software_amazon_awssdk_url_connection_client",
     ],
+)
+
+java_test(
+    name = "example-axum-junit-component-test",
+    size = "small",
+    srcs = glob(["tests/example-axum-junit-component-test/**/*.java"]),
+    javacopts = [
+        "--release",
+        "21",
+    ],
+    tags = [
+        "component_test",
+        "example_component",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-package=arena.examples.component",
+    ],
+    data = [
+        ":example-readings-axum-web-app",
+        "//arena-ffi:arena_ffi_shared",
+        ":instrument_reading_db_schema",
+        ":arena_config",
+        ":validation_db_schema",
+    ],
+    jvm_flags = ["-Djna.nosys=true"],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":ephemeral_test_runtime_java",
+        ":junit_shared",
+        "//arena-junit:arena_junit_lib",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:org_apache_kafka_kafka_clients",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+test_suite(
+    name = "example_component_tests",
+    tags = ["component_test"],
+    tests = [
+        ":pytest_axum_component_test",
+        ":pytest_fastapi_component_test",
+        ":example-axum-component-test",
+        ":example-axum-junit-component-test",
+        ":example-spring-boot-component-test",
+    ],
+    visibility = ["//visibility:public"],
 )
