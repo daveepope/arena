@@ -1,46 +1,14 @@
-import socket
 import sys
 import os
 from unittest.mock import MagicMock
 
 import pytest
 
-from ephemeral_test_runtime import RUNTIME, EphemeralTestRuntime, ephemeral_tcp_port
-
 
 def _playbook_pkg():
     from arena_pytest.playbook import ActivePlaybook as _  # noqa: F401
 
     return sys.modules["arena_pytest.playbook"]
-
-
-def test_ephemeral_tcp_port_bind_returns_nonzero_port():
-    port = ephemeral_tcp_port()
-    assert 1024 <= port <= 65535
-
-
-def test_ephemeral_runtime_ports_are_pairwise_distinct():
-    rt = EphemeralTestRuntime()
-    ports = (
-        rt.exec_web_app_port,
-        rt.docker_web_host_port,
-        rt.kafka_port,
-        rt.calibration_host_port,
-        rt.postgres_port,
-        rt.mssql_port,
-        rt.oauth_port,
-        rt.localstack_host_port,
-    )
-    assert len(ports) == len(set(ports))
-
-
-def test_ephemeral_runtime_suffixes_network_and_container_names():
-    assert RUNTIME.network_name("arena-example-api-network").startswith(
-        "arena-example-api-network-"
-    )
-    assert RUNTIME.container_name("example-api-postgres").startswith(
-        "example-api-postgres-"
-    )
 
 
 def test_active_playbooks_for_item_without_item_attr_returns_empty_list():

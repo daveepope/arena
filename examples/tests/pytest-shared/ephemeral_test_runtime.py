@@ -2,11 +2,24 @@ import os
 import socket
 import uuid
 
+PORT_SLOT_COUNT = 8
+
+
+def _allocate_distinct_tcp_ports(count: int) -> list[int]:
+    sockets: list[socket.socket] = []
+    try:
+        for _ in range(count):
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.bind(("127.0.0.1", 0))
+            sockets.append(s)
+        return [s.getsockname()[1] for s in sockets]
+    finally:
+        for s in sockets:
+            s.close()
+
 
 def ephemeral_tcp_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+    return _allocate_distinct_tcp_ports(1)[0]
 
 
 def run_suffix() -> str:
@@ -16,22 +29,27 @@ def run_suffix() -> str:
 class EphemeralTestRuntime:
     def __init__(self) -> None:
         self.run_suffix = run_suffix()
-        self.exec_web_app_port = ephemeral_tcp_port()
-        self.docker_web_host_port = ephemeral_tcp_port()
-        self.kafka_port = ephemeral_tcp_port()
-        self.calibration_host_port = ephemeral_tcp_port()
-        self.postgres_port = ephemeral_tcp_port()
-        self.mssql_port = ephemeral_tcp_port()
-        self.oauth_port = ephemeral_tcp_port()
-        self.localstack_host_port = ephemeral_tcp_port()
+        (
+            self.exec_web_app_port,
+            self.docker_web_host_port,
+            self.kafka_port,
+            self.calibration_host_port,
+            self.postgres_port,
+            self.mssql_port,
+            self.oauth_port,
+            self.localstack_host_port,
+        ) = _allocate_distinct_tcp_ports(PORT_SLOT_COUNT)
         self.oauth_issuer = f"https://127.0.0.1:{self.oauth_port}"
         os.environ["ARENA_PYTEST_OAUTH_ISSUER"] = self.oauth_issuer
 
-    def network_name(self, base: str) -> str:
+    def namespaced(self, base: str) -> str:
         return f"{base}-{self.run_suffix}"
 
+    def network_name(self, base: str) -> str:
+        return self.namespaced(base)
+
     def container_name(self, base: str) -> str:
-        return f"{base}-{self.run_suffix}"
+        return self.namespaced(base)
 
 
 RUNTIME = EphemeralTestRuntime()

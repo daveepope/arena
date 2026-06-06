@@ -29,6 +29,19 @@ py_library(
     visibility = ["//visibility:public"],
 )
 
+py_test(
+    name = "ephemeral_test_runtime_test",
+    size = "small",
+    srcs = ["tests/pytest-shared/ephemeral_test_runtime_test.py"],
+    main = "tests/pytest-shared/ephemeral_test_runtime_test.py",
+    imports = ["tests/pytest-shared"],
+    deps = [
+        ":ephemeral_test_runtime",
+        "@pip//pytest",
+    ],
+    python_version = "PY3",
+)
+
 java_library(
     name = "junit_shared",
     srcs = glob(["tests/junit-shared/**/*.java"]),

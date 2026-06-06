@@ -1,10 +1,13 @@
 package arena.examples.testruntime;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.UUID;
 
 public final class EphemeralTestRuntime {
+
+  public static final int PORT_SLOT_COUNT = 8;
 
   private static final EphemeralTestRuntime INSTANCE = new EphemeralTestRuntime();
 
@@ -21,14 +24,15 @@ public final class EphemeralTestRuntime {
 
   private EphemeralTestRuntime() {
     runSuffix = UUID.randomUUID().toString().replace("-", "");
-    execWebAppPort = ephemeralTcpPort();
-    dockerWebHostPort = ephemeralTcpPort();
-    kafkaPort = ephemeralTcpPort();
-    calibrationHostPort = ephemeralTcpPort();
-    postgresPort = ephemeralTcpPort();
-    mssqlPort = ephemeralTcpPort();
-    oauthPort = ephemeralTcpPort();
-    localstackHostPort = ephemeralTcpPort();
+    int[] ports = allocateDistinctTcpPorts(PORT_SLOT_COUNT);
+    execWebAppPort = ports[0];
+    dockerWebHostPort = ports[1];
+    kafkaPort = ports[2];
+    calibrationHostPort = ports[3];
+    postgresPort = ports[4];
+    mssqlPort = ports[5];
+    oauthPort = ports[6];
+    localstackHostPort = ports[7];
     oauthIssuer = "https://127.0.0.1:" + oauthPort;
   }
 
@@ -37,18 +41,45 @@ public final class EphemeralTestRuntime {
   }
 
   public String networkName(String base) {
-    return base + "-" + runSuffix;
+    return namespaced(base);
   }
 
   public String containerName(String base) {
+    return namespaced(base);
+  }
+
+  public String namespaced(String base) {
     return base + "-" + runSuffix;
   }
 
   public static int ephemeralTcpPort() {
-    try (ServerSocket socket = new ServerSocket(0)) {
-      return socket.getLocalPort();
+    return allocateDistinctTcpPorts(1)[0];
+  }
+
+  private static int[] allocateDistinctTcpPorts(int count) {
+    ServerSocket[] sockets = new ServerSocket[count];
+    try {
+      for (int i = 0; i < count; i++) {
+        ServerSocket socket = new ServerSocket();
+        socket.bind(new InetSocketAddress("127.0.0.1", 0));
+        sockets[i] = socket;
+      }
+      int[] ports = new int[count];
+      for (int i = 0; i < count; i++) {
+        ports[i] = sockets[i].getLocalPort();
+      }
+      return ports;
     } catch (IOException e) {
       throw new ExceptionInInitializerError(e);
+    } finally {
+      for (ServerSocket socket : sockets) {
+        if (socket != null) {
+          try {
+            socket.close();
+          } catch (IOException ignored) {
+          }
+        }
+      }
     }
   }
 }

@@ -116,7 +116,6 @@ py_test(
     data = ["//arena-ffi:arena_ffi_shared"],
     deps = [
         ":arena_pytest_lib",
-        "//examples:ephemeral_test_runtime",
         "@pip//pytest",
     ],
     python_version = "PY3",

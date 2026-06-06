@@ -22,6 +22,13 @@ pub fn sanitize_for_container(identifier: &str) -> String {
     slugify(identifier)
 }
 
+pub fn resolve_container_name(identifier: &str, override_name: Option<&str>) -> String {
+    match override_name {
+        Some(name) => name.to_string(),
+        None => sanitize_for_container(identifier),
+    }
+}
+
 fn slugify(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut last_dash = false;
