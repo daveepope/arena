@@ -1,5 +1,5 @@
 {
-  "checksum": "8185f5eb6f708ec6f55ebff85b975889d43ac498b0da34eb696f9f50e4fca44c",
+  "checksum": "afb4552ca40306be6b0356dbacc5012fc88ec520c00555a4e7c341570193a4d6",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -462,6 +462,15 @@
             {
               "id": "tracing 0.1.44",
               "target": "tracing"
+            }
+          ],
+          "selects": {}
+        },
+        "deps_dev": {
+          "common": [
+            {
+              "id": "tokio 1.52.1",
+              "target": "tokio"
             }
           ],
           "selects": {}

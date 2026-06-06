@@ -264,7 +264,7 @@ public final class ArenaFixture extends ClosedArenaExtension {
         new ClosedArena(
             RT.containerName("example-api-arena"),
             List.of(match),
-            ArenaLogLevel.WARN,
+            ArenaLogLevel.DEBUG,
             LOG,
             List.of("example-api-web-app"),
             List.of(
@@ -272,7 +272,12 @@ public final class ArenaFixture extends ClosedArenaExtension {
                 postgres.identifier(),
                 mssql.identifier(),
                 calibration.identifier(),
-                localstack.identifier()));
+                localstack.identifier(),
+                calibrationPlaybook.identifier(),
+                calibrationApiErrorPathPlaybook.identifier(),
+                calibrationApiFlakyPlaybook.identifier(),
+                resetValidationDbPlaybook.identifier(),
+                eventsPurgePlaybook.identifier()));
     return closed;
   }
 

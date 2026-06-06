@@ -59,10 +59,6 @@ from arena_config import (
     MSSQL_PORT,
     OAUTH_ISSUER,
     OAUTH_PORT,
-    PLAYBOOK_CALIBRATION_API_HAPPY_PATH,
-    PLAYBOOK_CALIBRATION_API_ERROR_PATH,
-    PLAYBOOK_CALIBRATION_API_FLAKY_PATH,
-    PLAYBOOK_VALIDATION_DB_SCOPED,
     POSTGRES_CONTAINER_NAME,
     POSTGRES_DB_NAME,
     POSTGRES_DB_PASS,
@@ -85,20 +81,6 @@ from arena_pytest import (
     OauthDependencyBuilder,
     PostgresDependencyBuilder,
 )
-_DISPATCHER_IMPLEMENTATION_DEPENDENCY_LOG_IDS = (
-    DEP_NAME_OAUTH,
-    DEP_NAME_POSTGRES,
-    DEP_NAME_KAFKA,
-    DEP_NAME_MSSQL,
-    DEP_NAME_CALIBRATION_HTTP,
-    PLAYBOOK_CALIBRATION_API_HAPPY_PATH,
-    PLAYBOOK_CALIBRATION_API_ERROR_PATH,
-    PLAYBOOK_CALIBRATION_API_FLAKY_PATH,
-    PLAYBOOK_VALIDATION_DB_SCOPED,
-)
-
-_DISPATCHER_IMPLEMENTATION_COMPONENT_LOG_IDS = (COMPONENT_NAME_EXECUTABLE,)
-
 _LOG = logging.getLogger(__name__)
 
 _OAUTH_TLS_CERT_PEM: str | None = None
@@ -262,37 +244,46 @@ def closed_arena() -> ClosedArena:
     mssql_startup_sql = [open(mssql_schema_path).read()] if mssql_schema_path else []
 
     calibration_http = _build_calibration_http()
-
+    postgres = _build_postgres(startup_sql)
+    kafka = _build_kafka()
     mssql = _build_mssql(mssql_startup_sql)
+    calibration_happy_path = CalibrationApiHappyPathPlaybook(calibration_http.identifier)
+    calibration_error_path = CalibrationApiErrorPathPlaybook(calibration_http.identifier)
+    calibration_flaky_path = CalibrationApiFlakyPlaybook(calibration_http.identifier)
+    reset_validation_db = ResetValidationDbPlaybook(mssql.identifier)
 
     a_match = MatchBuilder(MATCH_NAME)
     a_match = a_match.add_dependency(oauth)
-    a_match = a_match.add_dependency(_build_postgres(startup_sql))
-    a_match = a_match.add_dependency(_build_kafka())
+    a_match = a_match.add_dependency(postgres)
+    a_match = a_match.add_dependency(kafka)
     a_match = a_match.add_dependency(mssql)
     a_match = a_match.add_dependency(calibration_http)
     a_match = a_match.register_playbook(
-        CalibrationApiHappyPathPlaybook(calibration_http.identifier),
+        calibration_happy_path,
         exec_on_dependency_start=True,
     )
-    a_match = a_match.register_playbook(
-        CalibrationApiErrorPathPlaybook(calibration_http.identifier),
-    )
-    a_match = a_match.register_playbook(
-        CalibrationApiFlakyPlaybook(calibration_http.identifier),
-    )
-    a_match = a_match.register_playbook(
-        ResetValidationDbPlaybook(mssql.identifier),
-    )
+    a_match = a_match.register_playbook(calibration_error_path)
+    a_match = a_match.register_playbook(calibration_flaky_path)
+    a_match = a_match.register_playbook(reset_validation_db)
     a_match = a_match.add_component(_build_exec_component(oauth_ca_pem))
 
     return ClosedArena(
         CLOSED_ARENA_NAME,
         [a_match.build()],
-        log_level=ArenaLogLevel.WARN,
+        log_level=ArenaLogLevel.DEBUG,
         logger=_LOG,
-        log_component_ids=_DISPATCHER_IMPLEMENTATION_COMPONENT_LOG_IDS,
-        log_dependency_ids=_DISPATCHER_IMPLEMENTATION_DEPENDENCY_LOG_IDS,
+        log_component_ids=(COMPONENT_NAME_EXECUTABLE,),
+        log_dependency_ids=(
+            oauth.identifier,
+            postgres.identifier,
+            kafka.identifier,
+            mssql.identifier,
+            calibration_http.identifier,
+            calibration_happy_path.identifier,
+            calibration_error_path.identifier,
+            calibration_flaky_path.identifier,
+            reset_validation_db.identifier,
+        ),
     )
 
 
