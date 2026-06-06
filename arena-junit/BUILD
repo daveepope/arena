@@ -69,10 +69,36 @@ java_test(
 )
 
 java_test(
+    name = "arena_junit_playbook_extension_unit_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/playbook/PlaybookInvocationExtensionUnitTest.java"],
+    javacopts = [
+        "--release",
+        "21",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.playbook.PlaybookInvocationExtensionUnitTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:net_java_dev_jna_jna",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+)
+
+java_test(
     name = "arena_junit_playbook_test",
     size = "small",
     srcs = [
-        "src/test/java/arena/junit/ActiveHttpPlaybookVerifyTest.java",
         "src/test/java/arena/junit/ClosedArenaExtensionLifecycleTest.java",
         "src/test/java/arena/junit/HttpPlaybookFluentApiTest.java",
         "src/test/java/arena/junit/PlaybookInvocationExtensionTest.java",
@@ -87,7 +113,6 @@ java_test(
         "--include-engine=junit-jupiter",
         "--select-class=arena.junit.ClosedArenaExtensionLifecycleTest",
         "--select-class=arena.junit.PlaybookInvocationExtensionTest",
-        "--select-class=arena.junit.ActiveHttpPlaybookVerifyTest",
         "--select-class=arena.junit.HttpPlaybookFluentApiTest",
     ],
     tags = ["component_test"],

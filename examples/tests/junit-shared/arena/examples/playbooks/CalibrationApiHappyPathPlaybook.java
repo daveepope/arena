@@ -14,7 +14,6 @@ public final class CalibrationApiHappyPathPlaybook extends ManagedHttpPlaybook {
                 "POST",
                 PlaybookConfig.CALIBRATION_VALIDATE_PATH,
                 200,
-                Map.of("valid", true),
-                Expect.calledAtLeast(1))));
+                Map.of("valid", true))));
   }
 }

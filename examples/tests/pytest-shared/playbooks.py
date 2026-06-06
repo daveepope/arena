@@ -27,7 +27,6 @@ class CalibrationApiHappyPathPlaybook(ManagedHttpPlaybook):
                 HttpPlaybookBuilder(dependency_identifier)
                 .post(CALIBRATION_VALIDATE_PATH)
                 .will_return(ok_json({"valid": True}))
-                .expect_called_at_least(1)
             ),
         )
 

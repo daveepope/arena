@@ -35,12 +35,35 @@ def test_ephemeral_runtime_ports_are_pairwise_distinct():
 
 
 def test_ephemeral_runtime_suffixes_network_and_container_names():
-    assert RUNTIME.network_name("arena-readings-api-network").startswith(
-        "arena-readings-api-network-"
+    assert RUNTIME.network_name("arena-example-api-network").startswith(
+        "arena-example-api-network-"
     )
-    assert RUNTIME.container_name("readings-api-postgres").startswith(
-        "readings-api-postgres-"
+    assert RUNTIME.container_name("example-api-postgres").startswith(
+        "example-api-postgres-"
     )
+
+
+def test_active_playbooks_for_item_without_item_attr_returns_empty_list():
+    from arena_pytest.arena import active_playbooks_for_item
+
+    item = MagicMock(spec=[])
+    assert active_playbooks_for_item(item) == []
+
+
+def test_active_playbooks_for_item_returns_shallow_copy_of_registered_actives():
+    from arena_pytest.arena import active_playbooks_for_item
+    from arena_pytest.playbook import ActivePlaybook
+
+    active = ActivePlaybook(MagicMock(), 7)
+    item = MagicMock()
+    item._arena_pytest_function_actives = [active]
+    first = active_playbooks_for_item(item)
+    second = active_playbooks_for_item(item)
+    assert first == [active]
+    assert second == [active]
+    assert first is not second
+    first.append(MagicMock())
+    assert active_playbooks_for_item(item) == [active]
 
 
 def test_playbook_marker_two_args_raises_usage_error():

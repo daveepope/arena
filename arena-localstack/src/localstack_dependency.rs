@@ -139,7 +139,7 @@ impl LocalstackDependency {
     }
 
     async fn wait_until_ready(&self) {
-        let timeout = Duration::from_secs(60);
+        let timeout = Duration::from_secs(45);
         let poll_every = Duration::from_millis(100);
         let start = Instant::now();
 

@@ -49,6 +49,16 @@ class _Item:
         self._request = None
 
 
+def test_pytest_runtest_setup_without_marker_is_noop():
+    item = _Item([])
+    pytest_runtest_setup(item)
+
+
+def test_pytest_runtest_teardown_without_actives_is_noop():
+    item = _Item([])
+    pytest_runtest_teardown(item, None)
+
+
 def test_pytest_runtest_setup_teardown_activates_stacked_playbook_markers(monkeypatch):
     opened = []
     dropped = []
