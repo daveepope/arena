@@ -30,7 +30,7 @@ rust_test(
 rust_test(
     name = "network_component_test",
     srcs = ["tests/network_component_test.rs"],
-    size = "small",
+    size = "medium",
     edition = "2021",
     tags = ["component_test"],
     deps = all_crate_deps(
