@@ -134,7 +134,7 @@ py_test(
         "@pip//pytest_asyncio",
         "@pip//requests",
     ],
-    tags = ["requires_docker"],
+    tags = ["component_test"],
     python_version = "PY3",
     visibility = ["//visibility:public"],
 )
