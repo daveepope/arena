@@ -85,7 +85,7 @@ java_test(
         "--include-engine=junit-jupiter",
         "--select-package=arena.junit.readings.test",
     ],
-    tags = ["requires_docker"],
+    tags = ["component_test"],
     runtime_deps = [
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
         "@arena_java_maven//:org_junit_platform_junit_platform_console",
@@ -132,7 +132,7 @@ java_test(
         "--select-class=arena.junit.ActiveHttpPlaybookVerifyTest",
         "--select-class=arena.junit.HttpPlaybookFluentApiTest",
     ],
-    tags = ["requires_docker"],
+    tags = ["component_test"],
     runtime_deps = [
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
         "@arena_java_maven//:org_junit_platform_junit_platform_console",

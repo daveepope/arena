@@ -168,7 +168,7 @@ py_test(
         "@pip//pytest_asyncio",
         "@pip_examples//boto3",
     ],
-    tags = ["requires_docker"],
+    tags = ["component_test"],
     python_version = "PY3",
     visibility = ["//visibility:public"],
 )
@@ -196,7 +196,7 @@ py_test(
         "@pip_examples//boto3",
     ],
     tags = [
-        "requires_docker",
+        "component_test",
         "exclusive",
     ],
     python_version = "PY3",
@@ -210,7 +210,7 @@ rust_test(
     size = "small",
     edition = "2021",
     tags = [
-        "requires_docker",
+        "component_test",
         "exclusive",
     ],
     compile_data = [
@@ -307,7 +307,7 @@ java_test(
         "21",
     ],
     tags = [
-        "requires_docker",
+        "component_test",
         "exclusive",
     ],
     use_testrunner = False,

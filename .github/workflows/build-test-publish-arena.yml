@@ -117,7 +117,7 @@ jobs:
 
       - name: Coverage
         run: |
-          bazel coverage //... --config=coverage --build_tests_only --test_tag_filters=-requires_docker
+          bazel coverage //... --config=coverage --build_tests_only --test_tag_filters=-component_test
           cp "$(bazel info output_path)/_coverage/_coverage_report.dat" lcov.info
 
       - name: Upload to Codecov
@@ -172,7 +172,7 @@ jobs:
           repository-cache: true
 
       - name: Build and test
-        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-requires_docker
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
 
   wheel:
     name: Build wheel (Ubuntu 24.04)
