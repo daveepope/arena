@@ -3,10 +3,18 @@ use async_trait::async_trait;
 use serde::Deserialize;
 use std::time::Duration;
 
+fn default_readiness_timeout_ms() -> u64 {
+    10_000
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum ReadinessCheckConfig {
-    Http { target: String },
+    Http {
+        target: String,
+        #[serde(default = "default_readiness_timeout_ms")]
+        timeout_ms: u64,
+    },
 }
 
 pub(crate) struct HttpReadinessCheck;

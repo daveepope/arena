@@ -11,7 +11,6 @@ use crate::kafka_dependency;
 use crate::managed_playbook;
 use crate::postgres_dependency;
 
-const DEFAULT_NETWORK: &str = "arena-network";
 const DEFAULT_MATCH_NAME: &str = "arena-match";
 
 #[derive(Debug, Deserialize, Default)]
@@ -44,7 +43,7 @@ pub(crate) enum ComponentConfig {
 }
 
 pub(crate) async fn build_match_async(config: &MatchConfig) -> Result<Box<dyn MatchTrait>, String> {
-    let network = config.network.as_deref().unwrap_or(DEFAULT_NETWORK);
+    let network = config.network.as_deref();
     let match_name = config.match_name.as_deref().unwrap_or(DEFAULT_MATCH_NAME);
 
     let dependencies = build_dependencies(config, network)?;
@@ -59,7 +58,7 @@ pub(crate) async fn build_match_async(config: &MatchConfig) -> Result<Box<dyn Ma
     Ok(Box::new(a_match))
 }
 
-fn build_dependencies(config: &MatchConfig, network: &str) -> Result<Vec<Dependency>, String> {
+fn build_dependencies(config: &MatchConfig, network: Option<&str>) -> Result<Vec<Dependency>, String> {
     config
         .dependencies
         .as_deref()

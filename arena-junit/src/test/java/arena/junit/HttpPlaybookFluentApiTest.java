@@ -30,7 +30,7 @@ final class HttpPlaybookFluentApiTest {
   static final class FluentArenaFixture extends ClosedArenaExtension {
     @Override
     protected ClosedArena buildClosedArena() throws Exception {
-      httpPort = RT.calibrationHostPort;
+      httpPort = EphemeralTestRuntime.ephemeralTcpPort();
       HttpDependency http = new HttpDependencyBuilder("fluent-http").withPort(httpPort).build();
       dependencyIdentifier = http.identifier();
       Match match = new MatchBuilder("fluent-http-match").addDependency(http).build();

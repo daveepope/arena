@@ -127,7 +127,7 @@ async fn start_stop_happy_path_records_events() {
         last_connection_string.lock().unwrap().as_deref(),
         Some("postgres://127.0.0.1:5432/fake")
     );
-    assert_eq!(*last_timeout_ms.lock().unwrap(), Some(10_000));
+    assert_eq!(*last_timeout_ms.lock().unwrap(), Some(30_000));
 }
 
 #[tokio::test]

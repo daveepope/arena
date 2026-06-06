@@ -57,7 +57,12 @@ public final class ExecutableComponentBuilder {
   }
 
   public ExecutableComponentBuilder withReadinessCheck(ReadinessCheck check, String target) {
-    readiness.add(new ReadinessChecksFfi.ReadinessEntry(check, target));
+    return withReadinessCheck(check, target, 10_000L);
+  }
+
+  public ExecutableComponentBuilder withReadinessCheck(
+      ReadinessCheck check, String target, long timeoutMs) {
+    readiness.add(new ReadinessChecksFfi.ReadinessEntry(check, target, timeoutMs));
     return this;
   }
 

@@ -64,6 +64,7 @@ fn readiness_checks_for(config: &ExecutableComponentConfig) -> Vec<ReadinessChec
         if let Some(ref url) = config.readiness_check_url {
             v.push(ReadinessCheckConfig::Http {
                 target: url.clone(),
+                timeout_ms: 10_000,
             });
         }
     }
@@ -76,8 +77,12 @@ fn apply_readiness_checks(
 ) -> ExecutableComponentBuilder {
     for c in checks {
         builder = match c {
-            ReadinessCheckConfig::Http { target } => {
-                builder.with_readiness_check(HttpReadinessCheck::new(), target.as_str())
+            ReadinessCheckConfig::Http { target, timeout_ms } => {
+                builder.with_readiness_check_timeout(
+                    HttpReadinessCheck::new(),
+                    target.as_str(),
+                    *timeout_ms,
+                )
             }
         };
     }

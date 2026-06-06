@@ -69,8 +69,12 @@ pub(crate) async fn build(config: &ContainerizedComponentConfig) -> Result<Compo
     if let Some(checks) = &config.readiness_checks {
         for c in checks {
             builder = match c {
-                ReadinessCheckConfig::Http { target } => {
-                    builder.with_readiness_check(HttpReadinessCheck::new(), target.as_str())
+                ReadinessCheckConfig::Http { target, timeout_ms } => {
+                    builder.with_readiness_check_timeout(
+                        HttpReadinessCheck::new(),
+                        target.as_str(),
+                        *timeout_ms,
+                    )
                 }
             };
         }

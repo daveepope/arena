@@ -59,7 +59,6 @@ from arena_config import (
     MSSQL_DB_PASS,
     MSSQL_DB_USER,
     MSSQL_PORT,
-    NETWORK_NAME,
     OAUTH_ISSUER,
     OAUTH_PORT,
     POSTGRES_DB_NAME,
@@ -299,14 +298,13 @@ def closed_arena() -> ClosedArena:
         .with_env_var("EVENT_BUS_NAME", EVENT_BUS_NAME)
         .with_env_var("EVENT_SOURCE", EVENT_SOURCE)
         .with_readiness_check(
-            HttpReadinessCheck.create(), f"http://127.0.0.1:{WEB_APP_PORT}/health"
+            HttpReadinessCheck.create(), f"http://127.0.0.1:{WEB_APP_PORT}/health", 30_000
         )
         .build()
     )
 
     a_match = (
         MatchBuilder(MATCH_NAME)
-        .with_network(NETWORK_NAME)
         .add_dependency(oauth)
         .add_dependency(postgres)
         .add_dependency(mssql)

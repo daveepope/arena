@@ -15,13 +15,15 @@ pub(crate) struct HttpDependencyConfig {
     pub container_name: Option<String>,
 }
 
-pub(crate) fn build(config: &HttpDependencyConfig, network: &str) -> Result<Dependency, String> {
+pub(crate) fn build(config: &HttpDependencyConfig, network: Option<&str>) -> Result<Dependency, String> {
     let mut builder =
         HttpDependency::builder(&config.identifier).with_port(config.port.unwrap_or(0));
     if let Some(ref container_name) = config.container_name {
         builder = builder.with_container_name(container_name);
     }
-    builder = builder.with_network(network);
+    if let Some(network) = network {
+        builder = builder.with_network(network);
+    }
     if let Some(ref image_name) = config.image_name {
         builder = builder.with_image_name(image_name);
     }

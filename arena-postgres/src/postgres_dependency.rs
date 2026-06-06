@@ -113,7 +113,7 @@ impl PostgresDependency {
             .connection_string()
             .expect("connection string should be available after postgres starts");
 
-        let timeout = Duration::from_secs(10);
+        let timeout = Duration::from_secs(30);
 
         match self
             .readiness_check

@@ -52,7 +52,6 @@ _COMP_NAMES = _DATA["component_names"]
 _CTR_NAMES = _DATA["container_names"]
 _PB_NAMES = _DATA["playbook_names"]
 
-NETWORK_NAME = RUNTIME.network_name(_DATA["network_name"])
 DOCKER_IMAGE_TAG = _DATA["docker_image_tag"]
 CLOSED_ARENA_NAME = RUNTIME.container_name(_DATA["closed_arena_name"])
 MATCH_NAME = RUNTIME.container_name(_DATA["match_name"])
@@ -102,9 +101,5 @@ PLAYBOOK_EVENTS_PURGE = _PB_NAMES["events_purge"]
 
 MSSQL_CONNECTION_STRING_LOCAL = (
     f"Server=tcp:localhost,{MSSQL_PORT};Database={MSSQL_DB_NAME};"
-    f"User Id={MSSQL_DB_USER};Password={MSSQL_DB_PASS};TrustServerCertificate=True;encrypt=DANGER_PLAINTEXT;"
-)
-MSSQL_CONNECTION_STRING_DOCKER = (
-    f"Server=tcp:{MSSQL_CONTAINER_NAME},1433;Database={MSSQL_DB_NAME};"
     f"User Id={MSSQL_DB_USER};Password={MSSQL_DB_PASS};TrustServerCertificate=True;encrypt=DANGER_PLAINTEXT;"
 )

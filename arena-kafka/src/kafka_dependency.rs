@@ -84,7 +84,7 @@ impl KafkaDependency {
     }
 
     async fn wait_until_ready(&self) {
-        let timeout = Duration::from_secs(15);
+        let timeout = Duration::from_secs(30);
         let poll_every = Duration::from_millis(100);
         let start = Instant::now();
 

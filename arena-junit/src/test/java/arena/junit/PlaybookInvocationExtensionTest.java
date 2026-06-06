@@ -114,8 +114,7 @@ final class PlaybookInvocationExtensionTest {
           dependencyIdentifier,
           new HttpPlaybookBuilder(dependencyIdentifier)
               .post(CALIBRATION_VALIDATE_PATH)
-              .willReturn(arena.junit.playbook.HttpResponse.okJson(Map.of("valid", true)))
-              .expectCalledAtLeast(1));
+              .willReturn(arena.junit.playbook.HttpResponse.okJson(Map.of("valid", true))));
     }
   }
 

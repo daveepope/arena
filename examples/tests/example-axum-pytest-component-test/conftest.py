@@ -57,7 +57,6 @@ from arena_config import (
     MSSQL_DB_PASS,
     MSSQL_DB_USER,
     MSSQL_PORT,
-    NETWORK_NAME,
     OAUTH_ISSUER,
     OAUTH_PORT,
     PLAYBOOK_CALIBRATION_API_HAPPY_PATH,
@@ -242,7 +241,7 @@ def _build_exec_component(oauth_ca_pem: str) -> object:
             "mssql_connection_string", MSSQL_CONNECTION_STRING_LOCAL
         )
         .with_runtime_arg("oauth_issuer_url", OAUTH_ISSUER)
-        .with_readiness_check(HttpReadinessCheck.create(), healthcheck_url)
+        .with_readiness_check(HttpReadinessCheck.create(), healthcheck_url, 30_000)
     )
     if not is_bazel:
         exec_builder = exec_builder.with_source_path("examples").with_build_tool(BuildTool.CARGO)
@@ -267,7 +266,6 @@ def closed_arena() -> ClosedArena:
     mssql = _build_mssql(mssql_startup_sql)
 
     a_match = MatchBuilder(MATCH_NAME)
-    a_match = a_match.with_network(NETWORK_NAME)
     a_match = a_match.add_dependency(oauth)
     a_match = a_match.add_dependency(_build_postgres(startup_sql))
     a_match = a_match.add_dependency(_build_kafka())

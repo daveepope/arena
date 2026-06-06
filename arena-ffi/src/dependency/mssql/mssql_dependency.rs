@@ -42,7 +42,7 @@ pub(crate) struct MssqlDependencyConfig {
     pub encryption: Option<EncryptionConfig>,
 }
 
-pub(crate) fn build(config: &MssqlDependencyConfig, network: &str) -> Result<Dependency, String> {
+pub(crate) fn build(config: &MssqlDependencyConfig, network: Option<&str>) -> Result<Dependency, String> {
     let mut builder = MssqlDependency::builder(&config.identifier)
         .with_image(config.image.as_deref().unwrap_or("2022-CU14-ubuntu-22.04"));
     if let Some(ref image_name) = config.image_name {
@@ -58,9 +58,11 @@ pub(crate) fn build(config: &MssqlDependencyConfig, network: &str) -> Result<Dep
                 .as_deref()
                 .unwrap_or("yourStrong(!)Password"),
         )
-        .with_network(network)
         .with_encryption(config.encryption.unwrap_or_default().into())
         .with_startup_sql_scripts(config.startup_sql_scripts.clone().unwrap_or_default());
+    if let Some(network) = network {
+        builder = builder.with_network(network);
+    }
     if let Some(ref container_name) = config.container_name {
         builder = builder.with_container_name(container_name);
     }

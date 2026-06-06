@@ -77,7 +77,6 @@ public final class ArenaFixture extends ClosedArenaExtension {
   private static final String MSSQL_DB_NAME = "validationDb";
   private static final String MSSQL_DB_USER = "sa";
   private static final String MSSQL_DB_PASS = "yourStrong(!)Password";
-  private static final String NETWORK_NAME = RT.networkName("arena-example-api-network");
   static final String CALIBRATION_VALIDATE_PATH = "/api/v1/validate";
   private static final String EVENT_BUS_NAME = "example-api-events";
   private static final String EVENT_SOURCE = "readings.api";
@@ -242,11 +241,12 @@ public final class ArenaFixture extends ClosedArenaExtension {
             .withEnvVar("EVENT_BUS_NAME", EVENT_BUS_NAME)
             .withEnvVar("EVENT_SOURCE", EVENT_SOURCE)
             .withReadinessCheck(
-                HttpReadinessCheck.create(), "http://127.0.0.1:" + WEB_APP_PORT + "/health");
+                HttpReadinessCheck.create(),
+                "http://127.0.0.1:" + WEB_APP_PORT + "/health",
+                30_000L);
 
     Match match =
         new MatchBuilder(RT.containerName("example-api-happy-path"))
-            .withNetwork(NETWORK_NAME)
             .addDependency(oauth)
             .addDependency(postgres)
             .addDependency(mssql)

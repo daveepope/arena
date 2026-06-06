@@ -27,7 +27,6 @@ pub struct TestRuntime {
     pub calibration_http_port: u16,
     pub exec_web_app_port: u16,
     pub mssql_port: u16,
-    pub network_name: String,
     pub closed_arena_name: String,
     pub match_name: String,
 }
@@ -64,7 +63,6 @@ pub fn test_runtime() -> &'static TestRuntime {
             calibration_http_port: ephemeral_tcp_port(),
             exec_web_app_port: ephemeral_tcp_port(),
             mssql_port: ephemeral_tcp_port(),
-            network_name: format!("arena-example-api-network-{run_suffix}"),
             closed_arena_name: format!("example-api-arena-{run_suffix}"),
             match_name: format!("example-api-happy-path-{run_suffix}"),
         }
@@ -104,14 +102,12 @@ pub fn setup_dependencies() -> Vec<Dependency> {
         .with_database_name(POSTGRES_DB_NAME)
         .with_database_username(POSTGRES_DB_USER)
         .with_database_password(POSTGRES_DB_PASS)
-        .with_network(&rt.network_name)
         .with_startup_sql_scripts(startup_sql_scripts)
         .build();
 
     let kafka = KafkaDependency::builder("example-api-kafka")
         .with_flavor(KafkaFlavor::ApacheNative)
         .with_port(rt.kafka_port)
-        .with_network(&rt.network_name)
         .with_topic("readings")
         .build();
     KAFKA_ID
@@ -120,7 +116,6 @@ pub fn setup_dependencies() -> Vec<Dependency> {
 
     let calibration_service = HttpDependency::builder("example-api-calibration")
         .with_port(rt.calibration_http_port)
-        .with_network(&rt.network_name)
         .build();
     CALIBRATION_ID
         .set(calibration_service.identifier.clone())
@@ -134,7 +129,6 @@ pub fn setup_dependencies() -> Vec<Dependency> {
         .with_database_name(MSSQL_DB_NAME)
         .with_database_username(MSSQL_DB_USER)
         .with_database_password(MSSQL_DB_PASS)
-        .with_network(&rt.network_name)
         .with_startup_sql_scripts(mssql_startup_sql_scripts)
         .build();
     MSSQL_ID
@@ -207,7 +201,7 @@ pub fn setup_exec_component() -> Component {
             ),
         )
         .with_runtime_arg("oauth_issuer_url", rt.oauth_issuer.clone())
-        .with_readiness_check(HttpReadinessCheck::new(), healthcheck_url);
+        .with_readiness_check_timeout(HttpReadinessCheck::new(), healthcheck_url, 30_000);
 
     if !is_bazel {
         builder = builder

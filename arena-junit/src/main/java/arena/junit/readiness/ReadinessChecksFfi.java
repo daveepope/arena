@@ -15,11 +15,16 @@ public final class ReadinessChecksFfi {
         ObjectNode n = ArenaJson.object();
         n.put("kind", "http");
         n.put("target", e.target());
+        n.put("timeout_ms", e.timeoutMs());
         out.add(n);
       }
     }
     return out;
   }
 
-  public record ReadinessEntry(ReadinessCheck check, String target) {}
+  public record ReadinessEntry(ReadinessCheck check, String target, long timeoutMs) {
+    public ReadinessEntry(ReadinessCheck check, String target) {
+      this(check, target, 10_000L);
+    }
+  }
 }

@@ -76,9 +76,12 @@ pub(crate) enum EventTargetKindConfig {
 
 pub(crate) fn build(
     config: &LocalstackDependencyConfig,
-    network: &str,
+    network: Option<&str>,
 ) -> Result<Dependency, String> {
-    let mut builder = LocalstackDependency::builder(&config.identifier).with_network(network);
+    let mut builder = LocalstackDependency::builder(&config.identifier);
+    if let Some(network) = network {
+        builder = builder.with_network(network);
+    }
 
     if let Some(port) = config.port {
         builder = builder.with_port(port);

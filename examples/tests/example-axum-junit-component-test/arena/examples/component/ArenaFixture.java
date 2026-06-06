@@ -69,7 +69,6 @@ public final class ArenaFixture extends ClosedArenaExtension {
   private static final String MSSQL_DB_NAME = "validationDb";
   private static final String MSSQL_DB_USER = "sa";
   private static final String MSSQL_DB_PASS = "yourStrong(!)Password";
-  private static final String NETWORK_NAME = RT.networkName("arena-example-api-network");
   private static final String KAFKA_TOPIC = "readings";
   static final String CALIBRATION_VALIDATE_PATH = "/api/v1/validate";
 
@@ -184,11 +183,12 @@ public final class ArenaFixture extends ClosedArenaExtension {
                     + ";TrustServerCertificate=True;encrypt=DANGER_PLAINTEXT;")
             .withRuntimeArg("oauth_issuer_url", OAUTH_ISSUER)
             .withReadinessCheck(
-                HttpReadinessCheck.create(), "http://127.0.0.1:" + WEB_APP_PORT + "/health");
+                HttpReadinessCheck.create(),
+                "http://127.0.0.1:" + WEB_APP_PORT + "/health",
+                30_000L);
 
     Match match =
         new MatchBuilder(RT.containerName("example-api-happy-path"))
-            .withNetwork(NETWORK_NAME)
             .addDependency(oauth)
             .addDependency(postgres)
             .addDependency(kafka)
