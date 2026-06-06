@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "network_name": "arena-example-api-network",
+  "docker_image_tag": "example-api-axum-container-image",
+  "closed_arena_name": "example-api-arena",
+  "match_name": "example-api-happy-path",
+  "temp_directory_prefix": "example-api-image-build-ctx-",
+  "kafka_consumer_group_label": "example-api-consumer",
+  "postgres_image": "14.20-trixie",
+  "dependency_names": {
+    "oauth": "example-api-oauth",
+    "postgres": "example-api-postgres",
+    "kafka": "example-api-kafka",
+    "mssql": "example-api-mssql",
+    "calibration_http": "example-api-calibration"
+  },
+  "component_names": {
+    "executable": "example-api-web-app",
+    "containerized": "example-api-containerized-web-app"
+  },
+  "container_names": {
+    "postgres": "example-api-postgres",
+    "kafka": "example-api-kafka",
+    "mssql": "example-api-mssql",
+    "calibration": "example-api-calibration"
+  },
+  "playbook_names": {
+    "calibration_api_happy_path": "example-api-calibration-api-happy-path",
+    "calibration_api_error_path": "example-api-calibration-api-error-path",
+    "calibration_api_flaky_path": "example-api-calibration-api-flaky-path",
+    "validation_db_scoped": "example-api-validation-db-scoped",
+    "events_purge": "example-api-events-purge"
+  },
+  "ports": {
+    "exec_web_app": 3010,
+    "docker_web_host": 3112,
+    "kafka_host": 9093,
+    "calibration_host": 3011,
+    "postgres_host": 5560,
+    "mssql_host": 1438
+  },
+  "database": {
+    "postgres_name": "readings_db",
+    "postgres_user": "readings_user",
+    "postgres_password": "readings_password",
+    "mssql_name": "validationDb",
+    "mssql_user": "sa",
+    "mssql_password": "yourStrong(!)Password"
+  },
+  "kafka_topic": "readings",
+  "calibration_validate_path": "/api/v1/validate"
+}

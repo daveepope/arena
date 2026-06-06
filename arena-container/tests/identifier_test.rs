@@ -1,4 +1,4 @@
-use arena_container::identifier::{build, sanitize_for_container};
+use arena_container::identifier::{build, resolve_container_name, sanitize_for_container};
 
 const SUFFIX_LEN: usize = 6;
 
@@ -51,4 +51,20 @@ fn sanitize_is_noop_on_clean_identifier() {
 #[test]
 fn sanitize_collapses_spaces_and_non_alphanumerics() {
     assert_eq!(sanitize_for_container("Hello World!!"), "hello-world");
+}
+
+#[test]
+fn resolve_container_name_uses_override_when_set() {
+    assert_eq!(
+        resolve_container_name("arena-http-calibration-abc123", Some("custom-name")),
+        "custom-name"
+    );
+}
+
+#[test]
+fn resolve_container_name_derives_from_identifier_when_override_missing() {
+    assert_eq!(
+        resolve_container_name("Hello World!!", None),
+        "hello-world"
+    );
 }

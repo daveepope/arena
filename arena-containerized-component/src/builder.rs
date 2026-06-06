@@ -17,9 +17,11 @@ pub struct ContainerizedComponentBuilder {
     env_vars: Vec<(String, String)>,
     runtime_args: Vec<(String, String)>,
     port_mappings: Vec<(u16, u16)>,
-    readiness_checks: Vec<(Box<dyn ReadinessCheck>, String)>,
+    readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
     host_mappings: Vec<String>,
 }
+
+const DEFAULT_READINESS_TIMEOUT_MS: u64 = 10_000;
 
 impl ContainerizedComponentBuilder {
     pub(crate) fn new(identifier: impl Into<String>, containerfile: impl Into<String>) -> Self {
@@ -87,11 +89,24 @@ impl ContainerizedComponentBuilder {
         self
     }
 
-    pub fn with_readiness_check<R>(mut self, check: R, target: impl Into<String>) -> Self
+    pub fn with_readiness_check<R>(self, check: R, target: impl Into<String>) -> Self
     where
         R: ReadinessCheck + 'static,
     {
-        self.readiness_checks.push((Box::new(check), target.into()));
+        self.with_readiness_check_timeout(check, target, DEFAULT_READINESS_TIMEOUT_MS)
+    }
+
+    pub fn with_readiness_check_timeout<R>(
+        mut self,
+        check: R,
+        target: impl Into<String>,
+        timeout_ms: u64,
+    ) -> Self
+    where
+        R: ReadinessCheck + 'static,
+    {
+        self.readiness_checks
+            .push((Box::new(check), target.into(), timeout_ms));
         self
     }
 

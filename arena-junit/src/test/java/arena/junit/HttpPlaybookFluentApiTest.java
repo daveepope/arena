@@ -3,7 +3,7 @@ package arena.junit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import arena.examples.readings.testruntime.ReadingsEphemeralTestRuntime;
+import arena.examples.testruntime.EphemeralTestRuntime;
 import arena.junit.dep.HttpDependency;
 import arena.junit.dep.HttpDependencyBuilder;
 import arena.junit.match.Match;
@@ -23,14 +23,14 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 final class HttpPlaybookFluentApiTest {
 
-  private static final ReadingsEphemeralTestRuntime RT = ReadingsEphemeralTestRuntime.get();
+  private static final EphemeralTestRuntime RT = EphemeralTestRuntime.get();
   private static String dependencyIdentifier;
   private static int httpPort;
 
   static final class FluentArenaFixture extends ClosedArenaExtension {
     @Override
     protected ClosedArena buildClosedArena() throws Exception {
-      httpPort = RT.calibrationHostPort;
+      httpPort = EphemeralTestRuntime.ephemeralTcpPort();
       HttpDependency http = new HttpDependencyBuilder("fluent-http").withPort(httpPort).build();
       dependencyIdentifier = http.identifier();
       Match match = new MatchBuilder("fluent-http-match").addDependency(http).build();

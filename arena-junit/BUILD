@@ -43,9 +43,9 @@ java_test(
 )
 
 java_test(
-    name = "arena_junit_readings_unit_test",
+    name = "arena_junit_http_playbook_registration_test",
     size = "small",
-    srcs = ["src/test/java/arena/junit/readings/test/ReadingsHttpPlaybookRegistrationTest.java"],
+    srcs = ["src/test/java/arena/junit/HttpPlaybookRegistrationTest.java"],
     javacopts = [
         "--release",
         "21",
@@ -54,7 +54,7 @@ java_test(
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
         "--include-engine=junit-jupiter",
-        "--select-class=arena.junit.readings.test.ReadingsHttpPlaybookRegistrationTest",
+        "--select-class=arena.junit.HttpPlaybookRegistrationTest",
     ],
     runtime_deps = [
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
@@ -69,12 +69,9 @@ java_test(
 )
 
 java_test(
-    name = "arena_junit_readings_test",
+    name = "arena_junit_playbook_extension_unit_test",
     size = "small",
-    srcs = glob(
-        ["src/test/java/arena/junit/readings/**/*.java"],
-        exclude = ["src/test/java/arena/junit/readings/test/ReadingsHttpPlaybookRegistrationTest.java"],
-    ),
+    srcs = ["src/test/java/arena/junit/playbook/PlaybookInvocationExtensionUnitTest.java"],
     javacopts = [
         "--release",
         "21",
@@ -83,7 +80,38 @@ java_test(
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
         "--include-engine=junit-jupiter",
-        "--select-package=arena.junit.readings.test",
+        "--select-class=arena.junit.playbook.PlaybookInvocationExtensionUnitTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:net_java_dev_jna_jna",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+)
+
+java_test(
+    name = "arena_junit_playbook_extension_component_test",
+    size = "medium",
+    srcs = [
+        "src/test/java/arena/junit/ClosedArenaExtensionLifecycleComponentTest.java",
+        "src/test/java/arena/junit/PlaybookInvocationExtensionComponentTest.java",
+    ],
+    javacopts = [
+        "--release",
+        "21",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.ClosedArenaExtensionLifecycleComponentTest",
+        "--select-class=arena.junit.PlaybookInvocationExtensionComponentTest",
     ],
     tags = ["component_test"],
     runtime_deps = [
@@ -93,32 +121,21 @@ java_test(
     ],
     deps = [
         ":arena_junit_lib",
-        "//examples:readings_ephemeral_test_runtime_java",
+        "//examples:ephemeral_test_runtime_java",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
         "@arena_java_maven//:net_java_dev_jna_jna",
-        "@arena_java_maven//:org_apache_kafka_kafka_clients",
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
-        "@arena_java_maven//:org_slf4j_slf4j_api",
     ],
     data = [
         "//arena-ffi:arena_ffi_shared",
-        "//examples:readings_arena_config",
-        "//examples:example-readings-axum-web-app",
-        "//examples:instrument_reading_db_schema",
-        "//examples:validation_db_schema",
     ],
     jvm_flags = ["-Djna.nosys=true"],
 )
 
 java_test(
-    name = "arena_junit_playbook_test",
+    name = "arena_junit_http_playbook_fluent_api_test",
     size = "small",
-    srcs = [
-        "src/test/java/arena/junit/ActiveHttpPlaybookVerifyTest.java",
-        "src/test/java/arena/junit/ClosedArenaExtensionLifecycleTest.java",
-        "src/test/java/arena/junit/HttpPlaybookFluentApiTest.java",
-        "src/test/java/arena/junit/PlaybookInvocationExtensionTest.java",
-    ],
+    srcs = ["src/test/java/arena/junit/HttpPlaybookFluentApiTest.java"],
     javacopts = [
         "--release",
         "21",
@@ -127,9 +144,6 @@ java_test(
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
         "--include-engine=junit-jupiter",
-        "--select-class=arena.junit.ClosedArenaExtensionLifecycleTest",
-        "--select-class=arena.junit.PlaybookInvocationExtensionTest",
-        "--select-class=arena.junit.ActiveHttpPlaybookVerifyTest",
         "--select-class=arena.junit.HttpPlaybookFluentApiTest",
     ],
     tags = ["component_test"],
@@ -140,7 +154,7 @@ java_test(
     ],
     deps = [
         ":arena_junit_lib",
-        "//examples:readings_ephemeral_test_runtime_java",
+        "//examples:ephemeral_test_runtime_java",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
         "@arena_java_maven//:net_java_dev_jna_jna",
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",

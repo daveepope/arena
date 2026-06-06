@@ -12,3 +12,6 @@ path = "src/lib.rs"
 [dependencies]
 bollard = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

@@ -95,7 +95,9 @@ jobs:
           repository-cache: true
 
       - name: Build and test
-        run: bazel test //... --config=ci --build_tests_only
+        run: |
+          bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
+          bazel test //... --config=ci --build_tests_only --test_tag_filters=component_test --local_test_jobs=4
 
   coverage_ubuntu_24_04:
     name: Coverage Ubuntu 24.04
@@ -151,7 +153,9 @@ jobs:
           repository-cache: true
 
       - name: Build and test
-        run: bazel test //... --config=ci --build_tests_only
+        run: |
+          bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
+          bazel test //... --config=ci --build_tests_only --test_tag_filters=component_test --local_test_jobs=4
 
   test_macos_arm64:
     name: Test macOS ARM64

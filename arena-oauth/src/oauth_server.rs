@@ -122,7 +122,19 @@ impl OauthServer {
     pub(crate) async fn stop(&mut self) {
         if let Some(inner) = self.inner.take() {
             inner.handle.graceful_shutdown(None);
-            let _ = inner.join.await;
+            let mut join = inner.join;
+            match tokio::time::timeout(Duration::from_secs(10), &mut join).await {
+                Ok(Ok(_)) | Ok(Err(_)) => {}
+                Err(_) => {
+                    tracing::warn!(
+                        subsystem = "oauth",
+                        phase = "stop",
+                        "oauth server shutdown timed out; aborting task"
+                    );
+                    join.abort();
+                    let _ = join.await;
+                }
+            }
         }
     }
 
@@ -135,7 +147,7 @@ impl OauthServer {
     }
 
     pub(crate) async fn wait_until_ready(&self, log_label: &str) {
-        let timeout = Duration::from_secs(15);
+        let timeout = Duration::from_secs(30);
         let poll_every = Duration::from_millis(100);
         let start = Instant::now();
         let poll_base = self

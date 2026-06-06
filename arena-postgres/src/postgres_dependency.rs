@@ -61,10 +61,6 @@ impl PostgresDependency {
         }
     }
 
-    fn default_container_name(&self) -> String {
-        arena_container::identifier::sanitize_for_container(&self.identifier)
-    }
-
     pub fn connection_string(&self) -> Option<&str> {
         self.postgres_impl.connection_string()
     }
@@ -113,7 +109,7 @@ impl PostgresDependency {
             .connection_string()
             .expect("connection string should be available after postgres starts");
 
-        let timeout = Duration::from_secs(10);
+        let timeout = Duration::from_secs(30);
 
         match self
             .readiness_check
@@ -208,10 +204,10 @@ impl RunnableDependency for PostgresDependency {
         let database_password = self.database_password.clone();
         let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
-        let container_name = self
-            .container_name
-            .clone()
-            .unwrap_or_else(|| self.default_container_name());
+        let container_name = arena_container::identifier::resolve_container_name(
+            &self.identifier,
+            self.container_name.as_deref(),
+        );
 
         let sw_container = Instant::now();
         self.needs_teardown = true;
@@ -341,10 +337,10 @@ impl RunnableDependency for PostgresDependency {
         let database_password = self.database_password.clone();
         let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
-        let container_name = self
-            .container_name
-            .clone()
-            .unwrap_or_else(|| self.default_container_name());
+        let container_name = arena_container::identifier::resolve_container_name(
+            &self.identifier,
+            self.container_name.as_deref(),
+        );
 
         self.postgres_impl.stop().await;
         self.running = false;

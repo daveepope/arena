@@ -25,7 +25,7 @@ pub(crate) struct PostgresDependencyConfig {
 
 pub(crate) fn build(
     config: &PostgresDependencyConfig,
-    network: &str,
+    network: Option<&str>,
 ) -> Result<Dependency, String> {
     let mut builder = PostgresDependency::builder(&config.identifier)
         .with_image(config.image.as_deref().unwrap_or("14.20-trixie"));
@@ -37,8 +37,10 @@ pub(crate) fn build(
         .with_database_name(config.database_name.as_deref().unwrap_or("arena_db"))
         .with_database_username(config.database_username.as_deref().unwrap_or("arena_user"))
         .with_database_password(config.database_password.as_deref().unwrap_or("postgres"))
-        .with_network(network)
         .with_startup_sql_scripts(config.startup_sql_scripts.clone().unwrap_or_default());
+    if let Some(network) = network {
+        builder = builder.with_network(network);
+    }
     if let Some(ref container_name) = config.container_name {
         builder = builder.with_container_name(container_name);
     }

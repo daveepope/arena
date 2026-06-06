@@ -23,7 +23,7 @@ pub struct ContainerizedComponent {
     pub(crate) env_vars: Vec<(String, String)>,
     pub(crate) runtime_args: Vec<(String, String)>,
     pub(crate) port_mappings: Vec<(u16, u16)>,
-    pub(crate) readiness_checks: Vec<(Box<dyn ReadinessCheck>, String)>,
+    pub(crate) readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
     pub(crate) host_mappings: Vec<String>,
     pub(crate) runtime_client: Docker,
     pub(crate) container_id: Option<String>,
@@ -244,9 +244,10 @@ impl ContainerizedComponent {
             return;
         }
 
-        let timeout_ms = 10_000;
-        for (check, target) in &self.readiness_checks {
-            match check.is_ready(&self.identifier, target, timeout_ms).await {
+        for (check, target, check_timeout_ms) in &self.readiness_checks {
+            match check
+                .is_ready(&self.identifier, target, *check_timeout_ms)
+                .await {
                 Ok(()) => {
                     tracing::debug!(
                         component = %self.identifier,

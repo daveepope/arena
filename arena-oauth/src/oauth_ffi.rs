@@ -32,7 +32,7 @@ pub struct OauthFfiDependencyConfig {
 
 pub fn build_oauth_dependency_from_config(
     config: &OauthFfiDependencyConfig,
-    _network: &str,
+    _network: Option<&str>,
 ) -> Result<Dependency, String> {
     let listen_ip = match config.listen_ip.as_deref() {
         Some(s) if !s.trim().is_empty() => s

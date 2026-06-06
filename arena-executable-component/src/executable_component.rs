@@ -15,7 +15,7 @@ pub struct ExecutableComponent {
     pub(crate) runtime_args: Vec<(String, String)>,
     pub(crate) process_handle: Option<Child>,
     pub(crate) stopped: bool,
-    pub(crate) readiness_checks: Vec<(Box<dyn ReadinessCheck>, String)>,
+    pub(crate) readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
 }
 
 impl ExecutableComponent {
@@ -41,9 +41,10 @@ impl ExecutableComponent {
             return;
         }
 
-        let timeout_ms = 10_000;
-        for (check, target) in &self.readiness_checks {
-            match check.is_ready(&self.identifier, target, timeout_ms).await {
+        for (check, target, check_timeout_ms) in &self.readiness_checks {
+            match check
+                .is_ready(&self.identifier, target, *check_timeout_ms)
+                .await {
                 Ok(()) => {
                     tracing::debug!(
                         component = %self.identifier,

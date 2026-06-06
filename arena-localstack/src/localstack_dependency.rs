@@ -129,17 +129,13 @@ impl LocalstackDependency {
         self.readiness_check = check;
     }
 
-    fn set_container_name(&self) -> String {
-        arena_container::identifier::sanitize_for_container(&self.identifier)
-    }
-
     fn endpoint_on_host(&self) -> Result<&str, String> {
         self.endpoint_url()
             .ok_or_else(|| "localstack endpoint not available yet".to_string())
     }
 
     async fn wait_until_ready(&self) {
-        let timeout = Duration::from_secs(60);
+        let timeout = Duration::from_secs(45);
         let poll_every = Duration::from_millis(100);
         let start = Instant::now();
 
@@ -328,10 +324,10 @@ impl RunnableDependency for LocalstackDependency {
 
         let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
-        let container_name = self
-            .container_name
-            .clone()
-            .unwrap_or_else(|| self.set_container_name());
+        let container_name = arena_container::identifier::resolve_container_name(
+            &self.identifier,
+            self.container_name.as_deref(),
+        );
         let services = self.services.clone();
 
         let sw_container = Instant::now();
@@ -443,10 +439,10 @@ impl RunnableDependency for LocalstackDependency {
         );
         let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
-        let container_name = self
-            .container_name
-            .clone()
-            .unwrap_or_else(|| self.set_container_name());
+        let container_name = arena_container::identifier::resolve_container_name(
+            &self.identifier,
+            self.container_name.as_deref(),
+        );
         let services = self.services.clone();
 
         self.localstack_impl.stop().await;

@@ -123,17 +123,13 @@ impl HttpDependency {
         self.readiness_check = check;
     }
 
-    fn default_container_name(&self) -> String {
-        arena_container::identifier::sanitize_for_container(&self.identifier)
-    }
-
     fn admin_url_or_panic(&self) -> String {
         self.admin_url()
             .unwrap_or_else(|| panic!("[Http-{}] admin url not available yet", self.identifier))
     }
 
     async fn wait_until_ready(&self) {
-        let timeout = Duration::from_secs(15);
+        let timeout = Duration::from_secs(45);
         let poll_every = Duration::from_millis(100);
         let start = Instant::now();
 
@@ -210,10 +206,10 @@ impl RunnableDependency for HttpDependency {
 
         let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
-        let container_name = self
-            .container_name
-            .clone()
-            .unwrap_or_else(|| self.default_container_name());
+        let container_name = arena_container::identifier::resolve_container_name(
+            &self.identifier,
+            self.container_name.as_deref(),
+        );
 
         let sw_container = Instant::now();
         self.needs_teardown = true;
@@ -310,10 +306,10 @@ impl RunnableDependency for HttpDependency {
 
         let image_name = self.image_name.clone();
         let image_tag = self.image_tag.clone();
-        let container_name = self
-            .container_name
-            .clone()
-            .unwrap_or_else(|| self.default_container_name());
+        let container_name = arena_container::identifier::resolve_container_name(
+            &self.identifier,
+            self.container_name.as_deref(),
+        );
 
         self.http_impl.stop().await;
         self.running = false;

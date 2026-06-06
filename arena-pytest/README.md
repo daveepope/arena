@@ -156,5 +156,11 @@ After publishing, users install with `pip install arena-pytest`.
 ## Run tests in this repo
 
 ```bash
-bazel test //arena-pytest:arena_pytest_test
+bazel test //arena-pytest:arena_pytest_unit_test
+```
+
+Readings Axum pytest e2e (arena-pytest driving the Rust example app) lives under examples:
+
+```bash
+bazel test //examples:pytest_axum_component_test
 ```
