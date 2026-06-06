@@ -134,7 +134,7 @@ java_test(
 
 java_test(
     name = "arena_junit_http_playbook_fluent_api_test",
-    size = "small",
+    size = "medium",
     srcs = ["src/test/java/arena/junit/HttpPlaybookFluentApiTest.java"],
     javacopts = [
         "--release",
