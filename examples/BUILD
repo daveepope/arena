@@ -182,7 +182,7 @@ rust_binary(
 
 py_test(
     name = "pytest_axum_component_test",
-    size = "small",
+    size = "medium",
     srcs = glob(["tests/example-axum-pytest-component-test/**/*.py"]),
     main = "tests/example-axum-pytest-component-test/axum_component_test.py",
     imports = [
@@ -214,7 +214,7 @@ py_test(
 
 py_test(
     name = "pytest_fastapi_component_test",
-    size = "small",
+    size = "medium",
     srcs = glob(["tests/example-fastapi-pytest-component-test/**/*.py"]),
     main = "tests/example-fastapi-pytest-component-test/fastapi_component_test.py",
     imports = [
@@ -248,7 +248,7 @@ rust_test(
     name = "example-axum-component-test",
     srcs = glob(["tests/example-axum-component-test/**/*.rs"]),
     crate_root = "tests/example-axum-component-test/axum_component_test.rs",
-    size = "small",
+    size = "medium",
     edition = "2021",
     tags = [
         "component_test",
@@ -341,7 +341,7 @@ java_library(
 
 java_test(
     name = "example-spring-boot-component-test",
-    size = "small",
+    size = "medium",
     srcs = glob(["tests/example-spring-boot-component-test/**/*.java"]),
     javacopts = [
         "--release",
@@ -388,7 +388,7 @@ java_test(
 
 java_test(
     name = "example-axum-junit-component-test",
-    size = "small",
+    size = "medium",
     srcs = glob(["tests/example-axum-junit-component-test/**/*.java"]),
     javacopts = [
         "--release",
