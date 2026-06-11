@@ -76,6 +76,52 @@ jobs:
             exit 1
           fi
 
+  verify_dependency_release_age:
+    name: Verify dependency release age (Ubuntu 24.04)
+    needs: changes
+    if: needs.changes.outputs.bazel == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: dep_files
+        with:
+          filters: |
+            deps:
+              - 'Cargo.Bazel.lock'
+              - 'Cargo.toml'
+              - '**/Cargo.toml'
+              - '**/requirements_lock.txt'
+              - '**/requirements.txt'
+              - 'MODULE.bazel'
+              - 'MODULE.bazel.lock'
+
+      - name: Setup Bazel
+        if: steps.dep_files.outputs.deps == 'true'
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-ubuntu-24.04
+          repository-cache: true
+
+      - name: Check dependency release age
+        if: steps.dep_files.outputs.deps == 'true'
+        env:
+          ARENA_DEP_AGE_BASE_REF: >-
+            ${{
+              github.event_name == 'pull_request'
+              && github.event.pull_request.base.sha
+              || (github.event.before != '0000000000000000000000000000000000000000' && github.event.before || '')
+            }}
+        run: |
+          bazel test //scripts:dependency_release_age_parse_test --config=ci
+          bazel run //scripts:check_dependency_release_age --config=ci
+
   test_ubuntu_24_04:
     name: Test Ubuntu 24.04
     needs: changes
