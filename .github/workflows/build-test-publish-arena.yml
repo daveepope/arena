@@ -43,59 +43,71 @@ jobs:
     steps:
       - run: echo "No Bazel-relevant changes; build and test skipped."
 
-  release_head:
-    name: Release HEAD check
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    outputs:
-      version_only: ${{ steps.check.outputs.version_only }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 1
-
-      - id: check
-        run: |
-          if [ "$(git log -1 --format=%s)" = "chore: bump release VERSION for master" ]; then
-            echo "version_only=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "version_only=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  bump_release_version:
-    name: Bump release VERSION (PR)
-    needs: [release_head]
+  release_preview:
+    name: Release version preview
     if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      (needs.release_head.result == 'skipped' || needs.release_head.outputs.version_only != 'true')
+      (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'push' &&
+        github.ref == 'refs/heads/master' &&
+        !contains(github.event.head_commit.message, 'chore: release VERSION'))
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+      pull-requests: read
     outputs:
-      version_changed: ${{ steps.bump.outputs.version_changed }}
+      needs_repin: ${{ steps.preview.outputs.needs_repin }}
+      release_target: ${{ steps.preview.outputs.release_target }}
       artifact_ready: ${{ steps.upload.outputs.outcome == 'success' }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
           fetch-depth: 0
 
-      - name: Fetch master
-        run: git fetch origin master
+      - name: Resolve semver level from labels
+        id: semver
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labelNames = (labels) => labels.map((label) => label.name);
+            const levelFromLabels = (labels) => {
+              if (labels.includes("semver:major")) return "major";
+              if (labels.includes("semver:minor")) return "minor";
+              return "patch";
+            };
+            let level = "patch";
+            if (context.eventName === "pull_request") {
+              level = levelFromLabels(labelNames(context.payload.pull_request.labels));
+            } else {
+              const { data } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.sha,
+              });
+              const merged = data.find((pr) => pr.merged_at) ?? data[0];
+              if (merged) {
+                level = levelFromLabels(labelNames(merged.labels));
+              }
+            }
+            core.setOutput("level", level);
 
-      - name: Bump VERSION from master
-        id: bump
+      - name: Set release base ref
+        id: base
         run: |
-          python3 scripts/bump_release_version.py
-          if git diff --quiet VERSION Cargo.toml MODULE.bazel; then
-            echo "version_changed=false" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin master
+            echo "ref=origin/master" >> "$GITHUB_OUTPUT"
           else
-            echo "version_changed=true" >> "$GITHUB_OUTPUT"
+            echo "ref=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Preview release VERSION
+        id: preview
+        env:
+          ARENA_VERSION_BASE_REF: ${{ steps.base.outputs.ref }}
+          ARENA_SEMVER_LEVEL: ${{ steps.semver.outputs.level }}
+        run: python3 scripts/bump_release_version.py
 
       - name: Upload release version files
         id: upload
@@ -109,13 +121,11 @@ jobs:
           if-no-files-found: error
 
   repin_release_locks:
-    name: Repin lockfiles after version bump (PR)
-    needs: [release_head, bump_release_version]
+    name: Repin lockfiles for release preview
+    needs: [release_preview]
     if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      (needs.release_head.result == 'skipped' || needs.release_head.outputs.version_only != 'true') &&
-      needs.bump_release_version.outputs.version_changed == 'true'
+      needs.release_preview.result == 'success' &&
+      needs.release_preview.outputs.needs_repin == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -124,7 +134,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
           fetch-depth: 0
 
       - uses: actions/download-artifact@v4
@@ -138,7 +148,7 @@ jobs:
           disk-cache: build-test-publish-arena-ubuntu-24.04
           repository-cache: true
 
-      - name: Repin after version bump
+      - name: Repin for release preview
         run: |
           CARGO_BAZEL_REPIN=1 bazel build //...
           bazel mod deps --lockfile_mode=update
@@ -156,14 +166,13 @@ jobs:
 
   verify_cargo_bazel_lock:
     name: Verify Cargo.Bazel.lock (Ubuntu 24.04)
-    needs: [changes, release_head, bump_release_version, repin_release_locks]
+    needs: [changes, release_preview, repin_release_locks]
     if: >-
       always() &&
       !cancelled() &&
       needs.changes.result == 'success' &&
       needs.changes.outputs.bazel == 'true' &&
-      (needs.release_head.result == 'skipped' || needs.release_head.outputs.version_only != 'true') &&
-      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped') &&
+      (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
       (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
@@ -175,12 +184,12 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/download-artifact@v4
-        if: needs.bump_release_version.outputs.artifact_ready == 'true'
+        if: needs.release_preview.outputs.artifact_ready == 'true'
         with:
           name: arena-release-version
 
       - uses: actions/download-artifact@v4
-        if: needs.bump_release_version.outputs.version_changed == 'true'
+        if: needs.release_preview.outputs.needs_repin == 'true'
         with:
           name: arena-release-lockfiles
 
@@ -207,7 +216,7 @@ jobs:
       - name: Verify lockfiles
         if: steps.rust_crates.outputs.rust_crates == 'true'
         run: |
-          if [ "${{ needs.bump_release_version.outputs.version_changed }}" = "true" ]; then
+          if [ "${{ needs.release_preview.result }}" = "success" ] && [ "${{ needs.release_preview.outputs.needs_repin }}" = "true" ]; then
             bazel build //... --config=ci
           else
             CARGO_BAZEL_REPIN=1 bazel build //...
@@ -221,14 +230,13 @@ jobs:
 
   verify_dependency_release_age:
     name: Verify dependency release age (Ubuntu 24.04)
-    needs: [changes, release_head, bump_release_version, repin_release_locks]
+    needs: [changes, release_preview, repin_release_locks]
     if: >-
       always() &&
       !cancelled() &&
       needs.changes.result == 'success' &&
       needs.changes.outputs.bazel == 'true' &&
-      (needs.release_head.result == 'skipped' || needs.release_head.outputs.version_only != 'true') &&
-      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped') &&
+      (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
       (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
@@ -240,12 +248,12 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/download-artifact@v4
-        if: needs.bump_release_version.outputs.artifact_ready == 'true'
+        if: needs.release_preview.outputs.artifact_ready == 'true'
         with:
           name: arena-release-version
 
       - uses: actions/download-artifact@v4
-        if: needs.bump_release_version.outputs.version_changed == 'true'
+        if: needs.release_preview.outputs.needs_repin == 'true'
         with:
           name: arena-release-lockfiles
 
@@ -285,14 +293,13 @@ jobs:
 
   test_ubuntu_24_04:
     name: Test Ubuntu 24.04
-    needs: [changes, release_head, bump_release_version, repin_release_locks]
+    needs: [changes, release_preview, repin_release_locks]
     if: >-
       always() &&
       !cancelled() &&
       needs.changes.result == 'success' &&
       needs.changes.outputs.bazel == 'true' &&
-      (needs.release_head.result == 'skipped' || needs.release_head.outputs.version_only != 'true') &&
-      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped') &&
+      (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
       (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
@@ -305,12 +312,12 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/download-artifact@v4
-        if: needs.bump_release_version.outputs.artifact_ready == 'true'
+        if: needs.release_preview.outputs.artifact_ready == 'true'
         with:
           name: arena-release-version
 
       - uses: actions/download-artifact@v4
-        if: needs.bump_release_version.outputs.version_changed == 'true'
+        if: needs.release_preview.outputs.needs_repin == 'true'
         with:
           name: arena-release-lockfiles
 
@@ -328,14 +335,13 @@ jobs:
 
   coverage_ubuntu_24_04:
     name: Coverage Ubuntu 24.04
-    needs: [changes, release_head, bump_release_version, repin_release_locks]
+    needs: [changes, release_preview, repin_release_locks]
     if: >-
       always() &&
       !cancelled() &&
       needs.changes.result == 'success' &&
       needs.changes.outputs.bazel == 'true' &&
-      (needs.release_head.result == 'skipped' || needs.release_head.outputs.version_only != 'true') &&
-      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped') &&
+      (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
       (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
@@ -348,12 +354,12 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/download-artifact@v4
-        if: needs.bump_release_version.outputs.artifact_ready == 'true'
+        if: needs.release_preview.outputs.artifact_ready == 'true'
         with:
           name: arena-release-version
 
       - uses: actions/download-artifact@v4
-        if: needs.bump_release_version.outputs.version_changed == 'true'
+        if: needs.release_preview.outputs.needs_repin == 'true'
         with:
           name: arena-release-lockfiles
 
@@ -380,14 +386,13 @@ jobs:
 
   test_macos_intel:
     name: Test macOS Intel
-    needs: [changes, release_head, bump_release_version, repin_release_locks]
+    needs: [changes, release_preview, repin_release_locks]
     if: >-
       always() &&
       !cancelled() &&
       needs.changes.result == 'success' &&
       needs.changes.outputs.bazel == 'true' &&
-      (needs.release_head.result == 'skipped' || needs.release_head.outputs.version_only != 'true') &&
-      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped') &&
+      (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
       (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped')
     runs-on: macos-15-intel
     permissions:
@@ -400,12 +405,12 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/download-artifact@v4
-        if: needs.bump_release_version.outputs.artifact_ready == 'true'
+        if: needs.release_preview.outputs.artifact_ready == 'true'
         with:
           name: arena-release-version
 
       - uses: actions/download-artifact@v4
-        if: needs.bump_release_version.outputs.version_changed == 'true'
+        if: needs.release_preview.outputs.needs_repin == 'true'
         with:
           name: arena-release-lockfiles
 
@@ -426,14 +431,13 @@ jobs:
 
   test_macos_arm64:
     name: Test macOS ARM64
-    needs: [changes, release_head, bump_release_version, repin_release_locks]
+    needs: [changes, release_preview, repin_release_locks]
     if: >-
       always() &&
       !cancelled() &&
       needs.changes.result == 'success' &&
       needs.changes.outputs.bazel == 'true' &&
-      (needs.release_head.result == 'skipped' || needs.release_head.outputs.version_only != 'true') &&
-      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped') &&
+      (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
       (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped')
     runs-on: macos-latest
     permissions:
@@ -446,12 +450,12 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/download-artifact@v4
-        if: needs.bump_release_version.outputs.artifact_ready == 'true'
+        if: needs.release_preview.outputs.artifact_ready == 'true'
         with:
           name: arena-release-version
 
       - uses: actions/download-artifact@v4
-        if: needs.bump_release_version.outputs.version_changed == 'true'
+        if: needs.release_preview.outputs.needs_repin == 'true'
         with:
           name: arena-release-lockfiles
 
@@ -467,7 +471,7 @@ jobs:
 
   wheel:
     name: Build wheel (${{ matrix.runs-on }})
-    needs: [changes, release_head, bump_release_version, repin_release_locks, test_ubuntu_24_04, test_macos_intel, test_macos_arm64]
+    needs: [changes, release_preview, repin_release_locks, test_ubuntu_24_04, test_macos_intel, test_macos_arm64]
     if: >-
       always() &&
       !cancelled() &&
@@ -476,8 +480,7 @@ jobs:
       needs.test_macos_intel.result == 'success' &&
       needs.test_macos_arm64.result == 'success' &&
       needs.changes.outputs.bazel == 'true' &&
-      (needs.release_head.result == 'skipped' || needs.release_head.outputs.version_only != 'true') &&
-      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped') &&
+      (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
       (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped') &&
       (
         (
@@ -509,12 +512,12 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/download-artifact@v4
-        if: needs.bump_release_version.outputs.artifact_ready == 'true'
+        if: needs.release_preview.outputs.artifact_ready == 'true'
         with:
           name: arena-release-version
 
       - uses: actions/download-artifact@v4
-        if: needs.bump_release_version.outputs.version_changed == 'true'
+        if: needs.release_preview.outputs.needs_repin == 'true'
         with:
           name: arena-release-lockfiles
 
@@ -558,23 +561,22 @@ jobs:
           if-no-files-found: error
 
   commit_release_version:
-    name: Commit release VERSION (PR)
-    needs: [wheel, bump_release_version, repin_release_locks]
+    name: Commit release VERSION (master)
+    needs: [wheel, release_preview, repin_release_locks]
     if: >-
       always() &&
       !cancelled() &&
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      needs.bump_release_version.outputs.version_changed == 'true' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/master' &&
+      needs.release_preview.result == 'success' &&
       needs.wheel.result == 'success' &&
-      needs.repin_release_locks.result == 'success'
+      (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
           fetch-depth: 0
 
       - uses: actions/download-artifact@v4
@@ -582,19 +584,20 @@ jobs:
           name: arena-release-version
 
       - uses: actions/download-artifact@v4
+        if: needs.repin_release_locks.result == 'success'
         with:
           name: arena-release-lockfiles
 
       - name: Commit release version
         run: |
           if git diff --quiet VERSION Cargo.toml MODULE.bazel Cargo.Bazel.lock Cargo.lock MODULE.bazel.lock; then
-            echo "VERSION already on branch"
+            echo "VERSION already on master"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add VERSION Cargo.toml MODULE.bazel Cargo.Bazel.lock Cargo.lock MODULE.bazel.lock
-          git commit -m "chore: bump release VERSION for master"
+          git commit -m "chore: release VERSION"
           git push
 
   publish_testpypi:

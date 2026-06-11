@@ -116,12 +116,12 @@ def bump_release_version(version: str, level: str) -> str:
     raise ValueError(f"unsupported semver level {level!r}")
 
 
-def max_release_version(left: str, right: str) -> str:
-    left_tuple = parse_release_version(left)
-    right_tuple = parse_release_version(right)
-    if left_tuple >= right_tuple:
-        return release_version_only(left)
-    return release_version_only(right)
+def resolve_semver_level_from_labels(labels: list[str]) -> str:
+    if "semver:major" in labels:
+        return "major"
+    if "semver:minor" in labels:
+        return "minor"
+    return "patch"
 
 
 def resolve_semver_level_from_event(event_path: Path) -> str:
@@ -130,11 +130,7 @@ def resolve_semver_level_from_event(event_path: Path) -> str:
         label["name"]
         for label in payload.get("pull_request", {}).get("labels", [])
     ]
-    if "semver:major" in labels:
-        return "major"
-    if "semver:minor" in labels:
-        return "minor"
-    return "patch"
+    return resolve_semver_level_from_labels(labels)
 
 
 def _git_show_at_ref(root: Path, ref: str, path: str) -> str | None:
@@ -195,31 +191,57 @@ def read_release_version_from_git_ref(root: Path, ref: str) -> tuple[str, bool]:
     )
 
 
-def prepare_release_version(root: Path, master_ref: str, level: str) -> tuple[str, list[str]]:
-    base, base_has_version_file = read_release_version_from_git_ref(root, master_ref)
-    target_from_master = bump_release_version(base, level)
-    current = release_version_only(read_version(root))
-    target = max_release_version(current, target_from_master)
-    migration_floor = (1, 0, 0)
-    if not base_has_version_file:
-        if (
-            parse_release_version(current) > parse_release_version(target_from_master)
-            and parse_release_version(current) == migration_floor
-        ):
-            target = max_release_version(bump_release_version(current, level), target)
+def release_target_from_base(root: Path, base_ref: str, level: str) -> str:
+    base, _base_has_version_file = read_release_version_from_git_ref(root, base_ref)
+    return bump_release_version(base, level)
+
+
+def apply_release_target(root: Path, target: str) -> list[str]:
     changed: list[str] = []
     if release_version_only(read_version(root)) != target:
         write_version(root, target)
         changed.append("VERSION")
     changed.extend(sync_workspace_version(root))
+    return changed
+
+
+def prepare_release_from_base(root: Path, base_ref: str, level: str) -> tuple[str, list[str]]:
+    target = release_target_from_base(root, base_ref, level)
+    changed = apply_release_target(root, target)
     return target, changed
 
 
+def workspace_version_in_cargo_bazel_lock(root: Path) -> str | None:
+    lock_path = root / "Cargo.Bazel.lock"
+    if not lock_path.exists():
+        return None
+    data = json.loads(lock_path.read_text(encoding="utf-8"))
+    for entry in data.get("crates", {}).values():
+        if entry.get("name") != "arena":
+            continue
+        if entry.get("package_url") is not None:
+            continue
+        version = entry.get("version")
+        if version:
+            return release_version_only(version)
+    return None
+
+
+def release_lockfiles_need_repin(root: Path, target: str) -> bool:
+    locked = workspace_version_in_cargo_bazel_lock(root)
+    if locked is None:
+        cargo = cargo_workspace_version(root)
+        if cargo is None:
+            return True
+        return release_version_only(cargo) != target
+    return locked != target
+
+
 def resolve_semver_level_from_env() -> str:
+    level = os.environ.get("ARENA_SEMVER_LEVEL", "").strip().lower()
+    if level in ("major", "minor", "patch"):
+        return level
     event_path = os.environ.get("GITHUB_EVENT_PATH")
     if event_path:
         return resolve_semver_level_from_event(Path(event_path))
-    level = os.environ.get("ARENA_SEMVER_LEVEL", "patch").strip().lower()
-    if level in ("major", "minor", "patch"):
-        return level
-    raise ValueError(f"unsupported ARENA_SEMVER_LEVEL {level!r}")
+    return "patch"
