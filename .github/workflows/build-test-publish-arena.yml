@@ -56,7 +56,6 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      needs_repin: ${{ steps.preview.outputs.needs_repin }}
       release_target: ${{ steps.preview.outputs.release_target }}
       artifact_ready: ${{ steps.upload.outputs.outcome == 'success' }}
     steps:
@@ -109,71 +108,18 @@ jobs:
           ARENA_SEMVER_LEVEL: ${{ steps.semver.outputs.level }}
         run: python3 scripts/bump_release_version.py
 
-      - name: Upload release version files
+      - name: Upload release VERSION preview
         id: upload
         uses: actions/upload-artifact@v4
         with:
           name: arena-release-version
-          path: |
-            VERSION
-            Cargo.toml
-            MODULE.bazel
-          if-no-files-found: error
-
-  repin_release_locks:
-    name: Repin lockfiles for release preview
-    needs: [release_preview]
-    if: >-
-      needs.release_preview.result == 'success' &&
-      needs.release_preview.outputs.needs_repin == 'true'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    outputs:
-      artifact_ready: ${{ steps.upload.outputs.outcome == 'success' }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
-          fetch-depth: 0
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: arena-release-version
-
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.14.0
-        with:
-          bazelisk-cache: true
-          disk-cache: build-test-publish-arena-ubuntu-24.04
-          repository-cache: true
-
-      - name: Repin for release preview
-        run: |
-          CARGO_BAZEL_REPIN=1 bazel build //...
-          bazel mod deps --lockfile_mode=update
-
-      - name: Upload repinned lockfiles
-        id: upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: arena-release-lockfiles
-          path: |
-            Cargo.Bazel.lock
-            Cargo.lock
-            MODULE.bazel.lock
+          path: VERSION
           if-no-files-found: error
 
   verify_cargo_bazel_lock:
     name: Verify Cargo.Bazel.lock (Ubuntu 24.04)
-    needs: [changes, release_preview, repin_release_locks]
-    if: >-
-      always() &&
-      !cancelled() &&
-      needs.changes.result == 'success' &&
-      needs.changes.outputs.bazel == 'true' &&
-      (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
-      (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped')
+    needs: [changes]
+    if: needs.changes.outputs.bazel == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -182,16 +128,6 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
           fetch-depth: 0
-
-      - uses: actions/download-artifact@v4
-        if: needs.release_preview.outputs.artifact_ready == 'true'
-        with:
-          name: arena-release-version
-
-      - uses: actions/download-artifact@v4
-        if: needs.release_preview.outputs.needs_repin == 'true'
-        with:
-          name: arena-release-lockfiles
 
       - uses: dorny/paths-filter@v3
         id: rust_crates
@@ -216,28 +152,18 @@ jobs:
       - name: Verify lockfiles
         if: steps.rust_crates.outputs.rust_crates == 'true'
         run: |
-          if [ "${{ needs.release_preview.result }}" = "success" ] && [ "${{ needs.release_preview.outputs.needs_repin }}" = "true" ]; then
-            bazel build //... --config=ci
-          else
-            CARGO_BAZEL_REPIN=1 bazel build //...
-            bazel mod deps --lockfile_mode=update
-            if ! git diff --quiet Cargo.Bazel.lock MODULE.bazel.lock; then
-              echo "Lockfiles are out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //... && bazel mod deps --lockfile_mode=update"
-              git diff Cargo.Bazel.lock MODULE.bazel.lock
-              exit 1
-            fi
+          CARGO_BAZEL_REPIN=1 bazel build //...
+          bazel mod deps --lockfile_mode=update
+          if ! git diff --quiet Cargo.Bazel.lock MODULE.bazel.lock; then
+            echo "Lockfiles are out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //... && bazel mod deps --lockfile_mode=update"
+            git diff Cargo.Bazel.lock MODULE.bazel.lock
+            exit 1
           fi
 
   verify_dependency_release_age:
     name: Verify dependency release age (Ubuntu 24.04)
-    needs: [changes, release_preview, repin_release_locks]
-    if: >-
-      always() &&
-      !cancelled() &&
-      needs.changes.result == 'success' &&
-      needs.changes.outputs.bazel == 'true' &&
-      (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
-      (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped')
+    needs: [changes]
+    if: needs.changes.outputs.bazel == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -246,16 +172,6 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
           fetch-depth: 0
-
-      - uses: actions/download-artifact@v4
-        if: needs.release_preview.outputs.artifact_ready == 'true'
-        with:
-          name: arena-release-version
-
-      - uses: actions/download-artifact@v4
-        if: needs.release_preview.outputs.needs_repin == 'true'
-        with:
-          name: arena-release-lockfiles
 
       - uses: dorny/paths-filter@v3
         id: dep_files
@@ -293,14 +209,8 @@ jobs:
 
   test_ubuntu_24_04:
     name: Test Ubuntu 24.04
-    needs: [changes, release_preview, repin_release_locks]
-    if: >-
-      always() &&
-      !cancelled() &&
-      needs.changes.result == 'success' &&
-      needs.changes.outputs.bazel == 'true' &&
-      (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
-      (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped')
+    needs: [changes]
+    if: needs.changes.outputs.bazel == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -310,16 +220,6 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
           fetch-depth: 0
-
-      - uses: actions/download-artifact@v4
-        if: needs.release_preview.outputs.artifact_ready == 'true'
-        with:
-          name: arena-release-version
-
-      - uses: actions/download-artifact@v4
-        if: needs.release_preview.outputs.needs_repin == 'true'
-        with:
-          name: arena-release-lockfiles
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
@@ -335,14 +235,8 @@ jobs:
 
   coverage_ubuntu_24_04:
     name: Coverage Ubuntu 24.04
-    needs: [changes, release_preview, repin_release_locks]
-    if: >-
-      always() &&
-      !cancelled() &&
-      needs.changes.result == 'success' &&
-      needs.changes.outputs.bazel == 'true' &&
-      (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
-      (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped')
+    needs: [changes]
+    if: needs.changes.outputs.bazel == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -352,16 +246,6 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
           fetch-depth: 0
-
-      - uses: actions/download-artifact@v4
-        if: needs.release_preview.outputs.artifact_ready == 'true'
-        with:
-          name: arena-release-version
-
-      - uses: actions/download-artifact@v4
-        if: needs.release_preview.outputs.needs_repin == 'true'
-        with:
-          name: arena-release-lockfiles
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
@@ -386,14 +270,8 @@ jobs:
 
   test_macos_intel:
     name: Test macOS Intel
-    needs: [changes, release_preview, repin_release_locks]
-    if: >-
-      always() &&
-      !cancelled() &&
-      needs.changes.result == 'success' &&
-      needs.changes.outputs.bazel == 'true' &&
-      (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
-      (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped')
+    needs: [changes]
+    if: needs.changes.outputs.bazel == 'true'
     runs-on: macos-15-intel
     permissions:
       contents: read
@@ -403,16 +281,6 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
           fetch-depth: 0
-
-      - uses: actions/download-artifact@v4
-        if: needs.release_preview.outputs.artifact_ready == 'true'
-        with:
-          name: arena-release-version
-
-      - uses: actions/download-artifact@v4
-        if: needs.release_preview.outputs.needs_repin == 'true'
-        with:
-          name: arena-release-lockfiles
 
       - name: Setup Colima
         uses: douglascamata/setup-docker-macos-action@v1.1.0
@@ -431,14 +299,8 @@ jobs:
 
   test_macos_arm64:
     name: Test macOS ARM64
-    needs: [changes, release_preview, repin_release_locks]
-    if: >-
-      always() &&
-      !cancelled() &&
-      needs.changes.result == 'success' &&
-      needs.changes.outputs.bazel == 'true' &&
-      (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
-      (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped')
+    needs: [changes]
+    if: needs.changes.outputs.bazel == 'true'
     runs-on: macos-latest
     permissions:
       contents: read
@@ -448,16 +310,6 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
           fetch-depth: 0
-
-      - uses: actions/download-artifact@v4
-        if: needs.release_preview.outputs.artifact_ready == 'true'
-        with:
-          name: arena-release-version
-
-      - uses: actions/download-artifact@v4
-        if: needs.release_preview.outputs.needs_repin == 'true'
-        with:
-          name: arena-release-lockfiles
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
@@ -471,7 +323,7 @@ jobs:
 
   wheel:
     name: Build wheel (${{ matrix.runs-on }})
-    needs: [changes, release_preview, repin_release_locks, test_ubuntu_24_04, test_macos_intel, test_macos_arm64]
+    needs: [changes, release_preview, test_ubuntu_24_04, test_macos_intel, test_macos_arm64]
     if: >-
       always() &&
       !cancelled() &&
@@ -481,7 +333,6 @@ jobs:
       needs.test_macos_arm64.result == 'success' &&
       needs.changes.outputs.bazel == 'true' &&
       (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
-      (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped') &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -516,11 +367,6 @@ jobs:
         with:
           name: arena-release-version
 
-      - uses: actions/download-artifact@v4
-        if: needs.release_preview.outputs.needs_repin == 'true'
-        with:
-          name: arena-release-lockfiles
-
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
@@ -543,7 +389,6 @@ jobs:
           version_file.write_text(unique + "\n")
           print(f"Patched VERSION to {unique} (TestPyPI)")
           PY
-          bazel run //scripts:sync_version --config=ci
           bazel shutdown
 
       - name: Build wheel
@@ -562,15 +407,14 @@ jobs:
 
   commit_release_version:
     name: Commit release VERSION (master)
-    needs: [wheel, release_preview, repin_release_locks]
+    needs: [wheel, release_preview]
     if: >-
       always() &&
       !cancelled() &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/master' &&
       needs.release_preview.result == 'success' &&
-      needs.wheel.result == 'success' &&
-      (needs.repin_release_locks.result == 'success' || needs.repin_release_locks.result == 'skipped')
+      needs.wheel.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -583,10 +427,20 @@ jobs:
         with:
           name: arena-release-version
 
-      - uses: actions/download-artifact@v4
-        if: needs.repin_release_locks.result == 'success'
+      - name: Sync release VERSION
+        run: python3 scripts/sync_version.py
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
         with:
-          name: arena-release-lockfiles
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-ubuntu-24.04
+          repository-cache: true
+
+      - name: Repin lockfiles for release VERSION
+        run: |
+          CARGO_BAZEL_REPIN=1 bazel build //...
+          bazel mod deps --lockfile_mode=update
 
       - name: Commit release version
         run: |
