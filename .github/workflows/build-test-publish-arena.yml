@@ -163,15 +163,19 @@ jobs:
       - name: Verify VERSION sync
         run: bazel test //scripts:version_sync_test //scripts:arena_version_test --config=ci
 
-      - name: Repin and verify lockfile
+      - name: Verify lockfiles
         if: steps.rust_crates.outputs.rust_crates == 'true'
         run: |
-          CARGO_BAZEL_REPIN=1 bazel build //...
-          bazel mod deps --lockfile_mode=update
-          if ! git diff --quiet Cargo.Bazel.lock MODULE.bazel.lock; then
-            echo "Lockfiles are out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //... && bazel mod deps --lockfile_mode=update"
-            git diff Cargo.Bazel.lock MODULE.bazel.lock
-            exit 1
+          if [ "${{ needs.bump_release_version.outputs.artifact_ready }}" = "true" ]; then
+            bazel build //... --config=ci
+          else
+            CARGO_BAZEL_REPIN=1 bazel build //...
+            bazel mod deps --lockfile_mode=update
+            if ! git diff --quiet Cargo.Bazel.lock MODULE.bazel.lock; then
+              echo "Lockfiles are out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //... && bazel mod deps --lockfile_mode=update"
+              git diff Cargo.Bazel.lock MODULE.bazel.lock
+              exit 1
+            fi
           fi
 
   verify_dependency_release_age:

@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from check_dependency_release_age import (
+    local_cargo_crates_from_bazel_lock,
     parse_cargo_bazel_lock,
     parse_module_bazel,
     parse_requirements_lock,
@@ -58,6 +59,30 @@ arena_java_maven.install(
                 ("bcr", "rules_python", "0.34.0"),
                 ("maven", "com.fasterxml.jackson.core:jackson-databind", "2.18.2"),
             },
+        )
+
+
+class LocalCargoCratesFromBazelLockTest(unittest.TestCase):
+    def test_local_cargo_crates_null_package_url_returns_name_version(self) -> None:
+        text = """
+{
+  "crates": {
+    "arena 1.3.0": {
+      "name": "arena",
+      "version": "1.3.0",
+      "package_url": null
+    },
+    "serde 1.0.228": {
+      "name": "serde",
+      "version": "1.0.228",
+      "package_url": "https://github.com/serde-rs/serde"
+    }
+  }
+}
+"""
+        self.assertEqual(
+            local_cargo_crates_from_bazel_lock(text),
+            {("arena", "1.3.0")},
         )
 
 

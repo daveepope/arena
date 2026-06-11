@@ -86,6 +86,21 @@ def _changed_watched_files(root: Path, base_ref: str | None) -> list[str]:
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
+def local_cargo_crates_from_bazel_lock(text: str) -> set[tuple[str, str]]:
+    if not text:
+        return set()
+    data = json.loads(text)
+    local: set[tuple[str, str]] = set()
+    for entry in data.get("crates", {}).values():
+        if entry.get("package_url") is not None:
+            continue
+        name = entry.get("name")
+        version = entry.get("version")
+        if name and version:
+            local.add((name, version))
+    return local
+
+
 def parse_cargo_bazel_lock(text: str) -> set[tuple[str, str, str]]:
     data = json.loads(text)
     pairs: set[tuple[str, str, str]] = set()
@@ -271,7 +286,12 @@ def check_release_ages(
         return []
     failures: list[str] = []
     skipped: list[str] = []
+    cargo_lock_text = _read_file_at_ref(root, "HEAD", "Cargo.Bazel.lock")
+    local_cargo = local_cargo_crates_from_bazel_lock(cargo_lock_text)
     for kind, name, version in sorted(new_versions):
+        if kind == "cargo" and (name, version) in local_cargo:
+            skipped.append(f"{kind} {name} {version}")
+            continue
         published_at = _published_at(kind, name, version)
         label = f"{kind} {name} {version}"
         if published_at is None:
@@ -288,8 +308,7 @@ def check_release_ages(
             )
     if skipped:
         print(
-            "skipped bcr modules without release timestamps: "
-            + ", ".join(skipped),
+            "skipped local or untimestamped dependencies: " + ", ".join(skipped),
             file=sys.stderr,
         )
     return failures
