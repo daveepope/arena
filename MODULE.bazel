@@ -1,7 +1,10 @@
 module(
     name = "arena",
-    version = "0.4.0-beta.1",
+    version = "1.0.0",
 )
+
+arena_version_ext = use_extension("//tools:arena_version.bzl", "arena_version")
+use_repo(arena_version_ext, "arena_version")
 
 bazel_dep(name = "rules_python", version = "0.34.0")
 bazel_dep(name = "rules_rust", version = "0.69.0")

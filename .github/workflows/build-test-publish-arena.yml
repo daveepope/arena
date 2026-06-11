@@ -5,6 +5,7 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
   changes:
@@ -38,15 +39,71 @@ jobs:
     steps:
       - run: echo "No Bazel-relevant changes; build and test skipped."
 
+  bump_release_version:
+    name: Bump release VERSION (PR)
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Fetch master
+        run: git fetch origin master
+
+      - name: Bump VERSION from master
+        run: python3 scripts/bump_release_version.py
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-ubuntu-24.04
+          repository-cache: true
+
+      - name: Repin after version bump
+        run: |
+          if git diff --quiet VERSION Cargo.toml MODULE.bazel; then
+            echo "VERSION already set for this release"
+            exit 0
+          fi
+          CARGO_BAZEL_REPIN=1 bazel build //... --config=ci
+
+      - name: Commit release version
+        run: |
+          if git diff --quiet VERSION Cargo.toml MODULE.bazel Cargo.Bazel.lock Cargo.lock; then
+            echo "VERSION already set for this release"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION Cargo.toml MODULE.bazel Cargo.Bazel.lock Cargo.lock
+          git commit -m "chore: bump release VERSION for master"
+          git push
+
   verify_cargo_bazel_lock:
     name: Verify Cargo.Bazel.lock (Ubuntu 24.04)
-    needs: changes
-    if: needs.changes.outputs.bazel == 'true'
+    needs: [changes, bump_release_version]
+    if: >-
+      needs.changes.outputs.bazel == 'true' &&
+      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Sync PR branch after version bump
+        if: github.event_name == 'pull_request'
+        run: git pull --ff-only origin ${{ github.head_ref }}
 
       - uses: dorny/paths-filter@v3
         id: rust_crates
@@ -59,12 +116,14 @@ jobs:
               - 'MODULE.bazel'
 
       - name: Setup Bazel
-        if: steps.rust_crates.outputs.rust_crates == 'true'
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
           bazelisk-cache: true
           disk-cache: build-test-publish-arena-ubuntu-24.04
           repository-cache: true
+
+      - name: Verify VERSION sync
+        run: bazel test //scripts:version_sync_test //scripts:arena_version_test --config=ci
 
       - name: Repin and verify lockfile
         if: steps.rust_crates.outputs.rust_crates == 'true'
@@ -78,15 +137,22 @@ jobs:
 
   verify_dependency_release_age:
     name: Verify dependency release age (Ubuntu 24.04)
-    needs: changes
-    if: needs.changes.outputs.bazel == 'true'
+    needs: [changes, bump_release_version]
+    if: >-
+      needs.changes.outputs.bazel == 'true' &&
+      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
           fetch-depth: 0
+
+      - name: Sync PR branch after version bump
+        if: github.event_name == 'pull_request'
+        run: git pull --ff-only origin ${{ github.head_ref }}
 
       - uses: dorny/paths-filter@v3
         id: dep_files
@@ -124,14 +190,23 @@ jobs:
 
   test_ubuntu_24_04:
     name: Test Ubuntu 24.04
-    needs: changes
-    if: needs.changes.outputs.bazel == 'true'
+    needs: [changes, bump_release_version]
+    if: >-
+      needs.changes.outputs.bazel == 'true' &&
+      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Sync PR branch after version bump
+        if: github.event_name == 'pull_request'
+        run: git pull --ff-only origin ${{ github.head_ref }}
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
@@ -147,14 +222,23 @@ jobs:
 
   coverage_ubuntu_24_04:
     name: Coverage Ubuntu 24.04
-    needs: changes
-    if: needs.changes.outputs.bazel == 'true'
+    needs: [changes, bump_release_version]
+    if: >-
+      needs.changes.outputs.bazel == 'true' &&
+      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Sync PR branch after version bump
+        if: github.event_name == 'pull_request'
+        run: git pull --ff-only origin ${{ github.head_ref }}
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
@@ -179,14 +263,23 @@ jobs:
 
   test_macos_intel:
     name: Test macOS Intel
-    needs: changes
-    if: needs.changes.outputs.bazel == 'true'
+    needs: [changes, bump_release_version]
+    if: >-
+      needs.changes.outputs.bazel == 'true' &&
+      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped')
     runs-on: macos-15-intel
     permissions:
       contents: read
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Sync PR branch after version bump
+        if: github.event_name == 'pull_request'
+        run: git pull --ff-only origin ${{ github.head_ref }}
 
       - name: Setup Colima
         uses: douglascamata/setup-docker-macos-action@v1.1.0
@@ -205,14 +298,23 @@ jobs:
 
   test_macos_arm64:
     name: Test macOS ARM64
-    needs: changes
-    if: needs.changes.outputs.bazel == 'true'
+    needs: [changes, bump_release_version]
+    if: >-
+      needs.changes.outputs.bazel == 'true' &&
+      (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped')
     runs-on: macos-latest
     permissions:
       contents: read
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Sync PR branch after version bump
+        if: github.event_name == 'pull_request'
+        run: git pull --ff-only origin ${{ github.head_ref }}
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
@@ -226,10 +328,11 @@ jobs:
 
   wheel:
     name: Build wheel (${{ matrix.runs-on }})
-    needs: [changes, test_ubuntu_24_04, test_macos_intel, test_macos_arm64]
+    needs: [changes, bump_release_version, test_ubuntu_24_04, test_macos_intel, test_macos_arm64]
     if: >-
       ${{
         needs.changes.outputs.bazel == 'true' &&
+        (needs.bump_release_version.result == 'success' || needs.bump_release_version.result == 'skipped') &&
         (
           (
             github.event_name == 'pull_request' &&
@@ -256,6 +359,13 @@ jobs:
             disk-cache: build-test-publish-arena-macos-arm64
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Sync PR branch after version bump
+        if: github.event_name == 'pull_request'
+        run: git pull --ff-only origin ${{ github.head_ref }}
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
@@ -270,32 +380,17 @@ jobs:
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           python3 <<'PY'
-          import os, pathlib, re, tomllib
+          import os, pathlib
 
           run_id = os.environ.get("GITHUB_RUN_ID", "0")
-          pyproject = pathlib.Path("arena-pytest/pyproject.toml")
-          data = tomllib.loads(pyproject.read_text())
-          base = data["project"]["version"]
+          version_file = pathlib.Path("VERSION")
+          base = version_file.read_text().strip()
           unique = f"{base}.dev{run_id}"
-          text = pyproject.read_text()
-          text = re.sub(
-              r'^version = "[^"]+"',
-              f'version = "{unique}"',
-              text,
-              count=1,
-              flags=re.MULTILINE,
-          )
-          pyproject.write_text(text)
-          build = pathlib.Path("arena-pytest/BUILD").read_text()
-          build = re.sub(
-              r'ARENA_PYTEST_VERSION = "[^"]+"',
-              f'ARENA_PYTEST_VERSION = "{unique}"',
-              build,
-              count=1,
-          )
-          pathlib.Path("arena-pytest/BUILD").write_text(build)
-          print(f"Patched arena-pytest version to {unique} (TestPyPI)")
+          version_file.write_text(unique + "\n")
+          print(f"Patched VERSION to {unique} (TestPyPI)")
           PY
+          bazel run //scripts:sync_version --config=ci
+          bazel shutdown
 
       - name: Build wheel
         run: |
