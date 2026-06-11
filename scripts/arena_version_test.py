@@ -103,6 +103,33 @@ class PrepareReleaseVersionTest(unittest.TestCase):
             self.assertEqual(target, "1.0.1")
             self.assertEqual(read_version(root), "1.0.1")
 
+    def test_prepare_release_version_ahead_pr_keeps_version(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_version(root, "1.3.0")
+            (root / "Cargo.toml").write_text(
+                '[workspace.package]\nversion = "1.3.0"\n',
+                encoding="utf-8",
+            )
+            (root / "MODULE.bazel").write_text(
+                'module(\n    name = "arena",\n    version = "1.3.0",\n)\n',
+                encoding="utf-8",
+            )
+            (root / "arena-pytest").mkdir()
+            (root / "arena-pytest/pyproject.toml").write_text(
+                '[project]\ndynamic = ["version"]\n',
+                encoding="utf-8",
+            )
+
+            with patch(
+                "arena_version.read_release_version_from_git_ref",
+                return_value=("1.0.0", False),
+            ):
+                target, changed = prepare_release_version(root, "origin/master", "patch")
+
+            self.assertEqual(target, "1.3.0")
+            self.assertEqual(changed, [])
+
     def test_prepare_release_version_higher_pr_keeps_version(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

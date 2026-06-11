@@ -197,14 +197,16 @@ def read_release_version_from_git_ref(root: Path, ref: str) -> tuple[str, bool]:
 
 def prepare_release_version(root: Path, master_ref: str, level: str) -> tuple[str, list[str]]:
     base, base_has_version_file = read_release_version_from_git_ref(root, master_ref)
-    target = bump_release_version(base, level)
+    target_from_master = bump_release_version(base, level)
     current = release_version_only(read_version(root))
-    target = max_release_version(current, target)
-    if (
-        not base_has_version_file
-        and parse_release_version(current) > parse_release_version(bump_release_version(base, level))
-    ):
-        target = max_release_version(bump_release_version(current, level), target)
+    target = max_release_version(current, target_from_master)
+    migration_floor = (1, 0, 0)
+    if not base_has_version_file:
+        if (
+            parse_release_version(current) > parse_release_version(target_from_master)
+            and parse_release_version(current) == migration_floor
+        ):
+            target = max_release_version(bump_release_version(current, level), target)
     changed: list[str] = []
     if release_version_only(read_version(root)) != target:
         write_version(root, target)
