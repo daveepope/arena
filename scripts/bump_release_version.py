@@ -7,8 +7,9 @@ import sys
 from pathlib import Path
 
 from arena_version import (
+    prepare_preview_from_base,
     prepare_release_from_base,
-    release_lockfiles_need_repin,
+    preview_only_from_env,
     resolve_semver_level_from_env,
 )
 
@@ -24,19 +25,20 @@ def main() -> int:
     root = _repo_root()
     level = resolve_semver_level_from_env()
     base_ref = os.environ.get("ARENA_VERSION_BASE_REF", "origin/master")
-    target, changed = prepare_release_from_base(root, base_ref, level)
-    needs_repin = release_lockfiles_need_repin(root, target)
-    if changed:
-        print(f"release VERSION {target} ({level}; updated {', '.join(changed)})")
+    if preview_only_from_env():
+        target, changed = prepare_preview_from_base(root, base_ref, level)
+        label = "preview for TestPyPI"
     else:
-        print(f"release VERSION {target} ({level}; preview)")
-    if needs_repin:
-        print(f"lockfiles need repin for workspace version {target}")
+        target, changed = prepare_release_from_base(root, base_ref, level)
+        label = "release"
+    if changed:
+        print(f"release VERSION {target} ({level}; {label}; updated {', '.join(changed)})")
+    else:
+        print(f"release VERSION {target} ({level}; {label})")
     github_output = os.environ.get("GITHUB_OUTPUT")
     if github_output:
         with open(github_output, "a", encoding="utf-8") as out:
             out.write(f"release_target={target}\n")
-            out.write(f"needs_repin={'true' if needs_repin else 'false'}\n")
     return 0
 
 

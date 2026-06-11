@@ -9,7 +9,9 @@ from unittest.mock import patch
 
 from arena_version import (
     bump_release_version,
+    cargo_workspace_version,
     is_synced,
+    prepare_preview_from_base,
     prepare_release_from_base,
     read_version,
     read_version_from_git_ref,
@@ -91,6 +93,28 @@ class PrepareReleaseFromBaseTest(unittest.TestCase):
             '[project]\ndynamic = ["version"]\n',
             encoding="utf-8",
         )
+
+    def test_prepare_preview_from_base_no_version_on_master_returns_first_release(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._setup_root(root, "1.0.0")
+            with patch(
+                "arena_version.read_release_version_from_git_ref",
+                return_value=("0.4.0", False),
+            ):
+                target, changed = prepare_preview_from_base(root, "origin/master", "minor")
+            self.assertEqual(target, "1.0.0")
+            self.assertEqual(changed, [])
+
+    def test_release_target_from_base_version_on_master_uses_label(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._setup_root(root, "1.0.0")
+            with patch(
+                "arena_version.read_release_version_from_git_ref",
+                return_value=("1.0.0", True),
+            ):
+                self.assertEqual(release_target_from_base(root, "origin/master", "minor"), "1.1.0")
 
     def test_prepare_release_from_base_uses_base_not_branch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

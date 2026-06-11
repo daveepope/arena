@@ -192,7 +192,9 @@ def read_release_version_from_git_ref(root: Path, ref: str) -> tuple[str, bool]:
 
 
 def release_target_from_base(root: Path, base_ref: str, level: str) -> str:
-    base, _base_has_version_file = read_release_version_from_git_ref(root, base_ref)
+    base, base_has_version_file = read_release_version_from_git_ref(root, base_ref)
+    if not base_has_version_file:
+        return "1.0.0"
     return bump_release_version(base, level)
 
 
@@ -205,10 +207,28 @@ def apply_release_target(root: Path, target: str) -> list[str]:
     return changed
 
 
+def apply_preview_version(root: Path, target: str) -> list[str]:
+    if release_version_only(read_version(root)) == target:
+        return []
+    write_version(root, target)
+    return ["VERSION"]
+
+
 def prepare_release_from_base(root: Path, base_ref: str, level: str) -> tuple[str, list[str]]:
     target = release_target_from_base(root, base_ref, level)
     changed = apply_release_target(root, target)
     return target, changed
+
+
+def prepare_preview_from_base(root: Path, base_ref: str, level: str) -> tuple[str, list[str]]:
+    target = release_target_from_base(root, base_ref, level)
+    changed = apply_preview_version(root, target)
+    return target, changed
+
+
+def preview_only_from_env() -> bool:
+    raw = os.environ.get("ARENA_VERSION_PREVIEW_ONLY", "").strip().lower()
+    return raw in ("1", "true", "yes")
 
 
 def workspace_version_in_cargo_bazel_lock(root: Path) -> str | None:
