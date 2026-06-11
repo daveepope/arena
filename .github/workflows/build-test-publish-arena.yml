@@ -47,6 +47,8 @@ jobs:
     name: Release HEAD check
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     outputs:
       version_only: ${{ steps.check.outputs.version_only }}
     steps:
