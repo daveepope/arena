@@ -72,17 +72,18 @@ jobs:
             echo "VERSION already set for this release"
             exit 0
           fi
-          CARGO_BAZEL_REPIN=1 bazel build //... --config=ci
+          CARGO_BAZEL_REPIN=1 bazel build //...
+          bazel mod deps --lockfile_mode=update
 
       - name: Commit release version
         run: |
-          if git diff --quiet VERSION Cargo.toml MODULE.bazel Cargo.Bazel.lock Cargo.lock; then
+          if git diff --quiet VERSION Cargo.toml MODULE.bazel Cargo.Bazel.lock Cargo.lock MODULE.bazel.lock; then
             echo "VERSION already set for this release"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add VERSION Cargo.toml MODULE.bazel Cargo.Bazel.lock Cargo.lock
+          git add VERSION Cargo.toml MODULE.bazel Cargo.Bazel.lock Cargo.lock MODULE.bazel.lock
           git commit -m "chore: bump release VERSION for master"
           git push
 
@@ -128,10 +129,11 @@ jobs:
       - name: Repin and verify lockfile
         if: steps.rust_crates.outputs.rust_crates == 'true'
         run: |
-          CARGO_BAZEL_REPIN=1 bazel build //... --config=ci
-          if ! git diff --quiet Cargo.Bazel.lock; then
-            echo "Cargo.Bazel.lock is out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //..."
-            git diff Cargo.Bazel.lock
+          CARGO_BAZEL_REPIN=1 bazel build //...
+          bazel mod deps --lockfile_mode=update
+          if ! git diff --quiet Cargo.Bazel.lock MODULE.bazel.lock; then
+            echo "Lockfiles are out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //... && bazel mod deps --lockfile_mode=update"
+            git diff Cargo.Bazel.lock MODULE.bazel.lock
             exit 1
           fi
 
