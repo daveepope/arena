@@ -5,6 +5,11 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+    types: [opened, synchronize, reopened, labeled]
+
+concurrency:
+  group: build-test-publish-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   changes:
@@ -38,15 +43,92 @@ jobs:
     steps:
       - run: echo "No Bazel-relevant changes; build and test skipped."
 
+  release_preview:
+    name: Release version preview
+    if: >-
+      (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'push' &&
+        github.ref == 'refs/heads/master' &&
+        !contains(github.event.head_commit.message, 'chore: release VERSION'))
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      release_target: ${{ steps.preview.outputs.release_target }}
+      artifact_ready: ${{ steps.upload.outputs.outcome == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Resolve semver level from labels
+        id: semver
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labelNames = (labels) => labels.map((label) => label.name);
+            const levelFromLabels = (labels) => {
+              if (labels.includes("semver:major")) return "major";
+              if (labels.includes("semver:minor")) return "minor";
+              return "patch";
+            };
+            let level = "patch";
+            if (context.eventName === "pull_request") {
+              level = levelFromLabels(labelNames(context.payload.pull_request.labels));
+            } else {
+              const { data } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.sha,
+              });
+              const merged = data.find((pr) => pr.merged_at) ?? data[0];
+              if (merged) {
+                level = levelFromLabels(labelNames(merged.labels));
+              }
+            }
+            core.setOutput("level", level);
+
+      - name: Set release base ref
+        id: base
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin master
+            echo "ref=origin/master" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Preview release VERSION
+        id: preview
+        env:
+          ARENA_VERSION_BASE_REF: ${{ steps.base.outputs.ref }}
+          ARENA_SEMVER_LEVEL: ${{ steps.semver.outputs.level }}
+          ARENA_VERSION_PREVIEW_ONLY: "true"
+        run: python3 scripts/bump_release_version.py
+
+      - name: Upload release VERSION preview
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: arena-release-version
+          path: VERSION
+          if-no-files-found: error
+
   verify_cargo_bazel_lock:
     name: Verify Cargo.Bazel.lock (Ubuntu 24.04)
-    needs: changes
+    needs: [changes]
     if: needs.changes.outputs.bazel == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
 
       - uses: dorny/paths-filter@v3
         id: rust_crates
@@ -59,26 +141,76 @@ jobs:
               - 'MODULE.bazel'
 
       - name: Setup Bazel
-        if: steps.rust_crates.outputs.rust_crates == 'true'
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
           bazelisk-cache: true
           disk-cache: build-test-publish-arena-ubuntu-24.04
           repository-cache: true
 
-      - name: Repin and verify lockfile
+      - name: Verify VERSION sync
+        run: bazel test //scripts:version_sync_test //scripts:arena_version_test --config=ci
+
+      - name: Verify lockfiles
         if: steps.rust_crates.outputs.rust_crates == 'true'
         run: |
-          CARGO_BAZEL_REPIN=1 bazel build //... --config=ci
-          if ! git diff --quiet Cargo.Bazel.lock; then
-            echo "Cargo.Bazel.lock is out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //..."
-            git diff Cargo.Bazel.lock
+          CARGO_BAZEL_REPIN=1 bazel build //...
+          bazel mod deps --lockfile_mode=update
+          if ! git diff --quiet Cargo.Bazel.lock MODULE.bazel.lock; then
+            echo "Lockfiles are out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //... && bazel mod deps --lockfile_mode=update"
+            git diff Cargo.Bazel.lock MODULE.bazel.lock
             exit 1
           fi
 
+  verify_dependency_release_age:
+    name: Verify dependency release age (Ubuntu 24.04)
+    needs: [changes]
+    if: needs.changes.outputs.bazel == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: dep_files
+        with:
+          filters: |
+            deps:
+              - 'Cargo.Bazel.lock'
+              - 'Cargo.toml'
+              - '**/Cargo.toml'
+              - '**/requirements_lock.txt'
+              - '**/requirements.txt'
+              - 'MODULE.bazel'
+              - 'MODULE.bazel.lock'
+
+      - name: Setup Bazel
+        if: steps.dep_files.outputs.deps == 'true'
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-ubuntu-24.04
+          repository-cache: true
+
+      - name: Check dependency release age
+        if: steps.dep_files.outputs.deps == 'true'
+        env:
+          ARENA_DEP_AGE_BASE_REF: >-
+            ${{
+              github.event_name == 'pull_request'
+              && github.event.pull_request.base.sha
+              || (github.event.before != '0000000000000000000000000000000000000000' && github.event.before || '')
+            }}
+        run: |
+          bazel test //scripts:dependency_release_age_parse_test --config=ci
+          bazel run //scripts:check_dependency_release_age --config=ci
+
   test_ubuntu_24_04:
     name: Test Ubuntu 24.04
-    needs: changes
+    needs: [changes]
     if: needs.changes.outputs.bazel == 'true'
     runs-on: ubuntu-24.04
     permissions:
@@ -86,6 +218,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
@@ -101,7 +236,7 @@ jobs:
 
   coverage_ubuntu_24_04:
     name: Coverage Ubuntu 24.04
-    needs: changes
+    needs: [changes]
     if: needs.changes.outputs.bazel == 'true'
     runs-on: ubuntu-24.04
     permissions:
@@ -109,6 +244,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
@@ -133,7 +271,7 @@ jobs:
 
   test_macos_intel:
     name: Test macOS Intel
-    needs: changes
+    needs: [changes]
     if: needs.changes.outputs.bazel == 'true'
     runs-on: macos-15-intel
     permissions:
@@ -141,6 +279,9 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
 
       - name: Setup Colima
         uses: douglascamata/setup-docker-macos-action@v1.1.0
@@ -159,7 +300,7 @@ jobs:
 
   test_macos_arm64:
     name: Test macOS ARM64
-    needs: changes
+    needs: [changes]
     if: needs.changes.outputs.bazel == 'true'
     runs-on: macos-latest
     permissions:
@@ -167,6 +308,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
@@ -180,21 +324,26 @@ jobs:
 
   wheel:
     name: Build wheel (${{ matrix.runs-on }})
-    needs: [changes, test_ubuntu_24_04, test_macos_intel, test_macos_arm64]
+    needs: [changes, release_preview, test_ubuntu_24_04, test_macos_intel, test_macos_arm64]
     if: >-
-      ${{
-        needs.changes.outputs.bazel == 'true' &&
+      always() &&
+      !cancelled() &&
+      needs.changes.result == 'success' &&
+      needs.test_ubuntu_24_04.result == 'success' &&
+      needs.test_macos_intel.result == 'success' &&
+      needs.test_macos_arm64.result == 'success' &&
+      needs.changes.outputs.bazel == 'true' &&
+      (needs.release_preview.result == 'success' || needs.release_preview.result == 'skipped') &&
+      (
         (
-          (
-            github.event_name == 'pull_request' &&
-            github.event.pull_request.head.repo.full_name == github.repository
-          ) ||
-          (
-            github.event_name == 'push' &&
-            github.ref == 'refs/heads/master'
-          )
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        ) ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/master'
         )
-      }}
+      )
     runs-on: ${{ matrix.runs-on }}
     permissions:
       contents: read
@@ -210,6 +359,14 @@ jobs:
             disk-cache: build-test-publish-arena-macos-arm64
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        if: needs.release_preview.outputs.artifact_ready == 'true'
+        with:
+          name: arena-release-version
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
@@ -224,32 +381,16 @@ jobs:
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           python3 <<'PY'
-          import os, pathlib, re, tomllib
+          import os, pathlib
 
           run_id = os.environ.get("GITHUB_RUN_ID", "0")
-          pyproject = pathlib.Path("arena-pytest/pyproject.toml")
-          data = tomllib.loads(pyproject.read_text())
-          base = data["project"]["version"]
+          version_file = pathlib.Path("VERSION")
+          base = version_file.read_text().strip()
           unique = f"{base}.dev{run_id}"
-          text = pyproject.read_text()
-          text = re.sub(
-              r'^version = "[^"]+"',
-              f'version = "{unique}"',
-              text,
-              count=1,
-              flags=re.MULTILINE,
-          )
-          pyproject.write_text(text)
-          build = pathlib.Path("arena-pytest/BUILD").read_text()
-          build = re.sub(
-              r'ARENA_PYTEST_VERSION = "[^"]+"',
-              f'ARENA_PYTEST_VERSION = "{unique}"',
-              build,
-              count=1,
-          )
-          pathlib.Path("arena-pytest/BUILD").write_text(build)
-          print(f"Patched arena-pytest version to {unique} (TestPyPI)")
+          version_file.write_text(unique + "\n")
+          print(f"Patched VERSION to {unique} (TestPyPI)")
           PY
+          bazel shutdown
 
       - name: Build wheel
         run: |
@@ -264,6 +405,55 @@ jobs:
           name: ${{ matrix.artifact }}
           path: bazel-bin/arena-pytest/*.whl
           if-no-files-found: error
+
+  commit_release_version:
+    name: Commit release VERSION (master)
+    needs: [wheel, release_preview]
+    if: >-
+      always() &&
+      !cancelled() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/master' &&
+      needs.release_preview.result == 'success' &&
+      needs.wheel.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: arena-release-version
+
+      - name: Sync release VERSION
+        run: python3 scripts/sync_version.py
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-ubuntu-24.04
+          repository-cache: true
+
+      - name: Repin lockfiles for release VERSION
+        run: |
+          CARGO_BAZEL_REPIN=1 bazel build //...
+          bazel mod deps --lockfile_mode=update
+
+      - name: Commit release version
+        run: |
+          if git diff --quiet VERSION Cargo.toml MODULE.bazel Cargo.Bazel.lock Cargo.lock MODULE.bazel.lock; then
+            echo "VERSION already on master"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION Cargo.toml MODULE.bazel Cargo.Bazel.lock Cargo.lock MODULE.bazel.lock
+          git commit -m "chore: release VERSION"
+          git push
 
   publish_testpypi:
     name: Publish TestPyPI (Ubuntu 24.04)

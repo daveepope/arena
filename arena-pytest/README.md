@@ -111,7 +111,7 @@ If `pip` sees two wheels for the same version, remove old files under `bazel-bin
 
 ## Publish to PyPI
 
-Bump **`version`** in both `BUILD` (`ARENA_PYTEST_VERSION` / `py_wheel`) and `pyproject.toml` before a release. Keep `arena-pytest/LICENSE` aligned with the repository root `LICENSE`, then rebuild the wheel.
+Release version is driven by the repo root **`VERSION`** file. On PRs, CI computes the next release from `master` (patch by default; add **`semver:minor`** or **`semver:major`** labels for larger bumps), tests with that version via CI artifacts, then commits **`VERSION`** and synced lockfiles to the PR branch after tests pass. `Cargo.toml`, `MODULE.bazel`, and the Bazel wheel read that value via sync; `pyproject.toml` loads it dynamically from `../VERSION`. Keep `arena-pytest/LICENSE` aligned with the repository root `LICENSE`, then rebuild the wheel.
 
 ### 1. Smoke test (install the wheel locally, no upload)
 
