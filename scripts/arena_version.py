@@ -137,25 +137,74 @@ def resolve_semver_level_from_event(event_path: Path) -> str:
     return "patch"
 
 
-def read_version_from_git_ref(root: Path, ref: str) -> str:
+def _git_show_at_ref(root: Path, ref: str, path: str) -> str | None:
     result = subprocess.run(
-        ["git", "show", f"{ref}:VERSION"],
+        ["git", "show", f"{ref}:{path}"],
         cwd=root,
-        check=True,
         capture_output=True,
         text=True,
     )
-    version = result.stdout.strip()
-    if not version:
-        raise ValueError(f"VERSION is empty at {ref}")
-    return release_version_only(version)
+    if result.returncode != 0:
+        return None
+    return result.stdout
+
+
+def _parse_cargo_workspace_version_text(cargo: str) -> str | None:
+    match = re.search(r'^version = "([^"]+)"\s*$', cargo, re.MULTILINE)
+    if not match:
+        return None
+    return release_version_only(match.group(1))
+
+
+def _parse_module_bazel_version_text(module: str) -> str | None:
+    match = re.search(
+        r'module\(\n    name = "arena",\n    version = "([^"]+)"',
+        module,
+    )
+    if not match:
+        return None
+    return release_version_only(match.group(1))
+
+
+def read_version_from_git_ref(root: Path, ref: str) -> str:
+    version, _has_version_file = read_release_version_from_git_ref(root, ref)
+    return version
+
+
+def read_release_version_from_git_ref(root: Path, ref: str) -> tuple[str, bool]:
+    version_text = _git_show_at_ref(root, ref, "VERSION")
+    if version_text is not None:
+        version = version_text.strip()
+        if version:
+            return release_version_only(version), True
+
+    cargo_text = _git_show_at_ref(root, ref, "Cargo.toml")
+    if cargo_text is not None:
+        parsed = _parse_cargo_workspace_version_text(cargo_text)
+        if parsed:
+            return parsed, False
+
+    module_text = _git_show_at_ref(root, ref, "MODULE.bazel")
+    if module_text is not None:
+        parsed = _parse_module_bazel_version_text(module_text)
+        if parsed:
+            return parsed, False
+
+    raise ValueError(
+        f"no release version found at {ref} (expected VERSION, Cargo.toml, or MODULE.bazel)"
+    )
 
 
 def prepare_release_version(root: Path, master_ref: str, level: str) -> tuple[str, list[str]]:
-    base = read_version_from_git_ref(root, master_ref)
+    base, base_has_version_file = read_release_version_from_git_ref(root, master_ref)
     target = bump_release_version(base, level)
     current = release_version_only(read_version(root))
     target = max_release_version(current, target)
+    if (
+        not base_has_version_file
+        and parse_release_version(current) > parse_release_version(bump_release_version(base, level))
+    ):
+        target = max_release_version(bump_release_version(current, level), target)
     changed: list[str] = []
     if release_version_only(read_version(root)) != target:
         write_version(root, target)

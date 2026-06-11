@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +12,7 @@ from arena_version import (
     is_synced,
     prepare_release_version,
     read_version,
+    read_version_from_git_ref,
     release_version_only,
     resolve_semver_level_from_event,
     sync_workspace_version,
@@ -57,7 +59,50 @@ class ResolveSemverLevelTest(unittest.TestCase):
             self.assertEqual(resolve_semver_level_from_event(event), "patch")
 
 
+class ReadVersionFromGitRefTest(unittest.TestCase):
+    def test_read_version_from_git_ref_missing_version_uses_cargo(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "test"], cwd=root, check=True)
+            (root / "Cargo.toml").write_text(
+                '[workspace.package]\nversion = "0.4.0-beta.1"\n',
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "Cargo.toml"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True)
+            self.assertEqual(read_version_from_git_ref(root, "HEAD"), "0.4.0")
+
+
 class PrepareReleaseVersionTest(unittest.TestCase):
+    def test_prepare_release_version_new_epoch_bumps_current(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_version(root, "1.0.0")
+            (root / "Cargo.toml").write_text(
+                '[workspace.package]\nversion = "1.0.0"\n',
+                encoding="utf-8",
+            )
+            (root / "MODULE.bazel").write_text(
+                'module(\n    name = "arena",\n    version = "1.0.0",\n)\n',
+                encoding="utf-8",
+            )
+            (root / "arena-pytest").mkdir()
+            (root / "arena-pytest/pyproject.toml").write_text(
+                '[project]\ndynamic = ["version"]\n',
+                encoding="utf-8",
+            )
+
+            with patch(
+                "arena_version.read_release_version_from_git_ref",
+                return_value=("0.4.0", False),
+            ):
+                target, _changed = prepare_release_version(root, "origin/master", "patch")
+
+            self.assertEqual(target, "1.0.1")
+            self.assertEqual(read_version(root), "1.0.1")
+
     def test_prepare_release_version_higher_pr_keeps_version(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -77,8 +122,8 @@ class PrepareReleaseVersionTest(unittest.TestCase):
             )
 
             with patch(
-                "arena_version.read_version_from_git_ref",
-                return_value="1.0.0",
+                "arena_version.read_release_version_from_git_ref",
+                return_value=("1.0.0", True),
             ):
                 target, changed = prepare_release_version(root, "origin/master", "patch")
 
