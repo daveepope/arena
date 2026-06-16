@@ -63,7 +63,7 @@ pydantic-core==2.46.3
     # via pydantic
 pydantic-settings==2.14.0
     # via -r examples/requirements.txt
-pyjwt[crypto]==2.12.1
+pyjwt[crypto]==2.13.0
     # via
     #   -r examples/requirements.txt
     #   pyjwt
