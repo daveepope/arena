@@ -602,7 +602,7 @@ jobs:
           root = Path('.')
           sys.exit(0 if release_lockfiles_need_repin(root, read_version(root)) else 1)
           "; then
-            CARGO_BAZEL_REPIN=1 bazel build //...
+            CARGO_BAZEL_REPIN=1 bazel sync --only=crates
             bazel mod deps --lockfile_mode=update
           else
             echo "lockfiles already match VERSION"
