@@ -14,3 +14,4 @@ venv/
 /bazel-out
 /bazel-testlogs
 /bazel-arena
+/bazel-*
