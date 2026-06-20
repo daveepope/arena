@@ -448,9 +448,9 @@ jobs:
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
-          bazelisk-cache: true
-          disk-cache: build-test-publish-arena-macos-arm64
-          repository-cache: true
+          bazelisk-cache: false
+          disk-cache: ''
+          repository-cache: false
 
       - name: Build and test
         run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
