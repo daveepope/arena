@@ -41,6 +41,16 @@ jobs:
               - '!CLAUDE.md'
               - '!.cursor/**'
               - '!.github/**'
+              - '!.gitignore'
+              - '!.gitattributes'
+              - '!.editorconfig'
+              - '!.idea/**'
+              - '!.vscode/**'
+              - '!.dockerignore'
+              - '!.bazelignore'
+              - '!.codecov.yml'
+              - '!LICENSE'
+              - '!**/*.png'
 
       - id: mode
         run: |
