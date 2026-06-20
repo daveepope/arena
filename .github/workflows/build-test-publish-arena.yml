@@ -237,7 +237,7 @@ jobs:
       - name: Verify lockfiles
         if: steps.rust_crates.outputs.rust_crates == 'true'
         run: |
-          CARGO_BAZEL_REPIN=1 bazel build //...
+          CARGO_BAZEL_REPIN=1 bazel sync --only=crates
           bazel mod deps --lockfile_mode=update
           if ! git diff --quiet Cargo.Bazel.lock MODULE.bazel.lock; then
             echo "Lockfiles are out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //... && bazel mod deps --lockfile_mode=update"
