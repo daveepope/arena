@@ -19,6 +19,7 @@ jobs:
       contents: read
     outputs:
       bazel: ${{ steps.filter.outputs.bazel }}
+      publishable: ${{ steps.filter.outputs.publishable }}
       ci_mode: ${{ steps.mode.outputs.ci_mode }}
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +34,13 @@ jobs:
               - '!AGENTS.md'
               - '!CLAUDE.md'
               - '!.cursor/**'
+            publishable:
+              - '**/*'
+              - '!**/*.md'
+              - '!AGENTS.md'
+              - '!CLAUDE.md'
+              - '!.cursor/**'
+              - '!.github/**'
 
       - id: mode
         run: |
@@ -107,10 +115,13 @@ jobs:
     name: Release version preview
     needs: changes
     if: >-
-      needs.changes.outputs.ci_mode == 'master_push' ||
+      needs.changes.outputs.publishable == 'true' &&
       (
-        needs.changes.outputs.ci_mode == 'pr' &&
-        github.event.pull_request.head.repo.full_name == github.repository
+        needs.changes.outputs.ci_mode == 'master_push' ||
+        (
+          needs.changes.outputs.ci_mode == 'pr' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        )
       )
     runs-on: ubuntu-24.04
     permissions:
@@ -463,6 +474,7 @@ jobs:
       !cancelled() &&
       needs.changes.result == 'success' &&
       needs.changes.outputs.bazel == 'true' &&
+      needs.changes.outputs.publishable == 'true' &&
       needs.release_preview.result == 'success' &&
       (
         (
@@ -533,7 +545,6 @@ jobs:
           version_file.write_text(unique + "\n")
           print(f"Patched VERSION to {unique} (TestPyPI)")
           PY
-          bazel shutdown
 
       - name: Build wheel
         run: |
