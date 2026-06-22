@@ -159,7 +159,7 @@
     "//tools:arena_version.bzl%arena_version": {
       "general": {
         "bzlTransitiveDigest": "DKya/O7/G21oGTUpyPEcPOtxkNd6MuOComr8gCuG21I=",
-        "usagesDigest": "tbqC/tz2TzlEwTuvTOgzWw4jratE11YfBDOXGlB5A6A=",
+        "usagesDigest": "hMEH1KgzqtgrhtYw9cwFtGPWWn+pCj4IOWQyLdiMGk4=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -397,7 +397,7 @@
     "@@rules_python~//python/extensions:pip.bzl%pip": {
       "general": {
         "bzlTransitiveDigest": "JC0QeECYyqXLtaWpQYfYqjOICRtu4Vp9VKSKMQfwp0A=",
-        "usagesDigest": "oOW0sces/mz7oDfdrnbyumC7P6BYsqem411AgP7ilrg=",
+        "usagesDigest": "QBCRZga45KAS5qtoDvP+sxZxcn6XukQcHizmtNtAn9c=",
         "recordedFileInputs": {
           "@@rules_python~//tools/publish/requirements_linux.txt": "d576e0d8542df61396a9b38deeaa183c24135ed5e8e73bb9622f298f2671811e",
           "@@rules_fuzzing~//fuzzing/requirements.txt": "ab04664be026b632a0d2a2446c4f65982b7654f5b6851d2f9d399a19b7242a5b",
