@@ -12,6 +12,7 @@ members = [
     "arena-container",
     "arena-containerized-component",
     "arena-ffi",
+    "arbiter",
     "examples"
 ]
 
