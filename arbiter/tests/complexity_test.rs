@@ -3,8 +3,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use arbiter::complexity::{
-    baseline_complexity, collect_source_files, compute_deltas, cyclomatic, watchable_directories,
-    Language,
+    baseline_bytes, baseline_complexity, bytes_delta, collect_source_files, compute_deltas,
+    cyclomatic, files_delta, watchable_directories, Language,
 };
 
 #[test]
@@ -154,4 +154,47 @@ fn compute_deltas_reports_increase_decrease_and_removal() {
         summarized,
         vec![(path_up, 5), (path_gone, -4), (path_down, -2)]
     );
+}
+
+#[test]
+fn disk_scan_trajectory_rises_then_falls() {
+    let root = std::env::temp_dir().join(format!(
+        "arbiter-disk-traj-{}-{:?}",
+        std::process::id(),
+        std::time::SystemTime::now()
+    ));
+    let src = root.join("src");
+    fs::create_dir_all(&src).unwrap();
+    fs::write(src.join("Base.java"), "class Base {}").unwrap();
+
+    let baseline = baseline_bytes(&root);
+    let dump = src.join("Dump.java");
+    fs::write(
+        &dump,
+        "class Dump { void a(int x) { if (x > 0) {} if (x < 0) {} } }",
+    )
+    .unwrap();
+    let expanded = baseline_bytes(&root);
+    let bytes_up = bytes_delta(&baseline, &expanded);
+    let files_up = files_delta(&baseline, &expanded);
+    assert!(bytes_up > 0);
+    assert_eq!(files_up, 1);
+
+    fs::remove_file(&dump).unwrap();
+    let trimmed = baseline_bytes(&root);
+    assert_eq!(bytes_delta(&baseline, &trimmed), 0);
+    assert_eq!(files_delta(&baseline, &trimmed), 0);
+
+    let cc_baseline = baseline_complexity(&root);
+    fs::write(
+        &dump,
+        "class Dump { void a(int x) { if (x > 0) {} if (x < 0) {} } }",
+    )
+    .unwrap();
+    let cc_expanded = baseline_complexity(&root);
+    let cc_up = i64::from(cc_expanded.values().sum::<u32>())
+        - i64::from(cc_baseline.values().sum::<u32>());
+    assert!(cc_up > 0);
+
+    fs::remove_dir_all(&root).ok();
 }

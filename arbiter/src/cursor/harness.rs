@@ -46,6 +46,8 @@ impl Harness for CursorHarness {
 
     fn features(&self) -> Features {
         let mut features = self.engine.features();
+        features.bytes_delta = self.complexity.bytes_delta();
+        features.files_delta = self.complexity.files_delta();
         features.complexity_introduced = self.complexity.introduced();
         features
     }

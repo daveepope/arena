@@ -6,7 +6,9 @@ pub mod scoring;
 pub mod session;
 pub mod transcript;
 
-pub use complexity::{ComplexityDelta, ComplexityEngine};
+pub use complexity::{
+    baseline_bytes, bytes_delta, file_bytes, files_delta, ComplexityDelta, ComplexityEngine,
+};
 pub use features::{extract, Features};
 pub use harness::{AgentHarness, Harness, UnsupportedHarness};
 pub use scoring::{grade, report, score, DebtSample, Grade, Report};

@@ -70,5 +70,6 @@ _FACTORY = "tests/harness_factory/mod.rs"
         "harness_test",
         "sessions_test",
         "complexity_test",
+        "trajectory_test",
     ]
 ]

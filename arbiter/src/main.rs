@@ -179,12 +179,14 @@ fn print_report(report: &Report) {
 fn format_report(report: &Report) -> String {
     let features = &report.features;
     format!(
-        "debt={:.1} [{}] | turns={} autonomy={} spec_gap={:.2} complexity+={} probes={} reads={} shells={} edits={}B",
+        "debt={:.1} [{}] | turns={} autonomy={}/{} bytes={} files={} complexity={} probes={} reads={} shells={} edits={}B",
         report.debt,
         report.grade.label(),
         features.user_turns,
+        features.autonomy_streak,
         features.max_autonomy_run,
-        features.spec_gap,
+        features.bytes_delta,
+        features.files_delta,
         features.complexity_introduced,
         features.probe_hits,
         features.read_ops,

@@ -62,7 +62,13 @@ impl SessionEngine {
     }
 
     pub fn features(&self) -> Features {
-        let events = self.state.lock().expect("session state poisoned");
+        let events = match read_events(&self.path, self.parse) {
+            Ok(events) => events,
+            Err(_) => self.state.lock().expect("session state poisoned").clone(),
+        };
+        if let Ok(mut guard) = self.state.lock() {
+            *guard = events.clone();
+        }
         extract(&events)
     }
 

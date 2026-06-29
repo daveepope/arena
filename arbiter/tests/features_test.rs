@@ -59,6 +59,7 @@ fn extract_consecutive_assistant_returns_max_autonomy() {
     ];
     let features = extract(&events);
     assert_eq!(features.max_autonomy_run, 3);
+    assert_eq!(features.autonomy_streak, 1);
 }
 
 #[test]
@@ -71,4 +72,18 @@ fn extract_resets_autonomy_after_user_turn() {
     ];
     let features = extract(&events);
     assert_eq!(features.max_autonomy_run, 2);
+    assert_eq!(features.autonomy_streak, 1);
+}
+
+#[test]
+fn extract_ends_on_user_turn_zeros_autonomy_streak() {
+    let events = [
+        assistant_edit(1),
+        assistant_edit(1),
+        assistant_edit(1),
+        user(5, 0),
+    ];
+    let features = extract(&events);
+    assert_eq!(features.max_autonomy_run, 3);
+    assert_eq!(features.autonomy_streak, 0);
 }

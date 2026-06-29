@@ -9,8 +9,11 @@ pub struct Features {
     pub read_ops: usize,
     pub shell_ops: usize,
     pub probe_hits: usize,
+    pub autonomy_streak: usize,
     pub max_autonomy_run: usize,
     pub spec_gap: f64,
+    pub bytes_delta: i64,
+    pub files_delta: i64,
     pub complexity_introduced: i64,
 }
 
@@ -35,5 +38,6 @@ pub fn extract(events: &[Event]) -> Features {
     }
 
     features.spec_gap = features.edit_bytes as f64 / features.prompt_chars.max(1) as f64;
+    features.autonomy_streak = run;
     features
 }

@@ -187,6 +187,27 @@ pub fn baseline_complexity(root: &Path) -> HashMap<PathBuf, u32> {
     parallel_complexity(collect_source_files(root))
 }
 
+pub fn file_bytes(path: &Path) -> u64 {
+    fs::metadata(path).map(|metadata| metadata.len()).unwrap_or(0)
+}
+
+pub fn baseline_bytes(root: &Path) -> HashMap<PathBuf, u64> {
+    collect_source_files(root)
+        .into_iter()
+        .map(|path| (path.clone(), file_bytes(&path)))
+        .collect()
+}
+
+pub fn bytes_delta(baseline: &HashMap<PathBuf, u64>, current: &HashMap<PathBuf, u64>) -> i64 {
+    let baseline_total: i64 = baseline.values().map(|size| *size as i64).sum();
+    let current_total: i64 = current.values().map(|size| *size as i64).sum();
+    current_total - baseline_total
+}
+
+pub fn files_delta(baseline: &HashMap<PathBuf, u64>, current: &HashMap<PathBuf, u64>) -> i64 {
+    current.len() as i64 - baseline.len() as i64
+}
+
 fn parallel_complexity(files: Vec<PathBuf>) -> HashMap<PathBuf, u32> {
     let workers = std::thread::available_parallelism()
         .map(|count| count.get())
@@ -278,6 +299,8 @@ pub fn compute_deltas(
 struct DiskState {
     baseline: HashMap<PathBuf, u32>,
     current: HashMap<PathBuf, u32>,
+    baseline_bytes: HashMap<PathBuf, u64>,
+    current_bytes: HashMap<PathBuf, u64>,
 }
 
 pub struct ComplexityEngine {
@@ -297,10 +320,13 @@ impl ComplexityEngine {
 
     pub fn start(&mut self) -> notify::Result<()> {
         let baseline = baseline_complexity(&self.root);
+        let baseline_bytes = baseline_bytes(&self.root);
 
         if let Ok(mut guard) = self.state.lock() {
             guard.current = baseline.clone();
             guard.baseline = baseline;
+            guard.current_bytes = baseline_bytes.clone();
+            guard.baseline_bytes = baseline_bytes;
         }
 
         let state = Arc::clone(&self.state);
@@ -311,18 +337,38 @@ impl ComplexityEngine {
                     return;
                 };
                 for path in event.paths {
-                    if Language::from_path(&path).is_none() || is_ignored_descendant(&root, &path) {
+                    if is_ignored_descendant(&root, &path) {
                         continue;
                     }
-                    let value = complexity_of(&path);
+                    let is_source = Language::from_path(&path).is_some();
+                    let value = if is_source {
+                        complexity_of(&path)
+                    } else {
+                        None
+                    };
+                    let size = if is_source && path.is_file() {
+                        Some(file_bytes(&path))
+                    } else {
+                        None
+                    };
                     if let Ok(mut guard) = state.lock() {
                         match value {
                             Some(value) => {
-                                guard.current.insert(path, value);
+                                guard.current.insert(path.clone(), value);
                             }
-                            None => {
+                            None if is_source => {
                                 guard.current.remove(&path);
                             }
+                            None => {}
+                        }
+                        match size {
+                            Some(size) => {
+                                guard.current_bytes.insert(path, size);
+                            }
+                            None if is_source => {
+                                guard.current_bytes.remove(&path);
+                            }
+                            None => {}
                         }
                     }
                 }
@@ -343,6 +389,16 @@ impl ComplexityEngine {
     pub fn introduced(&self) -> i64 {
         let guard = self.state.lock().expect("complexity state poisoned");
         i64::from(total(&guard.current)) - i64::from(total(&guard.baseline))
+    }
+
+    pub fn bytes_delta(&self) -> i64 {
+        let guard = self.state.lock().expect("complexity state poisoned");
+        bytes_delta(&guard.baseline_bytes, &guard.current_bytes)
+    }
+
+    pub fn files_delta(&self) -> i64 {
+        let guard = self.state.lock().expect("complexity state poisoned");
+        files_delta(&guard.baseline_bytes, &guard.current_bytes)
     }
 
     pub fn deltas(&self) -> Vec<ComplexityDelta> {
