@@ -70,7 +70,10 @@ jobs:
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      needs.changes.outputs.publishable == 'true'
+      (
+        needs.changes.outputs.version_changed == 'true' ||
+        needs.changes.outputs.publishable == 'true'
+      )
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -343,7 +346,7 @@ jobs:
     if: >-
       always() && !cancelled() && !failure() &&
       needs.changes.outputs.bazel == 'true' &&
-      needs.changes.outputs.publishable == 'true' &&
+      needs.changes.outputs.version_changed == 'true' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -356,7 +359,6 @@ jobs:
         ) ||
         (
           github.event_name == 'push' &&
-          needs.changes.outputs.version_changed == 'true' &&
           (
             needs.master_merge_guard.outputs.from_merged_pr == 'true' ||
             (

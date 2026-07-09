@@ -111,7 +111,7 @@ If `pip` sees two wheels for the same version, remove old files under `bazel-bin
 
 ## Publish to PyPI
 
-Release version is driven by the repo root **`VERSION`** file. For same-repo PRs with publishable code changes, bump **`VERSION`**, run `python3 scripts/sync_version.py` to sync `Cargo.toml` and `MODULE.bazel`, and repin lockfiles if needed — CI blocks those PRs until **`VERSION`** increases vs `master`. Fork PRs run the full test matrix without a VERSION bump; TestPyPI and wheel build run only on same-repo PRs. Each same-repo PR push publishes a pre-release wheel to TestPyPI as `{VERSION}.dev{run_id}`. Merging to `master` publishes to PyPI only when **`VERSION`** changed on that merge.
+Release version is driven by the repo root **`VERSION`** file. For same-repo PRs with publishable code changes, bump **`VERSION`**, run `python3 scripts/sync_version.py` to sync `Cargo.toml` and `MODULE.bazel`, and repin lockfiles if needed — CI blocks those PRs until **`VERSION`** increases vs `master`. Fork PRs run the full test matrix without a VERSION bump; TestPyPI and wheel build run only on same-repo PRs. Each same-repo PR that changes **`VERSION`** publishes a pre-release wheel to TestPyPI as `{VERSION}.dev{run_id}` after tests pass. Merging to `master` publishes to PyPI only when **`VERSION`** changed on that merge.
 
 ### CI and branch protection
 
