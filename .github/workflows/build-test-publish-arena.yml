@@ -121,8 +121,8 @@ jobs:
               );
             }
 
-  full_ci:
-    name: Full CI gate
+  verify:
+    name: Verify (Ubuntu 24.04)
     needs: [changes, master_merge_guard]
     if: >-
       always() && !cancelled() && !failure() &&
@@ -138,16 +138,6 @@ jobs:
           needs.master_merge_guard.outputs.from_merged_pr != 'true'
         )
       )
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    steps:
-      - run: echo "Full build and test required."
-
-  verify:
-    name: Verify (Ubuntu 24.04)
-    needs: [changes, full_ci]
-    if: needs.full_ci.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -221,8 +211,21 @@ jobs:
 
   test_ubuntu_24_04:
     name: Test Ubuntu 24.04
-    needs: [changes, full_ci]
-    if: needs.full_ci.result == 'success'
+    needs: [changes, master_merge_guard]
+    if: >-
+      always() && !cancelled() && !failure() &&
+      needs.changes.outputs.bazel == 'true' &&
+      (
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped'
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
+      )
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -247,8 +250,21 @@ jobs:
 
   coverage_ubuntu_24_04:
     name: Coverage Ubuntu 24.04
-    needs: [changes, full_ci]
-    if: needs.full_ci.result == 'success'
+    needs: [changes, master_merge_guard]
+    if: >-
+      always() && !cancelled() && !failure() &&
+      needs.changes.outputs.bazel == 'true' &&
+      (
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped'
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
+      )
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -282,8 +298,21 @@ jobs:
 
   test_macos_intel:
     name: Test macOS Intel
-    needs: [changes, full_ci]
-    if: needs.full_ci.result == 'success'
+    needs: [changes, master_merge_guard]
+    if: >-
+      always() && !cancelled() && !failure() &&
+      needs.changes.outputs.bazel == 'true' &&
+      (
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped'
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
+      )
     runs-on: macos-15-intel
     permissions:
       contents: read
@@ -311,8 +340,21 @@ jobs:
 
   test_macos_arm64:
     name: Test macOS ARM64
-    needs: [changes, full_ci]
-    if: needs.full_ci.result == 'success'
+    needs: [changes, master_merge_guard]
+    if: >-
+      always() && !cancelled() && !failure() &&
+      needs.changes.outputs.bazel == 'true' &&
+      (
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped'
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
+      )
     runs-on: macos-latest
     permissions:
       contents: read
@@ -333,8 +375,8 @@ jobs:
       - name: Build and test
         run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
 
-  wheel:
-    name: Build wheel (${{ matrix.runs-on }})
+  publish_gate:
+    name: Publish gate
     needs:
       - changes
       - master_merge_guard
@@ -351,6 +393,7 @@ jobs:
         (
           github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.full_name == github.repository &&
+          needs.master_merge_guard.result == 'skipped' &&
           needs.require_version_bump.result == 'success' &&
           needs.verify.result == 'success' &&
           needs.test_ubuntu_24_04.result == 'success' &&
@@ -359,6 +402,7 @@ jobs:
         ) ||
         (
           github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
           (
             needs.master_merge_guard.outputs.from_merged_pr == 'true' ||
             (
@@ -370,6 +414,18 @@ jobs:
           )
         )
       )
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - run: echo "Ready to build release wheels."
+
+  wheel:
+    name: Build wheel (${{ matrix.runs-on }})
+    needs: [changes, publish_gate]
+    if: >-
+      always() && !cancelled() && !failure() &&
+      needs.publish_gate.result == 'success'
     runs-on: ${{ matrix.runs-on }}
     permissions:
       contents: read
@@ -430,6 +486,7 @@ jobs:
     name: Publish TestPyPI (Ubuntu 24.04)
     needs: wheel
     if: >-
+      always() && !cancelled() && !failure() &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       needs.wheel.result == 'success'
@@ -457,6 +514,7 @@ jobs:
     name: Publish PyPI (Ubuntu 24.04)
     needs: [changes, wheel]
     if: >-
+      always() && !cancelled() && !failure() &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/master' &&
       needs.changes.outputs.version_changed == 'true' &&
