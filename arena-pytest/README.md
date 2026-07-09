@@ -111,7 +111,18 @@ If `pip` sees two wheels for the same version, remove old files under `bazel-bin
 
 ## Publish to PyPI
 
-Release version is driven by the repo root **`VERSION`** file. On PRs, CI computes the next release from `master` (patch by default; add **`semver:minor`** or **`semver:major`** labels for larger bumps), tests with that version via CI artifacts, then commits **`VERSION`** and synced lockfiles to the PR branch after tests pass. `Cargo.toml`, `MODULE.bazel`, and the Bazel wheel read that value via sync; `pyproject.toml` loads it dynamically from `../VERSION`. Keep `arena-pytest/LICENSE` aligned with the repository root `LICENSE`, then rebuild the wheel.
+Release version is driven by the repo root **`VERSION`** file. For same-repo PRs with publishable code changes, bump **`VERSION`**, run `python3 scripts/sync_version.py` to sync `Cargo.toml` and `MODULE.bazel`, and repin lockfiles if needed — CI blocks those PRs until **`VERSION`** increases vs `master`. Fork PRs run the full test matrix without a VERSION bump; TestPyPI and wheel build run only on same-repo PRs. Each same-repo PR push publishes a pre-release wheel to TestPyPI as `{VERSION}.dev{run_id}`. Merging to `master` publishes to PyPI only when **`VERSION`** changed on that merge.
+
+### CI and branch protection
+
+Pull requests run the full test matrix on Linux and macOS when Bazel-relevant files change. Merges to `master` skip re-testing and go straight to wheel build and PyPI publish when **`VERSION`** changed on that merge — that fast path assumes the PR already passed required checks.
+
+Configure branch protection on `master` so merges require at least:
+
+- **Build, test, publish arena** — `Verify (Ubuntu 24.04)`, `Test Ubuntu 24.04`, `Test macOS Intel`, `Test macOS ARM64`, and `Require VERSION bump (same-repo PR)` when applicable
+- **OSV-Scanner** — dependency vulnerability scan on PRs
+
+Direct pushes to `master` run the full matrix again before any publish. Docs-only or CI-config-only changes skip the heavy jobs via path filters.
 
 ### 1. Smoke test (install the wheel locally, no upload)
 

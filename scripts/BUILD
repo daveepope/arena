@@ -15,18 +15,41 @@ py_library(
 )
 
 py_binary(
-    name = "bump_release_version",
-    srcs = ["bump_release_version.py"],
-    main = "bump_release_version.py",
+    name = "sync_version",
+    srcs = ["sync_version.py"],
+    main = "sync_version.py",
     deps = [":arena_version_lib"],
     imports = ["."],
     visibility = ["//visibility:public"],
 )
 
 py_binary(
-    name = "sync_version",
-    srcs = ["sync_version.py"],
-    main = "sync_version.py",
+    name = "check_version_bump",
+    srcs = ["check_version_bump.py"],
+    main = "check_version_bump.py",
+    deps = [":arena_version_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "check_release_lockfiles",
+    srcs = ["check_release_lockfiles.py"],
+    main = "check_release_lockfiles.py",
+    deps = [":arena_version_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "check_version_bump_test",
+    size = "small",
+    srcs = [
+        "check_release_lockfiles.py",
+        "check_version_bump.py",
+        "check_version_bump_test.py",
+    ],
+    main = "check_version_bump_test.py",
     deps = [":arena_version_lib"],
     imports = ["."],
     visibility = ["//visibility:public"],
