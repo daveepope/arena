@@ -1,4 +1,4 @@
-FROM rust:1-bookworm AS builder
+FROM rust:1-bookworm@sha256:7d0723df719e7f213b69dc7c8c595985c3f4b060cfbee4f7bc0e347a86fe3b6a AS builder
 
 RUN apt-get update && \
     apt-get install -y cmake pkg-config libssl-dev && \
@@ -56,7 +56,7 @@ RUN rm -rf target/release/.fingerprint/arena-* \
     cargo build --release --bin example-readings-axum-web-app -p arena-examples
 
 # --- Runtime ---
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:60eac759739651111db372c07be67863818726f754804b8707c90979bda511df
 
 RUN apt-get update && \
     apt-get install -y ca-certificates && \
