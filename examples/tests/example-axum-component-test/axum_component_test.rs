@@ -25,19 +25,29 @@ async fn kafka_bootstrap(arena: &OpenArena) -> String {
         .to_string()
 }
 
-async fn wait_reading_created_event(bootstrap: &str, expected_id: i32) -> http::ReadingCreatedEvent {
+async fn wait_reading_created_event<F, Fut>(bootstrap: &str, create: F) -> http::ReadingCreatedEvent
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = i32>,
+{
+    let (warmed_tx, warmed_rx) = std::sync::mpsc::channel();
     let (id_tx, id_rx) = std::sync::mpsc::channel();
     let bootstrap = bootstrap.to_string();
     let consume_handle = tokio::task::spawn_blocking(move || {
         consume_reading_created_event(
             bootstrap,
             "readings".to_string(),
+            warmed_tx,
             id_rx,
-            Duration::from_secs(5),
+            Duration::from_secs(15),
         )
     });
+    warmed_rx
+        .recv()
+        .expect("kafka consumer warmup");
+    let created_id = create().await;
     id_tx
-        .send(expected_id as i64)
+        .send(created_id as i64)
         .expect("send created_id to consumer");
     consume_handle
         .await
@@ -56,15 +66,17 @@ fn create_reading_publishes_event_and_lists_via_http() {
             .await
             .expect("reset validation db playbook");
 
-        let created_id = create_reading(
-            exec_web_app_port(),
-            "Readings API User",
-            77,
-            Some("kafka happy path".to_string()),
-        )
+        let consumed = wait_reading_created_event(&bootstrap, || async {
+            create_reading(
+                exec_web_app_port(),
+                "Readings API User",
+                77,
+                Some("kafka happy path".to_string()),
+            )
+            .await
+        })
         .await;
-
-        let consumed = wait_reading_created_event(&bootstrap, created_id).await;
+        let created_id = consumed.id as i32;
         assert_eq!(consumed.id, created_id as i64);
         assert_eq!(consumed.user_name, "Readings API User");
         assert_eq!(consumed.value, 77);

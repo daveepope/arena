@@ -421,22 +421,22 @@ jobs:
       - run: echo "Ready to build release wheels."
 
   wheel:
-    name: Build wheel (${{ matrix.runs-on }})
+    name: Build wheel (${{ matrix.runner }})
     needs: [changes, publish_gate]
     if: >-
       always() && !cancelled() && !failure() &&
       needs.publish_gate.result == 'success'
-    runs-on: ${{ matrix.runs-on }}
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
         include:
-          - runs-on: ubuntu-24.04
+          - runner: ubuntu-24.04
             artifact: arena-pytest-wheel-ubuntu-24.04
             disk-cache: build-test-publish-arena-ubuntu-24.04
-          - runs-on: macos-latest
+          - runner: macos-latest
             artifact: arena-pytest-wheel-macos-arm64
             disk-cache: build-test-publish-arena-macos-arm64
     steps:
