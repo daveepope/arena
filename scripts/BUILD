@@ -24,6 +24,15 @@ py_binary(
 )
 
 py_binary(
+    name = "bump_patch_version",
+    srcs = ["bump_patch_version.py"],
+    main = "bump_patch_version.py",
+    deps = [":arena_version_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
     name = "check_version_bump",
     srcs = ["check_version_bump.py"],
     main = "check_version_bump.py",
@@ -50,6 +59,19 @@ py_test(
         "check_version_bump_test.py",
     ],
     main = "check_version_bump_test.py",
+    deps = [":arena_version_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "bump_patch_version_test",
+    size = "small",
+    srcs = [
+        "bump_patch_version.py",
+        "bump_patch_version_test.py",
+    ],
+    main = "bump_patch_version_test.py",
     deps = [":arena_version_lib"],
     imports = ["."],
     visibility = ["//visibility:public"],

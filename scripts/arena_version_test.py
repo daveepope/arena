@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from arena_version import (
+    bump_patch_version,
     is_synced,
     read_version_from_git_ref,
     release_lockfiles_need_repin,
@@ -19,6 +20,11 @@ from arena_version import (
 class ReleaseVersionOnlyTest(unittest.TestCase):
     def test_release_version_only_dev_suffix_returns_base(self) -> None:
         self.assertEqual(release_version_only("1.0.1.dev12345"), "1.0.1")
+
+
+class BumpPatchVersionTest(unittest.TestCase):
+    def test_bump_patch_version_increments_patch(self) -> None:
+        self.assertEqual(bump_patch_version("1.1.0"), "1.1.1")
 
 
 class ReleaseVersionIncreasedTest(unittest.TestCase):

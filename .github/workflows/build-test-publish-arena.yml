@@ -73,6 +73,10 @@ jobs:
       (
         needs.changes.outputs.version_changed == 'true' ||
         needs.changes.outputs.publishable == 'true'
+      ) &&
+      !(
+        github.event.pull_request.user.login == 'dependabot[bot]' &&
+        needs.changes.outputs.version_changed != 'true'
       )
     runs-on: ubuntu-24.04
     permissions:
@@ -177,7 +181,8 @@ jobs:
       - name: Verify VERSION sync
         run: >-
           bazel test //scripts:version_sync_test //scripts:arena_version_test
-          //scripts:check_version_bump_test --config=ci
+          //scripts:check_version_bump_test //scripts:bump_patch_version_test
+          --config=ci
 
       - name: Check release lockfiles match VERSION
         if: steps.paths.outputs.version_file == 'true'

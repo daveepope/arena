@@ -1,0 +1,59 @@
+name: Dependabot version bump
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [master]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: dependabot-version-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  bump:
+    name: Bump patch version
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch base branch
+        run: git fetch origin "${{ github.base_ref }}"
+
+      - uses: bazel-contrib/setup-bazel@0.14.0
+        with:
+          bazelisk-cache: true
+          disk-cache: dependabot-version-bump
+          repository-cache: true
+
+      - name: Bump patch version and sync
+        env:
+          ARENA_VERSION_BASE_REF: origin/${{ github.base_ref }}
+        run: python3 scripts/bump_patch_version.py
+
+      - name: Repin lockfiles
+        run: |
+          CARGO_BAZEL_REPIN=1 bazel build //... --config=ci
+          bazel mod deps --lockfile_mode=update
+
+      - name: Commit and push
+        run: |
+          if git diff --quiet; then
+            echo "Release files already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION Cargo.toml MODULE.bazel Cargo.Bazel.lock Cargo.lock MODULE.bazel.lock
+          git commit -m "Bump patch version and sync release files"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
