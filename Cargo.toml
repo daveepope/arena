@@ -17,7 +17,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.2.0"
+version = "1.2.1"
 [workspace.dependencies]
 arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }
@@ -33,7 +33,7 @@ axum = "0.8.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_urlencoded = "0.7.1"
-tokio-postgres = "0.7"
+tokio-postgres = "0.7.18"
 postgres = "0.19"
 rdkafka = { version = "0.39.0" }
 backon = "1.5.2"

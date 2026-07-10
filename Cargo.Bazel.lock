@@ -1,5 +1,5 @@
 {
-  "checksum": "1d89241532f83d3b0ba3d98f0747ca4922e54199bda6e7cc99e7c19fb41392b2",
+  "checksum": "c9660012227e98d7430010168c3cb883e22350ddcdce06ffa7b522f48aa02a19",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -190,14 +190,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "anyhow 1.0.102": {
+    "anyhow 1.0.103": {
       "name": "anyhow",
-      "version": "1.0.102",
+      "version": "1.0.103",
       "package_url": "https://github.com/dtolnay/anyhow",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/anyhow/1.0.102/download",
-          "sha256": "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
+          "url": "https://static.crates.io/crates/anyhow/1.0.103/download",
+          "sha256": "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
         }
       },
       "targets": [
@@ -241,14 +241,14 @@
         "deps": {
           "common": [
             {
-              "id": "anyhow 1.0.102",
+              "id": "anyhow 1.0.103",
               "target": "build_script_build"
             }
           ],
           "selects": {}
         },
         "edition": "2021",
-        "version": "1.0.102"
+        "version": "1.0.103"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -268,9 +268,9 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arbiter 1.2.0": {
+    "arbiter 1.2.1": {
       "name": "arbiter",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -326,7 +326,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "1.2.0"
+        "version": "1.2.1"
       },
       "license": "todo",
       "license_ids": [],
@@ -419,9 +419,9 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arena 1.2.0": {
+    "arena 1.2.1": {
       "name": "arena",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -487,15 +487,15 @@
           ],
           "selects": {}
         },
-        "version": "1.2.0"
+        "version": "1.2.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-container 1.2.0": {
+    "arena-container 1.2.1": {
       "name": "arena-container",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -540,15 +540,15 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "1.2.0"
+        "version": "1.2.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-containerized-component 1.2.0": {
+    "arena-containerized-component 1.2.1": {
       "name": "arena-containerized-component",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -618,15 +618,15 @@
           ],
           "selects": {}
         },
-        "version": "1.2.0"
+        "version": "1.2.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-examples 1.2.0": {
+    "arena-examples 1.2.1": {
       "name": "arena-examples",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -691,7 +691,7 @@
               "target": "tokio"
             },
             {
-              "id": "tokio-postgres 0.7.17",
+              "id": "tokio-postgres 0.7.18",
               "target": "tokio_postgres"
             },
             {
@@ -724,15 +724,15 @@
           ],
           "selects": {}
         },
-        "version": "1.2.0"
+        "version": "1.2.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-executable-component 1.2.0": {
+    "arena-executable-component 1.2.1": {
       "name": "arena-executable-component",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -794,15 +794,15 @@
           ],
           "selects": {}
         },
-        "version": "1.2.0"
+        "version": "1.2.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-ffi 1.2.0": {
+    "arena-ffi 1.2.1": {
       "name": "arena-ffi",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -867,15 +867,15 @@
           ],
           "selects": {}
         },
-        "version": "1.2.0"
+        "version": "1.2.1"
       },
       "license": null,
       "license_ids": [],
       "license_file": null
     },
-    "arena-http 1.2.0": {
+    "arena-http 1.2.1": {
       "name": "arena-http",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -953,15 +953,15 @@
           ],
           "selects": {}
         },
-        "version": "1.2.0"
+        "version": "1.2.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-kafka 1.2.0": {
+    "arena-kafka 1.2.1": {
       "name": "arena-kafka",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1031,15 +1031,15 @@
           ],
           "selects": {}
         },
-        "version": "1.2.0"
+        "version": "1.2.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-localstack 1.2.0": {
+    "arena-localstack 1.2.1": {
       "name": "arena-localstack",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1141,15 +1141,15 @@
           ],
           "selects": {}
         },
-        "version": "1.2.0"
+        "version": "1.2.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-mssql 1.2.0": {
+    "arena-mssql 1.2.1": {
       "name": "arena-mssql",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1219,15 +1219,15 @@
           ],
           "selects": {}
         },
-        "version": "1.2.0"
+        "version": "1.2.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-oauth 1.2.0": {
+    "arena-oauth 1.2.1": {
       "name": "arena-oauth",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1333,15 +1333,15 @@
           ],
           "selects": {}
         },
-        "version": "1.2.0"
+        "version": "1.2.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-postgres 1.2.0": {
+    "arena-postgres 1.2.1": {
       "name": "arena-postgres",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1407,7 +1407,7 @@
           ],
           "selects": {}
         },
-        "version": "1.2.0"
+        "version": "1.2.1"
       },
       "license": "todo",
       "license_ids": [],
@@ -18380,7 +18380,7 @@
               "target": "tokio"
             },
             {
-              "id": "tokio-postgres 0.7.17",
+              "id": "tokio-postgres 0.7.18",
               "target": "tokio_postgres"
             }
           ],
@@ -18396,14 +18396,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "postgres-protocol 0.6.11": {
+    "postgres-protocol 0.6.12": {
       "name": "postgres-protocol",
-      "version": "0.6.11",
+      "version": "0.6.12",
       "package_url": "https://github.com/rust-postgres/rust-postgres",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/postgres-protocol/0.6.11/download",
-          "sha256": "56201207dac53e2f38e848e31b4b91616a6bb6e0c7205b77718994a7f49e70fc"
+          "url": "https://static.crates.io/crates/postgres-protocol/0.6.12/download",
+          "sha256": "08808e3c483c46e999108051c78334f473d5adb59d78bb80a1268c7e6aa6c514"
         }
       },
       "targets": [
@@ -18477,7 +18477,7 @@
           "selects": {}
         },
         "edition": "2024",
-        "version": "0.6.11"
+        "version": "0.6.12"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -18486,14 +18486,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "postgres-types 0.2.13": {
+    "postgres-types 0.2.14": {
       "name": "postgres-types",
-      "version": "0.2.13",
+      "version": "0.2.14",
       "package_url": "https://github.com/rust-postgres/rust-postgres",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/postgres-types/0.2.13/download",
-          "sha256": "8dc729a129e682e8d24170cd30ae1aa01b336b096cbb56df6d534ffec133d186"
+          "url": "https://static.crates.io/crates/postgres-types/0.2.14/download",
+          "sha256": "851ca9db4932932d69f3ea811b1abe63087a0f740a47692619dd40d4899b68be"
         }
       },
       "targets": [
@@ -18526,14 +18526,14 @@
               "target": "fallible_iterator"
             },
             {
-              "id": "postgres-protocol 0.6.11",
+              "id": "postgres-protocol 0.6.12",
               "target": "postgres_protocol"
             }
           ],
           "selects": {}
         },
         "edition": "2024",
-        "version": "0.2.13"
+        "version": "0.2.14"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -19231,7 +19231,7 @@
         "deps": {
           "common": [
             {
-              "id": "anyhow 1.0.102",
+              "id": "anyhow 1.0.103",
               "target": "anyhow"
             },
             {
@@ -19372,7 +19372,7 @@
               "target": "build_script_build"
             },
             {
-              "id": "quinn-proto 0.11.14",
+              "id": "quinn-proto 0.11.15",
               "target": "quinn_proto",
               "alias": "proto"
             },
@@ -19443,14 +19443,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "quinn-proto 0.11.14": {
+    "quinn-proto 0.11.15": {
       "name": "quinn-proto",
-      "version": "0.11.14",
+      "version": "0.11.15",
       "package_url": "https://github.com/quinn-rs/quinn",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/quinn-proto/0.11.14/download",
-          "sha256": "434b42fec591c96ef50e21e886936e66d3cc3f737104fdb9b737c40ffb94c098"
+          "url": "https://static.crates.io/crates/quinn-proto/0.11.15/download",
+          "sha256": "4fcb935c5bec503c2f0e306bdd3e58bb9029dcb14fa8d9ac76e3a5256ac0763e"
         }
       },
       "targets": [
@@ -19529,7 +19529,7 @@
           }
         },
         "edition": "2021",
-        "version": "0.11.14"
+        "version": "0.11.15"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -26233,14 +26233,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "tokio-postgres 0.7.17": {
+    "tokio-postgres 0.7.18": {
       "name": "tokio-postgres",
-      "version": "0.7.17",
+      "version": "0.7.18",
       "package_url": "https://github.com/rust-postgres/rust-postgres",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/tokio-postgres/0.7.17/download",
-          "sha256": "4dd8df5ef180f6364759a6f00f7aadda4fbbac86cdee37480826a6ff9f3574ce"
+          "url": "https://static.crates.io/crates/tokio-postgres/0.7.18/download",
+          "sha256": "a528f7d280f6d5b9cd149635c8705b0dd049754bc67d81d31fa25169a93809d3"
         }
       },
       "targets": [
@@ -26312,11 +26312,11 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "postgres-protocol 0.6.11",
+              "id": "postgres-protocol 0.6.12",
               "target": "postgres_protocol"
             },
             {
-              "id": "postgres-types 0.2.13",
+              "id": "postgres-types 0.2.14",
               "target": "postgres_types"
             },
             {
@@ -26355,7 +26355,7 @@
           ],
           "selects": {}
         },
-        "version": "0.7.17"
+        "version": "0.7.18"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -29800,7 +29800,7 @@
         "deps": {
           "common": [
             {
-              "id": "anyhow 1.0.102",
+              "id": "anyhow 1.0.103",
               "target": "anyhow"
             },
             {
@@ -32521,7 +32521,7 @@
         "deps": {
           "common": [
             {
-              "id": "anyhow 1.0.102",
+              "id": "anyhow 1.0.103",
               "target": "anyhow"
             },
             {
@@ -32589,7 +32589,7 @@
         "deps": {
           "common": [
             {
-              "id": "anyhow 1.0.102",
+              "id": "anyhow 1.0.103",
               "target": "anyhow"
             },
             {
@@ -32701,7 +32701,7 @@
         "deps": {
           "common": [
             {
-              "id": "anyhow 1.0.102",
+              "id": "anyhow 1.0.103",
               "target": "anyhow"
             },
             {
@@ -32797,7 +32797,7 @@
         "deps": {
           "common": [
             {
-              "id": "anyhow 1.0.102",
+              "id": "anyhow 1.0.103",
               "target": "anyhow"
             },
             {
@@ -32899,7 +32899,7 @@
         "deps": {
           "common": [
             {
-              "id": "anyhow 1.0.102",
+              "id": "anyhow 1.0.103",
               "target": "anyhow"
             },
             {
@@ -34193,19 +34193,19 @@
   },
   "binary_crates": [],
   "workspace_members": {
-    "arbiter 1.2.0": "arbiter",
-    "arena 1.2.0": "arena",
-    "arena-container 1.2.0": "arena-container",
-    "arena-containerized-component 1.2.0": "arena-containerized-component",
-    "arena-examples 1.2.0": "examples",
-    "arena-executable-component 1.2.0": "arena-executable-component",
-    "arena-ffi 1.2.0": "arena-ffi",
-    "arena-http 1.2.0": "arena-http",
-    "arena-kafka 1.2.0": "arena-kafka",
-    "arena-localstack 1.2.0": "arena-localstack",
-    "arena-mssql 1.2.0": "arena-mssql",
-    "arena-oauth 1.2.0": "arena-oauth",
-    "arena-postgres 1.2.0": "arena-postgres"
+    "arbiter 1.2.1": "arbiter",
+    "arena 1.2.1": "arena",
+    "arena-container 1.2.1": "arena-container",
+    "arena-containerized-component 1.2.1": "arena-containerized-component",
+    "arena-examples 1.2.1": "examples",
+    "arena-executable-component 1.2.1": "arena-executable-component",
+    "arena-ffi 1.2.1": "arena-ffi",
+    "arena-http 1.2.1": "arena-http",
+    "arena-kafka 1.2.1": "arena-kafka",
+    "arena-localstack 1.2.1": "arena-localstack",
+    "arena-mssql 1.2.1": "arena-mssql",
+    "arena-oauth 1.2.1": "arena-oauth",
+    "arena-postgres 1.2.1": "arena-postgres"
   },
   "conditions": {
     "aarch64-apple-darwin": [
@@ -34439,7 +34439,7 @@
     "testcontainers-modules 0.15.0",
     "tiberius 0.12.3",
     "tokio 1.52.1",
-    "tokio-postgres 0.7.17",
+    "tokio-postgres 0.7.18",
     "tokio-util 0.7.18",
     "tracing 0.1.44",
     "tracing-subscriber 0.3.23",
