@@ -87,6 +87,7 @@ pub async fn get_readings(port: u16) -> Vec<Reading> {
 pub fn consume_reading_created_event(
     bootstrap: String,
     topic: String,
+    warmed_tx: std::sync::mpsc::Sender<()>,
     id_rx: std::sync::mpsc::Receiver<i64>,
     timeout: Duration,
 ) -> Result<ReadingCreatedEvent, String> {
@@ -94,6 +95,7 @@ pub fn consume_reading_created_event(
         .set("bootstrap.servers", &bootstrap)
         .set("group.id", format!("component-test-{}", std::process::id()))
         .set("auto.offset.reset", "earliest")
+        .set("enable.auto.commit", "false")
         .create()
         .map_err(|e| format!("create kafka consumer failed: {e}"))?;
 
@@ -101,7 +103,13 @@ pub fn consume_reading_created_event(
         .subscribe(&[&topic])
         .map_err(|e| format!("kafka subscribe failed: {e}"))?;
 
-    let expected_id = id_rx.recv().map_err(|_| "id channel closed")?;
+    warm_assignment(&consumer)?;
+
+    warmed_tx
+        .send(())
+        .map_err(|_| "warmed signal channel closed".to_string())?;
+
+    let expected_id = id_rx.recv().map_err(|_| "id channel closed".to_string())?;
 
     let deadline = Instant::now() + timeout;
     while Instant::now() < deadline {
@@ -122,6 +130,23 @@ pub fn consume_reading_created_event(
         }
     }
     Err("did not receive expected ReadingCreatedEvent before timeout".to_string())
+}
+
+fn warm_assignment(consumer: &BaseConsumer) -> Result<(), String> {
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while Instant::now() < deadline {
+        let _ = consumer.poll(Duration::from_millis(100));
+        let assigned = consumer
+            .assignment()
+            .map_err(|e| format!("kafka assignment query failed: {e}"))?;
+        if assigned.count() > 0 {
+            return Ok(());
+        }
+    }
+    eprintln!(
+        "WARN: kafka consumer partition assignment not ready after 3s; continuing consume poll"
+    );
+    Ok(())
 }
 
 pub async fn post_reading_raw(

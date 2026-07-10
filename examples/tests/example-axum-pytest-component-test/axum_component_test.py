@@ -23,8 +23,10 @@ def test_create_reading_publishes_event_and_lists_via_http(
     api_client: ApiClient,
     wait_reading_created_event,
 ):
-    created_id = api_client.create_reading("Readings API User", 77, "kafka happy path")
-    consumed = wait_reading_created_event(created_id)
+    consumed = wait_reading_created_event(
+        lambda: api_client.create_reading("Readings API User", 77, "kafka happy path")
+    )
+    created_id = consumed["id"]
     assert consumed["id"] == created_id
     assert consumed["user_name"] == "Readings API User"
     assert consumed["value"] == 77

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import subprocess
 from pathlib import Path
@@ -105,32 +104,8 @@ def parse_release_version(version: str) -> tuple[int, int, int]:
     return int(match.group(1)), int(match.group(2)), int(match.group(3))
 
 
-def bump_release_version(version: str, level: str) -> str:
-    major, minor, patch = parse_release_version(version)
-    if level == "major":
-        return f"{major + 1}.0.0"
-    if level == "minor":
-        return f"{major}.{minor + 1}.0"
-    if level == "patch":
-        return f"{major}.{minor}.{patch + 1}"
-    raise ValueError(f"unsupported semver level {level!r}")
-
-
-def resolve_semver_level_from_labels(labels: list[str]) -> str:
-    if "semver:major" in labels:
-        return "major"
-    if "semver:minor" in labels:
-        return "minor"
-    return "patch"
-
-
-def resolve_semver_level_from_event(event_path: Path) -> str:
-    payload = json.loads(event_path.read_text(encoding="utf-8"))
-    labels = [
-        label["name"]
-        for label in payload.get("pull_request", {}).get("labels", [])
-    ]
-    return resolve_semver_level_from_labels(labels)
+def release_version_increased(base: str, head: str) -> bool:
+    return parse_release_version(head) > parse_release_version(base)
 
 
 def _git_show_at_ref(root: Path, ref: str, path: str) -> str | None:
@@ -163,72 +138,27 @@ def _parse_module_bazel_version_text(module: str) -> str | None:
 
 
 def read_version_from_git_ref(root: Path, ref: str) -> str:
-    version, _has_version_file = read_release_version_from_git_ref(root, ref)
-    return version
-
-
-def read_release_version_from_git_ref(root: Path, ref: str) -> tuple[str, bool]:
     version_text = _git_show_at_ref(root, ref, "VERSION")
     if version_text is not None:
         version = version_text.strip()
         if version:
-            return release_version_only(version), True
+            return release_version_only(version)
 
     cargo_text = _git_show_at_ref(root, ref, "Cargo.toml")
     if cargo_text is not None:
         parsed = _parse_cargo_workspace_version_text(cargo_text)
         if parsed:
-            return parsed, False
+            return parsed
 
     module_text = _git_show_at_ref(root, ref, "MODULE.bazel")
     if module_text is not None:
         parsed = _parse_module_bazel_version_text(module_text)
         if parsed:
-            return parsed, False
+            return parsed
 
     raise ValueError(
         f"no release version found at {ref} (expected VERSION, Cargo.toml, or MODULE.bazel)"
     )
-
-
-def release_target_from_base(root: Path, base_ref: str, level: str) -> str:
-    base, base_has_version_file = read_release_version_from_git_ref(root, base_ref)
-    if not base_has_version_file:
-        return "1.0.0"
-    return bump_release_version(base, level)
-
-
-def apply_release_target(root: Path, target: str) -> list[str]:
-    changed: list[str] = []
-    if release_version_only(read_version(root)) != target:
-        write_version(root, target)
-        changed.append("VERSION")
-    changed.extend(sync_workspace_version(root))
-    return changed
-
-
-def apply_preview_version(root: Path, target: str) -> list[str]:
-    if release_version_only(read_version(root)) == target:
-        return []
-    write_version(root, target)
-    return ["VERSION"]
-
-
-def prepare_release_from_base(root: Path, base_ref: str, level: str) -> tuple[str, list[str]]:
-    target = release_target_from_base(root, base_ref, level)
-    changed = apply_release_target(root, target)
-    return target, changed
-
-
-def prepare_preview_from_base(root: Path, base_ref: str, level: str) -> tuple[str, list[str]]:
-    target = release_target_from_base(root, base_ref, level)
-    changed = apply_preview_version(root, target)
-    return target, changed
-
-
-def preview_only_from_env() -> bool:
-    raw = os.environ.get("ARENA_VERSION_PREVIEW_ONLY", "").strip().lower()
-    return raw in ("1", "true", "yes")
 
 
 def workspace_version_in_cargo_bazel_lock(root: Path) -> str | None:
@@ -255,13 +185,3 @@ def release_lockfiles_need_repin(root: Path, target: str) -> bool:
             return True
         return release_version_only(cargo) != target
     return locked != target
-
-
-def resolve_semver_level_from_env() -> str:
-    level = os.environ.get("ARENA_SEMVER_LEVEL", "").strip().lower()
-    if level in ("major", "minor", "patch"):
-        return level
-    event_path = os.environ.get("GITHUB_EVENT_PATH")
-    if event_path:
-        return resolve_semver_level_from_event(Path(event_path))
-    return "patch"

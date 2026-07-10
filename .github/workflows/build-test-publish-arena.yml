@@ -5,7 +5,7 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
 
 concurrency:
   group: build-test-publish-${{ github.event.pull_request.number || github.ref }}
@@ -20,7 +20,7 @@ jobs:
     outputs:
       bazel: ${{ steps.filter.outputs.bazel }}
       publishable: ${{ steps.filter.outputs.publishable }}
-      ci_mode: ${{ steps.mode.outputs.ci_mode }}
+      version_changed: ${{ steps.filter.outputs.version_changed }}
     steps:
       - uses: actions/checkout@v4
 
@@ -51,58 +51,58 @@ jobs:
               - '!.codecov.yml'
               - '!LICENSE'
               - '!**/*.png'
-
-      - id: mode
-        run: |
-          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/master" ]; then
-            case "${{ github.event.head_commit.message }}" in
-              *"chore: release VERSION"*) echo "ci_mode=version_commit" >> "$GITHUB_OUTPUT" ;;
-              *) echo "ci_mode=master_push" >> "$GITHUB_OUTPUT" ;;
-            esac
-          else
-            echo "ci_mode=pr" >> "$GITHUB_OUTPUT"
-          fi
+            version_changed:
+              - 'VERSION'
 
   docs_only:
     name: Docs / agent rules only
     needs: changes
-    if: needs.changes.outputs.bazel != 'true' && needs.changes.outputs.ci_mode != 'version_commit'
+    if: needs.changes.outputs.bazel != 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
       - run: echo "No Bazel-relevant changes; build and test skipped."
 
-  version_commit_verify:
-    name: Verify VERSION sync (version commit)
+  require_version_bump:
+    name: Require VERSION bump (same-repo PR)
     needs: changes
-    if: needs.changes.outputs.ci_mode == 'version_commit'
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (
+        needs.changes.outputs.version_changed == 'true' ||
+        needs.changes.outputs.publishable == 'true'
+      )
     runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.14.0
         with:
-          bazelisk-cache: true
-          disk-cache: build-test-publish-arena-ubuntu-24.04
-          repository-cache: true
+          fetch-depth: 0
 
-      - name: Verify VERSION sync
-        run: bazel test //scripts:version_sync_test //scripts:arena_version_test --config=ci
+      - name: Fetch base branch
+        run: git fetch origin "${{ github.base_ref }}"
+
+      - name: Require VERSION bump for publishable changes
+        env:
+          ARENA_VERSION_BASE_REF: origin/${{ github.base_ref }}
+        run: python3 scripts/check_version_bump.py
 
   master_merge_guard:
     name: Guard master publish path
     needs: changes
-    if: needs.changes.outputs.ci_mode == 'master_push'
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/master' &&
+      needs.changes.outputs.bazel == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
     outputs:
-      allow_fast_publish: ${{ steps.guard.outputs.allow_fast_publish }}
+      from_merged_pr: ${{ steps.guard.outputs.from_merged_pr }}
     steps:
       - uses: actions/github-script@v7
         id: guard
@@ -114,106 +114,29 @@ jobs:
               commit_sha: context.sha,
             });
             const merged = data.some((pr) => pr.merged_at);
-            core.setOutput("allow_fast_publish", merged ? "true" : "false");
+            core.setOutput("from_merged_pr", merged ? "true" : "false");
             if (!merged) {
               core.warning(
                 "Direct push to master: full CI is required before publish. Open a pull request to use the fast publish path."
               );
             }
 
-  release_preview:
-    name: Release version preview
-    needs: changes
-    if: >-
-      needs.changes.outputs.publishable == 'true' &&
-      (
-        needs.changes.outputs.ci_mode == 'master_push' ||
-        (
-          needs.changes.outputs.ci_mode == 'pr' &&
-          github.event.pull_request.head.repo.full_name == github.repository
-        )
-      )
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      release_target: ${{ steps.preview.outputs.release_target }}
-      artifact_ready: ${{ steps.upload.outputs.outcome == 'success' }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
-          fetch-depth: 0
-
-      - name: Resolve semver level from labels
-        id: semver
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const labelNames = (labels) => labels.map((label) => label.name);
-            const levelFromLabels = (labels) => {
-              if (labels.includes("semver:major")) return "major";
-              if (labels.includes("semver:minor")) return "minor";
-              return "patch";
-            };
-            let level = "patch";
-            if (context.eventName === "pull_request") {
-              level = levelFromLabels(labelNames(context.payload.pull_request.labels));
-            } else {
-              const { data } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                commit_sha: context.sha,
-              });
-              const merged = data.find((pr) => pr.merged_at) ?? data[0];
-              if (merged) {
-                level = levelFromLabels(labelNames(merged.labels));
-              }
-            }
-            core.setOutput("level", level);
-
-      - name: Set release base ref
-        id: base
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git fetch origin master
-            echo "ref=origin/master" >> "$GITHUB_OUTPUT"
-          else
-            echo "ref=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Preview release VERSION
-        id: preview
-        env:
-          ARENA_VERSION_BASE_REF: ${{ steps.base.outputs.ref }}
-          ARENA_SEMVER_LEVEL: ${{ steps.semver.outputs.level }}
-          ARENA_VERSION_PREVIEW_ONLY: "true"
-        run: python3 scripts/bump_release_version.py
-
-      - name: Upload release VERSION preview
-        id: upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: arena-release-version
-          path: VERSION
-          if-no-files-found: error
-
-  verify_cargo_bazel_lock:
-    name: Verify Cargo.Bazel.lock (Ubuntu 24.04)
+  verify:
+    name: Verify (Ubuntu 24.04)
     needs: [changes, master_merge_guard]
     if: >-
-      always() &&
-      !cancelled() &&
+      always() && !cancelled() && !failure() &&
       needs.changes.outputs.bazel == 'true' &&
       (
-        needs.changes.outputs.ci_mode == 'pr' &&
-        needs.master_merge_guard.result == 'skipped'
-      ) ||
-      (
-        needs.changes.outputs.ci_mode == 'master_push' &&
-        needs.master_merge_guard.result == 'success' &&
-        needs.master_merge_guard.outputs.allow_fast_publish != 'true'
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped'
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
       )
     runs-on: ubuntu-24.04
     permissions:
@@ -225,7 +148,7 @@ jobs:
           fetch-depth: 0
 
       - uses: dorny/paths-filter@v3
-        id: rust_crates
+        id: paths
         with:
           filters: |
             rust_crates:
@@ -233,57 +156,8 @@ jobs:
               - 'Cargo.Bazel.lock'
               - '**/Cargo.toml'
               - 'MODULE.bazel'
-
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.14.0
-        with:
-          bazelisk-cache: true
-          disk-cache: build-test-publish-arena-ubuntu-24.04
-          repository-cache: true
-
-      - name: Verify VERSION sync
-        run: bazel test //scripts:version_sync_test //scripts:arena_version_test --config=ci
-
-      - name: Verify lockfiles
-        if: steps.rust_crates.outputs.rust_crates == 'true'
-        run: |
-          CARGO_BAZEL_REPIN=1 bazel build //...
-          bazel mod deps --lockfile_mode=update
-          if ! git diff --quiet Cargo.Bazel.lock MODULE.bazel.lock; then
-            echo "Lockfiles are out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //... && bazel mod deps --lockfile_mode=update"
-            git diff Cargo.Bazel.lock MODULE.bazel.lock
-            exit 1
-          fi
-
-  verify_dependency_release_age:
-    name: Verify dependency release age (Ubuntu 24.04)
-    needs: [changes, master_merge_guard]
-    if: >-
-      always() &&
-      !cancelled() &&
-      needs.changes.outputs.bazel == 'true' &&
-      (
-        needs.changes.outputs.ci_mode == 'pr' &&
-        needs.master_merge_guard.result == 'skipped'
-      ) ||
-      (
-        needs.changes.outputs.ci_mode == 'master_push' &&
-        needs.master_merge_guard.result == 'success' &&
-        needs.master_merge_guard.outputs.allow_fast_publish != 'true'
-      )
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
-          fetch-depth: 0
-
-      - uses: dorny/paths-filter@v3
-        id: dep_files
-        with:
-          filters: |
+            version_file:
+              - 'VERSION'
             deps:
               - 'Cargo.Bazel.lock'
               - 'Cargo.toml'
@@ -294,15 +168,36 @@ jobs:
               - 'MODULE.bazel.lock'
 
       - name: Setup Bazel
-        if: steps.dep_files.outputs.deps == 'true'
         uses: bazel-contrib/setup-bazel@0.14.0
         with:
           bazelisk-cache: true
           disk-cache: build-test-publish-arena-ubuntu-24.04
           repository-cache: true
 
+      - name: Verify VERSION sync
+        run: >-
+          bazel test //scripts:version_sync_test //scripts:arena_version_test
+          //scripts:check_version_bump_test --config=ci
+
+      - name: Check release lockfiles match VERSION
+        if: steps.paths.outputs.version_file == 'true'
+        run: python3 scripts/check_release_lockfiles.py
+
+      - name: Verify lockfiles
+        if: >-
+          steps.paths.outputs.rust_crates == 'true' ||
+          steps.paths.outputs.version_file == 'true'
+        run: |
+          CARGO_BAZEL_REPIN=1 bazel build //... --config=ci
+          bazel mod deps --lockfile_mode=update
+          if ! git diff --quiet Cargo.Bazel.lock Cargo.lock MODULE.bazel.lock; then
+            echo "Lockfiles are out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //... && bazel mod deps --lockfile_mode=update"
+            git diff Cargo.Bazel.lock Cargo.lock MODULE.bazel.lock
+            exit 1
+          fi
+
       - name: Check dependency release age
-        if: steps.dep_files.outputs.deps == 'true'
+        if: steps.paths.outputs.deps == 'true'
         env:
           ARENA_DEP_AGE_BASE_REF: >-
             ${{
@@ -318,17 +213,18 @@ jobs:
     name: Test Ubuntu 24.04
     needs: [changes, master_merge_guard]
     if: >-
-      always() &&
-      !cancelled() &&
+      always() && !cancelled() && !failure() &&
       needs.changes.outputs.bazel == 'true' &&
       (
-        needs.changes.outputs.ci_mode == 'pr' &&
-        needs.master_merge_guard.result == 'skipped'
-      ) ||
-      (
-        needs.changes.outputs.ci_mode == 'master_push' &&
-        needs.master_merge_guard.result == 'success' &&
-        needs.master_merge_guard.outputs.allow_fast_publish != 'true'
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped'
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
       )
     runs-on: ubuntu-24.04
     permissions:
@@ -356,17 +252,18 @@ jobs:
     name: Coverage Ubuntu 24.04
     needs: [changes, master_merge_guard]
     if: >-
-      always() &&
-      !cancelled() &&
+      always() && !cancelled() && !failure() &&
       needs.changes.outputs.bazel == 'true' &&
       (
-        needs.changes.outputs.ci_mode == 'pr' &&
-        needs.master_merge_guard.result == 'skipped'
-      ) ||
-      (
-        needs.changes.outputs.ci_mode == 'master_push' &&
-        needs.master_merge_guard.result == 'success' &&
-        needs.master_merge_guard.outputs.allow_fast_publish != 'true'
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped'
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
       )
     runs-on: ubuntu-24.04
     permissions:
@@ -403,17 +300,18 @@ jobs:
     name: Test macOS Intel
     needs: [changes, master_merge_guard]
     if: >-
-      always() &&
-      !cancelled() &&
+      always() && !cancelled() && !failure() &&
       needs.changes.outputs.bazel == 'true' &&
       (
-        needs.changes.outputs.ci_mode == 'pr' &&
-        needs.master_merge_guard.result == 'skipped'
-      ) ||
-      (
-        needs.changes.outputs.ci_mode == 'master_push' &&
-        needs.master_merge_guard.result == 'success' &&
-        needs.master_merge_guard.outputs.allow_fast_publish != 'true'
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped'
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
       )
     runs-on: macos-15-intel
     permissions:
@@ -444,17 +342,18 @@ jobs:
     name: Test macOS ARM64
     needs: [changes, master_merge_guard]
     if: >-
-      always() &&
-      !cancelled() &&
+      always() && !cancelled() && !failure() &&
       needs.changes.outputs.bazel == 'true' &&
       (
-        needs.changes.outputs.ci_mode == 'pr' &&
-        needs.master_merge_guard.result == 'skipped'
-      ) ||
-      (
-        needs.changes.outputs.ci_mode == 'master_push' &&
-        needs.master_merge_guard.result == 'success' &&
-        needs.master_merge_guard.outputs.allow_fast_publish != 'true'
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped'
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
       )
     runs-on: macos-latest
     permissions:
@@ -476,50 +375,68 @@ jobs:
       - name: Build and test
         run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
 
-  wheel:
-    name: Build wheel (${{ matrix.runs-on }})
-    needs: [changes, master_merge_guard, release_preview, test_ubuntu_24_04, test_macos_intel, test_macos_arm64]
+  publish_gate:
+    name: Publish gate
+    needs:
+      - changes
+      - master_merge_guard
+      - require_version_bump
+      - verify
+      - test_ubuntu_24_04
+      - test_macos_intel
+      - test_macos_arm64
     if: >-
-      always() &&
-      !cancelled() &&
-      needs.changes.result == 'success' &&
+      always() && !cancelled() && !failure() &&
       needs.changes.outputs.bazel == 'true' &&
-      needs.changes.outputs.publishable == 'true' &&
-      needs.release_preview.result == 'success' &&
+      needs.changes.outputs.version_changed == 'true' &&
       (
         (
-          needs.changes.outputs.ci_mode == 'master_push' &&
-          needs.master_merge_guard.result == 'success' &&
-          needs.master_merge_guard.outputs.allow_fast_publish == 'true'
-        ) ||
-        (
-          needs.changes.outputs.ci_mode == 'master_push' &&
-          needs.master_merge_guard.result == 'success' &&
-          needs.master_merge_guard.outputs.allow_fast_publish != 'true' &&
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          needs.master_merge_guard.result == 'skipped' &&
+          needs.require_version_bump.result == 'success' &&
+          needs.verify.result == 'success' &&
           needs.test_ubuntu_24_04.result == 'success' &&
           needs.test_macos_intel.result == 'success' &&
           needs.test_macos_arm64.result == 'success'
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          (
+            needs.master_merge_guard.outputs.from_merged_pr == 'true' ||
+            (
+              needs.verify.result == 'success' &&
+              needs.test_ubuntu_24_04.result == 'success' &&
+              needs.test_macos_intel.result == 'success' &&
+              needs.test_macos_arm64.result == 'success'
+            )
+          )
         )
-      ) ||
-      (
-        needs.changes.outputs.ci_mode == 'pr' &&
-        needs.master_merge_guard.result == 'skipped' &&
-        needs.test_ubuntu_24_04.result == 'success' &&
-        needs.test_macos_intel.result == 'success' &&
-        needs.test_macos_arm64.result == 'success' &&
-        github.event.pull_request.head.repo.full_name == github.repository
       )
-    runs-on: ${{ matrix.runs-on }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - run: echo "Ready to build release wheels."
+
+  wheel:
+    name: Build wheel (${{ matrix.runner }})
+    needs: [changes, publish_gate]
+    if: >-
+      always() && !cancelled() && !failure() &&
+      needs.publish_gate.result == 'success'
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
         include:
-          - runs-on: ubuntu-24.04
+          - runner: ubuntu-24.04
             artifact: arena-pytest-wheel-ubuntu-24.04
             disk-cache: build-test-publish-arena-ubuntu-24.04
-          - runs-on: macos-latest
+          - runner: macos-latest
             artifact: arena-pytest-wheel-macos-arm64
             disk-cache: build-test-publish-arena-macos-arm64
     steps:
@@ -527,11 +444,6 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
           fetch-depth: 0
-
-      - uses: actions/download-artifact@v4
-        if: needs.release_preview.outputs.artifact_ready == 'true'
-        with:
-          name: arena-release-version
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.14.0
@@ -570,70 +482,14 @@ jobs:
           path: bazel-bin/arena-pytest/*.whl
           if-no-files-found: error
 
-  commit_release_version:
-    name: Commit release VERSION (master)
-    needs: [changes, master_merge_guard, wheel, release_preview]
-    if: >-
-      always() &&
-      !cancelled() &&
-      needs.changes.outputs.ci_mode == 'master_push' &&
-      needs.master_merge_guard.result == 'success' &&
-      needs.release_preview.result == 'success' &&
-      needs.wheel.result == 'success'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: arena-release-version
-
-      - name: Sync release VERSION
-        run: python3 scripts/sync_version.py
-
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.14.0
-        with:
-          bazelisk-cache: true
-          disk-cache: build-test-publish-arena-ubuntu-24.04
-          repository-cache: true
-
-      - name: Repin lockfiles for release VERSION
-        run: |
-          if python3 -c "
-          from pathlib import Path
-          import sys
-          sys.path.insert(0, 'scripts')
-          from arena_version import read_version, release_lockfiles_need_repin
-          root = Path('.')
-          sys.exit(0 if release_lockfiles_need_repin(root, read_version(root)) else 1)
-          "; then
-            CARGO_BAZEL_REPIN=1 bazel build //...
-            bazel mod deps --lockfile_mode=update
-          else
-            echo "lockfiles already match VERSION"
-          fi
-
-      - name: Commit release version
-        run: |
-          if git diff --quiet VERSION Cargo.toml MODULE.bazel Cargo.Bazel.lock Cargo.lock MODULE.bazel.lock; then
-            echo "VERSION already on master"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add VERSION Cargo.toml MODULE.bazel Cargo.Bazel.lock Cargo.lock MODULE.bazel.lock
-          git commit -m "chore: release VERSION"
-          git push
-
   publish_testpypi:
     name: Publish TestPyPI (Ubuntu 24.04)
     needs: wheel
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      always() && !cancelled() && !failure() &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.wheel.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -656,10 +512,12 @@ jobs:
 
   publish_pypi:
     name: Publish PyPI (Ubuntu 24.04)
-    needs: [changes, master_merge_guard, wheel]
+    needs: [changes, wheel]
     if: >-
-      needs.changes.outputs.ci_mode == 'master_push' &&
-      needs.master_merge_guard.result == 'success' &&
+      always() && !cancelled() && !failure() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/master' &&
+      needs.changes.outputs.version_changed == 'true' &&
       needs.wheel.result == 'success'
     runs-on: ubuntu-24.04
     permissions:

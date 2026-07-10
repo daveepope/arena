@@ -24,8 +24,10 @@ public final class ComponentTest {
   @Test
   @Playbook(ResetValidationDbPlaybook.class)
   void createReadingPublishesEventAndListsViaHttp() throws Exception {
-    int createdId = apiClient().createReading("Readings API User", 77, "kafka happy path");
-    JsonNode detail = waitReadingCreatedOnKafka(createdId);
+    JsonNode detail =
+        waitReadingCreatedOnKafka(
+            () -> apiClient().createReading("Readings API User", 77, "kafka happy path"));
+    int createdId = detail.path("id").asInt();
     assertEquals(createdId, detail.path("id").asInt());
     assertEquals("Readings API User", detail.path("user_name").asText());
     assertEquals(77, detail.path("value").asInt());
@@ -110,11 +112,12 @@ public final class ComponentTest {
         "http://127.0.0.1:" + arena.webAppPort(), arena.accessToken(), ArenaFixture.MAPPER);
   }
 
-  private static JsonNode waitReadingCreatedOnKafka(int expectedId) throws Exception {
+  private static JsonNode waitReadingCreatedOnKafka(KafkaWait.ReadingCreateAction create)
+      throws Exception {
     return KafkaWait.waitReadingCreatedDetail(
         ArenaFixture.MAPPER,
         "localhost:" + arena.kafkaPort(),
         arena.kafkaTopic(),
-        expectedId);
+        create);
   }
 }
