@@ -112,6 +112,15 @@ py_library(
 )
 
 py_binary(
+    name = "write_default_images_rs",
+    srcs = ["write_default_images_rs.py"],
+    main = "write_default_images_rs.py",
+    deps = [":container_defaults_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
     name = "container_image_matrix",
     srcs = ["container_image_matrix.py"],
     main = "container_image_matrix.py",

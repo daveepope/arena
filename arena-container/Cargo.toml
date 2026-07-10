@@ -9,9 +9,6 @@ license = "todo"
 [lib]
 path = "src/lib.rs"
 
-[build-dependencies]
-toml = "0.8"
-
 [dependencies]
 bollard = { workspace = true }
 tracing = { workspace = true }

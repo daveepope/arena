@@ -1,26 +1,22 @@
-load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@crates//:defs.bzl", "all_crate_deps")
 
-cargo_build_script(
-    name = "build_script",
-    srcs = ["build.rs"],
-    data = ["//:container_defaults.toml"],
-    compile_data = ["//:container_defaults.toml"],
-    build_script_env = {
-        "ARENA_CONTAINER_DEFAULTS_TOML": "$(execpath //:container_defaults.toml)",
-    },
-    deps = all_crate_deps(build = True),
+genrule(
+    name = "default_images_rs",
+    srcs = ["//:container_defaults.toml"],
+    outs = ["src/default_images.rs"],
+    cmd = "$(location //scripts:write_default_images_rs) $(location //:container_defaults.toml) $@",
+    tools = ["//scripts:write_default_images_rs"],
 )
 
 rust_library(
     name = "arena_container",
-    srcs = glob(["src/**/*.rs"]),
-    compile_data = ["//:container_defaults.toml"],
+    srcs = glob(
+        ["src/**/*.rs"],
+        exclude = ["src/default_images.rs"],
+    ) + [":default_images_rs"],
     edition = "2021",
-    deps = all_crate_deps(normal = True) + [
-        ":build_script",
-    ],
+    deps = all_crate_deps(normal = True),
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
 )
