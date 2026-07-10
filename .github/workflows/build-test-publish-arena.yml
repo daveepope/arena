@@ -17,25 +17,31 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+      pull-requests: read
     outputs:
       bazel: ${{ steps.filter.outputs.bazel }}
       publishable: ${{ steps.filter.outputs.publishable }}
       version_changed: ${{ steps.filter.outputs.version_changed }}
+      ci_only: ${{ steps.ci_only.outputs.ci_only }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: dorny/paths-filter@v3
         id: filter
         with:
+          list-files: shell
+          predicate-quantifier: every
           filters: |
+            all_changed:
+              - '**'
             bazel:
-              - '**/*'
+              - '**'
               - '!**/*.md'
               - '!AGENTS.md'
               - '!CLAUDE.md'
               - '!.cursor/**'
             publishable:
-              - '**/*'
+              - '**'
               - '!**/*.md'
               - '!AGENTS.md'
               - '!CLAUDE.md'
@@ -53,6 +59,23 @@ jobs:
               - '!**/*.png'
             version_changed:
               - 'VERSION'
+
+      - name: Classify CI-only changes
+        id: ci_only
+        env:
+          ALL_CHANGED_FILES: ${{ steps.filter.outputs.all_changed_files }}
+        run: |
+          ci_only=false
+          if [ -n "$ALL_CHANGED_FILES" ]; then
+            ci_only=true
+            for path in $ALL_CHANGED_FILES; do
+              case "$path" in
+                .github/*|.codecov.yml) ;;
+                *) ci_only=false; break ;;
+              esac
+            done
+          fi
+          echo "ci_only=${ci_only}" >> "$GITHUB_OUTPUT"
 
   dependabot_awaiting_version_bump:
     name: Awaiting Dependabot version bump
@@ -77,12 +100,23 @@ jobs:
     steps:
       - run: echo "No Bazel-relevant changes; build and test skipped."
 
+  ci_config_only:
+    name: CI config only
+    needs: changes
+    if: needs.changes.outputs.ci_only == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - run: echo "CI/config-only changes; VERSION bump not required."
+
   require_version_bump:
     name: Require VERSION bump (same-repo PR)
     needs: changes
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.changes.outputs.ci_only != 'true' &&
       (
         needs.changes.outputs.version_changed == 'true' ||
         needs.changes.outputs.publishable == 'true'
