@@ -1,5 +1,5 @@
 {
-  "checksum": "c6447a2423fed4ead1831249b69d8ecfaf25fbe619f049f12ddf6ef59955ec58",
+  "checksum": "e534ab100d6bca8cb44cc3c425faf2f16a6521e1b03e303e851f7f4fd1cf047f",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -268,9 +268,9 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arbiter 1.1.0": {
+    "arbiter 1.1.1": {
       "name": "arbiter",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -326,7 +326,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "license": "todo",
       "license_ids": [],
@@ -419,9 +419,9 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arena 1.1.0": {
+    "arena 1.1.1": {
       "name": "arena",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -487,15 +487,15 @@
           ],
           "selects": {}
         },
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-container 1.1.0": {
+    "arena-container 1.1.1": {
       "name": "arena-container",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -540,15 +540,15 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-containerized-component 1.1.0": {
+    "arena-containerized-component 1.1.1": {
       "name": "arena-containerized-component",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -618,15 +618,15 @@
           ],
           "selects": {}
         },
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-examples 1.1.0": {
+    "arena-examples 1.1.1": {
       "name": "arena-examples",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -724,15 +724,15 @@
           ],
           "selects": {}
         },
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-executable-component 1.1.0": {
+    "arena-executable-component 1.1.1": {
       "name": "arena-executable-component",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -794,15 +794,15 @@
           ],
           "selects": {}
         },
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-ffi 1.1.0": {
+    "arena-ffi 1.1.1": {
       "name": "arena-ffi",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -867,15 +867,15 @@
           ],
           "selects": {}
         },
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "license": null,
       "license_ids": [],
       "license_file": null
     },
-    "arena-http 1.1.0": {
+    "arena-http 1.1.1": {
       "name": "arena-http",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -953,15 +953,15 @@
           ],
           "selects": {}
         },
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-kafka 1.1.0": {
+    "arena-kafka 1.1.1": {
       "name": "arena-kafka",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1031,15 +1031,15 @@
           ],
           "selects": {}
         },
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-localstack 1.1.0": {
+    "arena-localstack 1.1.1": {
       "name": "arena-localstack",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1141,15 +1141,15 @@
           ],
           "selects": {}
         },
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-mssql 1.1.0": {
+    "arena-mssql 1.1.1": {
       "name": "arena-mssql",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1219,15 +1219,15 @@
           ],
           "selects": {}
         },
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-oauth 1.1.0": {
+    "arena-oauth 1.1.1": {
       "name": "arena-oauth",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1333,15 +1333,15 @@
           ],
           "selects": {}
         },
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-postgres 1.1.0": {
+    "arena-postgres 1.1.1": {
       "name": "arena-postgres",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1407,7 +1407,7 @@
           ],
           "selects": {}
         },
-        "version": "1.1.0"
+        "version": "1.1.1"
       },
       "license": "todo",
       "license_ids": [],
@@ -6065,14 +6065,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "cmov 0.5.3": {
+    "cmov 0.5.4": {
       "name": "cmov",
-      "version": "0.5.3",
+      "version": "0.5.4",
       "package_url": "https://github.com/RustCrypto/utils",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/cmov/0.5.3/download",
-          "sha256": "3f88a43d011fc4a6876cb7344703e297c71dda42494fee094d5f7c76bf13f746"
+          "url": "https://static.crates.io/crates/cmov/0.5.4/download",
+          "sha256": "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
         }
       },
       "targets": [
@@ -6095,7 +6095,7 @@
           "**"
         ],
         "edition": "2024",
-        "version": "0.5.3"
+        "version": "0.5.4"
       },
       "license": "Apache-2.0 OR MIT",
       "license_ids": [
@@ -6932,7 +6932,7 @@
         "deps": {
           "common": [
             {
-              "id": "cmov 0.5.3",
+              "id": "cmov 0.5.4",
               "target": "cmov"
             }
           ],
@@ -34193,19 +34193,19 @@
   },
   "binary_crates": [],
   "workspace_members": {
-    "arbiter 1.1.0": "arbiter",
-    "arena 1.1.0": "arena",
-    "arena-container 1.1.0": "arena-container",
-    "arena-containerized-component 1.1.0": "arena-containerized-component",
-    "arena-examples 1.1.0": "examples",
-    "arena-executable-component 1.1.0": "arena-executable-component",
-    "arena-ffi 1.1.0": "arena-ffi",
-    "arena-http 1.1.0": "arena-http",
-    "arena-kafka 1.1.0": "arena-kafka",
-    "arena-localstack 1.1.0": "arena-localstack",
-    "arena-mssql 1.1.0": "arena-mssql",
-    "arena-oauth 1.1.0": "arena-oauth",
-    "arena-postgres 1.1.0": "arena-postgres"
+    "arbiter 1.1.1": "arbiter",
+    "arena 1.1.1": "arena",
+    "arena-container 1.1.1": "arena-container",
+    "arena-containerized-component 1.1.1": "arena-containerized-component",
+    "arena-examples 1.1.1": "examples",
+    "arena-executable-component 1.1.1": "arena-executable-component",
+    "arena-ffi 1.1.1": "arena-ffi",
+    "arena-http 1.1.1": "arena-http",
+    "arena-kafka 1.1.1": "arena-kafka",
+    "arena-localstack 1.1.1": "arena-localstack",
+    "arena-mssql 1.1.1": "arena-mssql",
+    "arena-oauth 1.1.1": "arena-oauth",
+    "arena-postgres 1.1.1": "arena-postgres"
   },
   "conditions": {
     "aarch64-apple-darwin": [
