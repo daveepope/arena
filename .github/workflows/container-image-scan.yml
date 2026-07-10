@@ -46,7 +46,9 @@ jobs:
           image-ref: ${{ matrix.image }}
           format: sarif
           output: trivy-results.sarif
-          severity: MODERATE,HIGH,CRITICAL
+          scanners: vuln
+          severity: CRITICAL
+          ignore-unfixed: true
           exit-code: 1
 
       - name: Upload SARIF

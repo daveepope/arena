@@ -7,9 +7,11 @@ from pathlib import Path
 
 from container_defaults import (
     BUILDER_IMAGE_IDS,
+    image_refs,
     load_container_defaults,
     render_default_images_rs,
     rust_string_literal,
+    validate_container_default_entries,
     validate_image_id,
 )
 
@@ -20,6 +22,20 @@ class ContainerDefaultsTest(unittest.TestCase):
         if ws:
             return Path(ws)
         return Path(__file__).resolve().parent.parent
+
+    def test_image_refs_returns_colon_separated_refs(self) -> None:
+        refs = image_refs(self._root())
+        self.assertIn("postgres:17", refs)
+        self.assertTrue(all(":" in ref for ref in refs))
+
+    def test_rust_string_literal_escapes_backslash(self) -> None:
+        self.assertEqual(rust_string_literal("a\\b"), '"a\\\\b"')
+
+    def test_validate_container_default_entries_rejects_empty_tag(self) -> None:
+        with self.assertRaises(ValueError):
+            validate_container_default_entries(
+                [{"id": "http", "image": "example/repo", "tag": ""}]
+            )
 
     def test_load_container_defaults_includes_builder_ids(self) -> None:
         rows = load_container_defaults(self._root())

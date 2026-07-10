@@ -1,18 +1,23 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from arena_version import (
     bump_patch_version,
     is_synced,
+    read_version,
     read_version_from_git_ref,
     release_lockfiles_need_repin,
     release_version_increased,
     release_version_only,
+    repin_release_lockfiles,
     sync_workspace_version,
+    workspace_version_in_cargo_bazel_lock,
     write_version,
 )
 
@@ -20,6 +25,25 @@ from arena_version import (
 class ReleaseVersionOnlyTest(unittest.TestCase):
     def test_release_version_only_dev_suffix_returns_base(self) -> None:
         self.assertEqual(release_version_only("1.0.1.dev12345"), "1.0.1")
+
+    def test_release_version_only_invalid_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            release_version_only("not-a-version")
+
+
+class ReadVersionTest(unittest.TestCase):
+    def test_read_version_empty_file_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "VERSION").write_text("\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                read_version(root)
+
+    def test_write_version_roundtrip_returns_value(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_version(root, "3.4.5")
+            self.assertEqual(read_version(root), "3.4.5")
 
 
 class BumpPatchVersionTest(unittest.TestCase):
@@ -52,6 +76,27 @@ class ReadVersionFromGitRefTest(unittest.TestCase):
             subprocess.run(["git", "add", "Cargo.toml"], cwd=root, check=True)
             subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True)
             self.assertEqual(read_version_from_git_ref(root, "HEAD"), "0.4.0")
+
+    def test_read_version_from_git_ref_module_bazel_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "test"], cwd=root, check=True)
+            (root / "MODULE.bazel").write_text(
+                'module(\n    name = "arena",\n    version = "2.1.0",\n)\n',
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "MODULE.bazel"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "init"], cwd=root, check=True)
+            self.assertEqual(read_version_from_git_ref(root, "HEAD"), "2.1.0")
+
+    def test_read_version_from_git_ref_missing_ref_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+            with self.assertRaises(ValueError):
+                read_version_from_git_ref(root, "HEAD")
 
 
 class SyncWorkspaceVersionTest(unittest.TestCase):
@@ -93,6 +138,61 @@ class SyncWorkspaceVersionTest(unittest.TestCase):
 """
             (root / "Cargo.Bazel.lock").write_text(lock, encoding="utf-8")
             self.assertTrue(release_lockfiles_need_repin(root, "1.0.1"))
+
+    def test_release_lockfiles_need_repin_aligned_returns_false(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lock = """
+{
+  "crates": {
+    "arena 1.0.1": {
+      "name": "arena",
+      "version": "1.0.1",
+      "package_url": null
+    }
+  }
+}
+"""
+            (root / "Cargo.Bazel.lock").write_text(lock, encoding="utf-8")
+            self.assertFalse(release_lockfiles_need_repin(root, "1.0.1"))
+
+    def test_workspace_version_in_cargo_bazel_lock_missing_returns_none(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.assertIsNone(workspace_version_in_cargo_bazel_lock(root))
+
+    def test_workspace_version_in_cargo_bazel_lock_reads_arena_version(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lock = """
+{
+  "crates": {
+    "arena 9.8.7": {
+      "name": "arena",
+      "version": "9.8.7",
+      "package_url": null
+    }
+  }
+}
+"""
+            (root / "Cargo.Bazel.lock").write_text(lock, encoding="utf-8")
+            self.assertEqual(workspace_version_in_cargo_bazel_lock(root), "9.8.7")
+
+    def test_repin_release_lockfiles_invokes_bazel(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch("arena_version.subprocess.run") as run:
+                repin_release_lockfiles(root)
+                self.assertEqual(run.call_count, 2)
+
+    def test_repin_release_lockfiles_passes_bazel_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.dict(os.environ, {"ARENA_BAZEL_CONFIG": "ci"}):
+                with patch("arena_version.subprocess.run") as run:
+                    repin_release_lockfiles(root)
+                    build_args = run.call_args_list[0].args[0]
+                    self.assertIn("--config=ci", build_args)
 
 
 if __name__ == "__main__":

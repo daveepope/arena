@@ -18,13 +18,13 @@ fn default_images_postgres_matches_toml_default() {
 #[test]
 fn default_images_builder_ids_match_toml_defaults() {
     assert_eq!(HTTP.image, "wiremock/wiremock");
-    assert_eq!(HTTP.tag, "3.13.0");
+    assert_eq!(HTTP.tag, "3.13.2");
     assert_eq!(KAFKA_APACHE.image, "apache/kafka");
-    assert_eq!(KAFKA_APACHE.tag, "3.8.0");
+    assert_eq!(KAFKA_APACHE.tag, "3.9.1");
     assert_eq!(KAFKA_CONFLUENT.image, "confluentinc/cp-kafka");
-    assert_eq!(KAFKA_CONFLUENT.tag, "6.1.1");
+    assert_eq!(KAFKA_CONFLUENT.tag, "7.8.9");
     assert_eq!(MSSQL.image, "mcr.microsoft.com/mssql/server");
-    assert_eq!(MSSQL.tag, "2022-CU14-ubuntu-22.04");
+    assert_eq!(MSSQL.tag, "2022-CU25-ubuntu-22.04");
     assert_eq!(LOCALSTACK.image, "localstack/localstack");
-    assert_eq!(LOCALSTACK.tag, "4.5");
+    assert_eq!(LOCALSTACK.tag, "4.14.0");
 }

@@ -35,6 +35,13 @@ rust_shared_library(
 )
 
 rust_test(
+    name = "ffi_lib_unit_test",
+    crate = ":arena_ffi",
+    size = "small",
+    edition = "2021",
+)
+
+rust_test(
     name = "ffi_http_mapping_spec_test",
     srcs = ["tests/playbook/http_mapping_spec.rs"],
     size = "small",
