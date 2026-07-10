@@ -17,9 +17,11 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+      pull-requests: read
     outputs:
       bazel: ${{ steps.filter.outputs.bazel }}
-      publishable: ${{ steps.filter.outputs.publishable }}
+      only_non_publishable: ${{ steps.classify.outputs.only_non_publishable }}
+      has_publishable: ${{ steps.classify.outputs.has_publishable }}
       version_changed: ${{ steps.filter.outputs.version_changed }}
     steps:
       - uses: actions/checkout@v4
@@ -27,32 +29,51 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
+          list-files: shell
+          predicate-quantifier: every
           filters: |
+            all_changed:
+              - '**'
             bazel:
-              - '**/*'
+              - '**'
               - '!**/*.md'
               - '!AGENTS.md'
               - '!CLAUDE.md'
               - '!.cursor/**'
-            publishable:
-              - '**/*'
-              - '!**/*.md'
-              - '!AGENTS.md'
-              - '!CLAUDE.md'
-              - '!.cursor/**'
-              - '!.github/**'
-              - '!.gitignore'
-              - '!.gitattributes'
-              - '!.editorconfig'
-              - '!.idea/**'
-              - '!.vscode/**'
-              - '!.dockerignore'
-              - '!.bazelignore'
-              - '!.codecov.yml'
-              - '!LICENSE'
-              - '!**/*.png'
             version_changed:
               - 'VERSION'
+
+      - name: Classify changed files
+        id: classify
+        env:
+          CHANGED: ${{ steps.filter.outputs.all_changed_files }}
+        run: |
+          meta_path() {
+            case "$1" in
+              *.md|AGENTS.md|CLAUDE.md) return 0 ;;
+              .github/*) return 0 ;;
+              .gitignore|.gitattributes|.editorconfig|.dockerignore|.bazelignore) return 0 ;;
+              .codecov.yml|LICENSE) return 0 ;;
+              *.png) return 0 ;;
+            esac
+            [[ "$1" == .cursor/* || "$1" == .idea/* || "$1" == .vscode/* ]]
+          }
+          only_non_publishable=false
+          has_publishable=false
+          if [ -n "$CHANGED" ]; then
+            only_non_publishable=true
+            for path in $CHANGED; do
+              if meta_path "$path"; then
+                continue
+              fi
+              only_non_publishable=false
+              has_publishable=true
+            done
+          fi
+          echo "only_non_publishable=${only_non_publishable}" >> "$GITHUB_OUTPUT"
+          echo "has_publishable=${has_publishable}" >> "$GITHUB_OUTPUT"
+          echo "changed=${CHANGED:-<none>}"
+          echo "only_non_publishable=${only_non_publishable} has_publishable=${has_publishable}"
 
   dependabot_awaiting_version_bump:
     name: Awaiting Dependabot version bump
@@ -77,6 +98,18 @@ jobs:
     steps:
       - run: echo "No Bazel-relevant changes; build and test skipped."
 
+  non_publishable_only:
+    name: Non-publishable changes only
+    needs: changes
+    if: >-
+      needs.changes.outputs.bazel == 'true' &&
+      needs.changes.outputs.only_non_publishable == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - run: echo "Only non-publishable files changed; full CI runs but no VERSION bump."
+
   require_version_bump:
     name: Require VERSION bump (same-repo PR)
     needs: changes
@@ -85,7 +118,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       (
         needs.changes.outputs.version_changed == 'true' ||
-        needs.changes.outputs.publishable == 'true'
+        needs.changes.outputs.has_publishable == 'true'
       ) &&
       !(
         github.event.pull_request.user.login == 'dependabot[bot]' &&
