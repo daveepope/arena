@@ -25,12 +25,12 @@ pub struct KafkaDependencyBuilder {
 
 impl KafkaDependencyBuilder {
     const APACHE_DEFAULT_PORT: u16 = 9092;
-    const APACHE_DEFAULT_IMAGE_NAME: &'static str = "apache/kafka";
-    const APACHE_DEFAULT_TAG: &'static str = "3.8.0";
+    const APACHE_DEFAULT_IMAGE_NAME: &'static str = arena_container::default_images::KAFKA_APACHE.image;
+    const APACHE_DEFAULT_TAG: &'static str = arena_container::default_images::KAFKA_APACHE.tag;
 
     const CONFLUENT_DEFAULT_PORT: u16 = 9093;
-    const CONFLUENT_DEFAULT_IMAGE_NAME: &'static str = "confluentinc/cp-kafka";
-    const CONFLUENT_DEFAULT_TAG: &'static str = "6.1.1";
+    const CONFLUENT_DEFAULT_IMAGE_NAME: &'static str = arena_container::default_images::KAFKA_CONFLUENT.image;
+    const CONFLUENT_DEFAULT_TAG: &'static str = arena_container::default_images::KAFKA_CONFLUENT.tag;
 
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {

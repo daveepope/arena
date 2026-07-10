@@ -64,8 +64,8 @@ pub struct LocalstackDependencyBuilder {
 
 impl LocalstackDependencyBuilder {
     const AUTO_HOST_PORT: u16 = 0;
-    const DEFAULT_IMAGE_NAME: &'static str = "localstack/localstack";
-    const DEFAULT_IMAGE_TAG: &'static str = "4.5";
+    const DEFAULT_IMAGE_NAME: &'static str = arena_container::default_images::LOCALSTACK.image;
+    const DEFAULT_IMAGE_TAG: &'static str = arena_container::default_images::LOCALSTACK.tag;
 
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {

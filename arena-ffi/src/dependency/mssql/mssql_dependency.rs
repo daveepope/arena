@@ -43,8 +43,10 @@ pub(crate) struct MssqlDependencyConfig {
 }
 
 pub(crate) fn build(config: &MssqlDependencyConfig, network: Option<&str>) -> Result<Dependency, String> {
-    let mut builder = MssqlDependency::builder(&config.identifier)
-        .with_image(config.image.as_deref().unwrap_or("2022-CU14-ubuntu-22.04"));
+    let mut builder = MssqlDependency::builder(&config.identifier);
+    if let Some(image) = config.image.as_deref() {
+        builder = builder.with_image(image);
+    }
     if let Some(ref image_name) = config.image_name {
         builder = builder.with_image_name(image_name);
     }
@@ -69,3 +71,37 @@ pub(crate) fn build(config: &MssqlDependencyConfig, network: Option<&str>) -> Re
     Ok(Box::new(builder.build()))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn minimal_mssql_config() -> MssqlDependencyConfig {
+        MssqlDependencyConfig {
+            identifier: "mssql".to_string(),
+            image_name: None,
+            image: None,
+            port: None,
+            database_name: None,
+            database_username: None,
+            database_password: None,
+            container_name: None,
+            startup_sql_scripts: None,
+            encryption: None,
+        }
+    }
+
+    #[test]
+    fn build_minimal_config_returns_dependency() {
+        assert!(build(&minimal_mssql_config(), None).is_ok());
+    }
+
+    #[test]
+    fn build_image_overrides_apply() {
+        let mut config = minimal_mssql_config();
+        config.image = Some("2022-CU25-ubuntu-22.04".to_string());
+        config.image_name = Some("mcr.microsoft.com/mssql/server".to_string());
+        config.encryption = Some(EncryptionConfig::On);
+        config.container_name = Some("mssql-box".to_string());
+        assert!(build(&config, Some("arena-net")).is_ok());
+    }
+}

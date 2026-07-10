@@ -104,6 +104,44 @@ py_binary(
     visibility = ["//visibility:public"],
 )
 
+py_library(
+    name = "container_defaults_lib",
+    srcs = ["container_defaults.py"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "write_default_images_rs",
+    srcs = ["write_default_images_rs.py"],
+    main = "write_default_images_rs.py",
+    deps = [":container_defaults_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "container_image_matrix",
+    srcs = ["container_image_matrix.py"],
+    main = "container_image_matrix.py",
+    deps = [":container_defaults_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "check_container_defaults_test",
+    size = "small",
+    srcs = [
+        "check_container_defaults_test.py",
+        "container_defaults.py",
+    ],
+    main = "check_container_defaults_test.py",
+    deps = [":container_defaults_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
 py_test(
     name = "dependency_release_age_parse_test",
     size = "small",

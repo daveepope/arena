@@ -29,8 +29,8 @@ impl MssqlDependencyBuilder {
     const DEFAULT_DATABASE_NAME: &'static str = "arena_db";
     const DEFAULT_DATABASE_USERNAME: &'static str = "sa";
     const DEFAULT_DATABASE_PASSWORD: &'static str = "yourStrong(!)Password";
-    const DEFAULT_IMAGE_NAME: &'static str = "mcr.microsoft.com/mssql/server";
-    const DEFAULT_IMAGE_TAG: &'static str = "2022-CU14-ubuntu-22.04";
+    const DEFAULT_IMAGE_NAME: &'static str = arena_container::default_images::MSSQL.image;
+    const DEFAULT_IMAGE_TAG: &'static str = arena_container::default_images::MSSQL.tag;
 
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {

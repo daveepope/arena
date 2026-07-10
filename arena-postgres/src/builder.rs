@@ -24,8 +24,6 @@ impl PostgresDependencyBuilder {
     const DEFAULT_DATABASE_NAME: &'static str = "arena_db";
     const DEFAULT_DATABASE_USERNAME: &'static str = "arena_user";
     const DEFAULT_DATABASE_PASSWORD: &'static str = "postgres";
-    const DEFAULT_IMAGE_NAME: &'static str = "postgres";
-    const DEFAULT_IMAGE_TAG: &'static str = "latest";
 
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {
@@ -141,10 +139,10 @@ impl PostgresDependencyBuilder {
         let dependencies = self.dependencies;
         let image_name = self
             .image_name
-            .unwrap_or_else(|| Self::DEFAULT_IMAGE_NAME.to_string());
+            .unwrap_or_else(|| arena_container::default_images::POSTGRES.image.to_string());
         let image_tag = self
             .image_tag
-            .unwrap_or_else(|| Self::DEFAULT_IMAGE_TAG.to_string());
+            .unwrap_or_else(|| arena_container::default_images::POSTGRES.tag.to_string());
         let container_name = self.container_name;
         let readiness_check = self.readiness_check;
 

@@ -39,12 +39,10 @@ jobs:
       - name: Bump patch version and sync
         env:
           ARENA_VERSION_BASE_REF: origin/${{ github.base_ref }}
-        run: python3 scripts/bump_patch_version.py
-
-      - name: Repin lockfiles
+          ARENA_BAZEL_CONFIG: ci
         run: |
-          CARGO_BAZEL_REPIN=1 bazel build //... --config=ci
-          bazel mod deps --lockfile_mode=update
+          bazel run //scripts:bump_patch_version --config=ci
+          bazel run //scripts:sync_version --config=ci
 
       - name: Commit and push
         run: |
