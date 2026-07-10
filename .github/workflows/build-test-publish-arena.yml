@@ -54,6 +54,19 @@ jobs:
             version_changed:
               - 'VERSION'
 
+  dependabot_awaiting_version_bump:
+    name: Awaiting Dependabot version bump
+    needs: changes
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      needs.changes.outputs.version_changed != 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - run: echo "Dependabot version bump runs first; build and test start after VERSION is pushed."
+
   docs_only:
     name: Docs / agent rules only
     needs: changes
@@ -134,7 +147,11 @@ jobs:
       (
         (
           github.event_name == 'pull_request' &&
-          needs.master_merge_guard.result == 'skipped'
+          needs.master_merge_guard.result == 'skipped' &&
+          !(
+            github.event.pull_request.user.login == 'dependabot[bot]' &&
+            needs.changes.outputs.version_changed != 'true'
+          )
         ) ||
         (
           github.event_name == 'push' &&
@@ -223,7 +240,11 @@ jobs:
       (
         (
           github.event_name == 'pull_request' &&
-          needs.master_merge_guard.result == 'skipped'
+          needs.master_merge_guard.result == 'skipped' &&
+          !(
+            github.event.pull_request.user.login == 'dependabot[bot]' &&
+            needs.changes.outputs.version_changed != 'true'
+          )
         ) ||
         (
           github.event_name == 'push' &&
@@ -262,7 +283,11 @@ jobs:
       (
         (
           github.event_name == 'pull_request' &&
-          needs.master_merge_guard.result == 'skipped'
+          needs.master_merge_guard.result == 'skipped' &&
+          !(
+            github.event.pull_request.user.login == 'dependabot[bot]' &&
+            needs.changes.outputs.version_changed != 'true'
+          )
         ) ||
         (
           github.event_name == 'push' &&
@@ -310,7 +335,11 @@ jobs:
       (
         (
           github.event_name == 'pull_request' &&
-          needs.master_merge_guard.result == 'skipped'
+          needs.master_merge_guard.result == 'skipped' &&
+          !(
+            github.event.pull_request.user.login == 'dependabot[bot]' &&
+            needs.changes.outputs.version_changed != 'true'
+          )
         ) ||
         (
           github.event_name == 'push' &&
@@ -352,7 +381,11 @@ jobs:
       (
         (
           github.event_name == 'pull_request' &&
-          needs.master_merge_guard.result == 'skipped'
+          needs.master_merge_guard.result == 'skipped' &&
+          !(
+            github.event.pull_request.user.login == 'dependabot[bot]' &&
+            needs.changes.outputs.version_changed != 'true'
+          )
         ) ||
         (
           github.event_name == 'push' &&
