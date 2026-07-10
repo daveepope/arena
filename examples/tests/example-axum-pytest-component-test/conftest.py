@@ -329,6 +329,23 @@ def _new_kafka_consumer(bootstrap: str, topic: str, group_prefix: str):
         bootstrap_servers=bootstrap,
         group_id=f"{KAFKA_CONSUMER_GROUP_LABEL}-{group_prefix}-{os.getpid()}",
         auto_offset_reset="earliest",
+        enable_auto_commit=False,
+    )
+
+
+def _warm_assignment(consumer, warmup_s: float) -> None:
+    import sys
+    import time
+
+    deadline = time.time() + warmup_s
+    while time.time() < deadline:
+        consumer.poll(timeout_ms=100)
+        if consumer.assignment():
+            return
+    print(
+        f"WARN: kafka consumer partition assignment not ready after {warmup_s}s; "
+        "continuing consume poll",
+        file=sys.stderr,
     )
 
 
@@ -336,14 +353,17 @@ def _consume_reading_created_event(
     bootstrap: str,
     topic: str,
     group_prefix: str,
-    expected_id: int,
-    timeout: float = 5.0,
+    create,
+    timeout: float = 15.0,
+    assignment_warmup: float = 3.0,
 ) -> dict:
     import json
     import time
 
     consumer = _new_kafka_consumer(bootstrap, topic, group_prefix)
     try:
+        _warm_assignment(consumer, assignment_warmup)
+        expected_id = create()
         deadline = time.time() + timeout
         while time.time() < deadline:
             for msg in consumer.poll(timeout_ms=100).values():
@@ -366,12 +386,12 @@ def base_url() -> str:
 def wait_reading_created_event():
     bootstrap = f"localhost:{KAFKA_PORT}"
 
-    def wait(expected_id: int) -> dict:
+    def wait(create):
         return _consume_reading_created_event(
             bootstrap,
             KAFKA_TOPIC,
             "exec",
-            expected_id,
+            create,
         )
 
     return wait
