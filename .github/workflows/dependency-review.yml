@@ -1,9 +1,8 @@
-name: Dependency Vulnerability Scan
+name: Dependency Review
 
 on:
   pull_request:
     branches: [master]
-  workflow_dispatch:
 
 permissions:
   contents: read
