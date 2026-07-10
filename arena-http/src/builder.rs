@@ -77,8 +77,8 @@ impl HttpDependencyHttpsBuilder {
 
 impl HttpDependencyBuilder {
     const DEFAULT_PORT: u16 = 0;
-    const DEFAULT_IMAGE_NAME: &'static str = "wiremock/wiremock";
-    const DEFAULT_IMAGE_TAG: &'static str = "3.13.0";
+    const DEFAULT_IMAGE_NAME: &'static str = arena_container::default_images::HTTP.image;
+    const DEFAULT_IMAGE_TAG: &'static str = arena_container::default_images::HTTP.tag;
 
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {

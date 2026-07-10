@@ -43,8 +43,10 @@ pub(crate) struct MssqlDependencyConfig {
 }
 
 pub(crate) fn build(config: &MssqlDependencyConfig, network: Option<&str>) -> Result<Dependency, String> {
-    let mut builder = MssqlDependency::builder(&config.identifier)
-        .with_image(config.image.as_deref().unwrap_or("2022-CU14-ubuntu-22.04"));
+    let mut builder = MssqlDependency::builder(&config.identifier);
+    if let Some(image) = config.image.as_deref() {
+        builder = builder.with_image(image);
+    }
     if let Some(ref image_name) = config.image_name {
         builder = builder.with_image_name(image_name);
     }

@@ -27,8 +27,10 @@ pub(crate) fn build(
     config: &PostgresDependencyConfig,
     network: Option<&str>,
 ) -> Result<Dependency, String> {
-    let mut builder = PostgresDependency::builder(&config.identifier)
-        .with_image(config.image.as_deref().unwrap_or("14.20-trixie"));
+    let mut builder = PostgresDependency::builder(&config.identifier);
+    if let Some(image) = config.image.as_deref() {
+        builder = builder.with_image(image);
+    }
     if let Some(ref image_name) = config.image_name {
         builder = builder.with_image_name(image_name);
     }

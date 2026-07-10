@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -190,3 +191,17 @@ def release_lockfiles_need_repin(root: Path, target: str) -> bool:
             return True
         return release_version_only(cargo) != target
     return locked != target
+
+
+def repin_release_lockfiles(root: Path) -> None:
+    bazel = os.environ.get("BAZEL", "bazel")
+    env = os.environ.copy()
+    env["CARGO_BAZEL_REPIN"] = "1"
+    build_args = [bazel, "build", "//..."]
+    mod_args = [bazel, "mod", "deps", "--lockfile_mode=update"]
+    bazel_config = os.environ.get("ARENA_BAZEL_CONFIG", "").strip()
+    if bazel_config:
+        build_args.append(f"--config={bazel_config}")
+        mod_args.append(f"--config={bazel_config}")
+    subprocess.run(build_args, cwd=root, env=env, check=True)
+    subprocess.run(mod_args, cwd=root, env=env, check=True)

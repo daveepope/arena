@@ -31,7 +31,7 @@ def validate_version_bump(root: Path, base_ref: str) -> tuple[int, str]:
         return (
             1,
             f"publishable changes require a VERSION bump (still {head}); "
-            "bump VERSION, run python3 scripts/sync_version.py, and repin lockfiles if needed",
+            "bump VERSION, then run: bazel run //scripts:sync_version",
         )
     if not release_version_increased(base, head):
         return 1, f"VERSION must increase ({base} -> {head})"

@@ -38,7 +38,7 @@ def main() -> int:
         return 0
     print(f"error: {message}", file=sys.stderr)
     print(
-        "Run: CARGO_BAZEL_REPIN=1 bazel build //... && bazel mod deps --lockfile_mode=update",
+        "Run: bazel run //scripts:sync_version",
         file=sys.stderr,
     )
     return 1

@@ -1,1 +1,1 @@
-exports_files(["VERSION"])
+exports_files(["VERSION", "container_defaults.toml"])

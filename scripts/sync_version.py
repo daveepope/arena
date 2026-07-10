@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 
-from arena_version import read_version, sync_workspace_version
+from arena_version import (
+    read_version,
+    release_lockfiles_need_repin,
+    release_version_only,
+    repin_release_lockfiles,
+    sync_workspace_version,
+)
 
 
 def _repo_root() -> Path:
@@ -18,14 +25,21 @@ def _repo_root() -> Path:
 
 def main() -> int:
     root = _repo_root()
-    version = read_version(root)
+    version = release_version_only(read_version(root))
     changed = sync_workspace_version(root)
     if changed:
         for name in changed:
             print(f"updated {name} -> {version}")
-        print("if Rust deps changed, run: CARGO_BAZEL_REPIN=1 bazel build //...")
+    elif release_lockfiles_need_repin(root, version):
+        print(f"VERSION files already at {version}")
     else:
         print(f"already in sync at {version}")
+        return 0
+
+    if changed or release_lockfiles_need_repin(root, version):
+        print("repinning release lockfiles")
+        repin_release_lockfiles(root)
+        print("updated Cargo.Bazel.lock, Cargo.lock, MODULE.bazel.lock")
     return 0
 
 
