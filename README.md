@@ -4,7 +4,6 @@
 
 [![CI](https://github.com/daveepope/arena/actions/workflows/build-test-publish-arena.yml/badge.svg?branch=master)](https://github.com/daveepope/arena/actions/workflows/build-test-publish-arena.yml)
 [![codecov](https://codecov.io/gh/daveepope/arena/graph/badge.svg?branch=master)](https://codecov.io/gh/daveepope/arena)
-[![Release](https://img.shields.io/github/v/release/daveepope/arena)](https://github.com/daveepope/arena/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/daveepope/arena/badge)](https://scorecard.dev/viewer/?uri=github.com/daveepope/arena)
 [![OSV Lockfile Scan](https://img.shields.io/github/actions/workflow/status/daveepope/arena/osv-scanner.yml?branch=master&label=OSV%20Lockfile%20Scan)](https://github.com/daveepope/arena/actions/workflows/osv-scanner.yml)
