@@ -104,6 +104,11 @@ def parse_release_version(version: str) -> tuple[int, int, int]:
     return int(match.group(1)), int(match.group(2)), int(match.group(3))
 
 
+def bump_patch_version(version: str) -> str:
+    major, minor, patch = parse_release_version(version)
+    return f"{major}.{minor}.{patch + 1}"
+
+
 def release_version_increased(base: str, head: str) -> bool:
     return parse_release_version(head) > parse_release_version(base)
 
