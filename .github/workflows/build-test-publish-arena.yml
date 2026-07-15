@@ -620,3 +620,82 @@ jobs:
           verbose: true
           print-hash: true
           skip-existing: true
+
+  publish_maven_snapshot:
+    name: Publish Maven snapshot (Ubuntu 24.04)
+    needs: [changes, publish_gate]
+    if: >-
+      always() && !cancelled() &&
+      needs.publish_gate.result == 'success' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-ubuntu-24.04
+          repository-cache: true
+
+      - name: Publish snapshot to Maven Central
+        env:
+          MAVEN_REPO: https://central.sonatype.com/repository/maven-snapshots/
+          MAVEN_USER: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+        run: bazel run //arena-junit:arena_junit_maven_snapshot.publish --config=ci
+
+  publish_maven_central:
+    name: Publish Maven Central (Ubuntu 24.04)
+    needs: [changes, publish_gate]
+    if: >-
+      always() && !cancelled() &&
+      needs.publish_gate.result == 'success' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/master' &&
+      needs.changes.outputs.version_changed == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-ubuntu-24.04
+          repository-cache: true
+
+      - name: Build release artifacts
+        run: |
+          bazel build //arena-junit:arena_junit_maven //arena-junit:arena_junit_maven-docs \
+            //arena-junit:arena_junit_maven-pom //arena-junit:libarena_junit_maven-lib-src.jar \
+            --config=ci
+
+      - name: Import GPG key
+        run: echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+
+      - name: Sign and publish release to Maven Central
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+        run: |
+          bazel run //scripts:publish_maven_central --config=ci -- \
+            "$PWD/bazel-bin/arena-junit/libarena_junit_maven-lib.jar" \
+            "$PWD/bazel-bin/arena-junit/arena_junit_maven-pom.xml" \
+            "$PWD/bazel-bin/arena-junit/libarena_junit_maven-lib-src.jar" \
+            "$PWD/bazel-bin/arena-junit/arena_junit_maven-docs.jar"
