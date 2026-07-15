@@ -1,19 +1,51 @@
+load("@arena_version//:defs.bzl", "ARENA_VERSION")
 load("@rules_java//java:defs.bzl", "java_library", "java_test")
+load("@rules_jvm_external//:defs.bzl", "java_export")
+
+_ARENA_JUNIT_SRCS = glob(["src/main/java/**/*.java"])
+
+_ARENA_JUNIT_JAVACOPTS = [
+    "--release",
+    "21",
+]
+
+_ARENA_JUNIT_DEPS = [
+    "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+    "@arena_java_maven//:net_java_dev_jna_jna",
+    "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    "@arena_java_maven//:org_slf4j_slf4j_api",
+]
+
+_MAVEN_GROUP_ARTIFACT = "io.github.stationdevx:arena-junit"
 
 java_library(
     name = "arena_junit_lib",
-    srcs = glob(["src/main/java/**/*.java"]),
-    javacopts = [
-        "--release",
-        "21",
-    ],
+    srcs = _ARENA_JUNIT_SRCS,
+    javacopts = _ARENA_JUNIT_JAVACOPTS,
     visibility = ["//visibility:public"],
-    deps = [
-        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
-        "@arena_java_maven//:net_java_dev_jna_jna",
-        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
-        "@arena_java_maven//:org_slf4j_slf4j_api",
-    ],
+    deps = _ARENA_JUNIT_DEPS,
+)
+
+java_export(
+    name = "arena_junit_maven",
+    srcs = _ARENA_JUNIT_SRCS,
+    javacopts = _ARENA_JUNIT_JAVACOPTS,
+    tags = ["manual"],
+    maven_coordinates = _MAVEN_GROUP_ARTIFACT + ":" + ARENA_VERSION,
+    pom_template = "pom_template.xml",
+    visibility = ["//visibility:public"],
+    deps = _ARENA_JUNIT_DEPS,
+)
+
+java_export(
+    name = "arena_junit_maven_snapshot",
+    srcs = _ARENA_JUNIT_SRCS,
+    javacopts = _ARENA_JUNIT_JAVACOPTS,
+    tags = ["manual"],
+    maven_coordinates = _MAVEN_GROUP_ARTIFACT + ":" + ARENA_VERSION + "-SNAPSHOT",
+    pom_template = "pom_template.xml",
+    visibility = ["//visibility:public"],
+    deps = _ARENA_JUNIT_DEPS,
 )
 
 java_test(

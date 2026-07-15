@@ -104,6 +104,13 @@ py_binary(
     visibility = ["//visibility:public"],
 )
 
+py_binary(
+    name = "publish_maven_central",
+    srcs = ["publish_maven_central.py"],
+    main = "publish_maven_central.py",
+    visibility = ["//visibility:public"],
+)
+
 py_library(
     name = "container_defaults_lib",
     srcs = ["container_defaults.py"],

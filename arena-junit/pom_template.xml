@@ -1,0 +1,38 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>{groupId}</groupId>
+  <artifactId>{artifactId}</artifactId>
+  <version>{version}</version>
+  <packaging>{type}</packaging>
+
+  <name>arena-junit</name>
+  <description>JUnit integration for Arena</description>
+  <url>https://github.com/daveepope/arena</url>
+
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://github.com/daveepope/arena/blob/master/LICENSE</url>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <name>David Pope</name>
+      <email>pope.david12@gmail.com</email>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/daveepope/arena.git</connection>
+    <developerConnection>scm:git:https://github.com/daveepope/arena.git</developerConnection>
+    <url>https://github.com/daveepope/arena</url>
+  </scm>
+
+  <dependencies>
+    {dependencies}
+  </dependencies>
+</project>
