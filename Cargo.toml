@@ -17,7 +17,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.2.3"
+version = "1.2.4"
 [workspace.dependencies]
 arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }
