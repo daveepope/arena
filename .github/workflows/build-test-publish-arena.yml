@@ -679,8 +679,9 @@ jobs:
 
       - name: Build release artifacts
         run: |
-          bazel build //arena-junit:arena_junit_maven //arena-junit:arena_junit_maven-docs \
-            //arena-junit:arena_junit_maven-pom //arena-junit:libarena_junit_maven-lib-src.jar \
+          bazel build //arena-junit:arena_junit_maven //arena-junit:arena_junit_maven-lib \
+            //arena-junit:arena_junit_maven-docs //arena-junit:arena_junit_maven-pom \
+            //arena-junit:libarena_junit_maven-lib-src.jar \
             --config=ci
 
       - name: Import GPG key
