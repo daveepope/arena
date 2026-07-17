@@ -7,7 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import arena.junit.ArenaExtension;
 import arena.junit.OpenArena;
+import arena.junit.match.ArenaMatchPiece;
 import arena.junit.match.Match;
 import arena.junit.match.MatchBuilder;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -25,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExecutableInvoker;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ParameterContext;
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.extension.TestInstances;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
@@ -116,7 +117,7 @@ final class PlaybookInvocationExtensionUnitTest {
   @Test
   void beforeEach_methodPlaybookAnnotation_opensMethodScopeForParameterResolution() throws Exception {
     OpenArena arena = openArenaWithPlaybook(new UnitStubPlaybook(), false);
-    MethodPlaybookHost.ARENA_EXT.setArena(arena);
+    seedOpenArena(MethodPlaybookHost.class, arena);
     Method method = MethodPlaybookHost.class.getDeclaredMethod("scopedTest");
     ExtensionContext context = methodContext(MethodPlaybookHost.class, method, classContext(MethodPlaybookHost.class));
 
@@ -132,7 +133,7 @@ final class PlaybookInvocationExtensionUnitTest {
   @Test
   void beforeAll_classPlaybookAnnotation_opensClassScope() throws Exception {
     OpenArena arena = openArenaWithPlaybook(new UnitStubPlaybook(), false);
-    ClassPlaybookHost.ARENA_EXT.setArena(arena);
+    seedOpenArena(ClassPlaybookHost.class, arena);
     ExtensionContext context = classContext(ClassPlaybookHost.class);
 
     extension.beforeAll(context);
@@ -144,7 +145,7 @@ final class PlaybookInvocationExtensionUnitTest {
   @Test
   void beforeEach_classPlaybookWithoutMethodAnnotation_reusesClassScope() throws Exception {
     OpenArena arena = openArenaWithPlaybook(new UnitStubPlaybook(), false);
-    ClassPlaybookHost.ARENA_EXT.setArena(arena);
+    seedOpenArena(ClassPlaybookHost.class, arena);
     ExtensionContext classCtx = classContext(ClassPlaybookHost.class);
     extension.beforeAll(classCtx);
     Method method = ClassPlaybookHost.class.getDeclaredMethod("plainTest");
@@ -158,7 +159,7 @@ final class PlaybookInvocationExtensionUnitTest {
   }
 
   @Test
-  void resolveOpenArena_missingClosedArenaExtension_throwsIllegalStateException() throws Exception {
+  void resolveOpenArena_noArenaAnnotatedClass_throwsIllegalStateException() throws Exception {
     Method method = MissingExtensionHost.class.getDeclaredMethod("scopedTest");
     ExtensionContext context =
         methodContext(
@@ -167,20 +168,20 @@ final class PlaybookInvocationExtensionUnitTest {
             rootContext(MissingExtensionHost.class, new MapExtensionStore()));
     IllegalStateException error =
         assertThrows(IllegalStateException.class, () -> extension.beforeEach(context));
-    assertTrue(error.getMessage().contains("requires exactly one @RegisterExtension"));
+    assertTrue(error.getMessage().contains("@ArenaDependency"));
   }
 
   @Test
-  void resolveOpenArena_multipleClosedArenaExtensions_throwsIllegalStateException() throws Exception {
-    Method method = DuplicateExtensionHost.class.getDeclaredMethod("scopedTest");
+  void resolveOpenArena_topologyNotYetOpened_throwsIllegalStateException() throws Exception {
+    Method method = NotYetOpenedHost.class.getDeclaredMethod("scopedTest");
     ExtensionContext context =
         methodContext(
-            DuplicateExtensionHost.class,
+            NotYetOpenedHost.class,
             method,
-            rootContext(DuplicateExtensionHost.class, new MapExtensionStore()));
+            rootContext(NotYetOpenedHost.class, new MapExtensionStore()));
     IllegalStateException error =
         assertThrows(IllegalStateException.class, () -> extension.beforeEach(context));
-    assertTrue(error.getMessage().contains("multiple @RegisterExtension"));
+    assertTrue(error.getMessage().contains("beforeAll has not run yet"));
   }
 
   @Test
@@ -277,8 +278,15 @@ final class PlaybookInvocationExtensionUnitTest {
     return constructor.newInstance(new Pointer(1), 0L, List.of(match));
   }
 
+  static final class TopologyMarker implements ArenaMatchPiece {
+    @Override
+    public ObjectNode forFfi() {
+      return JsonNodeFactory.instance.objectNode();
+    }
+  }
+
   static final class MethodPlaybookHost {
-    @RegisterExtension static final InjectingArenaExtension ARENA_EXT = new InjectingArenaExtension();
+    @arena.junit.ArenaDependency static final TopologyMarker TOPOLOGY = new TopologyMarker();
 
     @arena.junit.Playbook(UnitStubPlaybook.class)
     void scopedTest() {}
@@ -286,7 +294,7 @@ final class PlaybookInvocationExtensionUnitTest {
 
   @arena.junit.Playbook(UnitStubPlaybook.class)
   static final class ClassPlaybookHost {
-    @RegisterExtension static final InjectingArenaExtension ARENA_EXT = new InjectingArenaExtension();
+    @arena.junit.ArenaDependency static final TopologyMarker TOPOLOGY = new TopologyMarker();
 
     void plainTest() {}
   }
@@ -296,10 +304,8 @@ final class PlaybookInvocationExtensionUnitTest {
     void scopedTest() {}
   }
 
-  static final class DuplicateExtensionHost {
-    @RegisterExtension static final InjectingArenaExtension FIRST = new InjectingArenaExtension();
-
-    @RegisterExtension static final InjectingArenaExtension SECOND = new InjectingArenaExtension();
+  static final class NotYetOpenedHost {
+    @arena.junit.ArenaDependency static final TopologyMarker TOPOLOGY = new TopologyMarker();
 
     @arena.junit.Playbook(UnitStubPlaybook.class)
     void scopedTest() {}
@@ -339,25 +345,19 @@ final class PlaybookInvocationExtensionUnitTest {
     }
   }
 
-  static final class InjectingArenaExtension extends arena.junit.ClosedArenaExtension {
-    private OpenArena arena;
-
-    void setArena(OpenArena arena) {
-      this.arena = arena;
-    }
-
-    @Override
-    protected arena.junit.ClosedArena buildClosedArena() {
-      throw new UnsupportedOperationException("unit test injects OpenArena directly");
-    }
-
-    @Override
-    public OpenArena openArena() {
-      if (arena == null) {
-        throw new IllegalStateException("unit test arena not configured");
-      }
-      return arena;
-    }
+  private static void seedOpenArena(Class<?> hostClass, OpenArena openArena) throws Exception {
+    Class<?> cachedArenaClass = Class.forName("arena.junit.ArenaExtension$CachedArena");
+    Constructor<?> cachedArenaConstructor = cachedArenaClass.getDeclaredConstructor(OpenArena.class);
+    cachedArenaConstructor.setAccessible(true);
+    Object cachedArena = cachedArenaConstructor.newInstance(openArena);
+    Field refsField = cachedArenaClass.getDeclaredField("refs");
+    refsField.setAccessible(true);
+    refsField.setInt(cachedArena, 1);
+    Field cacheField = ArenaExtension.class.getDeclaredField("CACHE");
+    cacheField.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    Map<Class<?>, Object> cache = (Map<Class<?>, Object>) cacheField.get(null);
+    cache.put(hostClass, cachedArena);
   }
 
   private static ExtensionContext extensionContext() {

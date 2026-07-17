@@ -40,7 +40,7 @@ checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
 
 [[package]]
 name = "arbiter"
-version = "1.2.4"
+version = "2.0.0"
 dependencies = [
  "notify",
  "serde",
@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "arena"
-version = "1.2.4"
+version = "2.0.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -84,7 +84,7 @@ dependencies = [
 
 [[package]]
 name = "arena-container"
-version = "1.2.4"
+version = "2.0.0"
 dependencies = [
  "bollard",
  "tokio",
@@ -93,7 +93,7 @@ dependencies = [
 
 [[package]]
 name = "arena-containerized-component"
-version = "1.2.4"
+version = "2.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -109,7 +109,7 @@ dependencies = [
 
 [[package]]
 name = "arena-examples"
-version = "1.2.4"
+version = "2.0.0"
 dependencies = [
  "arena",
  "arena-containerized-component",
@@ -138,7 +138,7 @@ dependencies = [
 
 [[package]]
 name = "arena-executable-component"
-version = "1.2.4"
+version = "2.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -152,7 +152,7 @@ dependencies = [
 
 [[package]]
 name = "arena-ffi"
-version = "1.2.4"
+version = "2.0.0"
 dependencies = [
  "arc-swap",
  "arena",
@@ -175,7 +175,7 @@ dependencies = [
 
 [[package]]
 name = "arena-http"
-version = "1.2.4"
+version = "2.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -193,7 +193,7 @@ dependencies = [
 
 [[package]]
 name = "arena-kafka"
-version = "1.2.4"
+version = "2.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -209,7 +209,7 @@ dependencies = [
 
 [[package]]
 name = "arena-localstack"
-version = "1.2.4"
+version = "2.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -233,7 +233,7 @@ dependencies = [
 
 [[package]]
 name = "arena-mssql"
-version = "1.2.4"
+version = "2.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -249,7 +249,7 @@ dependencies = [
 
 [[package]]
 name = "arena-oauth"
-version = "1.2.4"
+version = "2.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -274,7 +274,7 @@ dependencies = [
 
 [[package]]
 name = "arena-postgres"
-version = "1.2.4"
+version = "2.0.0"
 dependencies = [
  "arena",
  "arena-container",
