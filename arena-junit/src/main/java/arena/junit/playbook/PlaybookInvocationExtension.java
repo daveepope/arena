@@ -1,12 +1,10 @@
 package arena.junit.playbook;
 
-import arena.junit.ClosedArenaExtension;
+import arena.junit.ArenaExtension;
 import arena.junit.OpenArena;
 
 import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.extension.AfterAllCallback;
@@ -16,7 +14,6 @@ import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolver;
-import org.junit.jupiter.api.extension.RegisterExtension;
 
 public final class PlaybookInvocationExtension
     implements BeforeAllCallback,
@@ -187,43 +184,7 @@ public final class PlaybookInvocationExtension
   }
 
   private static OpenArena resolveOpenArena(ExtensionContext ctx) {
-    Object instance = ctx.getTestInstance().orElse(null);
-    Class<?> testClass = ctx.getRequiredTestClass();
-    List<Field> fields = new ArrayList<>();
-    for (Class<?> c = testClass; c != null && c != Object.class; c = c.getSuperclass()) {
-      for (Field f : c.getDeclaredFields()) {
-        if (f.isAnnotationPresent(RegisterExtension.class)
-            && ClosedArenaExtension.class.isAssignableFrom(f.getType())) {
-          fields.add(f);
-        }
-      }
-    }
-    if (fields.isEmpty()) {
-      throw new IllegalStateException(
-          "@Playbook requires exactly one @RegisterExtension field whose type extends "
-              + ClosedArenaExtension.class.getSimpleName());
-    }
-    if (fields.size() > 1) {
-      throw new IllegalStateException(
-          "@Playbook: multiple @RegisterExtension ClosedArenaExtension fields on "
-              + testClass.getName());
-    }
-    Field f = fields.get(0);
-    f.setAccessible(true);
-    Object ext;
-    try {
-      ext =
-          Modifier.isStatic(f.getModifiers())
-              ? f.get(null)
-              : (instance != null ? f.get(instance) : null);
-    } catch (IllegalAccessException e) {
-      throw new IllegalStateException("@Playbook: failed to read ClosedArenaExtension field", e);
-    }
-    if (ext == null) {
-      throw new IllegalStateException(
-          "@Playbook: ClosedArenaExtension field not initialized: " + f.getName());
-    }
-    return ((ClosedArenaExtension) ext).openArena();
+    return ArenaExtension.openArenaFor(ctx.getRequiredTestClass());
   }
 
   static final class PlaybookScope {
