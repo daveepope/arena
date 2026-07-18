@@ -1,5 +1,5 @@
 {
-  "checksum": "b9eccfd3b50addf6e1d174801e996300dbafc59063b633375a89412f0e2eb56a",
+  "checksum": "74213b313884963eb401b63722212f920e666213d7dab607ea388c83882347eb",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -355,9 +355,9 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arena 3.0.0": {
+    "arena 3.0.1": {
       "name": "arena",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -423,15 +423,15 @@
           ],
           "selects": {}
         },
-        "version": "3.0.0"
+        "version": "3.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-container 3.0.0": {
+    "arena-container 3.0.1": {
       "name": "arena-container",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -476,15 +476,15 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "3.0.0"
+        "version": "3.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-containerized-component 3.0.0": {
+    "arena-containerized-component 3.0.1": {
       "name": "arena-containerized-component",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -554,15 +554,15 @@
           ],
           "selects": {}
         },
-        "version": "3.0.0"
+        "version": "3.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-examples 3.0.0": {
+    "arena-examples 3.0.1": {
       "name": "arena-examples",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -660,15 +660,15 @@
           ],
           "selects": {}
         },
-        "version": "3.0.0"
+        "version": "3.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-executable-component 3.0.0": {
+    "arena-executable-component 3.0.1": {
       "name": "arena-executable-component",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -730,15 +730,15 @@
           ],
           "selects": {}
         },
-        "version": "3.0.0"
+        "version": "3.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-ffi 3.0.0": {
+    "arena-ffi 3.0.1": {
       "name": "arena-ffi",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -803,15 +803,15 @@
           ],
           "selects": {}
         },
-        "version": "3.0.0"
+        "version": "3.0.1"
       },
       "license": null,
       "license_ids": [],
       "license_file": null
     },
-    "arena-http 3.0.0": {
+    "arena-http 3.0.1": {
       "name": "arena-http",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -889,15 +889,15 @@
           ],
           "selects": {}
         },
-        "version": "3.0.0"
+        "version": "3.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-kafka 3.0.0": {
+    "arena-kafka 3.0.1": {
       "name": "arena-kafka",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -967,15 +967,15 @@
           ],
           "selects": {}
         },
-        "version": "3.0.0"
+        "version": "3.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-localstack 3.0.0": {
+    "arena-localstack 3.0.1": {
       "name": "arena-localstack",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1077,15 +1077,15 @@
           ],
           "selects": {}
         },
-        "version": "3.0.0"
+        "version": "3.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-mssql 3.0.0": {
+    "arena-mssql 3.0.1": {
       "name": "arena-mssql",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1155,15 +1155,15 @@
           ],
           "selects": {}
         },
-        "version": "3.0.0"
+        "version": "3.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-oauth 3.0.0": {
+    "arena-oauth 3.0.1": {
       "name": "arena-oauth",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1269,15 +1269,15 @@
           ],
           "selects": {}
         },
-        "version": "3.0.0"
+        "version": "3.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-postgres 3.0.0": {
+    "arena-postgres 3.0.1": {
       "name": "arena-postgres",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1343,7 +1343,7 @@
           ],
           "selects": {}
         },
-        "version": "3.0.0"
+        "version": "3.0.1"
       },
       "license": "todo",
       "license_ids": [],
@@ -5419,6 +5419,45 @@
         "Apache-2.0"
       ],
       "license_file": null
+    },
+    "bs58 0.5.1": {
+      "name": "bs58",
+      "version": "0.5.1",
+      "package_url": "https://github.com/Nullus157/bs58-rs",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/bs58/0.5.1/download",
+          "sha256": "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "bs58",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "bs58",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "edition": "2021",
+        "version": "0.5.1"
+      },
+      "license": "MIT/Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
     },
     "bumpalo 3.20.2": {
       "name": "bumpalo",
@@ -15994,7 +16033,7 @@
         "deps": {
           "common": [
             {
-              "id": "base64 0.22.1",
+              "id": "base64 0.21.7",
               "target": "base64"
             },
             {
@@ -22820,14 +22859,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "serde_with 3.18.0": {
+    "serde_with 3.21.0": {
       "name": "serde_with",
-      "version": "3.18.0",
+      "version": "3.21.0",
       "package_url": "https://github.com/jonasbb/serde_with/",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/serde_with/3.18.0/download",
-          "sha256": "dd5414fad8e6907dbdd5bc441a50ae8d6e26151a03b1de04d89a5576de61d01f"
+          "url": "https://static.crates.io/crates/serde_with/3.21.0/download",
+          "sha256": "76a5c54c7310e7b8b9577c286d7e399ddd876c3e12b3ed917a8aabc4b96e9e8c"
         }
       },
       "targets": [
@@ -22871,13 +22910,13 @@
         "proc_macro_deps": {
           "common": [
             {
-              "id": "serde_with_macros 3.18.0",
+              "id": "serde_with_macros 3.21.0",
               "target": "serde_with_macros"
             }
           ],
           "selects": {}
         },
-        "version": "3.18.0"
+        "version": "3.21.0"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -22886,14 +22925,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "serde_with_macros 3.18.0": {
+    "serde_with_macros 3.21.0": {
       "name": "serde_with_macros",
-      "version": "3.18.0",
+      "version": "3.21.0",
       "package_url": "https://github.com/jonasbb/serde_with/",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/serde_with_macros/3.18.0/download",
-          "sha256": "d3db8978e608f1fe7357e211969fd9abdcae80bac1ba7a3369bb7eb6b404eb65"
+          "url": "https://static.crates.io/crates/serde_with_macros/3.21.0/download",
+          "sha256": "84d57bc0c8b9a17920c178daa6bb924850d54a9c97ab45194bb8c17ad66bb660"
         }
       },
       "targets": [
@@ -22937,7 +22976,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "3.18.0"
+        "version": "3.21.0"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -24476,7 +24515,7 @@
               "target": "serde_json"
             },
             {
-              "id": "serde_with 3.18.0",
+              "id": "serde_with 3.21.0",
               "target": "serde_with"
             },
             {
@@ -32970,18 +33009,18 @@
   },
   "binary_crates": [],
   "workspace_members": {
-    "arena 3.0.0": "arena",
-    "arena-container 3.0.0": "arena-container",
-    "arena-containerized-component 3.0.0": "arena-containerized-component",
-    "arena-examples 3.0.0": "examples",
-    "arena-executable-component 3.0.0": "arena-executable-component",
-    "arena-ffi 3.0.0": "arena-ffi",
-    "arena-http 3.0.0": "arena-http",
-    "arena-kafka 3.0.0": "arena-kafka",
-    "arena-localstack 3.0.0": "arena-localstack",
-    "arena-mssql 3.0.0": "arena-mssql",
-    "arena-oauth 3.0.0": "arena-oauth",
-    "arena-postgres 3.0.0": "arena-postgres"
+    "arena 3.0.1": "arena",
+    "arena-container 3.0.1": "arena-container",
+    "arena-containerized-component 3.0.1": "arena-containerized-component",
+    "arena-examples 3.0.1": "examples",
+    "arena-executable-component 3.0.1": "arena-executable-component",
+    "arena-ffi 3.0.1": "arena-ffi",
+    "arena-http 3.0.1": "arena-http",
+    "arena-kafka 3.0.1": "arena-kafka",
+    "arena-localstack 3.0.1": "arena-localstack",
+    "arena-mssql 3.0.1": "arena-mssql",
+    "arena-oauth 3.0.1": "arena-oauth",
+    "arena-postgres 3.0.1": "arena-postgres"
   },
   "conditions": {
     "aarch64-apple-darwin": [
