@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import subprocess
@@ -33,6 +34,12 @@ def _pom_coordinates(pom_path: Path) -> tuple[str, str, str]:
     if not group_id or not artifact_id or not version:
         raise ValueError(f"pom at {pom_path} is missing groupId/artifactId/version")
     return group_id, artifact_id, version
+
+
+def _write_checksums(path: Path) -> None:
+    contents = path.read_bytes()
+    path.with_name(path.name + ".md5").write_text(hashlib.md5(contents).hexdigest())
+    path.with_name(path.name + ".sha1").write_text(hashlib.sha1(contents).hexdigest())
 
 
 def _sign(path: Path, passphrase: str) -> Path:
@@ -88,6 +95,7 @@ def _build_bundle(
         staged_paths.append(staged_path)
 
     for staged_path in staged_paths:
+        _write_checksums(staged_path)
         _sign(staged_path, passphrase)
 
     bundle_path = staging_dir / f"{artifact_prefix}-bundle.zip"

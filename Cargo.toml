@@ -12,12 +12,11 @@ members = [
     "arena-container",
     "arena-containerized-component",
     "arena-ffi",
-    "arbiter",
     "examples"
 ]
 
 [workspace.package]
-version = "1.2.2"
+version = "3.0.0"
 [workspace.dependencies]
 arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }

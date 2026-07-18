@@ -150,6 +150,104 @@ await open_arena.close()
 
 As in Rust, you can point at source plus `with_build_tool(...)` instead of a prebuilt path when you want Arena to compile the component first.
 
+### Java (arena-junit)
+
+`arena-junit` is a JUnit 5 extension. You point it at the jar your build already produces, so a test runs against the same artifact you ship rather than a separate in-process test context.
+
+#### Annotation style
+
+Put `@Arena` on the test class, annotate your dependencies and components as static fields, and Arena wires the sandbox for you before any test method runs.
+
+```java
+@Arena
+final class ReadingsComponentTest {
+
+  @ArenaDependency
+  static final PostgresDependency POSTGRES =
+      new PostgresDependencyBuilder("readings-db")
+          .withPort(5432)
+          .withDatabaseName("readings")
+          .withDatabaseUsername("readings_user")
+          .withDatabasePassword("readings_password")
+          .build();
+
+  @ArenaComponent
+  static final ExecutableComponent WEB_APP =
+      new ExecutableComponentBuilder("readings-app")
+          .withExecutablePath("/path/to/readings-app.jar")
+          .withEnvVar("POSTGRES_CONNECTION_STRING", "host=localhost port=5432 dbname=readings")
+          .withReadinessCheck(HttpReadinessCheck.create(), "http://127.0.0.1:8080/health")
+          .build();
+
+  @Test
+  void createReadingIsListed() throws Exception {
+    // call the app over HTTP, same as any other component test
+  }
+}
+```
+
+Postgres and the app start at the same time rather than one after the other, so adding another dependency does not add its startup time on top of the rest.
+
+Need a second copy of your service, or a second service alongside it, for a domain test or a scale test? Add another field:
+
+```java
+@ArenaComponent
+static final ExecutableComponent WEB_APP_2 =
+    new ExecutableComponentBuilder("readings-app-2")
+        .withExecutablePath("/path/to/readings-app.jar")
+        .withEnvVar("POSTGRES_CONNECTION_STRING", "host=localhost port=5432 dbname=readings")
+        .withReadinessCheck(HttpReadinessCheck.create(), "http://127.0.0.1:8081/health")
+        .build();
+```
+
+Both instances run in the same sandbox against the same Postgres, so you can test how your service behaves with two copies of itself running, or bring in another team's service and test the two together.
+
+#### Building the arena yourself
+
+If you would rather not use field scanning, build the same sandbox by hand with `MatchBuilder` and open it in a plain JUnit lifecycle method:
+
+```java
+final class ReadingsComponentTest {
+
+  private static OpenArena openArena;
+
+  @BeforeAll
+  static void openArena() throws Exception {
+    PostgresDependency postgres =
+        new PostgresDependencyBuilder("readings-db")
+            .withPort(5432)
+            .withDatabaseName("readings")
+            .build();
+
+    ExecutableComponent webApp =
+        new ExecutableComponentBuilder("readings-app")
+            .withExecutablePath("/path/to/readings-app.jar")
+            .withReadinessCheck(HttpReadinessCheck.create(), "http://127.0.0.1:8080/health")
+            .build();
+
+    Match match =
+        new MatchBuilder("readings")
+            .addDependency(postgres)
+            .addComponent(webApp)
+            .build();
+
+    openArena = new ClosedArena("readings-arena", List.of(match)).open();
+  }
+
+  @AfterAll
+  static void closeArena() {
+    openArena.close();
+  }
+
+  @Test
+  void createReadingIsListed() throws Exception {
+    // call the app over HTTP, same as any other component test
+  }
+}
+```
+
+Use this when you want full control over when the sandbox opens and closes, for example sharing one arena across several test classes yourself instead of letting `@Arena` manage it.
+
 ## Playbooks
 
 A **playbook** is a named, scoped behavior attached to a dependency in your sandbox. It describes how that dependency should act for the lifetime of the playbook — for example, baseline HTTP responses for a downstream service, resetting MSSQL tables when a scenario begins and ends, or purging localstack resources between scenarios. Playbooks are part of Arena’s lifecycle model: you open them when a scenario needs them and close them when that scenario is done, so the sandbox returns to a known baseline.
