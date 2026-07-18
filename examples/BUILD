@@ -301,7 +301,7 @@ java_library(
     resources = glob(["src/example_readings_spring_boot_web_app/src/main/resources/**"]),
     javacopts = [
         "--release",
-        "21",
+        "25",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -338,7 +338,7 @@ java_binary(
     name = "example-readings-spring-boot-web-app",
     javacopts = [
         "--release",
-        "21",
+        "25",
     ],
     main_class = "arena.examples.readings.springboot.ReadingsApplication",
     visibility = ["//visibility:public"],
@@ -358,7 +358,7 @@ java_test(
     srcs = glob(["tests/example-spring-boot-component-test/**/*.java"]),
     javacopts = [
         "--release",
-        "21",
+        "25",
     ],
     tags = [
         "component_test",
@@ -405,7 +405,7 @@ java_test(
     srcs = glob(["tests/example-axum-junit-component-test/**/*.java"]),
     javacopts = [
         "--release",
-        "21",
+        "25",
     ],
     tags = [
         "component_test",

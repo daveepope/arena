@@ -6,7 +6,7 @@ _ARENA_JUNIT_SRCS = glob(["src/main/java/**/*.java"])
 
 _ARENA_JUNIT_JAVACOPTS = [
     "--release",
-    "21",
+    "25",
 ]
 
 _ARENA_JUNIT_DEPS = [
@@ -54,7 +54,7 @@ java_test(
     srcs = ["src/test/java/arena/junit/HttpPlaybookBuilderSerializationTest.java"],
     javacopts = [
         "--release",
-        "21",
+        "25",
     ],
     use_testrunner = False,
     main_class = "org.junit.platform.console.ConsoleLauncher",
@@ -80,7 +80,7 @@ java_test(
     srcs = ["src/test/java/arena/junit/HttpPlaybookRegistrationTest.java"],
     javacopts = [
         "--release",
-        "21",
+        "25",
     ],
     use_testrunner = False,
     main_class = "org.junit.platform.console.ConsoleLauncher",
@@ -106,7 +106,7 @@ java_test(
     srcs = ["src/test/java/arena/junit/playbook/PlaybookInvocationExtensionUnitTest.java"],
     javacopts = [
         "--release",
-        "21",
+        "25",
     ],
     use_testrunner = False,
     main_class = "org.junit.platform.console.ConsoleLauncher",
@@ -135,7 +135,7 @@ java_test(
     ],
     javacopts = [
         "--release",
-        "21",
+        "25",
     ],
     use_testrunner = False,
     main_class = "org.junit.platform.console.ConsoleLauncher",
@@ -168,7 +168,7 @@ java_test(
     srcs = ["src/test/java/arena/junit/ArenaExtensionLifecycleComponentTest.java"],
     javacopts = [
         "--release",
-        "21",
+        "25",
     ],
     use_testrunner = False,
     main_class = "org.junit.platform.console.ConsoleLauncher",
@@ -202,7 +202,7 @@ java_test(
     srcs = ["src/test/java/arena/junit/HttpPlaybookFluentApiTest.java"],
     javacopts = [
         "--release",
-        "21",
+        "25",
     ],
     use_testrunner = False,
     main_class = "org.junit.platform.console.ConsoleLauncher",
@@ -235,7 +235,7 @@ java_test(
     srcs = ["src/test/java/arena/junit/ffi/DispatcherHostLoggingLifecycleTest.java"],
     javacopts = [
         "--release",
-        "21",
+        "25",
     ],
     use_testrunner = False,
     main_class = "org.junit.platform.console.ConsoleLauncher",

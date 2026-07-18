@@ -1,6 +1,6 @@
 module(
     name = "arena",
-    version = "2.0.0",
+    version = "3.0.0",
 )
 
 arena_version_ext = use_extension("//tools:arena_version.bzl", "arena_version")
@@ -9,7 +9,7 @@ use_repo(arena_version_ext, "arena_version")
 bazel_dep(name = "rules_python", version = "0.34.0")
 bazel_dep(name = "rules_rust", version = "0.69.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
-bazel_dep(name = "rules_java", version = "7.12.2")
+bazel_dep(name = "rules_java", version = "9.0.0")
 bazel_dep(name = "rules_jvm_external", version = "6.6")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 
@@ -32,20 +32,18 @@ use_repo(
     "remote_java_tools_darwin_x86_64",
     "remote_java_tools_darwin_arm64",
 )
-_ARENA_JDK21 = [
-    "remotejdk21_linux",
-    "remotejdk21_linux_aarch64",
-    "remotejdk21_linux_ppc64le",
-    "remotejdk21_linux_s390x",
-    "remotejdk21_macos",
-    "remotejdk21_macos_aarch64",
-    "remotejdk21_win",
-    "remotejdk21_win_arm64",
+_ARENA_JDK25 = [
+    "remotejdk25_linux",
+    "remotejdk25_linux_aarch64",
+    "remotejdk25_macos",
+    "remotejdk25_macos_aarch64",
+    "remotejdk25_win",
+    "remotejdk25_win_arm64",
 ]
 
-[use_repo(java_toolchains, repo + "_toolchain_config_repo") for repo in _ARENA_JDK21]
+[use_repo(java_toolchains, repo + "_toolchain_config_repo") for repo in _ARENA_JDK25]
 
-[register_toolchains("@" + repo + "_toolchain_config_repo//:all") for repo in _ARENA_JDK21]
+[register_toolchains("@" + repo + "_toolchain_config_repo//:all") for repo in _ARENA_JDK25]
 
 arena_java_maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
 arena_java_maven.install(
@@ -59,10 +57,10 @@ arena_java_maven.install(
         "org.junit.jupiter:junit-jupiter-engine:5.11.4",
         "org.junit.platform:junit-platform-console:1.11.4",
         "org.apache.kafka:kafka-clients:3.9.0",
-        "org.springframework.boot:spring-boot-starter-web:3.4.1",
-        "org.springframework.boot:spring-boot-starter-jdbc:3.4.1",
-        "org.springframework.boot:spring-boot-starter-validation:3.4.1",
-        "org.springframework.boot:spring-boot-starter-oauth2-resource-server:3.4.1",
+        "org.springframework.boot:spring-boot-starter-web:3.5.3",
+        "org.springframework.boot:spring-boot-starter-jdbc:3.5.3",
+        "org.springframework.boot:spring-boot-starter-validation:3.5.3",
+        "org.springframework.boot:spring-boot-starter-oauth2-resource-server:3.5.3",
         "org.postgresql:postgresql:42.7.4",
         "com.microsoft.sqlserver:mssql-jdbc:12.8.1.jre11",
         "software.amazon.awssdk:eventbridge:2.29.29",
@@ -70,7 +68,7 @@ arena_java_maven.install(
         "software.amazon.awssdk:auth:2.29.29",
         "software.amazon.awssdk:regions:2.29.29",
         "software.amazon.awssdk:url-connection-client:2.29.29",
-        "org.springframework.boot:spring-boot-starter-logging:3.4.1",
+        "org.springframework.boot:spring-boot-starter-logging:3.5.3",
         "ch.qos.logback:logback-classic:1.5.12",
     ],
     fail_on_missing_checksum = False,
