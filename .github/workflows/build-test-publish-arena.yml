@@ -327,8 +327,7 @@ jobs:
         ) ||
         (
           github.event_name == 'push' &&
-          needs.master_merge_guard.result == 'success' &&
-          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+          needs.master_merge_guard.result == 'success'
         )
       )
     runs-on: ubuntu-24.04
@@ -484,12 +483,12 @@ jobs:
         (
           github.event_name == 'push' &&
           needs.master_merge_guard.result == 'success' &&
+          needs.coverage_ubuntu_24_04.result == 'success' &&
           (
             needs.master_merge_guard.outputs.from_merged_pr == 'true' ||
             (
               needs.verify.result == 'success' &&
               needs.test_ubuntu_24_04.result == 'success' &&
-              needs.coverage_ubuntu_24_04.result == 'success' &&
               needs.test_macos_intel.result == 'success' &&
               needs.test_macos_arm64.result == 'success'
             )

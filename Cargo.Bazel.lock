@@ -1,5 +1,5 @@
 {
-  "checksum": "67136ce3f59c2d5a7774392a4a6394add4fa7dcb471b850e4977c6a5e7434991",
+  "checksum": "b9eccfd3b50addf6e1d174801e996300dbafc59063b633375a89412f0e2eb56a",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -268,70 +268,6 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arbiter 2.0.0": {
-      "name": "arbiter",
-      "version": "2.0.0",
-      "package_url": null,
-      "repository": null,
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "arbiter",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "arbiter",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "notify 8.2.0",
-              "target": "notify"
-            },
-            {
-              "id": "serde 1.0.228",
-              "target": "serde"
-            },
-            {
-              "id": "serde_json 1.0.149",
-              "target": "serde_json"
-            },
-            {
-              "id": "tree-sitter 0.25.10",
-              "target": "tree_sitter"
-            },
-            {
-              "id": "tree-sitter-java 0.23.5",
-              "target": "tree_sitter_java"
-            },
-            {
-              "id": "tree-sitter-python 0.23.6",
-              "target": "tree_sitter_python"
-            },
-            {
-              "id": "tree-sitter-rust 0.24.2",
-              "target": "tree_sitter_rust"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2021",
-        "version": "2.0.0"
-      },
-      "license": "todo",
-      "license_ids": [],
-      "license_file": null
-    },
     "arbitrary 1.4.2": {
       "name": "arbitrary",
       "version": "1.4.2",
@@ -419,9 +355,9 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arena 2.0.0": {
+    "arena 3.0.0": {
       "name": "arena",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -487,15 +423,15 @@
           ],
           "selects": {}
         },
-        "version": "2.0.0"
+        "version": "3.0.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-container 2.0.0": {
+    "arena-container 3.0.0": {
       "name": "arena-container",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -540,15 +476,15 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "2.0.0"
+        "version": "3.0.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-containerized-component 2.0.0": {
+    "arena-containerized-component 3.0.0": {
       "name": "arena-containerized-component",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -618,15 +554,15 @@
           ],
           "selects": {}
         },
-        "version": "2.0.0"
+        "version": "3.0.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-examples 2.0.0": {
+    "arena-examples 3.0.0": {
       "name": "arena-examples",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -724,15 +660,15 @@
           ],
           "selects": {}
         },
-        "version": "2.0.0"
+        "version": "3.0.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-executable-component 2.0.0": {
+    "arena-executable-component 3.0.0": {
       "name": "arena-executable-component",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -794,15 +730,15 @@
           ],
           "selects": {}
         },
-        "version": "2.0.0"
+        "version": "3.0.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-ffi 2.0.0": {
+    "arena-ffi 3.0.0": {
       "name": "arena-ffi",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -867,15 +803,15 @@
           ],
           "selects": {}
         },
-        "version": "2.0.0"
+        "version": "3.0.0"
       },
       "license": null,
       "license_ids": [],
       "license_file": null
     },
-    "arena-http 2.0.0": {
+    "arena-http 3.0.0": {
       "name": "arena-http",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -953,15 +889,15 @@
           ],
           "selects": {}
         },
-        "version": "2.0.0"
+        "version": "3.0.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-kafka 2.0.0": {
+    "arena-kafka 3.0.0": {
       "name": "arena-kafka",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1031,15 +967,15 @@
           ],
           "selects": {}
         },
-        "version": "2.0.0"
+        "version": "3.0.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-localstack 2.0.0": {
+    "arena-localstack 3.0.0": {
       "name": "arena-localstack",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1141,15 +1077,15 @@
           ],
           "selects": {}
         },
-        "version": "2.0.0"
+        "version": "3.0.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-mssql 2.0.0": {
+    "arena-mssql 3.0.0": {
       "name": "arena-mssql",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1219,15 +1155,15 @@
           ],
           "selects": {}
         },
-        "version": "2.0.0"
+        "version": "3.0.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-oauth 2.0.0": {
+    "arena-oauth 3.0.0": {
       "name": "arena-oauth",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1333,15 +1269,15 @@
           ],
           "selects": {}
         },
-        "version": "2.0.0"
+        "version": "3.0.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-postgres 2.0.0": {
+    "arena-postgres 3.0.0": {
       "name": "arena-postgres",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1407,7 +1343,7 @@
           ],
           "selects": {}
         },
-        "version": "2.0.0"
+        "version": "3.0.0"
       },
       "license": "todo",
       "license_ids": [],
@@ -9627,53 +9563,6 @@
       ],
       "license_file": "LICENSE"
     },
-    "fsevent-sys 4.1.0": {
-      "name": "fsevent-sys",
-      "version": "4.1.0",
-      "package_url": "https://github.com/octplane/fsevent-rust/tree/master/fsevent-sys",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/fsevent-sys/4.1.0/download",
-          "sha256": "76ee7a02da4d231650c7cea31349b889be2f45ddb3ef3032d2ec8185f6313fd2"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "fsevent_sys",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "fsevent_sys",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "libc 0.2.185",
-              "target": "libc"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2018",
-        "version": "4.1.0"
-      },
-      "license": "MIT",
-      "license_ids": [
-        "MIT"
-      ],
-      "license_file": "LICENSE"
-    },
     "futures 0.3.32": {
       "name": "futures",
       "version": "0.3.32",
@@ -13428,108 +13317,6 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "inotify 0.11.2": {
-      "name": "inotify",
-      "version": "0.11.2",
-      "package_url": "https://github.com/hannobraun/inotify-rs",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/inotify/0.11.2/download",
-          "sha256": "533e68a5842e734946fe159fb03fc9bbbb254f590dd0d8ad321ae5ff7beca2c1"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "inotify",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "inotify",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "bitflags 2.11.1",
-              "target": "bitflags"
-            },
-            {
-              "id": "inotify-sys 0.1.5",
-              "target": "inotify_sys"
-            },
-            {
-              "id": "libc 0.2.185",
-              "target": "libc"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2018",
-        "version": "0.11.2"
-      },
-      "license": "ISC",
-      "license_ids": [
-        "ISC"
-      ],
-      "license_file": "LICENSE"
-    },
-    "inotify-sys 0.1.5": {
-      "name": "inotify-sys",
-      "version": "0.1.5",
-      "package_url": "https://github.com/hannobraun/inotify-sys",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/inotify-sys/0.1.5/download",
-          "sha256": "e05c02b5e89bff3b946cedeca278abc628fe811e604f027c45a8aa3cf793d0eb"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "inotify_sys",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "inotify_sys",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "libc 0.2.185",
-              "target": "libc"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2015",
-        "version": "0.1.5"
-      },
-      "license": "ISC",
-      "license_ids": [
-        "ISC"
-      ],
-      "license_file": "LICENSE"
-    },
     "ipnet 2.12.0": {
       "name": "ipnet",
       "version": "2.12.0",
@@ -13962,108 +13749,6 @@
         },
         "edition": "2024",
         "version": "10.4.0"
-      },
-      "license": "MIT",
-      "license_ids": [
-        "MIT"
-      ],
-      "license_file": "LICENSE"
-    },
-    "kqueue 1.2.0": {
-      "name": "kqueue",
-      "version": "1.2.0",
-      "package_url": "https://gitlab.com/rust-kqueue/rust-kqueue",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/kqueue/1.2.0/download",
-          "sha256": "273c0752728918e0ac4976f2b275b6fefb9ecd400585dec929419f3844cd87b5"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "kqueue",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "kqueue",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "kqueue-sys 1.1.2",
-              "target": "kqueue_sys"
-            },
-            {
-              "id": "libc 0.2.185",
-              "target": "libc"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2021",
-        "version": "1.2.0"
-      },
-      "license": "MIT",
-      "license_ids": [
-        "MIT"
-      ],
-      "license_file": "LICENSE"
-    },
-    "kqueue-sys 1.1.2": {
-      "name": "kqueue-sys",
-      "version": "1.1.2",
-      "package_url": "https://gitlab.com/rust-kqueue/rust-kqueue-sys",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/kqueue-sys/1.1.2/download",
-          "sha256": "07293a4e297ac234359b510362495713f75ea345d5307140414f20c69ffeb087"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "kqueue_sys",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "kqueue_sys",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "bitflags 2.11.1",
-              "target": "bitflags"
-            },
-            {
-              "id": "libc 0.2.185",
-              "target": "libc"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2021",
-        "version": "1.1.2"
       },
       "license": "MIT",
       "license_ids": [
@@ -15069,30 +14754,11 @@
             "os-ext",
             "os-poll"
           ],
-          "selects": {
-            "aarch64-unknown-linux-gnu": [
-              "default",
-              "log"
-            ],
-            "x86_64-unknown-linux-gnu": [
-              "default",
-              "log"
-            ],
-            "x86_64-unknown-nixos-gnu": [
-              "default",
-              "log"
-            ]
-          }
+          "selects": {}
         },
         "deps": {
           "common": [],
           "selects": {
-            "aarch64-unknown-linux-gnu": [
-              {
-                "id": "log 0.4.29",
-                "target": "log"
-              }
-            ],
             "cfg(any(unix, target_os = \"hermit\", target_os = \"wasi\"))": [
               {
                 "id": "libc 0.2.185",
@@ -15109,18 +14775,6 @@
               {
                 "id": "windows-sys 0.61.2",
                 "target": "windows_sys"
-              }
-            ],
-            "x86_64-unknown-linux-gnu": [
-              {
-                "id": "log 0.4.29",
-                "target": "log"
-              }
-            ],
-            "x86_64-unknown-nixos-gnu": [
-              {
-                "id": "log 0.4.29",
-                "target": "log"
               }
             ]
           }
@@ -15504,160 +15158,6 @@
         "MIT"
       ],
       "license_file": "LICENSE"
-    },
-    "notify 8.2.0": {
-      "name": "notify",
-      "version": "8.2.0",
-      "package_url": "https://github.com/notify-rs/notify.git",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/notify/8.2.0/download",
-          "sha256": "4d3d07927151ff8575b7087f245456e549fea62edf0ec4e565a5ee50c8402bc3"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "notify",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "notify",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "crate_features": {
-          "common": [
-            "default",
-            "fsevent-sys",
-            "macos_fsevent"
-          ],
-          "selects": {}
-        },
-        "deps": {
-          "common": [
-            {
-              "id": "libc 0.2.185",
-              "target": "libc"
-            },
-            {
-              "id": "log 0.4.29",
-              "target": "log"
-            },
-            {
-              "id": "notify-types 2.1.0",
-              "target": "notify_types"
-            },
-            {
-              "id": "walkdir 2.5.0",
-              "target": "walkdir"
-            }
-          ],
-          "selects": {
-            "aarch64-apple-darwin": [
-              {
-                "id": "fsevent-sys 4.1.0",
-                "target": "fsevent_sys"
-              }
-            ],
-            "cfg(any(target_os = \"freebsd\", target_os = \"openbsd\", target_os = \"netbsd\", target_os = \"dragonflybsd\", target_os = \"ios\"))": [
-              {
-                "id": "kqueue 1.2.0",
-                "target": "kqueue"
-              },
-              {
-                "id": "mio 1.2.0",
-                "target": "mio"
-              }
-            ],
-            "cfg(any(target_os = \"linux\", target_os = \"android\"))": [
-              {
-                "id": "inotify 0.11.2",
-                "target": "inotify"
-              },
-              {
-                "id": "mio 1.2.0",
-                "target": "mio"
-              }
-            ],
-            "cfg(target_os = \"macos\")": [
-              {
-                "id": "bitflags 2.11.1",
-                "target": "bitflags"
-              }
-            ],
-            "cfg(windows)": [
-              {
-                "id": "windows-sys 0.60.2",
-                "target": "windows_sys"
-              }
-            ]
-          }
-        },
-        "edition": "2021",
-        "version": "8.2.0"
-      },
-      "license": "CC0-1.0",
-      "license_ids": [
-        "CC0-1.0"
-      ],
-      "license_file": "LICENSE-CC0"
-    },
-    "notify-types 2.1.0": {
-      "name": "notify-types",
-      "version": "2.1.0",
-      "package_url": "https://github.com/notify-rs/notify.git",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/notify-types/2.1.0/download",
-          "sha256": "42b8cfee0e339a0337359f3c88165702ac6e600dc01c0cc9579a92d62b08477a"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "notify_types",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "notify_types",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "bitflags 2.11.1",
-              "target": "bitflags"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2021",
-        "version": "2.1.0"
-      },
-      "license": "MIT OR Apache-2.0",
-      "license_ids": [
-        "Apache-2.0",
-        "MIT"
-      ],
-      "license_file": "LICENSE-APACHE"
     },
     "nu-ansi-term 0.50.3": {
       "name": "nu-ansi-term",
@@ -22317,56 +21817,6 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "same-file 1.0.6": {
-      "name": "same-file",
-      "version": "1.0.6",
-      "package_url": "https://github.com/BurntSushi/same-file",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/same-file/1.0.6/download",
-          "sha256": "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "same_file",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "same_file",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [],
-          "selects": {
-            "cfg(windows)": [
-              {
-                "id": "winapi-util 0.1.11",
-                "target": "winapi_util"
-              }
-            ]
-          }
-        },
-        "edition": "2018",
-        "version": "1.0.6"
-      },
-      "license": "Unlicense/MIT",
-      "license_ids": [
-        "MIT",
-        "Unlicense"
-      ],
-      "license_file": "LICENSE-MIT"
-    },
     "schannel 0.1.29": {
       "name": "schannel",
       "version": "0.1.29",
@@ -23140,28 +22590,7 @@
             "raw_value",
             "std"
           ],
-          "selects": {
-            "aarch64-apple-darwin": [
-              "indexmap",
-              "preserve_order"
-            ],
-            "aarch64-unknown-linux-gnu": [
-              "indexmap",
-              "preserve_order"
-            ],
-            "x86_64-pc-windows-msvc": [
-              "indexmap",
-              "preserve_order"
-            ],
-            "x86_64-unknown-linux-gnu": [
-              "indexmap",
-              "preserve_order"
-            ],
-            "x86_64-unknown-nixos-gnu": [
-              "indexmap",
-              "preserve_order"
-            ]
-          }
+          "selects": {}
         },
         "deps": {
           "common": [
@@ -23187,40 +22616,10 @@
             }
           ],
           "selects": {
-            "aarch64-apple-darwin": [
-              {
-                "id": "indexmap 2.14.0",
-                "target": "indexmap"
-              }
-            ],
-            "aarch64-unknown-linux-gnu": [
-              {
-                "id": "indexmap 2.14.0",
-                "target": "indexmap"
-              }
-            ],
             "cfg(any())": [
               {
                 "id": "serde 1.0.228",
                 "target": "serde"
-              }
-            ],
-            "x86_64-pc-windows-msvc": [
-              {
-                "id": "indexmap 2.14.0",
-                "target": "indexmap"
-              }
-            ],
-            "x86_64-unknown-linux-gnu": [
-              {
-                "id": "indexmap 2.14.0",
-                "target": "indexmap"
-              }
-            ],
-            "x86_64-unknown-nixos-gnu": [
-              {
-                "id": "indexmap 2.14.0",
-                "target": "indexmap"
               }
             ]
           }
@@ -24320,45 +23719,6 @@
         ],
         "edition": "2015",
         "version": "1.2.1"
-      },
-      "license": "MIT OR Apache-2.0",
-      "license_ids": [
-        "Apache-2.0",
-        "MIT"
-      ],
-      "license_file": "LICENSE-APACHE"
-    },
-    "streaming-iterator 0.1.9": {
-      "name": "streaming-iterator",
-      "version": "0.1.9",
-      "package_url": "https://github.com/sfackler/streaming-iterator",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/streaming-iterator/0.1.9/download",
-          "sha256": "2b2231b7c3057d5e4ad0156fb3dc807d900806020c5ffa3ee6ff2c8c76fb8520"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "streaming_iterator",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "streaming_iterator",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "edition": "2021",
-        "version": "0.1.9"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -27594,469 +26954,6 @@
       ],
       "license_file": "LICENSE"
     },
-    "tree-sitter 0.25.10": {
-      "name": "tree-sitter",
-      "version": "0.25.10",
-      "package_url": "https://github.com/tree-sitter/tree-sitter",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/tree-sitter/0.25.10/download",
-          "sha256": "78f873475d258561b06f1c595d93308a7ed124d9977cb26b148c2084a4a3cc87"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "tree_sitter",
-            "crate_root": "binding_rust/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        },
-        {
-          "BuildScript": {
-            "crate_name": "build_script_build",
-            "crate_root": "binding_rust/build.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "tree_sitter",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "crate_features": {
-          "common": [
-            "default",
-            "std"
-          ],
-          "selects": {}
-        },
-        "deps": {
-          "common": [
-            {
-              "id": "regex 1.12.3",
-              "target": "regex"
-            },
-            {
-              "id": "regex-syntax 0.8.10",
-              "target": "regex_syntax"
-            },
-            {
-              "id": "streaming-iterator 0.1.9",
-              "target": "streaming_iterator"
-            },
-            {
-              "id": "tree-sitter 0.25.10",
-              "target": "build_script_build"
-            },
-            {
-              "id": "tree-sitter-language 0.1.7",
-              "target": "tree_sitter_language"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2021",
-        "version": "0.25.10"
-      },
-      "build_script_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "compile_data_glob_excludes": [
-          "**/*.rs"
-        ],
-        "data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "cc 1.2.60",
-              "target": "cc"
-            },
-            {
-              "id": "serde_json 1.0.149",
-              "target": "serde_json"
-            }
-          ],
-          "selects": {}
-        },
-        "link_deps": {
-          "common": [
-            {
-              "id": "tree-sitter-language 0.1.7",
-              "target": "tree_sitter_language"
-            }
-          ],
-          "selects": {}
-        },
-        "links": "tree-sitter"
-      },
-      "license": "MIT",
-      "license_ids": [
-        "MIT"
-      ],
-      "license_file": null
-    },
-    "tree-sitter-java 0.23.5": {
-      "name": "tree-sitter-java",
-      "version": "0.23.5",
-      "package_url": "https://github.com/tree-sitter/tree-sitter-java",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/tree-sitter-java/0.23.5/download",
-          "sha256": "0aa6cbcdc8c679b214e616fd3300da67da0e492e066df01bcf5a5921a71e90d6"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "tree_sitter_java",
-            "crate_root": "bindings/rust/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        },
-        {
-          "BuildScript": {
-            "crate_name": "build_script_build",
-            "crate_root": "bindings/rust/build.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "tree_sitter_java",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "tree-sitter-java 0.23.5",
-              "target": "build_script_build"
-            },
-            {
-              "id": "tree-sitter-language 0.1.7",
-              "target": "tree_sitter_language"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2021",
-        "version": "0.23.5"
-      },
-      "build_script_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "compile_data_glob_excludes": [
-          "**/*.rs"
-        ],
-        "data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "cc 1.2.60",
-              "target": "cc"
-            }
-          ],
-          "selects": {}
-        },
-        "link_deps": {
-          "common": [
-            {
-              "id": "tree-sitter-language 0.1.7",
-              "target": "tree_sitter_language"
-            }
-          ],
-          "selects": {}
-        }
-      },
-      "license": "MIT",
-      "license_ids": [
-        "MIT"
-      ],
-      "license_file": null
-    },
-    "tree-sitter-language 0.1.7": {
-      "name": "tree-sitter-language",
-      "version": "0.1.7",
-      "package_url": "https://github.com/tree-sitter/tree-sitter",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/tree-sitter-language/0.1.7/download",
-          "sha256": "009994f150cc0cd50ff54917d5bc8bffe8cad10ca10d81c34da2ec421ae61782"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "tree_sitter_language",
-            "crate_root": "src/language.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        },
-        {
-          "BuildScript": {
-            "crate_name": "build_script_build",
-            "crate_root": "build.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "tree_sitter_language",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "tree-sitter-language 0.1.7",
-              "target": "build_script_build"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2021",
-        "version": "0.1.7"
-      },
-      "build_script_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "compile_data_glob_excludes": [
-          "**/*.rs"
-        ],
-        "data_glob": [
-          "**"
-        ],
-        "links": "tree-sitter-language"
-      },
-      "license": "MIT",
-      "license_ids": [
-        "MIT"
-      ],
-      "license_file": "LICENSE"
-    },
-    "tree-sitter-python 0.23.6": {
-      "name": "tree-sitter-python",
-      "version": "0.23.6",
-      "package_url": "https://github.com/tree-sitter/tree-sitter-python",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/tree-sitter-python/0.23.6/download",
-          "sha256": "3d065aaa27f3aaceaf60c1f0e0ac09e1cb9eb8ed28e7bcdaa52129cffc7f4b04"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "tree_sitter_python",
-            "crate_root": "bindings/rust/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        },
-        {
-          "BuildScript": {
-            "crate_name": "build_script_build",
-            "crate_root": "bindings/rust/build.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "tree_sitter_python",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "tree-sitter-language 0.1.7",
-              "target": "tree_sitter_language"
-            },
-            {
-              "id": "tree-sitter-python 0.23.6",
-              "target": "build_script_build"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2021",
-        "version": "0.23.6"
-      },
-      "build_script_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "compile_data_glob_excludes": [
-          "**/*.rs"
-        ],
-        "data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "cc 1.2.60",
-              "target": "cc"
-            }
-          ],
-          "selects": {}
-        },
-        "link_deps": {
-          "common": [
-            {
-              "id": "tree-sitter-language 0.1.7",
-              "target": "tree_sitter_language"
-            }
-          ],
-          "selects": {}
-        }
-      },
-      "license": "MIT",
-      "license_ids": [
-        "MIT"
-      ],
-      "license_file": null
-    },
-    "tree-sitter-rust 0.24.2": {
-      "name": "tree-sitter-rust",
-      "version": "0.24.2",
-      "package_url": "https://github.com/tree-sitter/tree-sitter-rust",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/tree-sitter-rust/0.24.2/download",
-          "sha256": "439e577dbe07423ec2582ac62c7531120dbfccfa6e5f92406f93dd271a120e45"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "tree_sitter_rust",
-            "crate_root": "bindings/rust/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        },
-        {
-          "BuildScript": {
-            "crate_name": "build_script_build",
-            "crate_root": "bindings/rust/build.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "tree_sitter_rust",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "tree-sitter-language 0.1.7",
-              "target": "tree_sitter_language"
-            },
-            {
-              "id": "tree-sitter-rust 0.24.2",
-              "target": "build_script_build"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2021",
-        "version": "0.24.2"
-      },
-      "build_script_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "compile_data_glob_excludes": [
-          "**/*.rs"
-        ],
-        "data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "cc 1.2.60",
-              "target": "cc"
-            }
-          ],
-          "selects": {}
-        },
-        "link_deps": {
-          "common": [
-            {
-              "id": "tree-sitter-language 0.1.7",
-              "target": "tree_sitter_language"
-            }
-          ],
-          "selects": {}
-        }
-      },
-      "license": "MIT",
-      "license_ids": [
-        "MIT"
-      ],
-      "license_file": "LICENSE"
-    },
     "try-lock 0.2.5": {
       "name": "try-lock",
       "version": "0.2.5",
@@ -28997,61 +27894,6 @@
         "MIT"
       ],
       "license_file": null
-    },
-    "walkdir 2.5.0": {
-      "name": "walkdir",
-      "version": "2.5.0",
-      "package_url": "https://github.com/BurntSushi/walkdir",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/walkdir/2.5.0/download",
-          "sha256": "29790946404f91d9c5d06f9874efddea1dc06c5efe94541a7d6863108e3a5e4b"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "walkdir",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "walkdir",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "same-file 1.0.6",
-              "target": "same_file"
-            }
-          ],
-          "selects": {
-            "cfg(windows)": [
-              {
-                "id": "winapi-util 0.1.11",
-                "target": "winapi_util"
-              }
-            ]
-          }
-        },
-        "edition": "2018",
-        "version": "2.5.0"
-      },
-      "license": "Unlicense/MIT",
-      "license_ids": [
-        "MIT",
-        "Unlicense"
-      ],
-      "license_file": "LICENSE-MIT"
     },
     "want 0.3.1": {
       "name": "want",
@@ -30340,56 +29182,6 @@
       ],
       "license_file": null
     },
-    "winapi-util 0.1.11": {
-      "name": "winapi-util",
-      "version": "0.1.11",
-      "package_url": "https://github.com/BurntSushi/winapi-util",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/winapi-util/0.1.11/download",
-          "sha256": "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "winapi_util",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "winapi_util",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [],
-          "selects": {
-            "cfg(windows)": [
-              {
-                "id": "windows-sys 0.61.2",
-                "target": "windows_sys"
-              }
-            ]
-          }
-        },
-        "edition": "2021",
-        "version": "0.1.11"
-      },
-      "license": "Unlicense OR MIT",
-      "license_ids": [
-        "MIT",
-        "Unlicense"
-      ],
-      "license_file": "LICENSE-MIT"
-    },
     "winapi-x86_64-pc-windows-gnu 0.4.0": {
       "name": "winapi-x86_64-pc-windows-gnu",
       "version": "0.4.0",
@@ -30854,21 +29646,6 @@
         "compile_data_glob": [
           "**"
         ],
-        "crate_features": {
-          "common": [
-            "Win32",
-            "Win32_Foundation",
-            "Win32_Security",
-            "Win32_Storage",
-            "Win32_Storage_FileSystem",
-            "Win32_System",
-            "Win32_System_IO",
-            "Win32_System_Threading",
-            "Win32_System_WindowsProgramming",
-            "default"
-          ],
-          "selects": {}
-        },
         "deps": {
           "common": [
             {
@@ -34193,19 +32970,18 @@
   },
   "binary_crates": [],
   "workspace_members": {
-    "arbiter 2.0.0": "arbiter",
-    "arena 2.0.0": "arena",
-    "arena-container 2.0.0": "arena-container",
-    "arena-containerized-component 2.0.0": "arena-containerized-component",
-    "arena-examples 2.0.0": "examples",
-    "arena-executable-component 2.0.0": "arena-executable-component",
-    "arena-ffi 2.0.0": "arena-ffi",
-    "arena-http 2.0.0": "arena-http",
-    "arena-kafka 2.0.0": "arena-kafka",
-    "arena-localstack 2.0.0": "arena-localstack",
-    "arena-mssql 2.0.0": "arena-mssql",
-    "arena-oauth 2.0.0": "arena-oauth",
-    "arena-postgres 2.0.0": "arena-postgres"
+    "arena 3.0.0": "arena",
+    "arena-container 3.0.0": "arena-container",
+    "arena-containerized-component 3.0.0": "arena-containerized-component",
+    "arena-examples 3.0.0": "examples",
+    "arena-executable-component 3.0.0": "arena-executable-component",
+    "arena-ffi 3.0.0": "arena-ffi",
+    "arena-http 3.0.0": "arena-http",
+    "arena-kafka 3.0.0": "arena-kafka",
+    "arena-localstack 3.0.0": "arena-localstack",
+    "arena-mssql 3.0.0": "arena-mssql",
+    "arena-oauth 3.0.0": "arena-oauth",
+    "arena-postgres 3.0.0": "arena-postgres"
   },
   "conditions": {
     "aarch64-apple-darwin": [
@@ -34298,14 +33074,8 @@
     ],
     "cfg(any(target_os = \"dragonfly\", target_os = \"freebsd\", target_os = \"hurd\", target_os = \"illumos\", target_os = \"cygwin\", all(target_os = \"horizon\", target_arch = \"arm\")))": [],
     "cfg(any(target_os = \"freebsd\", target_os = \"netbsd\"))": [],
-    "cfg(any(target_os = \"freebsd\", target_os = \"openbsd\", target_os = \"netbsd\", target_os = \"dragonflybsd\", target_os = \"ios\"))": [],
     "cfg(any(target_os = \"haiku\", target_os = \"redox\", target_os = \"nto\", target_os = \"aix\"))": [],
     "cfg(any(target_os = \"ios\", target_os = \"visionos\", target_os = \"watchos\", target_os = \"tvos\"))": [],
-    "cfg(any(target_os = \"linux\", target_os = \"android\"))": [
-      "aarch64-unknown-linux-gnu",
-      "x86_64-unknown-linux-gnu",
-      "x86_64-unknown-nixos-gnu"
-    ],
     "cfg(any(target_os = \"macos\", target_os = \"openbsd\", target_os = \"vita\", target_os = \"emscripten\"))": [
       "aarch64-apple-darwin"
     ],
@@ -34423,7 +33193,6 @@
     "futures 0.3.32",
     "futures-timer 3.0.3",
     "jsonwebtoken 10.4.0",
-    "notify 8.2.0",
     "oauth2 5.0.0",
     "postgres 0.19.13",
     "rand 0.8.6",
@@ -34443,10 +33212,6 @@
     "tokio-util 0.7.18",
     "tracing 0.1.44",
     "tracing-subscriber 0.3.23",
-    "tree-sitter 0.25.10",
-    "tree-sitter-java 0.23.5",
-    "tree-sitter-python 0.23.6",
-    "tree-sitter-rust 0.24.2",
     "zip 2.4.2"
   ],
   "direct_dev_deps": [
