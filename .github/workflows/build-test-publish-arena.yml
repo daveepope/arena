@@ -23,6 +23,7 @@ jobs:
     outputs:
       only_non_publishable: ${{ steps.classify.outputs.only_non_publishable }}
       has_publishable: ${{ steps.classify.outputs.has_publishable }}
+      has_ci_relevant: ${{ steps.classify.outputs.has_ci_relevant }}
       version_changed: ${{ steps.filter.outputs.version_changed }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -42,31 +43,40 @@ jobs:
         env:
           CHANGED: ${{ steps.filter.outputs.all_changed_files }}
         run: |
-          meta_path() {
+          docs_path() {
             case "$1" in
               *.md|AGENTS.md|CLAUDE.md) return 0 ;;
               .gitignore|.gitattributes|.editorconfig|.dockerignore|.bazelignore) return 0 ;;
               .codecov.yml|LICENSE) return 0 ;;
               *.png) return 0 ;;
             esac
-            [[ "$1" == .cursor/* || "$1" == .idea/* || "$1" == .vscode/* || "$1" == .github/workflows/* ]]
+            [[ "$1" == .cursor/* || "$1" == .idea/* || "$1" == .vscode/* ]]
+          }
+          ci_only_path() {
+            [[ "$1" == .github/workflows/* || "$1" == .github/dependabot.yml ]]
           }
           only_non_publishable=false
           has_publishable=false
+          has_ci_relevant=false
           if [ -n "$CHANGED" ]; then
             only_non_publishable=true
             for path in $CHANGED; do
-              if meta_path "$path"; then
+              if docs_path "$path"; then
                 continue
               fi
               only_non_publishable=false
+              has_ci_relevant=true
+              if ci_only_path "$path"; then
+                continue
+              fi
               has_publishable=true
             done
           fi
           echo "only_non_publishable=${only_non_publishable}" >> "$GITHUB_OUTPUT"
           echo "has_publishable=${has_publishable}" >> "$GITHUB_OUTPUT"
+          echo "has_ci_relevant=${has_ci_relevant}" >> "$GITHUB_OUTPUT"
           echo "changed=${CHANGED:-<none>}"
-          echo "only_non_publishable=${only_non_publishable} has_publishable=${has_publishable}"
+          echo "only_non_publishable=${only_non_publishable} has_publishable=${has_publishable} has_ci_relevant=${has_ci_relevant}"
 
   dependabot_awaiting_version_bump:
     name: Awaiting Dependabot version bump
@@ -84,7 +94,7 @@ jobs:
   docs_only:
     name: Docs / agent rules only
     needs: changes
-    if: needs.changes.outputs.has_publishable != 'true'
+    if: needs.changes.outputs.has_ci_relevant != 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -95,7 +105,7 @@ jobs:
     name: Non-publishable changes only
     needs: changes
     if: >-
-      needs.changes.outputs.has_publishable != 'true' &&
+      needs.changes.outputs.has_ci_relevant != 'true' &&
       needs.changes.outputs.only_non_publishable == 'true'
     runs-on: ubuntu-24.04
     permissions:
@@ -141,7 +151,7 @@ jobs:
     if: >-
       github.event_name == 'push' &&
       github.ref == 'refs/heads/master' &&
-      needs.changes.outputs.has_publishable == 'true'
+      needs.changes.outputs.has_ci_relevant == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -173,7 +183,7 @@ jobs:
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
-      needs.changes.outputs.has_publishable == 'true' &&
+      needs.changes.outputs.has_ci_relevant == 'true' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -270,7 +280,7 @@ jobs:
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
-      needs.changes.outputs.has_publishable == 'true' &&
+      needs.changes.outputs.has_ci_relevant == 'true' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -315,7 +325,7 @@ jobs:
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
-      needs.changes.outputs.has_publishable == 'true' &&
+      needs.changes.outputs.has_ci_relevant == 'true' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -368,7 +378,7 @@ jobs:
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
-      needs.changes.outputs.has_publishable == 'true' &&
+      needs.changes.outputs.has_ci_relevant == 'true' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -416,7 +426,7 @@ jobs:
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
-      needs.changes.outputs.has_publishable == 'true' &&
+      needs.changes.outputs.has_ci_relevant == 'true' &&
       (
         (
           github.event_name == 'pull_request' &&
