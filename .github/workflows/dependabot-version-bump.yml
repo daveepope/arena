@@ -39,10 +39,12 @@ jobs:
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
-        if: ${{ secrets.BUILDBUDDY_API_KEY != '' }}
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          fi
 
       - name: Bump and sync version
         env:

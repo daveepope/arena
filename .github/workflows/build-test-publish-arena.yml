@@ -226,10 +226,12 @@ jobs:
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
-        if: ${{ secrets.BUILDBUDDY_API_KEY != '' }}
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          fi
 
       - name: Verify VERSION sync
         run: >-
@@ -310,10 +312,12 @@ jobs:
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
-        if: ${{ secrets.BUILDBUDDY_API_KEY != '' }}
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          fi
 
       - name: Build and test
         run: |
@@ -360,10 +364,12 @@ jobs:
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
-        if: ${{ secrets.BUILDBUDDY_API_KEY != '' }}
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          fi
 
       - name: Coverage
         run: |
@@ -423,10 +429,12 @@ jobs:
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
-        if: ${{ secrets.BUILDBUDDY_API_KEY != '' }}
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          fi
 
       - name: Build and test
         run: |
@@ -474,10 +482,12 @@ jobs:
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
-        if: ${{ secrets.BUILDBUDDY_API_KEY != '' }}
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          fi
 
       - name: Build and test
         run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
@@ -564,10 +574,12 @@ jobs:
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
-        if: ${{ secrets.BUILDBUDDY_API_KEY != '' }}
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          fi
 
       - name: Unique version for TestPyPI
         if: github.event_name == 'pull_request'
@@ -681,10 +693,12 @@ jobs:
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
-        if: ${{ secrets.BUILDBUDDY_API_KEY != '' }}
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          fi
 
       - name: Publish snapshot to Maven Central
         env:
@@ -719,10 +733,12 @@ jobs:
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
-        if: ${{ secrets.BUILDBUDDY_API_KEY != '' }}
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          fi
 
       - name: Build release artifacts
         run: |
