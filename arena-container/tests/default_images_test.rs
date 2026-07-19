@@ -26,5 +26,5 @@ fn default_images_builder_ids_match_toml_defaults() {
     assert_eq!(MSSQL.image, "mcr.microsoft.com/mssql/server");
     assert_eq!(MSSQL.tag, "2025-CU7-ubuntu-24.04");
     assert_eq!(LOCALSTACK.image, "localstack/localstack");
-    assert_eq!(LOCALSTACK.tag, "2026.06.3");
+    assert_eq!(LOCALSTACK.tag, "4.14.0");
 }

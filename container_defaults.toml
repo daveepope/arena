@@ -26,4 +26,4 @@ tag = "3.13.2-alpine"
 [[image]]
 id = "localstack"
 image = "localstack/localstack"
-tag = "2026.06.3"
+tag = "4.14.0"

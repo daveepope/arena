@@ -29,7 +29,7 @@ fn find_config_path() -> Option<String> {
             }
         }
     }
-    let dev = Path::new("examples/resources/arena_config.json");
+    let dev = Path::new("resources/arena_config.json");
     if dev.is_file() {
         return Some(dev.to_string_lossy().into_owned());
     }

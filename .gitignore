@@ -1,6 +1,8 @@
 /target
 .idea/
 
+arena-container/src/default_images.rs
+
 .venv/
 .venv-*/
 venv/
