@@ -12,19 +12,19 @@ fn default_images_all_entries_have_distinct_ids() {
 fn default_images_postgres_matches_toml_default() {
     assert_eq!(POSTGRES.id, "postgres");
     assert_eq!(POSTGRES.image, "postgres");
-    assert_eq!(POSTGRES.tag, "17");
+    assert_eq!(POSTGRES.tag, "18-bookworm");
 }
 
 #[test]
 fn default_images_builder_ids_match_toml_defaults() {
     assert_eq!(HTTP.image, "wiremock/wiremock");
-    assert_eq!(HTTP.tag, "3.13.2");
+    assert_eq!(HTTP.tag, "3.13.2-alpine");
     assert_eq!(KAFKA_APACHE.image, "apache/kafka");
-    assert_eq!(KAFKA_APACHE.tag, "3.9.1");
+    assert_eq!(KAFKA_APACHE.tag, "4.3.1");
     assert_eq!(KAFKA_CONFLUENT.image, "confluentinc/cp-kafka");
-    assert_eq!(KAFKA_CONFLUENT.tag, "7.8.9");
+    assert_eq!(KAFKA_CONFLUENT.tag, "8.2.2");
     assert_eq!(MSSQL.image, "mcr.microsoft.com/mssql/server");
-    assert_eq!(MSSQL.tag, "2022-CU25-ubuntu-22.04");
+    assert_eq!(MSSQL.tag, "2025-CU7-ubuntu-24.04");
     assert_eq!(LOCALSTACK.image, "localstack/localstack");
     assert_eq!(LOCALSTACK.tag, "4.14.0");
 }

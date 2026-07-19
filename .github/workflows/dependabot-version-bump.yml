@@ -37,6 +37,8 @@ jobs:
           bazelisk-cache: true
           disk-cache: dependabot-version-bump
           repository-cache: true
+
+      - name: Bump and sync version
         env:
           ARENA_VERSION_BASE_REF: origin/${{ github.base_ref }}
           ARENA_BAZEL_CONFIG: ci

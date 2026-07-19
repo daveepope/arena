@@ -1,5 +1,38 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
+config_setting(
+    name = "trivy_linux_x86_64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "trivy_macos_x86_64",
+    constraint_values = [
+        "@platforms//os:macos",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "trivy_macos_aarch64",
+    constraint_values = [
+        "@platforms//os:macos",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+alias(
+    name = "trivy_bin",
+    actual = select({
+        ":trivy_linux_x86_64": "@trivy_linux_x86_64//:trivy",
+        ":trivy_macos_x86_64": "@trivy_macos_x86_64//:trivy",
+        ":trivy_macos_aarch64": "@trivy_macos_arm64//:trivy",
+    }),
+)
+
 py_binary(
     name = "sync_agent_rules",
     srcs = ["sync_agent_rules.py"],
@@ -132,6 +165,37 @@ py_binary(
     srcs = ["container_image_matrix.py"],
     main = "container_image_matrix.py",
     deps = [":container_defaults_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
+    name = "check_container_cves_lib",
+    srcs = ["check_container_cves.py"],
+    deps = [
+        ":container_defaults_lib",
+        "@bazel_tools//tools/python/runfiles",
+    ],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "check_container_cves",
+    srcs = ["check_container_cves.py"],
+    data = [":trivy_bin"],
+    main = "check_container_cves.py",
+    deps = [":check_container_cves_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "check_container_cves_parse_test",
+    size = "small",
+    srcs = ["check_container_cves_test.py"],
+    main = "check_container_cves_test.py",
+    deps = [":check_container_cves_lib"],
     imports = ["."],
     visibility = ["//visibility:public"],
 )

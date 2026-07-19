@@ -1,0 +1,70 @@
+name: Best Effort Default Container CVE Search
+
+on:
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: '17 6 * * *'
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  container-cves:
+    name: Best Effort Default Container CVE Search
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: container-cves
+          repository-cache: true
+
+      - name: Verify check logic
+        run: bazel test //scripts:check_container_cves_parse_test --config=ci
+
+      - name: Search default container images for CVEs
+        id: cve_check
+        continue-on-error: true
+        env:
+          ARENA_DEFAULT_CONTAINER_CVE_SEVERITIES: "CRITICAL,HIGH"
+        run: bazel run //scripts:check_container_cves --config=ci | tee container-cve-report.txt
+
+      - name: Comment CVE report on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- container-cve-check -->';
+            const report = fs.existsSync('container-cve-report.txt')
+              ? fs.readFileSync('container-cve-report.txt', 'utf8')
+              : 'The search did not produce a report (the check may have failed to run).';
+            const body = `${marker}\n### Best Effort Default Container CVE Search (informational, non-blocking)\n\n\`\`\`\n${report}\n\`\`\`\n`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

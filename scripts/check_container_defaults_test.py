@@ -25,7 +25,7 @@ class ContainerDefaultsTest(unittest.TestCase):
 
     def test_image_refs_returns_colon_separated_refs(self) -> None:
         refs = image_refs(self._root())
-        self.assertIn("postgres:17", refs)
+        self.assertIn("postgres:18-bookworm", refs)
         self.assertTrue(all(":" in ref for ref in refs))
 
     def test_rust_string_literal_escapes_backslash(self) -> None:
@@ -42,11 +42,11 @@ class ContainerDefaultsTest(unittest.TestCase):
         loaded_ids = {row["id"] for row in rows}
         self.assertTrue(BUILDER_IMAGE_IDS.issubset(loaded_ids))
 
-    def test_load_container_defaults_postgres_tag_is_17(self) -> None:
+    def test_load_container_defaults_postgres_tag_is_18_bookworm(self) -> None:
         rows = load_container_defaults(self._root())
         postgres = next(row for row in rows if row["id"] == "postgres")
         self.assertEqual(postgres["image"], "postgres")
-        self.assertEqual(postgres["tag"], "17")
+        self.assertEqual(postgres["tag"], "18-bookworm")
 
     def test_render_default_images_rs_matches_toml_entries(self) -> None:
         rows = load_container_defaults(self._root())
