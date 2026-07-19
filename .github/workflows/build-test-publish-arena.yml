@@ -49,7 +49,7 @@ jobs:
               .codecov.yml|LICENSE) return 0 ;;
               *.png) return 0 ;;
             esac
-            [[ "$1" == .cursor/* || "$1" == .idea/* || "$1" == .vscode/* ]]
+            [[ "$1" == .cursor/* || "$1" == .idea/* || "$1" == .vscode/* || "$1" == .github/workflows/* ]]
           }
           only_non_publishable=false
           has_publishable=false
