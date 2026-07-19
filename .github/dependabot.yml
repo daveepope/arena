@@ -1,0 +1,58 @@
+version: 2
+
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      cargo:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "pip"
+    directory: "/arena-pytest"
+    schedule:
+      interval: "weekly"
+    groups:
+      pip-arena-pytest:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "pip"
+    directory: "/examples"
+    schedule:
+      interval: "weekly"
+    groups:
+      pip-examples:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "maven"
+    directory: "/examples/src/example_readings_spring_boot_web_app"
+    schedule:
+      interval: "weekly"
+    groups:
+      maven-examples:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "docker"
+    directory: "/examples/src/example_readings_axum_web_app/web_server"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
