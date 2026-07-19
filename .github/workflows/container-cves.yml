@@ -26,6 +26,14 @@ jobs:
           disk-cache: container-cves
           repository-cache: true
 
+      - name: Configure BuildBuddy remote cache
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          fi
+
       - name: Verify check logic
         run: bazel test //scripts:check_container_cves_parse_test --config=ci
 
