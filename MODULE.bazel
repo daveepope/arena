@@ -1,6 +1,6 @@
 module(
     name = "arena",
-    version = "3.0.1",
+    version = "3.1.0",
 )
 
 arena_version_ext = use_extension("//tools:arena_version.bzl", "arena_version")
@@ -21,6 +21,29 @@ http_archive(
     strip_prefix = "openssl-3.5.5",
     urls = ["https://github.com/openssl/openssl/releases/download/openssl-3.5.5/openssl-3.5.5.tar.gz"],
     build_file = "//third_party:openssl.BUILD.bazel",
+)
+
+_TRIVY_VERSION = "0.72.0"
+
+http_archive(
+    name = "trivy_linux_x86_64",
+    build_file_content = """exports_files(["trivy"])""",
+    sha256 = "bbb64b9695866ce4a7a8f5c9592002c5961cab378577fa3f8a040df362b9b2ea",
+    urls = ["https://github.com/aquasecurity/trivy/releases/download/v{v}/trivy_{v}_Linux-64bit.tar.gz".format(v = _TRIVY_VERSION)],
+)
+
+http_archive(
+    name = "trivy_macos_x86_64",
+    build_file_content = """exports_files(["trivy"])""",
+    sha256 = "ee5e60df8a98e5b89fd74a6d86f9e5c7e9a266a35002cb1e43291698b3bfee08",
+    urls = ["https://github.com/aquasecurity/trivy/releases/download/v{v}/trivy_{v}_macOS-64bit.tar.gz".format(v = _TRIVY_VERSION)],
+)
+
+http_archive(
+    name = "trivy_macos_arm64",
+    build_file_content = """exports_files(["trivy"])""",
+    sha256 = "88f208680dc05da2b459e19b4f5aa2b4dc7c2117892ba4aab2ae63baba330016",
+    urls = ["https://github.com/aquasecurity/trivy/releases/download/v{v}/trivy_{v}_macOS-ARM64.tar.gz".format(v = _TRIVY_VERSION)],
 )
 
 java_toolchains = use_extension("@rules_java//java:extensions.bzl", "toolchains")

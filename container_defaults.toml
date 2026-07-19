@@ -1,29 +1,29 @@
 [[image]]
 id = "postgres"
 image = "postgres"
-tag = "17"
+tag = "18-bookworm"
 
 [[image]]
 id = "kafka_apache"
 image = "apache/kafka"
-tag = "3.9.1"
+tag = "4.3.1"
 
 [[image]]
 id = "kafka_confluent"
 image = "confluentinc/cp-kafka"
-tag = "7.8.9"
+tag = "8.2.2"
 
 [[image]]
 id = "mssql"
 image = "mcr.microsoft.com/mssql/server"
-tag = "2022-CU25-ubuntu-22.04"
+tag = "2025-CU7-ubuntu-24.04"
 
 [[image]]
 id = "http"
 image = "wiremock/wiremock"
-tag = "3.13.2"
+tag = "3.13.2-alpine"
 
 [[image]]
 id = "localstack"
 image = "localstack/localstack"
-tag = "4.14.0"
+tag = "2026.06.3"
