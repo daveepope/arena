@@ -1,5 +1,5 @@
 {
-  "checksum": "bd6072fe7edc51f219a626b79eddf97bd7a761c1b3ce19969dea667d4629c56a",
+  "checksum": "e83b885806bf61dbd395c1d6b00abb43a16e50ced5fd6be2dcca063db4005415",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -446,6 +446,18 @@
               ]
             }
           }
+        },
+        {
+          "BuildScript": {
+            "crate_name": "build_script_build",
+            "crate_root": "build.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
         }
       ],
       "library_target_name": "arena_container",
@@ -455,6 +467,10 @@
         ],
         "deps": {
           "common": [
+            {
+              "id": "arena-container 3.1.0",
+              "target": "build_script_build"
+            },
             {
               "id": "bollard 0.20.2",
               "target": "bollard"
@@ -477,6 +493,17 @@
         },
         "edition": "2021",
         "version": "3.1.0"
+      },
+      "build_script_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "compile_data_glob_excludes": [
+          "**/*.rs"
+        ],
+        "data_glob": [
+          "**"
+        ]
       },
       "license": "todo",
       "license_ids": [],
