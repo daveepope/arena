@@ -1,0 +1,24 @@
+[package]
+name = "arena-temporal"
+version.workspace = true
+edition = "2021"
+authors = ["David Pope"]
+description = "Arena Temporal implementation"
+license = "todo"
+
+[dependencies]
+arena = { workspace = true }
+arena-container = { workspace = true }
+async-trait = { workspace = true }
+testcontainers-modules = { workspace = true }
+tracing = { workspace = true }
+futures = { workspace = true }
+futures-timer = { workspace = true }
+tokio = { workspace = true, features = ["net"] }
+tonic = { workspace = true }
+tonic-health = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+tokio-stream = { workspace = true, features = ["net"] }
+tracing-subscriber = { workspace = true }

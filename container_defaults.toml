@@ -27,3 +27,8 @@ tag = "3.13.2-alpine"
 id = "localstack"
 image = "localstack/localstack"
 tag = "4.14.0"
+
+[[image]]
+id = "temporal"
+image = "temporalio/temporal"
+tag = "1.8.0"
