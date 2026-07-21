@@ -1,6 +1,6 @@
 module(
     name = "arena",
-    version = "3.2.0",
+    version = "3.2.1",
 )
 
 arena_version_ext = use_extension("//tools:arena_version.bzl", "arena_version")
@@ -74,7 +74,7 @@ arena_java_maven.install(
     artifacts = [
         "net.java.dev.jna:jna:5.14.0",
         "org.slf4j:slf4j-api:2.0.16",
-        "com.fasterxml.jackson.core:jackson-databind:2.18.2",
+        "com.fasterxml.jackson.core:jackson-databind:2.18.8",
         "org.junit.jupiter:junit-jupiter-api:5.11.4",
         "org.junit.jupiter:junit-jupiter-params:5.11.4",
         "org.junit.jupiter:junit-jupiter-engine:5.11.4",
@@ -84,8 +84,8 @@ arena_java_maven.install(
         "org.springframework.boot:spring-boot-starter-jdbc:3.5.3",
         "org.springframework.boot:spring-boot-starter-validation:3.5.3",
         "org.springframework.boot:spring-boot-starter-oauth2-resource-server:3.5.3",
-        "org.postgresql:postgresql:42.7.4",
-        "com.microsoft.sqlserver:mssql-jdbc:12.8.1.jre11",
+        "org.postgresql:postgresql:42.7.12",
+        "com.microsoft.sqlserver:mssql-jdbc:12.8.2.jre11",
         "software.amazon.awssdk:eventbridge:2.29.29",
         "software.amazon.awssdk:sqs:2.29.29",
         "software.amazon.awssdk:auth:2.29.29",
