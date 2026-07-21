@@ -16,6 +16,17 @@ common:ci --show_timestamps
 common:ci --verbose_failures
 build:ci --keep_going
 
+common --noremote_upload_local_results
+
+common:ci --remote_cache=grpcs://arena.buildbuddy.io
+common:ci --remote_cache_compression
+common:ci --remote_timeout=10m
+common:ci --remote_upload_local_results
+common:ci --bes_backend=grpcs://arena.buildbuddy.io
+common:ci --bes_results_url=https://arena.buildbuddy.io/invocation/
+
+try-import %workspace%/.bazelrc.user
+
 coverage --combined_report=lcov
 coverage --strategy=CoverageReport=local
 

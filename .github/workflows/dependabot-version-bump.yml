@@ -38,6 +38,14 @@ jobs:
           disk-cache: dependabot-version-bump
           repository-cache: true
 
+      - name: Configure BuildBuddy remote cache
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          fi
+
       - name: Bump and sync version
         env:
           ARENA_VERSION_BASE_REF: origin/${{ github.base_ref }}
