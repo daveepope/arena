@@ -1,10 +1,13 @@
 import sys
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from check_dependency_release_age import (
+    check_release_ages,
     local_cargo_crates_from_bazel_lock,
     parse_cargo_bazel_lock,
     parse_module_bazel,
@@ -84,6 +87,64 @@ class LocalCargoCratesFromBazelLockTest(unittest.TestCase):
             local_cargo_crates_from_bazel_lock(text),
             {("arena", "1.3.0")},
         )
+
+
+class CheckReleaseAgesTest(unittest.TestCase):
+    def test_maven_undeterminable_publish_time_is_skipped_not_failed(self) -> None:
+        with (
+            mock.patch(
+                "check_dependency_release_age._changed_watched_files",
+                return_value=["MODULE.bazel"],
+            ),
+            mock.patch(
+                "check_dependency_release_age._collect_new_versions",
+                return_value={("maven", "org.postgresql:postgresql", "42.7.12")},
+            ),
+            mock.patch(
+                "check_dependency_release_age._published_at",
+                return_value=None,
+            ),
+            mock.patch(
+                "check_dependency_release_age._read_file_at_ref",
+                return_value="",
+            ),
+        ):
+            failures = check_release_ages(
+                Path("."),
+                "origin/master",
+                minimum_age=timedelta(days=3),
+                now=datetime.now(timezone.utc),
+            )
+
+        self.assertEqual(failures, [])
+
+    def test_bcr_undeterminable_publish_time_is_skipped_not_failed(self) -> None:
+        with (
+            mock.patch(
+                "check_dependency_release_age._changed_watched_files",
+                return_value=["MODULE.bazel"],
+            ),
+            mock.patch(
+                "check_dependency_release_age._collect_new_versions",
+                return_value={("bcr", "rules_python", "0.34.0")},
+            ),
+            mock.patch(
+                "check_dependency_release_age._published_at",
+                return_value=None,
+            ),
+            mock.patch(
+                "check_dependency_release_age._read_file_at_ref",
+                return_value="",
+            ),
+        ):
+            failures = check_release_ages(
+                Path("."),
+                "origin/master",
+                minimum_age=timedelta(days=3),
+                now=datetime.now(timezone.utc),
+            )
+
+        self.assertEqual(failures, [])
 
 
 if __name__ == "__main__":

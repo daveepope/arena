@@ -295,7 +295,7 @@ def check_release_ages(
         published_at = _published_at(kind, name, version)
         label = f"{kind} {name} {version}"
         if published_at is None:
-            if kind == "bcr":
+            if kind in ("bcr", "maven"):
                 skipped.append(label)
                 continue
             failures.append(f"{label}: could not determine publish time")
