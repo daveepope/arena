@@ -50,6 +50,42 @@ rust_test(
 )
 
 rust_test(
+    name = "builder_test",
+    srcs = ["tests/builder_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_temporal",
+        "//arena",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "lifecycle_test",
+    srcs = ["tests/lifecycle_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_temporal",
+        "//arena",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
     name = "component_test",
     srcs = ["tests/component_test.rs"],
     size = "medium",

@@ -1,5 +1,5 @@
 {
-  "checksum": "094c68db4d691873e6712171b073424af28de7da4cc4d74605da631b159d6467",
+  "checksum": "30007f1a701db4521339150d8b3d296bb6bb0c4f0bde52adf396489ba368e021",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -1435,6 +1435,10 @@
         },
         "deps_dev": {
           "common": [
+            {
+              "id": "tokio-stream 0.1.18",
+              "target": "tokio_stream"
+            },
             {
               "id": "tracing-subscriber 0.3.23",
               "target": "tracing_subscriber"
@@ -33436,7 +33440,8 @@
   ],
   "direct_dev_deps": [
     "ctor 0.4.3",
-    "mockall 0.14.0"
+    "mockall 0.14.0",
+    "tokio-stream 0.1.18"
   ],
   "unused_patches": []
 }
