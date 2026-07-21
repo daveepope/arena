@@ -8,6 +8,7 @@ members = [
     "arena-localstack",
     "arena-http",
     "arena-oauth",
+    "arena-temporal",
     "arena-executable-component",
     "arena-container",
     "arena-containerized-component",
@@ -23,6 +24,7 @@ arena-kafka = { path = "arena-kafka" }
 arena-localstack = { path = "arena-localstack" }
 arena-postgres = { path = "arena-postgres" }
 arena-mssql = { path = "arena-mssql" }
+arena-temporal = { path = "arena-temporal" }
 arena-executable-component = { path = "arena-executable-component" }
 arena-http = { path = "arena-http" }
 arena-oauth = { path = "arena-oauth" }
@@ -44,6 +46,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 testcontainers-modules = "0.15.0"
 tokio = "1"
+tonic = "0.14.5"
+tonic-health = "0.14.6"
 mockall = "0.14.0"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 rstest = "0.22"

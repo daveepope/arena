@@ -17,3 +17,4 @@ venv/
 /bazel-testlogs
 /bazel-arena
 /bazel-*
+.bazelrc.user

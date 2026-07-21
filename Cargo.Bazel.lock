@@ -1,5 +1,5 @@
 {
-  "checksum": "e83b885806bf61dbd395c1d6b00abb43a16e50ced5fd6be2dcca063db4005415",
+  "checksum": "1dd3025d2aa3ba9425dee4677c2c3d807c8122704f3b533b818f3425e58fbff3",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -474,6 +474,10 @@
             {
               "id": "bollard 0.20.2",
               "target": "bollard"
+            },
+            {
+              "id": "testcontainers-modules 0.15.0",
+              "target": "testcontainers_modules"
             },
             {
               "id": "tracing 0.1.44",
@@ -1353,6 +1357,88 @@
               "id": "tokio 1.52.1",
               "target": "tokio"
             },
+            {
+              "id": "tracing-subscriber 0.3.23",
+              "target": "tracing_subscriber"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "proc_macro_deps": {
+          "common": [
+            {
+              "id": "async-trait 0.1.89",
+              "target": "async_trait"
+            }
+          ],
+          "selects": {}
+        },
+        "version": "3.1.0"
+      },
+      "license": "todo",
+      "license_ids": [],
+      "license_file": null
+    },
+    "arena-temporal 3.1.0": {
+      "name": "arena-temporal",
+      "version": "3.1.0",
+      "package_url": null,
+      "repository": null,
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "arena_temporal",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "arena_temporal",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "futures 0.3.32",
+              "target": "futures"
+            },
+            {
+              "id": "futures-timer 3.0.3",
+              "target": "futures_timer"
+            },
+            {
+              "id": "testcontainers-modules 0.15.0",
+              "target": "testcontainers_modules"
+            },
+            {
+              "id": "tokio 1.52.1",
+              "target": "tokio"
+            },
+            {
+              "id": "tonic 0.14.6",
+              "target": "tonic"
+            },
+            {
+              "id": "tonic-health 0.14.6",
+              "target": "tonic_health"
+            },
+            {
+              "id": "tracing 0.1.44",
+              "target": "tracing"
+            }
+          ],
+          "selects": {}
+        },
+        "deps_dev": {
+          "common": [
             {
               "id": "tracing-subscriber 0.3.23",
               "target": "tracing_subscriber"
@@ -5189,7 +5275,7 @@
               "target": "tokio_util"
             },
             {
-              "id": "tonic 0.14.5",
+              "id": "tonic 0.14.6",
               "target": "tonic"
             },
             {
@@ -5322,11 +5408,11 @@
               "target": "prost_types"
             },
             {
-              "id": "tonic 0.14.5",
+              "id": "tonic 0.14.6",
               "target": "tonic"
             },
             {
-              "id": "tonic-prost 0.14.5",
+              "id": "tonic-prost 0.14.6",
               "target": "tonic_prost"
             },
             {
@@ -16060,7 +16146,7 @@
         "deps": {
           "common": [
             {
-              "id": "base64 0.21.7",
+              "id": "base64 0.22.1",
               "target": "base64"
             },
             {
@@ -25897,7 +25983,9 @@
           "common": [
             "default",
             "net",
-            "time"
+            "sync",
+            "time",
+            "tokio-util"
           ],
           "selects": {}
         },
@@ -25914,6 +26002,10 @@
             {
               "id": "tokio 1.52.1",
               "target": "tokio"
+            },
+            {
+              "id": "tokio-util 0.7.18",
+              "target": "tokio_util"
             }
           ],
           "selects": {}
@@ -26173,14 +26265,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "tonic 0.14.5": {
+    "tonic 0.14.6": {
       "name": "tonic",
-      "version": "0.14.5",
+      "version": "0.14.6",
       "package_url": "https://github.com/hyperium/tonic",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/tonic/0.14.5/download",
-          "sha256": "fec7c61a0695dc1887c1b53952990f3ad2e3a31453e1f49f10e75424943a93ec"
+          "url": "https://static.crates.io/crates/tonic/0.14.6/download",
+          "sha256": "ac2a5518c70fa84342385732db33fb3f44bc4cc748936eb5833d2df34d6445ef"
         }
       },
       "targets": [
@@ -26298,7 +26390,7 @@
           ],
           "selects": {}
         },
-        "edition": "2021",
+        "edition": "2024",
         "proc_macro_deps": {
           "common": [
             {
@@ -26308,7 +26400,7 @@
           ],
           "selects": {}
         },
-        "version": "0.14.5"
+        "version": "0.14.6"
       },
       "license": "MIT",
       "license_ids": [
@@ -26316,14 +26408,77 @@
       ],
       "license_file": "LICENSE"
     },
-    "tonic-prost 0.14.5": {
-      "name": "tonic-prost",
-      "version": "0.14.5",
+    "tonic-health 0.14.6": {
+      "name": "tonic-health",
+      "version": "0.14.6",
       "package_url": "https://github.com/hyperium/tonic",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/tonic-prost/0.14.5/download",
-          "sha256": "a55376a0bbaa4975a3f10d009ad763d8f4108f067c7c2e74f3001fb49778d309"
+          "url": "https://static.crates.io/crates/tonic-health/0.14.6/download",
+          "sha256": "fcfab99db777fba2802f0dfa861d1628d1ae916fb199d29819941f139ae85082"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "tonic_health",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "tonic_health",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "prost 0.14.3",
+              "target": "prost"
+            },
+            {
+              "id": "tokio 1.52.1",
+              "target": "tokio"
+            },
+            {
+              "id": "tokio-stream 0.1.18",
+              "target": "tokio_stream"
+            },
+            {
+              "id": "tonic 0.14.6",
+              "target": "tonic"
+            },
+            {
+              "id": "tonic-prost 0.14.6",
+              "target": "tonic_prost"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2024",
+        "version": "0.14.6"
+      },
+      "license": "MIT",
+      "license_ids": [
+        "MIT"
+      ],
+      "license_file": "LICENSE"
+    },
+    "tonic-prost 0.14.6": {
+      "name": "tonic-prost",
+      "version": "0.14.6",
+      "package_url": "https://github.com/hyperium/tonic",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/tonic-prost/0.14.6/download",
+          "sha256": "50849f68853be452acf590cde0b146665b8d507b3b8af17261df47e02c209ea0"
         }
       },
       "targets": [
@@ -26356,14 +26511,14 @@
               "target": "prost"
             },
             {
-              "id": "tonic 0.14.5",
+              "id": "tonic 0.14.6",
               "target": "tonic"
             }
           ],
           "selects": {}
         },
-        "edition": "2021",
-        "version": "0.14.5"
+        "edition": "2024",
+        "version": "0.14.6"
       },
       "license": "MIT",
       "license_ids": [
@@ -33047,7 +33202,8 @@
     "arena-localstack 3.1.0": "arena-localstack",
     "arena-mssql 3.1.0": "arena-mssql",
     "arena-oauth 3.1.0": "arena-oauth",
-    "arena-postgres 3.1.0": "arena-postgres"
+    "arena-postgres 3.1.0": "arena-postgres",
+    "arena-temporal 3.1.0": "arena-temporal"
   },
   "conditions": {
     "aarch64-apple-darwin": [
@@ -33276,6 +33432,8 @@
     "tokio 1.52.1",
     "tokio-postgres 0.7.18",
     "tokio-util 0.7.18",
+    "tonic 0.14.6",
+    "tonic-health 0.14.6",
     "tracing 0.1.44",
     "tracing-subscriber 0.3.23",
     "zip 2.4.2"
