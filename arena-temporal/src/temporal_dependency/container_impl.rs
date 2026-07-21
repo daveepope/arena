@@ -1,7 +1,7 @@
 use crate::temporal_dependency::TemporalImpl;
-use arena_container::healthcheck::tcp_healthcheck;
 use async_trait::async_trait;
-use testcontainers_modules::testcontainers::core::{ContainerPort, WaitFor};
+use std::time::Duration;
+use testcontainers_modules::testcontainers::core::{ContainerPort, Healthcheck, WaitFor};
 use testcontainers_modules::testcontainers::ImageExt;
 use testcontainers_modules::{
     testcontainers, testcontainers::runners::AsyncRunner, testcontainers::GenericImage,
@@ -9,6 +9,13 @@ use testcontainers_modules::{
 
 const TEMPORAL_GRPC_CONTAINER_PORT: u16 = 7233;
 const TEMPORAL_UI_CONTAINER_PORT: u16 = 8233;
+
+fn tcp_healthcheck(port: u16) -> Healthcheck {
+    Healthcheck::cmd_shell(format!("nc -z 127.0.0.1 {port}"))
+        .with_interval(Duration::from_millis(250))
+        .with_timeout(Duration::from_secs(1))
+        .with_retries(40u32)
+}
 
 pub(crate) struct TemporalContainerImpl {
     container: Option<testcontainers::core::ContainerAsync<GenericImage>>,

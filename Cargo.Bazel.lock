@@ -1,5 +1,5 @@
 {
-  "checksum": "1dd3025d2aa3ba9425dee4677c2c3d807c8122704f3b533b818f3425e58fbff3",
+  "checksum": "8895a0d7409c7d2296e39033afd9d055005858e713f97226d9f60437ade7d3fe",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -474,10 +474,6 @@
             {
               "id": "bollard 0.20.2",
               "target": "bollard"
-            },
-            {
-              "id": "testcontainers-modules 0.15.0",
-              "target": "testcontainers_modules"
             },
             {
               "id": "tracing 0.1.44",
