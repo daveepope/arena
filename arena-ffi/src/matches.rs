@@ -7,6 +7,7 @@ use crate::executable_component;
 use crate::dependency::http::http_dependency;
 use crate::dependency::localstack::localstack_dependency;
 use crate::dependency::mssql::mssql_dependency;
+use crate::dependency::temporal::temporal_dependency;
 use crate::kafka_dependency;
 use crate::managed_playbook;
 use crate::postgres_dependency;
@@ -32,6 +33,7 @@ pub(crate) enum DependencyConfig {
     Http(http_dependency::HttpDependencyConfig),
     Localstack(localstack_dependency::LocalstackDependencyConfig),
     Oauth(OauthFfiDependencyConfig),
+    Temporal(temporal_dependency::TemporalDependencyConfig),
 }
 
 #[derive(Debug, Deserialize)]
@@ -71,6 +73,7 @@ fn build_dependencies(config: &MatchConfig, network: Option<&str>) -> Result<Vec
             DependencyConfig::Http(h) => http_dependency::build(h, network),
             DependencyConfig::Localstack(l) => localstack_dependency::build(l, network),
             DependencyConfig::Oauth(o) => build_oauth_dependency_from_config(o, network),
+            DependencyConfig::Temporal(t) => temporal_dependency::build(t, network),
         })
         .collect()
 }

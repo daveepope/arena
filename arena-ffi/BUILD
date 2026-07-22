@@ -11,6 +11,7 @@ _ARENA_FFI_DEPS = all_crate_deps(normal = True) + [
     "//arena-mssql:arena_mssql",
     "//arena-oauth:arena_oauth",
     "//arena-postgres:arena_postgres",
+    "//arena-temporal:arena_temporal",
 ]
 
 _ARENA_FFI_PROC_MACRO_DEPS = all_crate_deps(proc_macro = True)
@@ -78,6 +79,23 @@ rust_test(
 rust_test(
     name = "ffi_test",
     srcs = ["tests/lifecycle/open_close_dependency_reset.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_temporal_dependency_test",
+    srcs = ["tests/dependency/temporal/temporal_dependency_test.rs"],
     size = "small",
     edition = "2021",
     deps = all_crate_deps(

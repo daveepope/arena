@@ -151,6 +151,7 @@ dependencies = [
  "arena-mssql",
  "arena-oauth",
  "arena-postgres",
+ "arena-temporal",
  "async-trait",
  "reqwest",
  "serde",
