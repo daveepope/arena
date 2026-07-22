@@ -19,10 +19,17 @@ create table if not exists "user" (
   name text not null unique
 );
 
--- reading (id, userId, value int, comment)
+-- device (id, name)
+create table if not exists device (
+  id bigserial primary key,
+  name text not null unique
+);
+
+-- reading (id, userId, deviceId, value int, comment)
 create table if not exists reading (
   id bigserial primary key,
   "userId" bigint not null references "user"(id) on delete cascade,
+  "deviceId" bigint references device(id) on delete cascade,
   value int not null,
   comment text
 );
@@ -43,10 +50,16 @@ insert into "user" (name) values
   ('Bender Bending Rodríguez')
 on conflict (name) do nothing;
 
+-- Seed devices
+insert into device (name) values
+  ('Smell-O-Scope Device')
+on conflict (name) do nothing;
+
 -- Seed readings (value = made-up "smell units"; comment = character quotes/jokes)
-insert into reading ("userId", value, comment)
-select u.id, r.value, r.comment
+insert into reading ("userId", "deviceId", value, comment)
+select u.id, d.id, r.value, r.comment
 from "user" u
+cross join (select id from device where name = 'Smell-O-Scope Device') d
 join (values
   ('Philip J. Fry', 10, 'Jupiter... smells like strawberries.'),
   ('Philip J. Fry', 100, 'Bllllalarghhhghg...'),

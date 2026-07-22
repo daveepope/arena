@@ -88,12 +88,13 @@ public class ReadingsService {
     long readingId =
         pg.queryForObject(
             """
-            insert into instrument_reading.reading("userId", value, comment)
-            values (?, ?, ?)
+            insert into instrument_reading.reading("userId", "deviceId", value, comment)
+            values (?, ?, ?, ?)
             returning id
             """,
             Long.class,
             userId,
+            req.deviceId(),
             req.value(),
             req.comment());
 

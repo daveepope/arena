@@ -27,6 +27,8 @@ import arena.junit.dep.MssqlDependency;
 import arena.junit.dep.MssqlDependencyBuilder;
 import arena.junit.dep.PostgresDependency;
 import arena.junit.dep.PostgresDependencyBuilder;
+import arena.junit.dep.temporal.TemporalDependency;
+import arena.junit.dep.temporal.TemporalDependencyBuilder;
 import arena.junit.exec.ExecutableComponent;
 import arena.junit.exec.ExecutableComponentBuilder;
 import arena.junit.ffi.ArenaBindingError;
@@ -84,6 +86,9 @@ public final class ComponentTest {
   private static final int MSSQL_PORT = RT.mssqlPort;
   private static final int CALIBRATION_HOST_PORT = RT.calibrationHostPort;
   private static final int LOCALSTACK_HOST_PORT = RT.localstackHostPort;
+  private static final int TEMPORAL_GRPC_PORT = RT.temporalGrpcPort;
+  private static final int TEMPORAL_UI_PORT = RT.temporalUiPort;
+  private static final String TEMPORAL_TARGET = "127.0.0.1:" + TEMPORAL_GRPC_PORT;
   private static final int OAUTH_PORT = RT.oauthPort;
   private static final String OAUTH_ISSUER = RT.oauthIssuer;
   private static final String POSTGRES_DB_NAME = "readings_db";
@@ -108,6 +113,7 @@ public final class ComponentTest {
   private static String accessToken;
   private static SqsClient sqsClient;
   private static String sqsQueueUrl;
+  private static long readingsDeviceId;
 
   @ArenaDependency
   static final OauthDependency OAUTH =
@@ -145,6 +151,14 @@ public final class ComponentTest {
 
   @ArenaDependency static final LocalstackDependency LOCALSTACK = buildLocalstack();
 
+  @ArenaDependency
+  static final TemporalDependency TEMPORAL =
+      new TemporalDependencyBuilder("example-api-temporal")
+          .withImage("1.8.0")
+          .withPort(TEMPORAL_GRPC_PORT)
+          .withUiPort(TEMPORAL_UI_PORT)
+          .build();
+
   @ArenaPlaybook
   static final CalibrationApiHappyPathPlaybook CALIBRATION_HAPPY_PATH =
       new CalibrationApiHappyPathPlaybook(CALIBRATION.identifier());
@@ -168,7 +182,8 @@ public final class ComponentTest {
   @Test
   @Playbook(ResetValidationDbPlaybook.class)
   void createReadingPublishesEventAndListsViaHttp() throws Exception {
-    int createdId = apiClient().createReading("Readings API User", 77, "sqs happy path");
+    int createdId =
+        apiClient().createReading("Readings API User", 77, "sqs happy path", readingsDeviceId);
     JsonNode detail = waitReadingCreatedOnQueue(createdId);
     assertEquals(createdId, detail.path("id").asInt());
     assertEquals("Readings API User", detail.path("user_name").asText());
@@ -184,8 +199,8 @@ public final class ComponentTest {
   @Playbook(ResetValidationDbPlaybook.class)
   void createMultipleReadingsAreListed() throws Exception {
     ApiClient client = apiClient();
-    int id1 = client.createReading("Bending", 1, "");
-    int id2 = client.createReading("joe", 2, "We're going to need a bigger ship");
+    int id1 = client.createReading("Bending", 1, "", readingsDeviceId);
+    int id2 = client.createReading("joe", 2, "We're going to need a bigger ship", readingsDeviceId);
     assertTrue(client.listReadingIds().contains(id1));
     assertTrue(client.listReadingIds().contains(id2));
   }
@@ -194,14 +209,16 @@ public final class ComponentTest {
   @Playbook(CalibrationApiErrorPathPlaybook.class)
   @Playbook(ResetValidationDbPlaybook.class)
   void postReadingReturns500WhenCalibrationOutagePlaybookActive() throws Exception {
-    HttpResponse<String> response = apiClient().postReadingRaw("Outage Test User", 99, null);
+    HttpResponse<String> response =
+        apiClient().postReadingRaw("Outage Test User", 99, null, readingsDeviceId);
     assertEquals(500, response.statusCode(), response.body());
   }
 
   @Test
   @Playbook(ResetValidationDbPlaybook.class)
   void postReadingSucceedsAfterOutagePlaybookScope() throws Exception {
-    int recoveredId = apiClient().createReading("Recovery Test User", 17, "post-outage");
+    int recoveredId =
+        apiClient().createReading("Recovery Test User", 17, "post-outage", readingsDeviceId);
     JsonNode found = apiClient().findReadingById(recoveredId);
     assertEquals("Recovery Test User", found.path("user_name").asText());
     assertEquals(17, found.path("value").asInt());
@@ -210,7 +227,8 @@ public final class ComponentTest {
   @Test
   @Playbook(ResetValidationDbPlaybook.class)
   void createReadingWithValidationDbScopedPlaybook() throws Exception {
-    int createdId = apiClient().createReading("Validation DB Scoped", 7, "mssql scope");
+    int createdId =
+        apiClient().createReading("Validation DB Scoped", 7, "mssql scope", readingsDeviceId);
     assertTrue(apiClient().listReadingIds().contains(createdId));
   }
 
@@ -218,7 +236,8 @@ public final class ComponentTest {
   @Playbook(CalibrationApiErrorPathPlaybook.class)
   @Playbook(ResetValidationDbPlaybook.class)
   void postReadingReturns500UnderStackedPlaybooks() throws Exception {
-    HttpResponse<String> response = apiClient().postReadingRaw("Stack Outage", 1, null);
+    HttpResponse<String> response =
+        apiClient().postReadingRaw("Stack Outage", 1, null, readingsDeviceId);
     assertEquals(500, response.statusCode(), response.body());
   }
 
@@ -227,9 +246,9 @@ public final class ComponentTest {
   @Playbook(ResetValidationDbPlaybook.class)
   void postReadingSucceedsAfterCalibrationFlakySequence() throws Exception {
     ApiClient client = apiClient();
-    assertEquals(500, client.postReadingRaw("Flaky 1", 1, null).statusCode());
-    assertEquals(500, client.postReadingRaw("Flaky 2", 2, null).statusCode());
-    int createdId = client.createReading("Flaky 3", 3, "recovered");
+    assertEquals(500, client.postReadingRaw("Flaky 1", 1, null, readingsDeviceId).statusCode());
+    assertEquals(500, client.postReadingRaw("Flaky 2", 2, null, readingsDeviceId).statusCode());
+    int createdId = client.createReading("Flaky 3", 3, "recovered", readingsDeviceId);
     assertTrue(client.listReadingIds().contains(createdId));
   }
 
@@ -237,8 +256,29 @@ public final class ComponentTest {
   @Playbook(CalibrationApiErrorPathPlaybook.class)
   void httpPlaybookVerifyAtLeastSucceedsWithTraffic(ActiveHttpPlaybook activeHttpPlaybook)
       throws Exception {
-    apiClient().postReadingRaw("Verify At Least", 3, null);
+    apiClient().postReadingRaw("Verify At Least", 3, null, readingsDeviceId);
     activeHttpPlaybook.verifyAtLeast("POST", CALIBRATION_VALIDATE_PATH, 1);
+  }
+
+  @Test
+  void createDeviceRequestTransitionAppliesRequestedState() throws Exception {
+    ApiClient client = apiClient();
+    long deviceId = client.createDevice("Smell-O-Scope Mk II");
+    assertEquals("OFF", client.getDeviceState(deviceId));
+
+    client.setDeviceState(deviceId, "ON");
+    assertEquals("ON", client.getDeviceState(deviceId));
+
+    client.setDeviceState(deviceId, "ERROR");
+    assertEquals("ERROR", client.getDeviceState(deviceId));
+
+    client.stopDevice(deviceId);
+  }
+
+  @Test
+  void getDeviceStateUnknownDeviceReturnsNotFound() throws Exception {
+    HttpResponse<String> response = apiClient().getDeviceStateRaw(999_999_999L);
+    assertEquals(404, response.statusCode());
   }
 
   @Test
@@ -252,6 +292,7 @@ public final class ComponentTest {
   @ArenaAfterOpen
   static void afterOpen() throws Exception {
     fetchAccessToken();
+    readingsDeviceId = apiClient().createDevice("Readings Component Test Device");
     var creds =
         StaticCredentialsProvider.create(
             AwsBasicCredentials.create(
@@ -342,6 +383,7 @@ public final class ComponentTest {
                 + ";Password="
                 + MSSQL_DB_PASS
                 + ";TrustServerCertificate=True;")
+        .withEnvVar("TEMPORAL_TARGET", TEMPORAL_TARGET)
         .withEnvVar("OAUTH_ISSUER_URL", OAUTH_ISSUER)
         .withEnvVar("OAUTH_TLS_CA_FILE", OAUTH_CA_PATH)
         .withEnvVar("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")

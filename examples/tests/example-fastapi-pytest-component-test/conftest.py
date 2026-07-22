@@ -42,6 +42,7 @@ from arena_pytest import (
     OauthDependencyBuilder,
     PostgresDependencyBuilder,
     SqsQueueTarget,
+    TemporalDependencyBuilder,
     oauth_loopback_tls_pem_pair,
 )
 
@@ -52,6 +53,7 @@ from arena_config import (
     DEP_NAME_MSSQL,
     DEP_NAME_OAUTH,
     DEP_NAME_POSTGRES,
+    DEP_NAME_TEMPORAL,
     EXEC_WEB_APP_PORT,
     LOCALSTACK_HOST_PORT,
     MATCH_NAME,
@@ -66,6 +68,8 @@ from arena_config import (
     POSTGRES_DB_USER,
     POSTGRES_PORT,
     CALIBRATION_HOST_PORT,
+    TEMPORAL_GRPC_PORT,
+    TEMPORAL_UI_PORT,
 )
 
 from api_http import ApiClient
@@ -242,6 +246,14 @@ def closed_arena() -> ClosedArena:
         .build()
     )
 
+    temporal = (
+        TemporalDependencyBuilder(DEP_NAME_TEMPORAL)
+        .with_image("1.8.0")
+        .with_port(TEMPORAL_GRPC_PORT)
+        .with_ui_port(TEMPORAL_UI_PORT)
+        .build()
+    )
+
     ls_id = f"ls-example-api-{uuid.uuid4().hex[:8]}"
     localstack = (
         LocalstackDependencyBuilder(ls_id)
@@ -288,6 +300,7 @@ def closed_arena() -> ClosedArena:
         .with_env_var("POSTGRES_CONNECTION_STRING", pg_cs)
         .with_env_var("CALIBRATION_URL", f"http://127.0.0.1:{CALIBRATION_HOST_PORT}")
         .with_env_var("MSSQL_CONNECTION_STRING", mssql_cs)
+        .with_env_var("TEMPORAL_TARGET", f"127.0.0.1:{TEMPORAL_GRPC_PORT}")
         .with_env_var("OAUTH_ISSUER_URL", OAUTH_ISSUER)
         .with_env_var("OAUTH_TLS_CA_FILE", str(oauth_ca_file))
         .with_env_var("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
@@ -310,6 +323,7 @@ def closed_arena() -> ClosedArena:
         .add_dependency(mssql)
         .add_dependency(calibration)
         .add_dependency(localstack)
+        .add_dependency(temporal)
         .add_component(fastapi_component)
         .register_playbook(
             CalibrationApiHappyPathPlaybook(calibration.identifier),
@@ -337,6 +351,7 @@ def closed_arena() -> ClosedArena:
             mssql.identifier,
             calibration.identifier,
             localstack.identifier,
+            temporal.identifier,
         ),
     )
 
@@ -356,6 +371,11 @@ def api_client(arena, base_url) -> ApiClient:
         {"Authorization": f"Bearer {_fetch_access_token(_OAUTH_CA_FILE, OAUTH_ISSUER)}"}
     )
     return ApiClient(base_url, session)
+
+
+@pytest.fixture(scope="session")
+def readings_device_id(api_client: ApiClient) -> int:
+    return api_client.create_device("Readings Component Test Device")
 
 
 @pytest.fixture(scope="session")

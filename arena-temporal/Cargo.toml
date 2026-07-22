@@ -14,7 +14,7 @@ testcontainers-modules = { workspace = true }
 tracing = { workspace = true }
 futures = { workspace = true }
 futures-timer = { workspace = true }
-tokio = { workspace = true, features = ["net"] }
+tokio = { workspace = true, features = ["macros", "net"] }
 tonic = { workspace = true }
 tonic-health = { workspace = true }
 

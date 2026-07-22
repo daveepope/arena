@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     postgres_connection_string: str
     calibration_url: str
     mssql_connection_string: str
+    temporal_target: str
     oauth_issuer_url: str
     oauth_tls_ca_pem: str = ""
     oauth_tls_ca_file: str = ""
