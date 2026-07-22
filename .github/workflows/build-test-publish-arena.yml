@@ -427,25 +427,12 @@ jobs:
     runs-on: macos-15-intel
     permissions:
       contents: read
-    timeout-minutes: 90
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
           fetch-depth: 0
-
-      - name: Cache Colima VM
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: |
-            ~/.colima
-            ~/.lima
-          key: build-test-publish-arena-macos-intel-colima-${{ github.run_id }}
-          restore-keys: |
-            build-test-publish-arena-macos-intel-colima-
-
-      - name: Setup Colima
-        uses: douglascamata/setup-docker-macos-action@d5ccc6aae0ce23e7700154f5e63cc53e6433ac48
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
@@ -463,13 +450,7 @@ jobs:
           fi
 
       - name: Build and test
-        run: |
-          bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
-          bazel test //... --config=ci --build_tests_only --test_tag_filters=component_test --local_test_jobs=4
-
-      - name: Stop Colima
-        if: always()
-        run: colima stop --force || true
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
 
   test_macos_arm64:
     name: Test macOS ARM64
