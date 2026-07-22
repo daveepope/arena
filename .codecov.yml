@@ -11,10 +11,8 @@ coverage:
 
 flag_management:
   default_rules:
-    - flags:
-        - linux
-      paths:
-        - "**"
+    paths:
+      - "**"
 
 ignore:
   - "bazel-*/**"
