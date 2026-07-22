@@ -153,6 +153,21 @@ def scan_image(trivy_bin: str, server_url: str, image_ref: str, severities: str)
     return json.loads(result.stdout)
 
 
+def warm_java_db(trivy_bin: str, image_ref: str) -> None:
+    # trivy's Java DB updater guards against concurrent downloads only within a
+    # single process (a sync.Once), so parallel `trivy image` invocations that
+    # each analyze a JAR-bundling image race on the shared on-disk cache and can
+    # fail with something like "chmod ...trivy-java.db: no such file or
+    # directory". Downloading it once, serially, before scanning in parallel
+    # avoids the race; best-effort since a failure here just means the later
+    # per-image scans fall back to their own (still race-prone) update attempt.
+    subprocess.run(
+        [trivy_bin, "image", "--download-java-db-only", "--quiet", image_ref],
+        capture_output=True,
+        text=True,
+    )
+
+
 def scan_all_images(
     trivy_bin: str,
     server_url: str,
@@ -268,6 +283,8 @@ def main() -> int:
     show_ids = show_vulnerability_ids_from_env()
     process, server_url = start_trivy_server(trivy_bin)
     try:
+        if entries:
+            warm_java_db(trivy_bin, f"{entries[0]['image']}:{entries[0]['tag']}")
         scan_results = scan_all_images(trivy_bin, server_url, entries, severities)
 
         errors = scan_error_entries(entries, scan_results)
