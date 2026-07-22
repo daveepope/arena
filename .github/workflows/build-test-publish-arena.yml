@@ -208,6 +208,12 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
           fetch-depth: 0
 
+      - name: Validate .codecov.yml
+        run: |
+          response=$(curl -s --data-binary @.codecov.yml https://codecov.io/validate)
+          echo "$response"
+          echo "$response" | grep -q "^Valid!" || { echo "::error::.codecov.yml failed Codecov schema validation"; exit 1; }
+
       - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590
         id: paths
         with:
@@ -427,6 +433,16 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
           fetch-depth: 0
+
+      - name: Cache Colima VM
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            ~/.colima
+            ~/.lima
+          key: build-test-publish-arena-macos-intel-colima-${{ github.run_id }}
+          restore-keys: |
+            build-test-publish-arena-macos-intel-colima-
 
       - name: Setup Colima
         uses: douglascamata/setup-docker-macos-action@d5ccc6aae0ce23e7700154f5e63cc53e6433ac48
