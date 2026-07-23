@@ -90,3 +90,82 @@ async fn build_components_async(config: &MatchConfig) -> Result<Vec<Component>, 
     }
     Ok(out)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn all_dependency_variants_config() -> MatchConfig {
+        serde_json::from_str(
+            r#"{
+                "dependencies": [
+                    {"type": "postgres", "identifier": "pg"},
+                    {"type": "mssql", "identifier": "mssql"},
+                    {"type": "kafka", "identifier": "kafka"},
+                    {"type": "http", "identifier": "http"},
+                    {"type": "localstack", "identifier": "localstack"},
+                    {"type": "oauth", "identifier": "oauth"},
+                    {"type": "temporal", "identifier": "temporal"}
+                ]
+            }"#,
+        )
+        .expect("valid match config")
+    }
+
+    fn exec_component_config() -> MatchConfig {
+        serde_json::from_str(
+            r#"{
+                "components": [
+                    {"type": "exec", "identifier": "exec", "executable_path": "/bin/true"}
+                ]
+            }"#,
+        )
+        .expect("valid match config")
+    }
+
+    fn full_match_config_with_playbook() -> MatchConfig {
+        serde_json::from_str(
+            r#"{
+                "match_name": "custom-match",
+                "network": "arena-net",
+                "dependencies": [{"type": "http", "identifier": "http"}],
+                "components": [{"type": "exec", "identifier": "exec", "executable_path": "/bin/true"}],
+                "playbooks": [{
+                    "identifier": "pb",
+                    "kind": "http",
+                    "dependency_identifier": "http",
+                    "mappings": []
+                }]
+            }"#,
+        )
+        .expect("valid match config")
+    }
+
+    #[test]
+    fn build_dependencies_all_variants_dispatches_to_each_builder() {
+        let config = all_dependency_variants_config();
+        let dependencies = build_dependencies(&config, None).expect("all variants build");
+        assert_eq!(dependencies.len(), 7);
+    }
+
+    #[test]
+    fn build_components_async_exec_variant_dispatches_to_builder() {
+        let config = exec_component_config();
+        let components = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(build_components_async(&config))
+            .expect("exec variant builds");
+        assert_eq!(components.len(), 1);
+    }
+
+    #[test]
+    fn build_match_async_full_config_registers_playbook_with_overrides() {
+        let config = full_match_config_with_playbook();
+        let result = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(build_match_async(&config));
+        if let Err(e) = result {
+            panic!("expected match to build: {e}");
+        }
+    }
+}
