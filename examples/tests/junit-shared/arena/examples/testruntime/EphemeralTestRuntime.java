@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public final class EphemeralTestRuntime {
 
-  public static final int PORT_SLOT_COUNT = 8;
+  public static final int PORT_SLOT_COUNT = 10;
 
   private static final EphemeralTestRuntime INSTANCE = new EphemeralTestRuntime();
 
@@ -20,6 +20,8 @@ public final class EphemeralTestRuntime {
   public final int mssqlPort;
   public final int oauthPort;
   public final int localstackHostPort;
+  public final int temporalGrpcPort;
+  public final int temporalUiPort;
   public final String oauthIssuer;
 
   private EphemeralTestRuntime() {
@@ -33,6 +35,8 @@ public final class EphemeralTestRuntime {
     mssqlPort = ports[5];
     oauthPort = ports[6];
     localstackHostPort = ports[7];
+    temporalGrpcPort = ports[8];
+    temporalUiPort = ports[9];
     oauthIssuer = "https://127.0.0.1:" + oauthPort;
   }
 

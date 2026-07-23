@@ -85,6 +85,7 @@ from arena_pytest.oauth import (
     oauth_loopback_tls_pem_pair,
 )
 from arena_pytest.dep.postgres import PostgresDependency, PostgresDependencyBuilder
+from arena_pytest.dep.temporal import TemporalDependency, TemporalDependencyBuilder
 from arena_pytest.readiness import HttpReadinessCheck, ReadinessCheck
 
 __all__ = [
@@ -152,6 +153,8 @@ __all__ = [
     "oauth_loopback_tls_pem_pair",
     "PostgresDependency",
     "PostgresDependencyBuilder",
+    "TemporalDependency",
+    "TemporalDependencyBuilder",
     "HttpReadinessCheck",
     "ReadinessCheck",
     "arena",

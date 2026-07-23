@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 import ssl
 
@@ -10,13 +12,28 @@ from fastmssql import Connection, PoolConfig, SslConfig
 from jwt import PyJWKClient
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
+from temporalio.client import Client as TemporalClient
+from temporalio.worker import Worker as TemporalWorker
 
 from example_readings_fastapi_web_app.conn_parse import (
     asyncpg_dsn_from_libpq,
     mssql_fastmssql_connection_string,
 )
-from example_readings_fastapi_web_app.routers import health, readings
+from example_readings_fastapi_web_app.routers import devices, health, readings
 from example_readings_fastapi_web_app.settings import Settings
+from example_readings_fastapi_web_app.workflows.device_activities import (
+    enter_error,
+    power_off,
+    power_on,
+)
+from example_readings_fastapi_web_app.workflows.device_workflow import (
+    DeviceLifecycleWorkflow,
+)
+
+DEVICE_TASK_QUEUE = "device-lifecycle-task-queue"
+WORKER_SHUTDOWN_TIMEOUT_SECONDS = 10.0
+
+_LOG = logging.getLogger(__name__)
 
 
 def build_ssl_context_ca_pem(pem: str) -> ssl.SSLContext:
@@ -67,14 +84,17 @@ class BearerGateMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI):
     settings = Settings()
     dsn = asyncpg_dsn_from_libpq(settings.postgres_connection_string)
-    pool = await asyncpg.create_pool(dsn, min_size=1, max_size=5)
     mssql_cs = mssql_fastmssql_connection_string(settings.mssql_connection_string)
     mssql = Connection(
         connection_string=mssql_cs,
         ssl_config=SslConfig.development(),
         pool_config=PoolConfig.adaptive(8),
     )
-    await mssql.connect()
+    pool, _, temporal_client = await asyncio.gather(
+        asyncpg.create_pool(dsn, min_size=1, max_size=5),
+        mssql.connect(),
+        TemporalClient.connect(settings.temporal_target),
+    )
     ca_path = settings.oauth_tls_ca_file.strip()
     if ca_path:
         ssl_ctx = build_ssl_context_ca_file(ca_path)
@@ -95,6 +115,15 @@ async def lifespan(app: FastAPI):
     )
     http = httpx.AsyncClient(timeout=30.0)
     req_scopes = [s for s in settings.oauth_required_access_token_scopes.split() if s]
+
+    temporal_worker = TemporalWorker(
+        temporal_client,
+        task_queue=DEVICE_TASK_QUEUE,
+        workflows=[DeviceLifecycleWorkflow],
+        activities=[power_on, power_off, enter_error],
+    )
+    temporal_worker_task = asyncio.create_task(temporal_worker.run())
+
     app.state.pool = pool
     app.state.http = http
     app.state.mssql = mssql
@@ -103,7 +132,20 @@ async def lifespan(app: FastAPI):
     app.state.oauth_issuer = issuer
     app.state.required_scopes = req_scopes
     app.state.events_client = events_client
+    app.state.temporal_client = temporal_client
+    app.state.temporal_task_queue = DEVICE_TASK_QUEUE
     yield
+    try:
+        await asyncio.wait_for(
+            temporal_worker.shutdown(), timeout=WORKER_SHUTDOWN_TIMEOUT_SECONDS
+        )
+    except Exception:
+        _LOG.exception("temporal worker shutdown failed")
+    temporal_worker_task.cancel()
+    try:
+        await temporal_worker_task
+    except asyncio.CancelledError:
+        pass
     await http.aclose()
     await pool.close()
     await mssql.disconnect()
@@ -113,6 +155,7 @@ def create_app() -> FastAPI:
     app = FastAPI(lifespan=lifespan)
     app.include_router(health.router)
     app.include_router(readings.router)
+    app.include_router(devices.router)
     app.add_middleware(BearerGateMiddleware)
     return app
 

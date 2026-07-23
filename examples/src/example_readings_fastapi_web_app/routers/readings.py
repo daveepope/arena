@@ -13,6 +13,7 @@ class CreateReadingBody(BaseModel):
     user_name: str
     value: int
     comment: Optional[str] = None
+    device_id: int
 
 
 class CreateReadingResponse(BaseModel):
@@ -70,11 +71,12 @@ async def create_reading(request: Request, body: CreateReadingBody):
             )
         rid = await conn.fetchval(
             """
-            insert into instrument_reading.reading("userId", value, comment)
-            values ($1, $2, $3)
+            insert into instrument_reading.reading("userId", "deviceId", value, comment)
+            values ($1, $2, $3, $4)
             returning id
             """,
             uid,
+            body.device_id,
             body.value,
             body.comment,
         )

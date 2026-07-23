@@ -73,21 +73,14 @@ impl TemporalImpl for TemporalContainerImpl {
 
         let container = request.start().await.expect("start temporal container");
 
-        let host = container
-            .get_host()
-            .await
-            .expect("Failed to get host")
-            .to_string();
-
-        let grpc_host_port = container
-            .get_host_port_ipv4(grpc_container_port)
-            .await
-            .expect("Failed to get grpc port");
-
-        let ui_host_port = container
-            .get_host_port_ipv4(ui_container_port)
-            .await
-            .expect("Failed to get ui port");
+        let (host, grpc_host_port, ui_host_port) = tokio::join!(
+            container.get_host(),
+            container.get_host_port_ipv4(grpc_container_port),
+            container.get_host_port_ipv4(ui_container_port),
+        );
+        let host = host.expect("Failed to get host").to_string();
+        let grpc_host_port = grpc_host_port.expect("Failed to get grpc port");
+        let ui_host_port = ui_host_port.expect("Failed to get ui port");
 
         self.grpc_endpoint = Some(format!("{host}:{grpc_host_port}"));
         self.ui_url = Some(format!("http://{host}:{ui_host_port}"));

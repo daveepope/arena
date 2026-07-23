@@ -115,6 +115,7 @@ py_library(
         "@pip_examples//pydantic_settings",
         "@pip_examples//pyjwt",
         "@pip_examples//fastmssql",
+        "@pip_examples//temporalio",
     ],
     visibility = ["//visibility:public"],
 )
@@ -331,6 +332,9 @@ java_library(
         "@arena_java_maven//:software_amazon_awssdk_eventbridge",
         "@arena_java_maven//:software_amazon_awssdk_regions",
         "@arena_java_maven//:software_amazon_awssdk_url_connection_client",
+        "@arena_java_maven//:io_temporal_temporal_sdk",
+        "@arena_java_maven//:io_temporal_temporal_serviceclient",
+        "@arena_java_maven//:org_slf4j_slf4j_api",
     ],
 )
 

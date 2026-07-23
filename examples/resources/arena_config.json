@@ -12,7 +12,8 @@
     "postgres": "example-api-postgres",
     "kafka": "example-api-kafka",
     "mssql": "example-api-mssql",
-    "calibration_http": "example-api-calibration"
+    "calibration_http": "example-api-calibration",
+    "temporal": "example-api-temporal"
   },
   "component_names": {
     "executable": "example-api-web-app",

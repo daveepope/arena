@@ -58,7 +58,7 @@ dependencies = [
 
 [[package]]
 name = "arena"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "arena-container"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
  "bollard",
  "tokio",
@@ -80,7 +80,7 @@ dependencies = [
 
 [[package]]
 name = "arena-containerized-component"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -96,7 +96,7 @@ dependencies = [
 
 [[package]]
 name = "arena-examples"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
  "arena",
  "arena-containerized-component",
@@ -125,7 +125,7 @@ dependencies = [
 
 [[package]]
 name = "arena-executable-component"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -139,7 +139,7 @@ dependencies = [
 
 [[package]]
 name = "arena-ffi"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
  "arc-swap",
  "arena",
@@ -151,6 +151,7 @@ dependencies = [
  "arena-mssql",
  "arena-oauth",
  "arena-postgres",
+ "arena-temporal",
  "async-trait",
  "reqwest",
  "serde",
@@ -162,7 +163,7 @@ dependencies = [
 
 [[package]]
 name = "arena-http"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -180,7 +181,7 @@ dependencies = [
 
 [[package]]
 name = "arena-kafka"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -196,7 +197,7 @@ dependencies = [
 
 [[package]]
 name = "arena-localstack"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -220,7 +221,7 @@ dependencies = [
 
 [[package]]
 name = "arena-mssql"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -236,7 +237,7 @@ dependencies = [
 
 [[package]]
 name = "arena-oauth"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -261,7 +262,7 @@ dependencies = [
 
 [[package]]
 name = "arena-postgres"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -276,7 +277,7 @@ dependencies = [
 
 [[package]]
 name = "arena-temporal"
-version = "3.2.1"
+version = "3.3.0"
 dependencies = [
  "arena",
  "arena-container",

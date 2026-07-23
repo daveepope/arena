@@ -2,7 +2,7 @@ import os
 import socket
 import uuid
 
-PORT_SLOT_COUNT = 8
+PORT_SLOT_COUNT = 10
 
 
 def _allocate_distinct_tcp_ports(count: int) -> list[int]:
@@ -38,6 +38,8 @@ class EphemeralTestRuntime:
             self.mssql_port,
             self.oauth_port,
             self.localstack_host_port,
+            self.temporal_grpc_port,
+            self.temporal_ui_port,
         ) = _allocate_distinct_tcp_ports(PORT_SLOT_COUNT)
         self.oauth_issuer = f"https://127.0.0.1:{self.oauth_port}"
         os.environ["ARENA_PYTEST_OAUTH_ISSUER"] = self.oauth_issuer
