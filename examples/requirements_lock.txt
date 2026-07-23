@@ -8,32 +8,32 @@ annotated-doc==0.0.4
     # via fastapi
 annotated-types==0.7.0
     # via pydantic
-anyio==4.13.0
+anyio==4.14.2
     # via
     #   httpx
     #   starlette
     #   watchfiles
 asyncpg==0.31.0
     # via -r examples/requirements.txt
-boto3==1.43.2
+boto3==1.43.54
     # via -r examples/requirements.txt
-botocore==1.43.2
+botocore==1.43.54
     # via
     #   boto3
     #   s3transfer
-certifi==2024.8.30
+certifi==2026.7.22
     # via
     #   httpcore
     #   httpx
-cffi==2.0.0
+cffi==2.1.0
     # via cryptography
-click==8.3.3
+click==8.4.2
     # via uvicorn
-cryptography==48.0.1
+cryptography==49.0.0
     # via pyjwt
-fastapi==0.136.1
+fastapi==0.139.2
     # via -r examples/requirements.txt
-fastmssql==0.6.8
+fastmssql==0.7.7
     # via -r examples/requirements.txt
 h11==0.16.0
     # via
@@ -41,11 +41,11 @@ h11==0.16.0
     #   uvicorn
 httpcore==1.0.9
     # via httpx
-httptools==0.7.1
+httptools==0.8.0
     # via uvicorn
 httpx==0.28.1
     # via -r examples/requirements.txt
-idna==3.15
+idna==3.18
     # via
     #   anyio
     #   httpx
@@ -59,11 +59,11 @@ protobuf==7.35.1
     # via temporalio
 pycparser==3.0
     # via cffi
-pydantic==2.13.3
+pydantic==2.13.4
     # via
     #   fastapi
     #   pydantic-settings
-pydantic-core==2.46.3
+pydantic-core==2.47.0
     # via pydantic
 pydantic-settings==2.14.2
     # via -r examples/requirements.txt
@@ -79,7 +79,7 @@ python-dotenv==1.2.2
     #   uvicorn
 pyyaml==6.0.3
     # via uvicorn
-s3transfer==0.17.0
+s3transfer==0.19.2
     # via boto3
 six==1.17.0
     # via python-dateutil
@@ -89,7 +89,7 @@ temporalio==1.30.0
     # via -r examples/requirements.txt
 types-protobuf==7.34.1.20260518
     # via temporalio
-typing-extensions==4.15.0
+typing-extensions==4.16.0
     # via
     #   anyio
     #   fastapi
@@ -106,11 +106,11 @@ typing-inspection==0.4.2
     #   pydantic-settings
 urllib3==2.7.0
     # via botocore
-uvicorn[standard]==0.46.0
+uvicorn[standard]==0.51.0
     # via -r examples/requirements.txt
 uvloop==0.22.1
     # via uvicorn
-watchfiles==1.1.1
+watchfiles==1.2.0
     # via uvicorn
-websockets==16.0
+websockets==16.1.1
     # via uvicorn
