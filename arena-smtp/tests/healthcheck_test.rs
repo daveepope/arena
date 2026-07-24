@@ -1,5 +1,5 @@
 use arena::dependency::RunnableDependency;
-use arena_smtp::{SmtpDependency, SmtpImpl};
+use arena_smtp::{SmtpDependency, SmtpImpl, SmtpTlsFiles};
 use async_trait::async_trait;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
@@ -19,6 +19,7 @@ impl SmtpImpl for FixedAddressSmtpImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
+        _tls: Option<&SmtpTlsFiles>,
     ) {
     }
 

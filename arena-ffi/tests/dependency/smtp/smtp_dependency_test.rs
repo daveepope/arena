@@ -8,6 +8,7 @@ fn minimal_smtp_config() -> SmtpDependencyConfig {
         port: None,
         ui_port: None,
         container_name: None,
+        starttls: false,
     }
 }
 
@@ -24,5 +25,6 @@ fn build_image_and_port_overrides_apply() {
     config.port = Some(11025);
     config.ui_port = Some(18025);
     config.container_name = Some("smtp-box".to_string());
+    config.starttls = true;
     assert!(build(&config, Some("arena-net")).is_ok());
 }

@@ -15,6 +15,8 @@ pub struct SmtpDependencyConfig {
     pub ui_port: Option<u16>,
     #[serde(default)]
     pub container_name: Option<String>,
+    #[serde(default)]
+    pub starttls: bool,
 }
 
 pub fn build(config: &SmtpDependencyConfig, network: Option<&str>) -> Result<Dependency, String> {
@@ -36,6 +38,9 @@ pub fn build(config: &SmtpDependencyConfig, network: Option<&str>) -> Result<Dep
     }
     if let Some(ref container_name) = config.container_name {
         builder = builder.with_container_name(container_name);
+    }
+    if config.starttls {
+        builder = builder.with_starttls();
     }
     Ok(Box::new(builder.build()))
 }

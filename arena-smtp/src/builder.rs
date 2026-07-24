@@ -13,6 +13,7 @@ pub struct SmtpDependencyBuilder {
     image_tag: Option<String>,
     container_name: Option<String>,
     network: Option<String>,
+    starttls: bool,
     readiness_check: Option<Box<dyn ReadinessCheck>>,
 }
 
@@ -31,6 +32,7 @@ impl SmtpDependencyBuilder {
             image_tag: None,
             container_name: None,
             network: None,
+            starttls: false,
             readiness_check: None,
         }
     }
@@ -85,6 +87,11 @@ impl SmtpDependencyBuilder {
         self
     }
 
+    pub fn with_starttls(mut self) -> Self {
+        self.starttls = true;
+        self
+    }
+
     pub fn with_readiness_check<W>(mut self, check: W) -> Self
     where
         W: ReadinessCheck + 'static,
@@ -120,6 +127,7 @@ impl SmtpDependencyBuilder {
             image_name,
             image_tag,
             self.container_name,
+            self.starttls,
         );
 
         if let Some(check) = self.readiness_check {

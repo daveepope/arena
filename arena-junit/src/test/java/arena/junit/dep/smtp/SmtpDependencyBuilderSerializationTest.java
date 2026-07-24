@@ -17,6 +17,13 @@ final class SmtpDependencyBuilderSerializationTest {
     assertTrue(config.path("identifier").asText().startsWith("arena-smtp-smtp-"));
     assertFalse(config.has("image"));
     assertFalse(config.has("port"));
+    assertFalse(config.has("starttls"));
+  }
+
+  @Test
+  void withStarttls_setsFlag() {
+    ObjectNode config = new SmtpDependencyBuilder("smtp").withStarttls().build().forFfi();
+    assertTrue(config.path("starttls").asBoolean());
   }
 
   @Test

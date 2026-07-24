@@ -1,6 +1,6 @@
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
-use arena_smtp::{SmtpDependency, SmtpImpl};
+use arena_smtp::{SmtpDependency, SmtpImpl, SmtpTlsFiles};
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
 
@@ -11,6 +11,7 @@ struct StartArgs {
     image_name: String,
     image_tag: String,
     container_name: String,
+    tls: Option<SmtpTlsFiles>,
 }
 
 struct RecordingSmtpImpl {
@@ -28,6 +29,7 @@ impl SmtpImpl for RecordingSmtpImpl {
         image_name: &str,
         image_tag: &str,
         container_name: &str,
+        tls: Option<&SmtpTlsFiles>,
     ) {
         *self.recorded.lock().unwrap() = Some(StartArgs {
             smtp_port,
@@ -35,6 +37,7 @@ impl SmtpImpl for RecordingSmtpImpl {
             image_name: image_name.to_string(),
             image_tag: image_tag.to_string(),
             container_name: container_name.to_string(),
+            tls: tls.cloned(),
         });
         self.smtp_address = Some("127.0.0.1:1025".to_string());
         self.http_api_url = Some("http://127.0.0.1:8025".to_string());
@@ -253,4 +256,54 @@ async fn with_child_dependencies_starts_and_stops_children() {
         events.lock().unwrap().as_slice(),
         &[ChildEvent::Start, ChildEvent::Stop]
     );
+}
+
+#[tokio::test]
+async fn with_starttls_passes_generated_tls_to_impl_start() {
+    let recorded = Arc::new(Mutex::new(None::<StartArgs>));
+    let mut dep = SmtpDependency::builder("builder-starttls")
+        .with_starttls()
+        .with_impl(RecordingSmtpImpl {
+            recorded: recorded.clone(),
+            smtp_address: None,
+            http_api_url: None,
+        })
+        .with_readiness_check(OkReadinessCheck)
+        .build();
+
+    dep.start().await;
+    dep.stop().await;
+
+    let tls = recorded
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("start should have recorded args")
+        .tls
+        .expect("starttls should generate tls files");
+    assert!(tls.certificate_pem.contains("-----BEGIN CERTIFICATE-----"));
+    assert!(tls.private_key_pem.contains("-----BEGIN PRIVATE KEY-----"));
+}
+
+#[tokio::test]
+async fn without_starttls_passes_no_tls_to_impl_start() {
+    let recorded = Arc::new(Mutex::new(None::<StartArgs>));
+    let mut dep = SmtpDependency::builder("builder-no-starttls")
+        .with_impl(RecordingSmtpImpl {
+            recorded: recorded.clone(),
+            smtp_address: None,
+            http_api_url: None,
+        })
+        .with_readiness_check(OkReadinessCheck)
+        .build();
+
+    dep.start().await;
+    dep.stop().await;
+
+    let args = recorded
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("start should have recorded args");
+    assert!(args.tls.is_none());
 }

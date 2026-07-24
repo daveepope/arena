@@ -1,6 +1,6 @@
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
-use arena_smtp::{SmtpDependency, SmtpImpl};
+use arena_smtp::{SmtpDependency, SmtpImpl, SmtpTlsFiles};
 use async_trait::async_trait;
 use futures::FutureExt;
 use std::sync::{Arc, Mutex};
@@ -26,6 +26,7 @@ impl SmtpImpl for FakeSmtpImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
+        _tls: Option<&SmtpTlsFiles>,
     ) {
         self.smtp_address = Some("127.0.0.1:1025".to_string());
         self.http_api_url = Some("http://127.0.0.1:8025".to_string());

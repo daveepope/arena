@@ -9,6 +9,12 @@ use async_trait::async_trait;
 use futures_timer::Delay;
 use std::time::{Duration, Instant};
 
+#[derive(Debug, Clone)]
+pub struct SmtpTlsFiles {
+    pub certificate_pem: String,
+    pub private_key_pem: String,
+}
+
 #[async_trait]
 pub trait SmtpImpl: Send + Sync {
     async fn start(
@@ -18,6 +24,7 @@ pub trait SmtpImpl: Send + Sync {
         image_name: &str,
         image_tag: &str,
         container_name: &str,
+        tls: Option<&SmtpTlsFiles>,
     );
     async fn stop(&mut self);
     fn smtp_address(&self) -> Option<&str>;
@@ -36,6 +43,7 @@ pub struct SmtpDependency {
     image_name: String,
     image_tag: String,
     container_name: Option<String>,
+    starttls: bool,
     readiness_check: Box<dyn ReadinessCheck>,
 }
 
@@ -50,6 +58,7 @@ impl SmtpDependency {
         image_name: String,
         image_tag: String,
         container_name: Option<String>,
+        starttls: bool,
     ) -> Self {
         Self {
             identifier,
@@ -60,11 +69,25 @@ impl SmtpDependency {
             image_name,
             image_tag,
             container_name,
+            starttls,
             running: false,
             needs_teardown: false,
             children_started: false,
             readiness_check: Box::new(DefaultSmtpReadinessCheck),
         }
+    }
+
+    fn tls_files(&self) -> Option<SmtpTlsFiles> {
+        if !self.starttls {
+            return None;
+        }
+        let (certificate_pem, private_key_pem) =
+            arena_container::ephemeral_tls::localhost_self_signed_pem_pair()
+                .expect("mint smtp tls certificate");
+        Some(SmtpTlsFiles {
+            certificate_pem,
+            private_key_pem,
+        })
     }
 
     pub fn smtp_address(&self) -> Option<&str> {
@@ -171,6 +194,8 @@ impl RunnableDependency for SmtpDependency {
             self.container_name.as_deref(),
         );
 
+        let tls = self.tls_files();
+
         let sw_container = Instant::now();
         self.needs_teardown = true;
         self.smtp_impl
@@ -180,6 +205,7 @@ impl RunnableDependency for SmtpDependency {
                 &image_name,
                 &image_tag,
                 &container_name,
+                tls.as_ref(),
             )
             .await;
         tracing::debug!(
@@ -267,6 +293,8 @@ impl RunnableDependency for SmtpDependency {
             self.container_name.as_deref(),
         );
 
+        let tls = self.tls_files();
+
         self.smtp_impl.stop().await;
         self.running = false;
 
@@ -277,6 +305,7 @@ impl RunnableDependency for SmtpDependency {
                 &image_name,
                 &image_tag,
                 &container_name,
+                tls.as_ref(),
             )
             .await;
         self.wait_until_ready().await;

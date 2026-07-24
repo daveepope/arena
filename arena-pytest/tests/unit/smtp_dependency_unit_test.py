@@ -7,6 +7,12 @@ def test_build_minimal_name_serializes_type_and_identifier():
     assert config["identifier"].startswith("arena-smtp-smtp-")
     assert "image" not in config
     assert "port" not in config
+    assert "starttls" not in config
+
+
+def test_with_starttls_sets_flag():
+    config = SmtpDependencyBuilder("smtp").with_starttls().build()._for_ffi()
+    assert config["starttls"] is True
 
 
 def test_build_with_overrides_serializes_configured_fields():

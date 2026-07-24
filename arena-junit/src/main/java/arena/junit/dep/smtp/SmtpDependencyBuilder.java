@@ -39,6 +39,11 @@ public final class SmtpDependencyBuilder {
     return this;
   }
 
+  public SmtpDependencyBuilder withStarttls() {
+    config.put("starttls", true);
+    return this;
+  }
+
   public SmtpDependency build() {
     return new SmtpDependency(config.deepCopy());
   }

@@ -1,4 +1,4 @@
-use crate::smtp_dependency::SmtpImpl;
+use crate::smtp_dependency::{SmtpImpl, SmtpTlsFiles};
 use async_trait::async_trait;
 use testcontainers_modules::testcontainers::core::ContainerPort;
 use testcontainers_modules::testcontainers::ImageExt;
@@ -8,6 +8,23 @@ use testcontainers_modules::{
 
 const SMTP_CONTAINER_PORT: u16 = 1025;
 const UI_CONTAINER_PORT: u16 = 8025;
+const TLS_CERT_CONTAINER_PATH: &str = "/tmp/arena-smtp-tls-cert.pem";
+const TLS_KEY_CONTAINER_PATH: &str = "/tmp/arena-smtp-tls-key.pem";
+
+fn tls_container_files(tls: &SmtpTlsFiles) -> [(&'static str, &'static str, Vec<u8>); 2] {
+    [
+        (
+            "MP_SMTP_TLS_CERT",
+            TLS_CERT_CONTAINER_PATH,
+            tls.certificate_pem.clone().into_bytes(),
+        ),
+        (
+            "MP_SMTP_TLS_KEY",
+            TLS_KEY_CONTAINER_PATH,
+            tls.private_key_pem.clone().into_bytes(),
+        ),
+    ]
+}
 
 pub(crate) struct SmtpContainerImpl {
     container: Option<testcontainers::core::ContainerAsync<GenericImage>>,
@@ -36,6 +53,7 @@ impl SmtpImpl for SmtpContainerImpl {
         image_name: &str,
         image_tag: &str,
         container_name: &str,
+        tls: Option<&SmtpTlsFiles>,
     ) {
         if self.container.is_some() {
             return;
@@ -54,6 +72,12 @@ impl SmtpImpl for SmtpContainerImpl {
             .with_container_name(container_name)
             .with_mapped_port(smtp_port, smtp_container_port)
             .with_mapped_port(ui_port, ui_container_port);
+
+        if let Some(tls) = tls {
+            for (env_var, path, bytes) in tls_container_files(tls) {
+                request = request.with_env_var(env_var, path).with_copy_to(path, bytes);
+            }
+        }
 
         if let Some(ref network) = self.network {
             arena_container::network::ensure_network_exists(network).await;
@@ -97,5 +121,27 @@ impl SmtpImpl for SmtpContainerImpl {
 
     fn http_api_url(&self) -> Option<&str> {
         self.http_api_url.as_deref()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tls_container_files_maps_env_vars_paths_and_pem_bytes() {
+        let tls = SmtpTlsFiles {
+            certificate_pem: "CERT-PEM".to_string(),
+            private_key_pem: "KEY-PEM".to_string(),
+        };
+
+        let files = tls_container_files(&tls);
+
+        assert_eq!(files[0].0, "MP_SMTP_TLS_CERT");
+        assert_eq!(files[0].1, TLS_CERT_CONTAINER_PATH);
+        assert_eq!(files[0].2, b"CERT-PEM");
+        assert_eq!(files[1].0, "MP_SMTP_TLS_KEY");
+        assert_eq!(files[1].1, TLS_KEY_CONTAINER_PATH);
+        assert_eq!(files[1].2, b"KEY-PEM");
     }
 }
