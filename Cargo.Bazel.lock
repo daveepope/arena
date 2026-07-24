@@ -1,5 +1,5 @@
 {
-  "checksum": "a000c4778da2ab13ce50ae061fbd59562b08c22f3563ec63333f480e0b5868cc",
+  "checksum": "9888486dfd9f2e58d8507e8fd65e7d6849ab418b2890f303ffb7c214cdce8423",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -474,6 +474,10 @@
             {
               "id": "bollard 0.20.2",
               "target": "bollard"
+            },
+            {
+              "id": "rcgen 0.14.7",
+              "target": "rcgen"
             },
             {
               "id": "tracing 0.1.44",
@@ -1237,10 +1241,6 @@
             {
               "id": "rand 0.8.6",
               "target": "rand"
-            },
-            {
-              "id": "rcgen 0.14.7",
-              "target": "rcgen"
             },
             {
               "id": "reqwest 0.12.28",

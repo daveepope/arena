@@ -74,6 +74,7 @@ name = "arena-container"
 version = "3.4.0"
 dependencies = [
  "bollard",
+ "rcgen",
  "tokio",
  "tracing",
 ]
@@ -249,7 +250,6 @@ dependencies = [
  "futures",
  "jsonwebtoken",
  "rand 0.8.6",
- "rcgen",
  "reqwest",
  "rsa",
  "rustls",

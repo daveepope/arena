@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::ephemeral_tls;
+use arena_container::ephemeral_tls;
 
 pub fn loopback_tls_pem_json_document() -> Result<String, String> {
     let (certificate_pem, private_key_pem) = ephemeral_tls::localhost_self_signed_pem_pair()?;

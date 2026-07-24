@@ -17,7 +17,6 @@ base64 = { workspace = true }
 jsonwebtoken = { workspace = true }
 tracing = { workspace = true }
 rand = { workspace = true }
-rcgen = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 rsa = { workspace = true }
 rustls = { workspace = true }

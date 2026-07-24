@@ -11,6 +11,7 @@ path = "src/lib.rs"
 
 [dependencies]
 bollard = { workspace = true }
+rcgen = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
