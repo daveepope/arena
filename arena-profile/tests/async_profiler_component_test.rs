@@ -43,9 +43,8 @@ fn prepare_cpu_profile_real_async_profiler_agent_flag_against_jvm_busy_loop_prod
         .status()
         .expect("send SIGTERM to jvm");
     assert!(status.success());
-    let _ = jvm.wait();
 
-    session.finish().expect("finish async-profiler profile");
+    session.finish(&mut jvm).expect("finish async-profiler profile");
     let _ = std::fs::remove_file(&fixture_path);
 
     let report = std::fs::read_to_string(&output_path).expect("read html report");

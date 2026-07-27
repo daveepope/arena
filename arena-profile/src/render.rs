@@ -67,3 +67,18 @@ fn is_wsl() -> bool {
             .map(|v| v.to_lowercase().contains("microsoft"))
             .unwrap_or(false)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_wsl_matches_wsl_distro_env_or_proc_version() {
+        let expected = std::env::var_os("WSL_DISTRO_NAME").is_some()
+            || std::fs::read_to_string("/proc/version")
+                .map(|v| v.to_lowercase().contains("microsoft"))
+                .unwrap_or(false);
+
+        assert_eq!(is_wsl(), expected);
+    }
+}

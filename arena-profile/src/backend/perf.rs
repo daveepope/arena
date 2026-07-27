@@ -47,11 +47,9 @@ impl WrappingSampler for PerfSampler {
             unreachable!("PerfSampler::collect given a non-perf WrapState");
         };
 
-        let signal_result = signal_interrupt(wrapping_child.id());
-        let wait_result = wait_bounded(wrapping_child, budget);
-        signal_result
+        signal_interrupt(wrapping_child)
             .map_err(|e| CpuProfileError::Finish(format!("failed to signal perf record: {e}")))?;
-        wait_result
+        wait_bounded(wrapping_child, budget)
             .map_err(|e| CpuProfileError::Finish(format!("perf record did not exit cleanly: {e}")))?;
 
         let mut script_child = Command::new(PERF_BINARY)

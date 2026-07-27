@@ -102,11 +102,18 @@ impl ExecutableComponent {
         });
     }
 
-    fn signal_terminate(pid: u32) -> std::io::Result<()> {
-        let status = Command::new("kill").args(["-TERM", &pid.to_string()]).status()?;
+    fn signal_terminate(child: &mut Child) -> std::io::Result<()> {
+        if child.try_wait()?.is_some() {
+            return Ok(());
+        }
+        let status = Command::new("kill").args(["-TERM", &child.id().to_string()]).status()?;
         if !status.success() {
+            if child.try_wait()?.is_some() {
+                return Ok(());
+            }
             return Err(std::io::Error::other(format!(
-                "kill -TERM {pid} exited with {status}"
+                "kill -TERM {} exited with {status}",
+                child.id()
             )));
         }
         Ok(())
@@ -146,7 +153,7 @@ impl ExecutableComponent {
                 let _ = child.wait();
             }
             ShutdownSignal::Terminate => {
-                if let Err(e) = Self::signal_terminate(child.id()) {
+                if let Err(e) = Self::signal_terminate(child) {
                     tracing::warn!(component = %identifier, error = %e, "SIGTERM failed, forcing kill");
                     let _ = child.kill();
                     let _ = child.wait();
@@ -305,8 +312,9 @@ impl RunnableComponent for ExecutableComponent {
                         phase = "cpu_profile_finish_begin",
                         "finishing cpu profile",
                     );
-                    let result = session.finish();
+                    let result = session.finish(&mut child);
                     self.on_cpu_profile_finished(result);
+                    let _ = child.wait();
                 }
                 None => {
                     tracing::debug!(
@@ -364,7 +372,7 @@ mod tests {
     fn signal_terminate_running_child_returns_ok_and_terminates() {
         let mut child = Command::new("sleep").arg("5").spawn().expect("spawn sleep");
 
-        let result = ExecutableComponent::signal_terminate(child.id());
+        let result = ExecutableComponent::signal_terminate(&mut child);
 
         assert!(result.is_ok());
         std::thread::sleep(std::time::Duration::from_millis(100));
@@ -372,13 +380,13 @@ mod tests {
     }
 
     #[test]
-    fn signal_terminate_already_exited_child_returns_err() {
+    fn signal_terminate_already_exited_child_returns_ok_without_signaling() {
         let mut child = Command::new("true").spawn().expect("spawn true");
         let _ = child.wait();
 
-        let result = ExecutableComponent::signal_terminate(child.id());
+        let result = ExecutableComponent::signal_terminate(&mut child);
 
-        assert!(result.is_err());
+        assert!(result.is_ok());
     }
 
     #[test]

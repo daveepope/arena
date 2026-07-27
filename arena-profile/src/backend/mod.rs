@@ -21,13 +21,18 @@ pub(crate) fn resolve_binary(
     binary: &'static str,
     install_hint: &'static str,
 ) -> Result<String, CpuProfileError> {
-    if let Ok(r) = runfiles::Runfiles::create() {
-        for rlocation in rlocations {
-            if let Some(path) = r.rlocation(rlocation) {
-                if path.exists() {
-                    return Ok(path.to_string_lossy().into_owned());
+    match runfiles::Runfiles::create() {
+        Ok(r) => {
+            for rlocation in rlocations {
+                if let Some(path) = r.rlocation(rlocation) {
+                    if path.exists() {
+                        return Ok(path.to_string_lossy().into_owned());
+                    }
                 }
             }
+        }
+        Err(e) => {
+            tracing::debug!(binary, error = %e, "runfiles resolution unavailable, falling back to PATH");
         }
     }
     if binary_on_path(path_fallback) {
@@ -59,11 +64,18 @@ pub(crate) fn map_spawn_error(
     }
 }
 
-pub(crate) fn signal_interrupt(pid: u32) -> std::io::Result<()> {
-    let status = Command::new("kill").args(["-INT", &pid.to_string()]).status()?;
+pub(crate) fn signal_interrupt(child: &mut Child) -> std::io::Result<()> {
+    if child.try_wait()?.is_some() {
+        return Ok(());
+    }
+    let status = Command::new("kill").args(["-INT", &child.id().to_string()]).status()?;
     if !status.success() {
+        if child.try_wait()?.is_some() {
+            return Ok(());
+        }
         return Err(std::io::Error::other(format!(
-            "kill -INT {pid} exited with {status}"
+            "kill -INT {} exited with {status}",
+            child.id()
         )));
     }
     Ok(())
@@ -156,7 +168,7 @@ mod tests {
     fn signal_interrupt_running_child_returns_ok_and_interrupts() {
         let mut child = Command::new("sleep").arg("5").spawn().expect("spawn sleep");
 
-        let result = signal_interrupt(child.id());
+        let result = signal_interrupt(&mut child);
 
         assert!(result.is_ok());
         std::thread::sleep(Duration::from_millis(100));
@@ -164,12 +176,12 @@ mod tests {
     }
 
     #[test]
-    fn signal_interrupt_already_exited_child_returns_err() {
+    fn signal_interrupt_already_exited_child_returns_ok_without_signaling() {
         let mut child = Command::new("true").spawn().expect("spawn true");
         let _ = child.wait();
 
-        let result = signal_interrupt(child.id());
+        let result = signal_interrupt(&mut child);
 
-        assert!(result.is_err());
+        assert!(result.is_ok());
     }
 }

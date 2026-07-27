@@ -44,11 +44,9 @@ impl WrappingSampler for PySpySampler {
             unreachable!("PySpySampler::collect given a non-py-spy WrapState");
         };
 
-        let signal_result = signal_interrupt(wrapping_child.id());
-        let wait_result = wait_bounded(wrapping_child, budget);
-        signal_result
+        signal_interrupt(wrapping_child)
             .map_err(|e| CpuProfileError::Finish(format!("failed to signal py-spy record: {e}")))?;
-        let status = wait_result.map_err(|e| {
+        let status = wait_bounded(wrapping_child, budget).map_err(|e| {
             CpuProfileError::Finish(format!("py-spy record did not exit cleanly: {e}"))
         })?;
 

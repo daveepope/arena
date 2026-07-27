@@ -51,3 +51,13 @@ fn render_error_from_io_error_wraps_as_io_variant() {
 
     assert!(matches!(e, RenderError::Io(_)));
 }
+
+#[test]
+fn render_folded_to_html_unwritable_output_path_returns_io_error() {
+    let folded = "main;handler;compute 42\n";
+    let bogus_path = std::path::Path::new("/nonexistent-dir/arena-profile-render-test.html");
+
+    let result = render_folded_to_html(folded.as_bytes(), bogus_path);
+
+    assert!(matches!(result, Err(RenderError::Io(_))));
+}
