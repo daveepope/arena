@@ -166,6 +166,19 @@ await open_arena.close()
 
 As in Rust, you can point at source plus `with_build_tool(...)` instead of a prebuilt path when you want Arena to compile the component first.
 
+The SMTP mail-capture dependency is available too:
+
+```python
+from arena_pytest import SmtpDependencyBuilder
+
+smtp = (
+    SmtpDependencyBuilder("mail")
+    .with_port(1025)
+    .with_ui_port(8025)
+    .build()
+)
+```
+
 ### Java (arena-junit)
 
 `arena-junit` is a JUnit 5 extension. You point it at the jar your build already produces, so a test runs against the same artifact you ship rather than a separate in-process test context.
@@ -217,6 +230,17 @@ static final ExecutableComponent WEB_APP_2 =
 ```
 
 Both instances run in the same sandbox against the same Postgres, so you can test how your service behaves with two copies of itself running, or bring in another team's service and test the two together.
+
+To capture outbound email, add an SMTP dependency the same way:
+
+```java
+@ArenaDependency
+static final SmtpDependency MAIL =
+    new SmtpDependencyBuilder("mail")
+        .withPort(1025)
+        .withUiPort(8025)
+        .build();
+```
 
 #### Building the arena yourself
 

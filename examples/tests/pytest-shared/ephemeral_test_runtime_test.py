@@ -28,6 +28,8 @@ def test_ephemeral_runtime_ports_are_pairwise_distinct():
         rt.localstack_host_port,
         rt.temporal_grpc_port,
         rt.temporal_ui_port,
+        rt.smtp_port,
+        rt.smtp_ui_port,
     )
     assert len(ports) == PORT_SLOT_COUNT
     assert len(ports) == len(set(ports))

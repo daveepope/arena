@@ -1,0 +1,21 @@
+package arena.junit.dep.smtp;
+import arena.junit.match.ArenaMatchPiece;
+
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+public final class SmtpDependency implements ArenaMatchPiece {
+  private final ObjectNode config;
+
+  SmtpDependency(ObjectNode config) {
+    this.config = config;
+  }
+
+  public String identifier() {
+    return config.get("identifier").asText();
+  }
+
+  @Override
+  public ObjectNode forFfi() {
+    return config;
+  }
+}

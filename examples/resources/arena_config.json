@@ -13,7 +13,8 @@
     "kafka": "example-api-kafka",
     "mssql": "example-api-mssql",
     "calibration_http": "example-api-calibration",
-    "temporal": "example-api-temporal"
+    "temporal": "example-api-temporal",
+    "smtp": "example-api-smtp"
   },
   "component_names": {
     "executable": "example-api-web-app",
@@ -38,7 +39,9 @@
     "kafka_host": 9093,
     "calibration_host": 3011,
     "postgres_host": 5560,
-    "mssql_host": 1438
+    "mssql_host": 1438,
+    "smtp_host": 3012,
+    "smtp_ui_host": 3013
   },
   "database": {
     "postgres_name": "readings_db",
