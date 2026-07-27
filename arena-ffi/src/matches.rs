@@ -7,6 +7,7 @@ use crate::executable_component;
 use crate::dependency::http::http_dependency;
 use crate::dependency::localstack::localstack_dependency;
 use crate::dependency::mssql::mssql_dependency;
+use crate::dependency::smtp::smtp_dependency;
 use crate::dependency::temporal::temporal_dependency;
 use crate::kafka_dependency;
 use crate::managed_playbook;
@@ -34,6 +35,7 @@ pub(crate) enum DependencyConfig {
     Localstack(localstack_dependency::LocalstackDependencyConfig),
     Oauth(OauthFfiDependencyConfig),
     Temporal(temporal_dependency::TemporalDependencyConfig),
+    Smtp(smtp_dependency::SmtpDependencyConfig),
 }
 
 #[derive(Debug, Deserialize)]
@@ -74,6 +76,7 @@ fn build_dependencies(config: &MatchConfig, network: Option<&str>) -> Result<Vec
             DependencyConfig::Localstack(l) => localstack_dependency::build(l, network),
             DependencyConfig::Oauth(o) => build_oauth_dependency_from_config(o, network),
             DependencyConfig::Temporal(t) => temporal_dependency::build(t, network),
+            DependencyConfig::Smtp(s) => smtp_dependency::build(s, network),
         })
         .collect()
 }
@@ -105,7 +108,8 @@ mod tests {
                     {"type": "http", "identifier": "http"},
                     {"type": "localstack", "identifier": "localstack"},
                     {"type": "oauth", "identifier": "oauth"},
-                    {"type": "temporal", "identifier": "temporal"}
+                    {"type": "temporal", "identifier": "temporal"},
+                    {"type": "smtp", "identifier": "smtp"}
                 ]
             }"#,
         )
@@ -145,7 +149,7 @@ mod tests {
     fn build_dependencies_all_variants_dispatches_to_each_builder() {
         let config = all_dependency_variants_config();
         let dependencies = build_dependencies(&config, None).expect("all variants build");
-        assert_eq!(dependencies.len(), 7);
+        assert_eq!(dependencies.len(), 8);
     }
 
     #[test]
