@@ -24,6 +24,7 @@ jobs:
       only_non_publishable: ${{ steps.classify.outputs.only_non_publishable }}
       has_publishable: ${{ steps.classify.outputs.has_publishable }}
       has_ci_relevant: ${{ steps.classify.outputs.has_ci_relevant }}
+      has_client_surface_change: ${{ steps.classify.outputs.has_client_surface_change }}
       version_changed: ${{ steps.filter.outputs.version_changed }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -55,12 +56,19 @@ jobs:
           ci_only_path() {
             [[ "$1" == .github/workflows/* || "$1" == .github/dependabot.yml ]]
           }
+          client_surface_path() {
+            [[ "$1" == arena-ffi/* || "$1" == arena-pytest/* || "$1" == arena-junit/* ]]
+          }
           only_non_publishable=false
           has_publishable=false
           has_ci_relevant=false
+          has_client_surface_change=false
           if [ -n "$CHANGED" ]; then
             only_non_publishable=true
             for path in $CHANGED; do
+              if client_surface_path "$path"; then
+                has_client_surface_change=true
+              fi
               if docs_path "$path"; then
                 continue
               fi
@@ -75,8 +83,9 @@ jobs:
           echo "only_non_publishable=${only_non_publishable}" >> "$GITHUB_OUTPUT"
           echo "has_publishable=${has_publishable}" >> "$GITHUB_OUTPUT"
           echo "has_ci_relevant=${has_ci_relevant}" >> "$GITHUB_OUTPUT"
+          echo "has_client_surface_change=${has_client_surface_change}" >> "$GITHUB_OUTPUT"
           echo "changed=${CHANGED:-<none>}"
-          echo "only_non_publishable=${only_non_publishable} has_publishable=${has_publishable} has_ci_relevant=${has_ci_relevant}"
+          echo "only_non_publishable=${only_non_publishable} has_publishable=${has_publishable} has_ci_relevant=${has_ci_relevant} has_client_surface_change=${has_client_surface_change}"
 
   dependabot_awaiting_version_bump:
     name: Awaiting Dependabot version bump
@@ -121,7 +130,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       (
         needs.changes.outputs.version_changed == 'true' ||
-        needs.changes.outputs.has_publishable == 'true'
+        needs.changes.outputs.has_client_surface_change == 'true'
       ) &&
       !(
         github.event.pull_request.user.login == 'dependabot[bot]' &&
