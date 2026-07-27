@@ -247,6 +247,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Verify VERSION sync
@@ -333,6 +336,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Build and test
@@ -385,6 +391,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Coverage
@@ -447,6 +456,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Build and test
@@ -498,6 +510,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Build and test
@@ -590,6 +605,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Unique version for TestPyPI
@@ -709,6 +727,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Publish snapshot to Maven Central
@@ -749,6 +770,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Build release artifacts
