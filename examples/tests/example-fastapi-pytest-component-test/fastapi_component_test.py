@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 
 _TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)
 
 import pytest
+import requests
 
 from arena_pytest import ArenaBindingError, playbook
 
@@ -16,8 +18,23 @@ from playbooks import (
     CalibrationApiFlakyPlaybook,
     ResetValidationDbPlaybook,
 )
-from arena_config import CALIBRATION_VALIDATE_PATH
+from arena_config import CALIBRATION_VALIDATE_PATH, SMTP_UI_PORT
 from api_http import ApiClient
+
+SMTP_MESSAGES_URL = f"http://127.0.0.1:{SMTP_UI_PORT}/api/v1/messages"
+MAIL_POLL_TIMEOUT_SECONDS = 10.0
+MAIL_POLL_INTERVAL_SECONDS = 0.1
+
+
+def _wait_device_provisioned_email(needle: str) -> None:
+    deadline = time.monotonic() + MAIL_POLL_TIMEOUT_SECONDS
+    while time.monotonic() < deadline:
+        r = requests.get(SMTP_MESSAGES_URL, timeout=5)
+        r.raise_for_status()
+        if needle in r.text:
+            return
+        time.sleep(MAIL_POLL_INTERVAL_SECONDS)
+    raise AssertionError(f"device provisioned email containing {needle!r} was not captured")
 
 
 @playbook(ResetValidationDbPlaybook)
@@ -150,6 +167,12 @@ def test_set_device_state_applies_requested_state(
 def test_get_device_state_unknown_device_returns_not_found(api_client: ApiClient):
     r = api_client.get_device_state_raw(999_999_999)
     assert r.status_code == 404
+
+
+def test_create_device_sends_provisioned_email(api_client: ApiClient):
+    device_name = f"Mail Probe Device {os.urandom(4).hex()}"
+    api_client.create_device(device_name)
+    _wait_device_provisioned_email(device_name)
 
 
 if __name__ == "__main__":

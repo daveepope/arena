@@ -70,6 +70,8 @@ OAUTH_ISSUER = RUNTIME.oauth_issuer
 LOCALSTACK_HOST_PORT = RUNTIME.localstack_host_port
 TEMPORAL_GRPC_PORT = RUNTIME.temporal_grpc_port
 TEMPORAL_UI_PORT = RUNTIME.temporal_ui_port
+SMTP_HOST_PORT = RUNTIME.smtp_port
+SMTP_UI_PORT = RUNTIME.smtp_ui_port
 
 POSTGRES_DB_NAME = _DATABASE["postgres_name"]
 POSTGRES_DB_USER = _DATABASE["postgres_user"]
@@ -92,6 +94,7 @@ DEP_NAME_KAFKA = _DEP_NAMES["kafka"]
 DEP_NAME_MSSQL = _DEP_NAMES["mssql"]
 DEP_NAME_CALIBRATION_HTTP = _DEP_NAMES["calibration_http"]
 DEP_NAME_TEMPORAL = _DEP_NAMES["temporal"]
+DEP_NAME_SMTP = _DEP_NAMES["smtp"]
 
 COMPONENT_NAME_EXECUTABLE = _COMP_NAMES["executable"]
 COMPONENT_NAME_CONTAINERIZED = _COMP_NAMES["containerized"]
