@@ -9,7 +9,7 @@
   <packaging>jar</packaging>
   <properties>
     <java.version>25</java.version>
-    <spring.boot.version>3.5.3</spring.boot.version>
+    <spring.boot.version>3.5.16</spring.boot.version>
   </properties>
   <dependencyManagement>
     <dependencies>

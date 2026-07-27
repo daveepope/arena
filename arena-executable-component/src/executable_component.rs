@@ -338,3 +338,102 @@ impl RunnableComponent for ExecutableComponent {
         self.children.get_or_insert_with(Vec::new).push(child);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn new_component(identifier: &str) -> ExecutableComponent {
+        ExecutableComponent::new(identifier.to_string())
+    }
+
+    #[test]
+    fn log_line_all_severity_markers_does_not_panic() {
+        for line in [
+            "2024-01-01 ERROR something broke",
+            "2024-01-01 WARN heads up",
+            "2024-01-01 DEBUG detail",
+            "2024-01-01 TRACE fine detail",
+            "2024-01-01 INFO normal",
+        ] {
+            ExecutableComponent::log_line("test-component", line);
+        }
+    }
+
+    #[test]
+    fn signal_terminate_running_child_returns_ok_and_terminates() {
+        let mut child = Command::new("sleep").arg("5").spawn().expect("spawn sleep");
+
+        let result = ExecutableComponent::signal_terminate(child.id());
+
+        assert!(result.is_ok());
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        assert!(child.try_wait().unwrap().is_some());
+    }
+
+    #[test]
+    fn signal_terminate_already_exited_child_returns_err() {
+        let mut child = Command::new("true").spawn().expect("spawn true");
+        let _ = child.wait();
+
+        let result = ExecutableComponent::signal_terminate(child.id());
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn graceful_then_force_kill_kill_signal_kills_child() {
+        let mut child = Command::new("sleep").arg("5").spawn().expect("spawn sleep");
+
+        ExecutableComponent::graceful_then_force_kill(&mut child, ShutdownSignal::Kill, "test-component");
+
+        assert!(child.try_wait().unwrap().is_some());
+    }
+
+    #[test]
+    fn graceful_then_force_kill_terminate_signal_stops_child() {
+        let mut child = Command::new("sleep").arg("5").spawn().expect("spawn sleep");
+
+        ExecutableComponent::graceful_then_force_kill(&mut child, ShutdownSignal::Terminate, "test-component");
+
+        assert!(child.try_wait().unwrap().is_some());
+    }
+
+    #[test]
+    fn spawn_process_no_executable_path_returns_err() {
+        let mut component = new_component("spawn-test");
+
+        let result = component.spawn_process();
+
+        assert_eq!(result, Err("executable_path not configured".to_string()));
+    }
+
+    #[test]
+    fn spawn_process_program_missing_returns_err() {
+        let mut component = new_component("spawn-test");
+        component.executable_path = Some(PathBuf::from("/nonexistent/arena-executable-component-fake-binary"));
+
+        let result = component.spawn_process();
+
+        assert!(result.unwrap_err().contains("failed to spawn process"));
+    }
+
+    #[test]
+    fn on_cpu_profile_finished_err_does_not_panic() {
+        let component = new_component("cpu-profile-test");
+
+        component.on_cpu_profile_finished(Err(arena_profile::CpuProfileError::Finish("boom".to_string())));
+    }
+
+    #[test]
+    fn on_cpu_profile_finished_ok_without_auto_open_does_not_attempt_open() {
+        let mut component = new_component("cpu-profile-test");
+        component.cpu_profile = Some((
+            arena_profile::CpuProfilerBackend::Perf,
+            PathBuf::from("/tmp/does-not-matter.html"),
+            false,
+        ));
+
+        component.on_cpu_profile_finished(Ok(()));
+    }
+}

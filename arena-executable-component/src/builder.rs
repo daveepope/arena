@@ -259,3 +259,117 @@ impl ExecutableComponentBuilder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_cargo_with_cpu_profile_selects_perf_backend() {
+        let component = ExecutableComponentBuilder::new("builder-test")
+            .with_build_tool(BuildTool::Cargo)
+            .with_executable_path("/bin/true")
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .build();
+
+        let (backend, _, auto_open) = component.cpu_profile.expect("cpu profile configured");
+        assert_eq!(backend, arena_profile::CpuProfilerBackend::Perf);
+        assert!(!auto_open);
+    }
+
+    #[test]
+    fn build_maven_or_gradle_with_cpu_profile_selects_async_profiler_backend() {
+        for build_tool in [BuildTool::Maven, BuildTool::Gradle] {
+            let component = ExecutableComponentBuilder::new("builder-test")
+                .with_build_tool(build_tool)
+                .with_executable_path("/bin/true")
+                .with_cpu_profile("/tmp/does-not-matter.html")
+                .build();
+
+            let (backend, _, _) = component.cpu_profile.expect("cpu profile configured");
+            assert_eq!(backend, arena_profile::CpuProfilerBackend::AsyncProfiler);
+        }
+    }
+
+    #[test]
+    fn build_python_with_cpu_profile_selects_pyspy_backend() {
+        let component = ExecutableComponentBuilder::new("builder-test")
+            .with_build_tool(BuildTool::Python)
+            .with_executable_path("/bin/true")
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .with_cpu_profile_auto_open()
+            .build();
+
+        let (backend, _, auto_open) = component.cpu_profile.expect("cpu profile configured");
+        assert_eq!(backend, arena_profile::CpuProfilerBackend::PySpy);
+        assert!(auto_open);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not supported for BuildTool::Dotnet")]
+    fn build_dotnet_with_cpu_profile_panics() {
+        ExecutableComponentBuilder::new("builder-test")
+            .with_build_tool(BuildTool::Dotnet)
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "is not supported for BuildTool::Make")]
+    fn build_make_with_cpu_profile_panics() {
+        ExecutableComponentBuilder::new("builder-test")
+            .with_build_tool(BuildTool::Make)
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "is not supported for BuildTool::CMake")]
+    fn build_cmake_with_cpu_profile_panics() {
+        ExecutableComponentBuilder::new("builder-test")
+            .with_build_tool(BuildTool::CMake)
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "is not supported for BuildTool::Custom")]
+    fn build_custom_with_cpu_profile_panics() {
+        ExecutableComponentBuilder::new("builder-test")
+            .with_build_tool(BuildTool::Custom {
+                command: "make-it-so".to_string(),
+                args: vec![],
+            })
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "requires a build_tool of Cargo, Maven, Gradle, or Python")]
+    fn build_no_build_tool_with_cpu_profile_panics() {
+        ExecutableComponentBuilder::new("builder-test")
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .build();
+    }
+
+    #[test]
+    fn build_absolute_executable_path_kept_as_is() {
+        let component = ExecutableComponentBuilder::new("builder-test")
+            .with_executable_path("/bin/true")
+            .build();
+
+        assert_eq!(component.executable_path, Some(PathBuf::from("/bin/true")));
+    }
+
+    #[test]
+    fn build_relative_executable_path_not_found_falls_back_to_current_dir_join() {
+        let relative = PathBuf::from("arena-executable-component-nonexistent-binary");
+
+        let component = ExecutableComponentBuilder::new("builder-test")
+            .with_executable_path(relative.clone())
+            .build();
+
+        let expected = std::env::current_dir().unwrap().join(&relative);
+        assert_eq!(component.executable_path, Some(expected));
+    }
+}

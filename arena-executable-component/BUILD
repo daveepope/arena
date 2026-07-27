@@ -15,6 +15,13 @@ rust_library(
 )
 
 rust_test(
+    name = "arena_executable_component_lib_unit_test",
+    crate = ":arena_executable_component",
+    size = "small",
+    edition = "2021",
+)
+
+rust_test(
     name = "lifecycle_test",
     srcs = ["tests/lifecycle_test.rs"],
     size = "small",

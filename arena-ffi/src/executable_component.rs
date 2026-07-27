@@ -107,3 +107,32 @@ fn build_tool_from_config(spec: &BuildToolConfig) -> Result<BuildTool, String> {
         }),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_tool_from_config_unknown_simple_name_returns_err() {
+        let result = build_tool_from_config(&BuildToolConfig::Simple("unknown-tool".to_string()));
+
+        match result {
+            Err(msg) => assert_eq!(msg, "unknown build_tool 'unknown-tool'"),
+            Ok(_) => panic!("expected Err for unknown build tool name"),
+        }
+    }
+
+    #[test]
+    fn build_tool_from_config_custom_returns_custom_build_tool() {
+        let result = build_tool_from_config(&BuildToolConfig::Custom {
+            command: "make-it-so".to_string(),
+            args: vec!["arg1".to_string()],
+        });
+
+        assert!(matches!(
+            result,
+            Ok(BuildTool::Custom { command, args })
+                if command == "make-it-so" && args == vec!["arg1".to_string()]
+        ));
+    }
+}

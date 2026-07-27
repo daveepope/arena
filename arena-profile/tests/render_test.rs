@@ -1,4 +1,4 @@
-use arena_profile::render::render_folded_to_html;
+use arena_profile::render::{render_folded_to_html, RenderError};
 
 fn temp_html_path(name: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("arena-profile-render-test-{name}-{}.html", std::process::id()))
@@ -29,4 +29,25 @@ fn render_folded_to_html_multiple_stacks_produces_valid_report() {
     assert!(report.contains("<html"));
     assert!(report.contains("</html>"));
     let _ = std::fs::remove_file(&output_path);
+}
+
+#[test]
+fn render_error_display_io_includes_underlying_error() {
+    let e = RenderError::Io(std::io::Error::other("missing"));
+
+    assert!(e.to_string().contains("missing"));
+}
+
+#[test]
+fn render_error_display_inferno_includes_message() {
+    let e = RenderError::Inferno("bad folded stacks".to_string());
+
+    assert!(e.to_string().contains("bad folded stacks"));
+}
+
+#[test]
+fn render_error_from_io_error_wraps_as_io_variant() {
+    let e: RenderError = std::io::Error::other("boom").into();
+
+    assert!(matches!(e, RenderError::Io(_)));
 }
