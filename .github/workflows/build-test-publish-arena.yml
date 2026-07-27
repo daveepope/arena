@@ -205,7 +205,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
       - name: Validate .codecov.yml
@@ -247,6 +247,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Verify VERSION sync
@@ -317,7 +320,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
       - name: Setup Bazel
@@ -333,6 +336,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Build and test
@@ -369,7 +375,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
       - name: Setup Bazel
@@ -385,6 +391,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Coverage
@@ -431,7 +440,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
       - name: Setup Bazel
@@ -447,6 +456,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Build and test
@@ -482,7 +494,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
       - name: Setup Bazel
@@ -498,6 +510,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Build and test
@@ -574,7 +589,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
       - name: Setup Bazel
@@ -590,6 +605,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Unique version for TestPyPI
@@ -693,7 +711,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Setup Bazel
@@ -709,6 +727,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Publish snapshot to Maven Central
@@ -749,6 +770,9 @@ jobs:
         run: |
           if [ -n "$BUILDBUDDY_API_KEY" ]; then
             echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
       - name: Build release artifacts
