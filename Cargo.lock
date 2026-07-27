@@ -276,6 +276,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "arena-smtp"
+version = "3.3.0"
+dependencies = [
+ "arena",
+ "arena-container",
+ "async-trait",
+ "futures",
+ "futures-timer",
+ "reqwest",
+ "testcontainers-modules",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "arena-temporal"
 version = "3.3.0"
 dependencies = [

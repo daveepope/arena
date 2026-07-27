@@ -97,6 +97,21 @@ open.close().await;
 
 You can also use `with_source_path` / `with_build_tool` on the builder so Arena builds the binary before starting it (see `examples/`).
 
+To test outbound email, add an SMTP mail-capture server dependency. Your app sends mail to it, and you assert on what was captured via its HTTP API:
+
+```rust
+use arena_smtp::SmtpDependency;
+
+let smtp: Dependency = Box::new(
+    SmtpDependency::builder("mail")
+        .with_port(1025)
+        .with_ui_port(8025)
+        .build(),
+);
+// After the arena is open: smtp.smtp_address() is the host:port to send to,
+// and smtp.http_api_url() is the HTTP API used to read captured messages.
+```
+
 ### Python (arena-pytest)
 
 ```python
