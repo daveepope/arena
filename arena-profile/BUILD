@@ -53,6 +53,19 @@ rust_test(
 )
 
 rust_test(
+    name = "backend_test",
+    srcs = ["tests/backend/mod_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_profile",
+    ],
+)
+
+rust_test(
     name = "perf_component_test",
     srcs = ["tests/perf_component_test.rs"],
     size = "small",

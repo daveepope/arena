@@ -172,7 +172,6 @@ mod tests {
 
     enum WrapOutcome {
         WrapFails(CpuProfileError),
-        CollectSucceeds(&'static str),
         CollectFails,
     }
 
@@ -189,7 +188,7 @@ mod tests {
         ) -> Result<(PathBuf, Vec<String>, WrapState), CpuProfileError> {
             match &self.outcome {
                 WrapOutcome::WrapFails(e) => Err(clone_error(e)),
-                _ => {
+                WrapOutcome::CollectFails => {
                     let mut args = vec!["--".to_string(), request.program.to_string_lossy().into_owned()];
                     args.extend(request.args.iter().cloned());
                     Ok((
@@ -210,56 +209,9 @@ mod tests {
             _budget: Duration,
         ) -> Result<PathBuf, CpuProfileError> {
             match &self.outcome {
-                WrapOutcome::CollectFails => {
-                    Err(CpuProfileError::Finish("collect failed".into()))
-                }
-                WrapOutcome::CollectSucceeds(folded_output) => {
-                    let path = std::env::temp_dir().join(format!(
-                        "arena-profile-fake-wrap-test-{}-{:p}.folded",
-                        std::process::id(),
-                        self
-                    ));
-                    std::fs::write(&path, folded_output).expect("write fake folded stacks");
-                    Ok(path)
-                }
+                WrapOutcome::CollectFails => Err(CpuProfileError::Finish("collect failed".into())),
                 WrapOutcome::WrapFails(_) => unreachable!("collect() called after wrap() failed"),
             }
-        }
-    }
-
-    enum AugmentOutcome {
-        AugmentSucceeds(&'static str),
-    }
-
-    struct FakeArgAugmentingSampler {
-        outcome: AugmentOutcome,
-    }
-
-    impl ArgAugmentingSampler for FakeArgAugmentingSampler {
-        fn augment(
-            &self,
-            request: &LaunchRequest,
-            _output_path: &Path,
-        ) -> Result<(Vec<String>, AugmentState), CpuProfileError> {
-            let mut args = vec!["-agentpath:fake.so=start".to_string()];
-            args.extend(request.args.iter().cloned());
-            Ok((
-                args,
-                AugmentState::AsyncProfiler {
-                    folded_path: PathBuf::from("/tmp/unused.collapsed"),
-                },
-            ))
-        }
-
-        fn collect(&self, _state: AugmentState, _budget: Duration) -> Result<PathBuf, CpuProfileError> {
-            let AugmentOutcome::AugmentSucceeds(folded_output) = &self.outcome;
-            let path = std::env::temp_dir().join(format!(
-                "arena-profile-fake-augment-test-{}-{:p}.folded",
-                std::process::id(),
-                self
-            ));
-            std::fs::write(&path, folded_output).expect("write fake folded stacks");
-            Ok(path)
         }
     }
 
@@ -268,9 +220,7 @@ mod tests {
             CpuProfileError::MissingBinary { binary, install_hint } => {
                 CpuProfileError::MissingBinary { binary, install_hint }
             }
-            CpuProfileError::Launch(msg) => CpuProfileError::Launch(msg.clone()),
-            CpuProfileError::Finish(msg) => CpuProfileError::Finish(msg.clone()),
-            _ => CpuProfileError::Launch("unexpected fake error clone".into()),
+            _ => unreachable!("clone_error only used for MissingBinary in these tests"),
         }
     }
 
@@ -282,24 +232,6 @@ mod tests {
         LaunchRequest {
             program: PathBuf::from("/bin/target"),
             args: vec!["a".to_string(), "b".to_string()],
-        }
-    }
-
-    #[test]
-    fn prepare_wrapped_sampler_succeeds_returns_wrapped_launch_with_program_and_args_in_order() {
-        let sampler = FakeWrappingSampler {
-            outcome: WrapOutcome::CollectSucceeds("main;foo 1\n"),
-            wrapped_program: "/usr/bin/perf",
-        };
-
-        let result = prepare_wrapped(Box::new(sampler), &sample_request(), temp_html_path("wrap-ok"));
-
-        match result.unwrap() {
-            PreparedLaunch::Wrapped { program, args, .. } => {
-                assert_eq!(program, PathBuf::from("/usr/bin/perf"));
-                assert_eq!(args, vec!["--", "/bin/target", "a", "b"]);
-            }
-            PreparedLaunch::ArgsAugmented { .. } => panic!("expected Wrapped variant"),
         }
     }
 
@@ -316,31 +248,6 @@ mod tests {
         let result = prepare_wrapped(Box::new(sampler), &sample_request(), temp_html_path("wrap-missing"));
 
         assert!(matches!(result, Err(CpuProfileError::MissingBinary { binary: "perf", .. })));
-    }
-
-    #[test]
-    fn wrapped_finish_collect_succeeds_renders_html_report() {
-        let output_path = temp_html_path("wrapped-finish-ok");
-        let sampler = FakeWrappingSampler {
-            outcome: WrapOutcome::CollectSucceeds("main;foo 3\nmain;bar 1\n"),
-            wrapped_program: "/usr/bin/perf",
-        };
-        let PreparedLaunch::Wrapped { session, .. } =
-            prepare_wrapped(Box::new(sampler), &sample_request(), output_path.clone()).unwrap()
-        else {
-            panic!("expected Wrapped variant");
-        };
-
-        let mut placeholder_child = std::process::Command::new("true")
-            .spawn()
-            .expect("spawn placeholder child");
-        session.finish(&mut placeholder_child).unwrap();
-        let _ = placeholder_child.wait();
-
-        let report = std::fs::read_to_string(&output_path).unwrap();
-        assert!(report.contains("<html"));
-        assert!(report.contains("<svg"));
-        let _ = std::fs::remove_file(&output_path);
     }
 
     #[test]
@@ -363,50 +270,5 @@ mod tests {
         let _ = placeholder_child.wait();
 
         assert!(matches!(result, Err(CpuProfileError::Finish(_))));
-    }
-
-    #[test]
-    fn prepare_augmented_sampler_prepends_agent_arg_ahead_of_original_args_and_requests_terminate() {
-        let sampler = FakeArgAugmentingSampler {
-            outcome: AugmentOutcome::AugmentSucceeds("main;foo 1\n"),
-        };
-        let request = LaunchRequest {
-            program: PathBuf::from("java"),
-            args: vec!["-jar".to_string(), "app.jar".to_string()],
-        };
-
-        let result = prepare_augmented(Box::new(sampler), &request, temp_html_path("augment-ok"));
-
-        match result.unwrap() {
-            PreparedLaunch::ArgsAugmented { args, shutdown_signal, .. } => {
-                assert_eq!(args, vec!["-agentpath:fake.so=start", "-jar", "app.jar"]);
-                assert_eq!(shutdown_signal, ShutdownSignal::Terminate);
-            }
-            PreparedLaunch::Wrapped { .. } => panic!("expected ArgsAugmented variant"),
-        }
-    }
-
-    #[test]
-    fn augmented_finish_collect_succeeds_renders_html_report() {
-        let output_path = temp_html_path("augmented-finish-ok");
-        let sampler = FakeArgAugmentingSampler {
-            outcome: AugmentOutcome::AugmentSucceeds("main;foo 3\nmain;bar 1\n"),
-        };
-        let request = LaunchRequest {
-            program: PathBuf::from("java"),
-            args: vec![],
-        };
-        let PreparedLaunch::ArgsAugmented { session, .. } =
-            prepare_augmented(Box::new(sampler), &request, output_path.clone()).unwrap()
-        else {
-            panic!("expected ArgsAugmented variant");
-        };
-
-        session.finish().unwrap();
-
-        let report = std::fs::read_to_string(&output_path).unwrap();
-        assert!(report.contains("<html"));
-        assert!(report.contains("<svg"));
-        let _ = std::fs::remove_file(&output_path);
     }
 }
