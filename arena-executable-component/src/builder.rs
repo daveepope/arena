@@ -10,6 +10,7 @@ pub enum BuildTool {
     Dotnet,
     Make,
     CMake,
+    Bazel { target: String, args: Vec<String> },
     Custom { command: String, args: Vec<String> },
 }
 
@@ -200,6 +201,13 @@ impl ExecutableComponentBuilder {
                 .current_dir(source_dir)
                 .output()
                 .expect("failed to run cmake"),
+            BuildTool::Bazel { target, args } => std::process::Command::new("bazel")
+                .arg("build")
+                .args(args)
+                .arg(target)
+                .current_dir(source_dir)
+                .output()
+                .expect("failed to run bazel build"),
             BuildTool::Custom { command, args } => std::process::Command::new(command)
                 .args(args)
                 .current_dir(source_dir)
