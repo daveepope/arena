@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from temporalio.client import WorkflowHandle
 from temporalio.service import RPCError, RPCStatusCode
 
+from example_readings_fastapi_web_app.mail import send_device_provisioned_email
 from example_readings_fastapi_web_app.workflows.device_workflow import (
     DeviceLifecycleWorkflow,
     DeviceSnapshot,
@@ -100,6 +101,16 @@ async def create_device(request: Request, body: CreateDeviceBody) -> CreateDevic
             status_code=502,
             detail=f"failed to start device workflow for device {device_id}",
         ) from exc
+    try:
+        await asyncio.to_thread(
+            send_device_provisioned_email,
+            st.smtp_host,
+            st.smtp_port,
+            device_id,
+            body.name,
+        )
+    except Exception:
+        pass
     return CreateDeviceResponse(id=device_id, name=body.name)
 
 

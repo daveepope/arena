@@ -9,6 +9,7 @@ members = [
     "arena-http",
     "arena-oauth",
     "arena-temporal",
+    "arena-smtp",
     "arena-executable-component",
     "arena-container",
     "arena-containerized-component",
@@ -18,7 +19,7 @@ members = [
 ]
 
 [workspace.package]
-version = "3.3.0"
+version = "3.4.0"
 [workspace.dependencies]
 arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }
@@ -26,6 +27,7 @@ arena-localstack = { path = "arena-localstack" }
 arena-postgres = { path = "arena-postgres" }
 arena-mssql = { path = "arena-mssql" }
 arena-temporal = { path = "arena-temporal" }
+arena-smtp = { path = "arena-smtp" }
 arena-executable-component = { path = "arena-executable-component" }
 arena-http = { path = "arena-http" }
 arena-oauth = { path = "arena-oauth" }

@@ -134,6 +134,8 @@ async def lifespan(app: FastAPI):
     app.state.events_client = events_client
     app.state.temporal_client = temporal_client
     app.state.temporal_task_queue = DEVICE_TASK_QUEUE
+    app.state.smtp_host = settings.smtp_host
+    app.state.smtp_port = settings.smtp_port
     yield
     try:
         await asyncio.wait_for(

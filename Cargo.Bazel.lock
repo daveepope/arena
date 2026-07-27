@@ -1,5 +1,5 @@
 {
-  "checksum": "b1edc90a2385baa7539cf4ba9e7c818da58eeddc17543e0e35653d30cb0a4798",
+  "checksum": "194bd28114daeb52d81af42753db5f9773a2099c509966eb90d141a2cc4863df",
   "crates": {
     "addr2line 0.26.1": {
       "name": "addr2line",
@@ -843,9 +843,9 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arena 3.3.0": {
+    "arena 3.4.0": {
       "name": "arena",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -911,15 +911,15 @@
           ],
           "selects": {}
         },
-        "version": "3.3.0"
+        "version": "3.4.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-container 3.3.0": {
+    "arena-container 3.4.0": {
       "name": "arena-container",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -956,7 +956,7 @@
         "deps": {
           "common": [
             {
-              "id": "arena-container 3.3.0",
+              "id": "arena-container 3.4.0",
               "target": "build_script_build"
             },
             {
@@ -980,7 +980,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "3.3.0"
+        "version": "3.4.0"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -997,9 +997,9 @@
       "license_ids": [],
       "license_file": null
     },
-    "arena-containerized-component 3.3.0": {
+    "arena-containerized-component 3.4.0": {
       "name": "arena-containerized-component",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1069,15 +1069,15 @@
           ],
           "selects": {}
         },
-        "version": "3.3.0"
+        "version": "3.4.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-examples 3.3.0": {
+    "arena-examples 3.4.0": {
       "name": "arena-examples",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1175,15 +1175,15 @@
           ],
           "selects": {}
         },
-        "version": "3.3.0"
+        "version": "3.4.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-executable-component 3.3.0": {
+    "arena-executable-component 3.4.0": {
       "name": "arena-executable-component",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1245,15 +1245,15 @@
           ],
           "selects": {}
         },
-        "version": "3.3.0"
+        "version": "3.4.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-ffi 3.3.0": {
+    "arena-ffi 3.4.0": {
       "name": "arena-ffi",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1318,15 +1318,15 @@
           ],
           "selects": {}
         },
-        "version": "3.3.0"
+        "version": "3.4.0"
       },
       "license": null,
       "license_ids": [],
       "license_file": null
     },
-    "arena-http 3.3.0": {
+    "arena-http 3.4.0": {
       "name": "arena-http",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1404,15 +1404,15 @@
           ],
           "selects": {}
         },
-        "version": "3.3.0"
+        "version": "3.4.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-kafka 3.3.0": {
+    "arena-kafka 3.4.0": {
       "name": "arena-kafka",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1482,15 +1482,15 @@
           ],
           "selects": {}
         },
-        "version": "3.3.0"
+        "version": "3.4.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-localstack 3.3.0": {
+    "arena-localstack 3.4.0": {
       "name": "arena-localstack",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1592,15 +1592,15 @@
           ],
           "selects": {}
         },
-        "version": "3.3.0"
+        "version": "3.4.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-mssql 3.3.0": {
+    "arena-mssql 3.4.0": {
       "name": "arena-mssql",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1670,15 +1670,15 @@
           ],
           "selects": {}
         },
-        "version": "3.3.0"
+        "version": "3.4.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-oauth 3.3.0": {
+    "arena-oauth 3.4.0": {
       "name": "arena-oauth",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1784,15 +1784,15 @@
           ],
           "selects": {}
         },
-        "version": "3.3.0"
+        "version": "3.4.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-postgres 3.3.0": {
+    "arena-postgres 3.4.0": {
       "name": "arena-postgres",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1858,15 +1858,15 @@
           ],
           "selects": {}
         },
-        "version": "3.3.0"
+        "version": "3.4.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-profile 3.3.0": {
+    "arena-profile 3.4.0": {
       "name": "arena-profile",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1915,15 +1915,93 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "3.3.0"
+        "version": "3.4.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-temporal 3.3.0": {
+    "arena-smtp 3.4.0": {
+      "name": "arena-smtp",
+      "version": "3.4.0",
+      "package_url": null,
+      "repository": null,
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "arena_smtp",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "arena_smtp",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "futures 0.3.32",
+              "target": "futures"
+            },
+            {
+              "id": "futures-timer 3.0.3",
+              "target": "futures_timer"
+            },
+            {
+              "id": "testcontainers-modules 0.15.0",
+              "target": "testcontainers_modules"
+            },
+            {
+              "id": "tokio 1.52.1",
+              "target": "tokio"
+            },
+            {
+              "id": "tracing 0.1.44",
+              "target": "tracing"
+            }
+          ],
+          "selects": {}
+        },
+        "deps_dev": {
+          "common": [
+            {
+              "id": "reqwest 0.12.28",
+              "target": "reqwest"
+            },
+            {
+              "id": "tracing-subscriber 0.3.23",
+              "target": "tracing_subscriber"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "proc_macro_deps": {
+          "common": [
+            {
+              "id": "async-trait 0.1.89",
+              "target": "async_trait"
+            }
+          ],
+          "selects": {}
+        },
+        "version": "3.4.0"
+      },
+      "license": "todo",
+      "license_ids": [],
+      "license_file": null
+    },
+    "arena-temporal 3.4.0": {
       "name": "arena-temporal",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -2001,7 +2079,7 @@
           ],
           "selects": {}
         },
-        "version": "3.3.0"
+        "version": "3.4.0"
       },
       "license": "todo",
       "license_ids": [],
@@ -7379,14 +7457,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "clap_complete 4.6.7": {
+    "clap_complete 4.6.8": {
       "name": "clap_complete",
-      "version": "4.6.7",
+      "version": "4.6.8",
       "package_url": "https://github.com/clap-rs/clap",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/clap_complete/4.6.7/download",
-          "sha256": "db8b397918185f0161ff3d6fcaa9e4bfc09b8367caf6e1d4a2848e5477ed027b"
+          "url": "https://static.crates.io/crates/clap_complete/4.6.8/download",
+          "sha256": "b1f84a88507dbd05c695f2cb5e8558e747179134005e9893882dec964190ed89"
         }
       },
       "targets": [
@@ -7424,7 +7502,7 @@
           "selects": {}
         },
         "edition": "2024",
-        "version": "4.6.7"
+        "version": "4.6.8"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -11025,7 +11103,7 @@
               "target": "env_filter"
             },
             {
-              "id": "jiff 0.2.34",
+              "id": "jiff 0.2.35",
               "target": "jiff"
             },
             {
@@ -16604,14 +16682,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "jiff 0.2.34": {
+    "jiff 0.2.35": {
       "name": "jiff",
-      "version": "0.2.34",
+      "version": "0.2.35",
       "package_url": "https://github.com/BurntSushi/jiff",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/jiff/0.2.34/download",
-          "sha256": "e184d09547b80eb7e20d141ba2fb1fbac843ca53f4cf1b31210adc4c1adc6e16"
+          "url": "https://static.crates.io/crates/jiff/0.2.35/download",
+          "sha256": "668b7183bd07af9a4885f5c35b0cc5c83c4607a913c16b7e17291832910d2dcc"
         }
       },
       "targets": [
@@ -16667,13 +16745,13 @@
           "selects": {
             "cfg(any())": [
               {
-                "id": "jiff-static 0.2.34",
+                "id": "jiff-static 0.2.35",
                 "target": "jiff_static"
               }
             ]
           }
         },
-        "version": "0.2.34"
+        "version": "0.2.35"
       },
       "license": "Unlicense OR MIT",
       "license_ids": [
@@ -16749,14 +16827,14 @@
       ],
       "license_file": "LICENSE-MIT"
     },
-    "jiff-static 0.2.34": {
+    "jiff-static 0.2.35": {
       "name": "jiff-static",
-      "version": "0.2.34",
+      "version": "0.2.35",
       "package_url": "https://github.com/BurntSushi/jiff",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/jiff-static/0.2.34/download",
-          "sha256": "323da076b7a6faf914dc677cb05a4b907742ff7375c8322c9e7f5061e5e0e9de"
+          "url": "https://static.crates.io/crates/jiff-static/0.2.35/download",
+          "sha256": "3a69dcb3a21cfb32ce1cd056169337ca284af0766dd766e7878819b251a49204"
         }
       },
       "targets": [
@@ -16801,7 +16879,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.2.34"
+        "version": "0.2.35"
       },
       "license": "Unlicense OR MIT",
       "license_ids": [
@@ -17998,6 +18076,52 @@
         },
         "edition": "2015",
         "version": "0.4.3"
+      },
+      "license": "BSD-2-Clause OR MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "BSD-2-Clause",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
+    "mach2 0.6.0": {
+      "name": "mach2",
+      "version": "0.6.0",
+      "package_url": "https://github.com/JohnTitor/mach2",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/mach2/0.6.0/download",
+          "sha256": "dae608c151f68243f2b000364e1f7b186d9c29845f7d2d85bd31b9ad77ad552b"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "mach2",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "mach2",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "default"
+          ],
+          "selects": {}
+        },
+        "edition": "2024",
+        "version": "0.6.0"
       },
       "license": "BSD-2-Clause OR MIT OR Apache-2.0",
       "license_ids": [
@@ -23030,6 +23154,109 @@
       ],
       "license_file": "License.md"
     },
+    "proc-maps 0.5.0": {
+      "name": "proc-maps",
+      "version": "0.5.0",
+      "package_url": "https://github.com/rbspy/proc-maps",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/proc-maps/0.5.0/download",
+          "sha256": "221de5f6ef11b9be9d59b330c5b81799b3e7c51b18af84c1f235ef88998b00e1"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "proc_maps",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        },
+        {
+          "BuildScript": {
+            "crate_name": "build_script_build",
+            "crate_root": "build.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "proc_maps",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "bindgen",
+            "default",
+            "generate-bindings"
+          ],
+          "selects": {}
+        },
+        "deps": {
+          "common": [
+            {
+              "id": "libc 0.2.189",
+              "target": "libc"
+            },
+            {
+              "id": "proc-maps 0.5.0",
+              "target": "build_script_build"
+            }
+          ],
+          "selects": {
+            "cfg(target_os = \"macos\")": [
+              {
+                "id": "anyhow 1.0.103",
+                "target": "anyhow"
+              },
+              {
+                "id": "libproc 0.14.11",
+                "target": "libproc"
+              },
+              {
+                "id": "mach2 0.6.0",
+                "target": "mach2"
+              }
+            ],
+            "cfg(windows)": [
+              {
+                "id": "winapi 0.3.9",
+                "target": "winapi"
+              }
+            ]
+          }
+        },
+        "edition": "2021",
+        "version": "0.5.0"
+      },
+      "build_script_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "compile_data_glob_excludes": [
+          "**/*.rs"
+        ],
+        "data_glob": [
+          "**"
+        ]
+      },
+      "license": "MIT",
+      "license_ids": [
+        "MIT"
+      ],
+      "license_file": "License.md"
+    },
     "prost 0.14.3": {
       "name": "prost",
       "version": "0.14.3",
@@ -23267,7 +23494,7 @@
               "target": "clap"
             },
             {
-              "id": "clap_complete 4.6.7",
+              "id": "clap_complete 4.6.8",
               "target": "clap_complete"
             },
             {
@@ -23347,7 +23574,7 @@
               "target": "regex"
             },
             {
-              "id": "remoteprocess 0.5.2",
+              "id": "remoteprocess 0.5.3",
               "target": "remoteprocess"
             },
             {
@@ -24763,14 +24990,14 @@
       ],
       "license_file": null
     },
-    "read-process-memory 0.1.6": {
+    "read-process-memory 0.2.0": {
       "name": "read-process-memory",
-      "version": "0.1.6",
+      "version": "0.2.0",
       "package_url": "https://github.com/rbspy/read-process-memory",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/read-process-memory/0.1.6/download",
-          "sha256": "8497683b2f0b6887786f1928c118f26ecc6bb3d78bbb6ed23e8e7ba110af3bb0"
+          "url": "https://static.crates.io/crates/read-process-memory/0.2.0/download",
+          "sha256": "98379bd2cb26a9ad7d0af215816348a41279285fd15e40b398af97108207a9d3"
         }
       },
       "targets": [
@@ -24806,20 +25033,20 @@
           "selects": {
             "cfg(target_os = \"macos\")": [
               {
-                "id": "mach 0.3.2",
-                "target": "mach"
+                "id": "mach2 0.6.0",
+                "target": "mach2"
               }
             ],
             "cfg(windows)": [
               {
-                "id": "winapi 0.3.9",
-                "target": "winapi"
+                "id": "windows-sys 0.61.2",
+                "target": "windows_sys"
               }
             ]
           }
         },
         "edition": "2021",
-        "version": "0.1.6"
+        "version": "0.2.0"
       },
       "license": "MIT",
       "license_ids": [
@@ -25325,14 +25552,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "remoteprocess 0.5.2": {
+    "remoteprocess 0.5.3": {
       "name": "remoteprocess",
-      "version": "0.5.2",
+      "version": "0.5.3",
       "package_url": "https://github.com/benfred/remoteprocess",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/remoteprocess/0.5.2/download",
-          "sha256": "1861c221cfbe6c963fd804eb56c64c0fa25d133b06537ac6cba7ca56085ae556"
+          "url": "https://static.crates.io/crates/remoteprocess/0.5.3/download",
+          "sha256": "1cf003a7855be186c613b65f6aa897d47e3d212e000862471b110ed662dbf438"
         }
       },
       "targets": [
@@ -25391,11 +25618,11 @@
               "target": "log"
             },
             {
-              "id": "proc-maps 0.4.0",
+              "id": "proc-maps 0.5.0",
               "target": "proc_maps"
             },
             {
-              "id": "read-process-memory 0.1.6",
+              "id": "read-process-memory 0.2.0",
               "target": "read_process_memory"
             },
             {
@@ -25403,7 +25630,7 @@
               "target": "regex"
             },
             {
-              "id": "remoteprocess 0.5.2",
+              "id": "remoteprocess 0.5.3",
               "target": "build_script_build"
             }
           ],
@@ -25453,7 +25680,7 @@
           }
         },
         "edition": "2021",
-        "version": "0.5.2"
+        "version": "0.5.3"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -34871,24 +35098,20 @@
         ],
         "crate_features": {
           "common": [
-            "basetsd",
             "consoleapi",
             "dbghelp",
             "errhandlingapi",
             "handleapi",
             "impl-default",
             "memoryapi",
-            "minwindef",
             "processenv",
             "processthreadsapi",
-            "std",
             "sysinfoapi",
             "timeapi",
             "tlhelp32",
             "winbase",
             "wincon",
-            "winerror",
-            "winnt"
+            "winerror"
           ],
           "selects": {}
         },
@@ -35540,6 +35763,8 @@
             "Win32_System",
             "Win32_System_Com",
             "Win32_System_Console",
+            "Win32_System_Diagnostics",
+            "Win32_System_Diagnostics_Debug",
             "Win32_System_IO",
             "Win32_System_LibraryLoader",
             "Win32_System_Memory",
@@ -38796,20 +39021,21 @@
   },
   "binary_crates": [],
   "workspace_members": {
-    "arena 3.3.0": "arena",
-    "arena-container 3.3.0": "arena-container",
-    "arena-containerized-component 3.3.0": "arena-containerized-component",
-    "arena-examples 3.3.0": "examples",
-    "arena-executable-component 3.3.0": "arena-executable-component",
-    "arena-ffi 3.3.0": "arena-ffi",
-    "arena-http 3.3.0": "arena-http",
-    "arena-kafka 3.3.0": "arena-kafka",
-    "arena-localstack 3.3.0": "arena-localstack",
-    "arena-mssql 3.3.0": "arena-mssql",
-    "arena-oauth 3.3.0": "arena-oauth",
-    "arena-postgres 3.3.0": "arena-postgres",
-    "arena-profile 3.3.0": "arena-profile",
-    "arena-temporal 3.3.0": "arena-temporal",
+    "arena 3.4.0": "arena",
+    "arena-container 3.4.0": "arena-container",
+    "arena-containerized-component 3.4.0": "arena-containerized-component",
+    "arena-examples 3.4.0": "examples",
+    "arena-executable-component 3.4.0": "arena-executable-component",
+    "arena-ffi 3.4.0": "arena-ffi",
+    "arena-http 3.4.0": "arena-http",
+    "arena-kafka 3.4.0": "arena-kafka",
+    "arena-localstack 3.4.0": "arena-localstack",
+    "arena-mssql 3.4.0": "arena-mssql",
+    "arena-oauth 3.4.0": "arena-oauth",
+    "arena-postgres 3.4.0": "arena-postgres",
+    "arena-profile 3.4.0": "arena-profile",
+    "arena-smtp 3.4.0": "arena-smtp",
+    "arena-temporal 3.4.0": "arena-temporal",
     "direct-cargo-bazel-deps 0.0.1": ""
   },
   "conditions": {

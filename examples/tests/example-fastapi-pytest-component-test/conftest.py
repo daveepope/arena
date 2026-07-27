@@ -41,6 +41,7 @@ from arena_pytest import (
     MssqlDependencyBuilder,
     OauthDependencyBuilder,
     PostgresDependencyBuilder,
+    SmtpDependencyBuilder,
     SqsQueueTarget,
     TemporalDependencyBuilder,
     oauth_loopback_tls_pem_pair,
@@ -53,6 +54,7 @@ from arena_config import (
     DEP_NAME_MSSQL,
     DEP_NAME_OAUTH,
     DEP_NAME_POSTGRES,
+    DEP_NAME_SMTP,
     DEP_NAME_TEMPORAL,
     EXEC_WEB_APP_PORT,
     LOCALSTACK_HOST_PORT,
@@ -68,6 +70,8 @@ from arena_config import (
     POSTGRES_DB_USER,
     POSTGRES_PORT,
     CALIBRATION_HOST_PORT,
+    SMTP_HOST_PORT,
+    SMTP_UI_PORT,
     TEMPORAL_GRPC_PORT,
     TEMPORAL_UI_PORT,
 )
@@ -254,6 +258,13 @@ def closed_arena() -> ClosedArena:
         .build()
     )
 
+    smtp = (
+        SmtpDependencyBuilder(DEP_NAME_SMTP)
+        .with_port(SMTP_HOST_PORT)
+        .with_ui_port(SMTP_UI_PORT)
+        .build()
+    )
+
     ls_id = f"ls-example-api-{uuid.uuid4().hex[:8]}"
     localstack = (
         LocalstackDependencyBuilder(ls_id)
@@ -301,6 +312,8 @@ def closed_arena() -> ClosedArena:
         .with_env_var("CALIBRATION_URL", f"http://127.0.0.1:{CALIBRATION_HOST_PORT}")
         .with_env_var("MSSQL_CONNECTION_STRING", mssql_cs)
         .with_env_var("TEMPORAL_TARGET", f"127.0.0.1:{TEMPORAL_GRPC_PORT}")
+        .with_env_var("SMTP_HOST", "127.0.0.1")
+        .with_env_var("SMTP_PORT", str(SMTP_HOST_PORT))
         .with_env_var("OAUTH_ISSUER_URL", OAUTH_ISSUER)
         .with_env_var("OAUTH_TLS_CA_FILE", str(oauth_ca_file))
         .with_env_var("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
@@ -324,6 +337,7 @@ def closed_arena() -> ClosedArena:
         .add_dependency(calibration)
         .add_dependency(localstack)
         .add_dependency(temporal)
+        .add_dependency(smtp)
         .add_component(fastapi_component)
         .register_playbook(
             CalibrationApiHappyPathPlaybook(calibration.identifier),
@@ -352,6 +366,7 @@ def closed_arena() -> ClosedArena:
             calibration.identifier,
             localstack.identifier,
             temporal.identifier,
+            smtp.identifier,
         ),
     )
 
