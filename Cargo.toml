@@ -12,6 +12,7 @@ members = [
     "arena-executable-component",
     "arena-container",
     "arena-containerized-component",
+    "arena-profile",
     "arena-ffi",
     "examples"
 ]
@@ -30,6 +31,10 @@ arena-http = { path = "arena-http" }
 arena-oauth = { path = "arena-oauth" }
 arena-container = { path = "arena-container" }
 arena-containerized-component = { path = "arena-containerized-component" }
+arena-profile = { path = "arena-profile" }
+inferno = "0.12.8"
+py-spy = "0.4.2"
+runfiles = "0.2.0"
 axum = "0.8.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

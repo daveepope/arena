@@ -10,6 +10,7 @@ pub enum BuildTool {
     Dotnet,
     Make,
     CMake,
+    Python,
     Custom { command: String, args: Vec<String> },
 }
 
@@ -22,6 +23,8 @@ pub struct ExecutableComponentBuilder {
     env_vars: Vec<(String, String)>,
     runtime_args: Vec<(String, String)>,
     readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
+    cpu_profile_output: Option<PathBuf>,
+    cpu_profile_auto_open: bool,
 }
 
 const DEFAULT_READINESS_TIMEOUT_MS: u64 = 10_000;
@@ -40,6 +43,8 @@ impl ExecutableComponentBuilder {
             env_vars: Vec::new(),
             runtime_args: Vec::new(),
             readiness_checks: Vec::new(),
+            cpu_profile_output: None,
+            cpu_profile_auto_open: false,
         }
     }
 
@@ -94,6 +99,16 @@ impl ExecutableComponentBuilder {
         self
     }
 
+    pub fn with_cpu_profile(mut self, output_path: impl Into<PathBuf>) -> Self {
+        self.cpu_profile_output = Some(output_path.into());
+        self
+    }
+
+    pub fn with_cpu_profile_auto_open(mut self) -> Self {
+        self.cpu_profile_auto_open = true;
+        self
+    }
+
     pub fn build(self) -> ExecutableComponent {
         if let (Some(ref source_path), Some(ref build_tool)) = (&self.source_path, &self.build_tool)
         {
@@ -126,11 +141,13 @@ impl ExecutableComponentBuilder {
                     ))
             };
 
-            let output = Self::execute_build(build_tool, &source_dir);
+            if !matches!(build_tool, BuildTool::Python) {
+                let output = Self::execute_build(build_tool, &source_dir);
 
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                panic!("build failed: {}", stderr);
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    panic!("build failed: {}", stderr);
+                }
             }
 
             tracing::debug!(
@@ -160,12 +177,45 @@ impl ExecutableComponentBuilder {
             }
         });
 
+        let cpu_profile_auto_open = self.cpu_profile_auto_open;
+        let cpu_profile = self.cpu_profile_output.map(|output_path| {
+            let backend = match &self.build_tool {
+                Some(BuildTool::Cargo) => arena_profile::CpuProfilerBackend::Perf,
+                Some(BuildTool::Maven) | Some(BuildTool::Gradle) => {
+                    arena_profile::CpuProfilerBackend::AsyncProfiler
+                }
+                Some(BuildTool::Python) => arena_profile::CpuProfilerBackend::PySpy,
+                Some(BuildTool::Dotnet) => panic!(
+                    "{}: .with_cpu_profile() is not supported for BuildTool::Dotnet",
+                    self.identifier
+                ),
+                Some(BuildTool::Make) => panic!(
+                    "{}: .with_cpu_profile() is not supported for BuildTool::Make",
+                    self.identifier
+                ),
+                Some(BuildTool::CMake) => panic!(
+                    "{}: .with_cpu_profile() is not supported for BuildTool::CMake",
+                    self.identifier
+                ),
+                Some(BuildTool::Custom { command, .. }) => panic!(
+                    "{}: .with_cpu_profile() is not supported for BuildTool::Custom(\"{}\")",
+                    self.identifier, command
+                ),
+                None => panic!(
+                    "{}: .with_cpu_profile() requires a build_tool of Cargo, Maven, Gradle, or Python",
+                    self.identifier
+                ),
+            };
+            (backend, output_path, cpu_profile_auto_open)
+        });
+
         let mut component = ExecutableComponent::new(self.identifier);
         component.children = self.children;
         component.executable_path = executable_path;
         component.env_vars = self.env_vars;
         component.runtime_args = self.runtime_args;
         component.readiness_checks = self.readiness_checks;
+        component.cpu_profile = cpu_profile;
         component
     }
 
@@ -205,6 +255,7 @@ impl ExecutableComponentBuilder {
                 .current_dir(source_dir)
                 .output()
                 .expect(&format!("failed to run custom build command: {}", command)),
+            BuildTool::Python => unreachable!("build() skips execute_build for BuildTool::Python"),
         }
     }
 }

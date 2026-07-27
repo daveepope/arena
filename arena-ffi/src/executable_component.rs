@@ -98,6 +98,7 @@ fn build_tool_from_config(spec: &BuildToolConfig) -> Result<BuildTool, String> {
             "dotnet" => Ok(BuildTool::Dotnet),
             "make" => Ok(BuildTool::Make),
             "cmake" => Ok(BuildTool::CMake),
+            "python" => Ok(BuildTool::Python),
             other => Err(format!("unknown build_tool '{other}'")),
         },
         BuildToolConfig::Custom { command, args } => Ok(BuildTool::Custom {

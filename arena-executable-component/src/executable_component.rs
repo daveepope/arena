@@ -1,11 +1,18 @@
 use crate::builder::ExecutableComponentBuilder;
 use arena::component::RunnableComponent;
 use arena::healthcheck::ReadinessCheck;
+use arena_profile::{AugmentedProfileSession, PreparedLaunch, ShutdownSignal, WrappedProfileSession};
 use async_trait::async_trait;
+use futures::FutureExt;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::thread;
+
+enum ActiveCpuProfile {
+    Wrapped(WrappedProfileSession),
+    ArgAugmented(AugmentedProfileSession, ShutdownSignal),
+}
 
 pub struct ExecutableComponent {
     pub(crate) identifier: String,
@@ -16,6 +23,8 @@ pub struct ExecutableComponent {
     pub(crate) process_handle: Option<Child>,
     pub(crate) stopped: bool,
     pub(crate) readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
+    pub(crate) cpu_profile: Option<(arena_profile::CpuProfilerBackend, PathBuf, bool)>,
+    active_cpu_profile: Option<ActiveCpuProfile>,
 }
 
 impl ExecutableComponent {
@@ -29,6 +38,8 @@ impl ExecutableComponent {
             process_handle: None,
             stopped: false,
             readiness_checks: Vec::new(),
+            cpu_profile: None,
+            active_cpu_profile: None,
         }
     }
 
@@ -91,27 +102,107 @@ impl ExecutableComponent {
         });
     }
 
+    fn signal_terminate(pid: u32) -> std::io::Result<()> {
+        let status = Command::new("kill").args(["-TERM", &pid.to_string()]).status()?;
+        if !status.success() {
+            return Err(std::io::Error::other(format!(
+                "kill -TERM {pid} exited with {status}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn on_cpu_profile_finished(&self, result: Result<(), arena_profile::CpuProfileError>) {
+        match result {
+            Ok(()) => {
+                tracing::debug!(
+                    component = %self.identifier,
+                    phase = "cpu_profile_finish_done",
+                    "cpu profile rendered",
+                );
+                if let Some((_, output_path, true)) = self.cpu_profile.as_ref() {
+                    if let Err(e) = arena_profile::open_report(output_path) {
+                        tracing::warn!(
+                            component = %self.identifier,
+                            error = %e,
+                            "failed to open cpu profile report",
+                        );
+                    }
+                }
+            }
+            Err(e) => tracing::error!(
+                component = %self.identifier,
+                error = %e,
+                phase = "cpu_profile_finish_failed",
+                "cpu profile finish failed",
+            ),
+        }
+    }
+
+    fn graceful_then_force_kill(child: &mut Child, signal: ShutdownSignal, identifier: &str) {
+        match signal {
+            ShutdownSignal::Kill => {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+            ShutdownSignal::Terminate => {
+                if let Err(e) = Self::signal_terminate(child.id()) {
+                    tracing::warn!(component = %identifier, error = %e, "SIGTERM failed, forcing kill");
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return;
+                }
+                if let Err(e) = arena_profile::wait_bounded(child, arena_profile::FINISH_TIMEOUT) {
+                    tracing::warn!(component = %identifier, error = %e, "graceful shutdown exceeded budget, forced kill");
+                }
+            }
+        }
+    }
+
     fn spawn_process(&mut self) -> Result<(), String> {
         let executable_path = self
             .executable_path
             .as_ref()
             .ok_or_else(|| "executable_path not configured".to_string())?;
 
+        let base_args: Vec<String> = self.runtime_args.iter().map(|(_, v)| v.clone()).collect();
+
+        let (spawn_program, spawn_args, active_profile) = if let Some((backend, output_path, _)) =
+            self.cpu_profile.as_ref()
+        {
+            let request = arena_profile::LaunchRequest {
+                program: executable_path.clone(),
+                args: base_args,
+            };
+            let prepared = arena_profile::prepare_cpu_profile(*backend, request, output_path.clone())
+                .map_err(|e| format!("cpu profiler preparation failed: {}", e))?;
+            match prepared {
+                PreparedLaunch::Wrapped { program, args, session } => {
+                    (program, args, Some(ActiveCpuProfile::Wrapped(session)))
+                }
+                PreparedLaunch::ArgsAugmented { args, shutdown_signal, session } => {
+                    (executable_path.clone(), args, Some(ActiveCpuProfile::ArgAugmented(session, shutdown_signal)))
+                }
+            }
+        } else {
+            (executable_path.clone(), base_args, None)
+        };
+
         tracing::debug!(
             component = %self.identifier,
-            executable_path = ?executable_path,
+            spawn_program = ?spawn_program,
             phase = "spawn_begin",
             "spawning child process",
         );
 
-        let mut cmd = Command::new(executable_path);
+        let mut cmd = Command::new(&spawn_program);
 
         for (key, value) in &self.env_vars {
             cmd.env(key, value);
         }
 
-        for (_key, value) in &self.runtime_args {
-            cmd.arg(value);
+        for arg in &spawn_args {
+            cmd.arg(arg);
         }
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
@@ -120,13 +211,14 @@ impl ExecutableComponent {
             .spawn()
             .map_err(|e| format!("failed to spawn process: {}", e))?;
 
-        let pid = child.id();
         tracing::debug!(
             component = %self.identifier,
-            pid,
+            pid = child.id(),
             phase = "spawned",
             "child process spawned",
         );
+
+        self.active_cpu_profile = active_profile;
 
         if let Some(stdout) = child.stdout.take() {
             Self::spawn_output_reader(stdout, self.identifier.clone());
@@ -161,7 +253,13 @@ impl RunnableComponent for ExecutableComponent {
             }
         }
 
-        self.wait_until_ready().await;
+        let readiness_result = std::panic::AssertUnwindSafe(self.wait_until_ready())
+            .catch_unwind()
+            .await;
+        if let Err(panic_payload) = readiness_result {
+            self.stop().await;
+            std::panic::resume_unwind(panic_payload);
+        }
 
         tracing::debug!(
             component = %self.identifier,
@@ -182,14 +280,45 @@ impl RunnableComponent for ExecutableComponent {
         );
 
         if let Some(mut child) = self.process_handle.take() {
-            tracing::debug!(
-                component = %self.identifier,
-                pid = child.id(),
-                phase = "kill_begin",
-                "killing child process",
-            );
-            let _ = child.kill();
-            let _ = child.wait();
+            match self.active_cpu_profile.take() {
+                Some(ActiveCpuProfile::Wrapped(session)) => {
+                    tracing::debug!(
+                        component = %self.identifier,
+                        phase = "cpu_profile_finish_begin",
+                        "finishing cpu profile",
+                    );
+                    let result = session.finish(&mut child);
+                    self.on_cpu_profile_finished(result);
+                    let _ = child.wait();
+                }
+                Some(ActiveCpuProfile::ArgAugmented(session, shutdown_signal)) => {
+                    tracing::debug!(
+                        component = %self.identifier,
+                        pid = child.id(),
+                        phase = "kill_begin",
+                        "stopping child process",
+                    );
+                    Self::graceful_then_force_kill(&mut child, shutdown_signal, &self.identifier);
+
+                    tracing::debug!(
+                        component = %self.identifier,
+                        phase = "cpu_profile_finish_begin",
+                        "finishing cpu profile",
+                    );
+                    let result = session.finish();
+                    self.on_cpu_profile_finished(result);
+                }
+                None => {
+                    tracing::debug!(
+                        component = %self.identifier,
+                        pid = child.id(),
+                        phase = "kill_begin",
+                        "killing child process",
+                    );
+                    let _ = child.kill();
+                    let _ = child.wait();
+                }
+            }
         }
 
         tracing::debug!(
