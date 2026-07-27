@@ -151,6 +151,7 @@ dependencies = [
  "arena-mssql",
  "arena-oauth",
  "arena-postgres",
+ "arena-smtp",
  "arena-temporal",
  "async-trait",
  "reqwest",
@@ -269,6 +270,22 @@ dependencies = [
  "async-trait",
  "futures",
  "postgres",
+ "testcontainers-modules",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "arena-smtp"
+version = "3.3.0"
+dependencies = [
+ "arena",
+ "arena-container",
+ "async-trait",
+ "futures",
+ "futures-timer",
+ "reqwest",
  "testcontainers-modules",
  "tokio",
  "tracing",

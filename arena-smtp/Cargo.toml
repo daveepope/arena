@@ -1,0 +1,22 @@
+[package]
+name = "arena-smtp"
+version.workspace = true
+edition = "2021"
+authors = ["David Pope"]
+description = "Arena SMTP implementation"
+license = "todo"
+
+[dependencies]
+arena = { workspace = true }
+arena-container = { workspace = true }
+async-trait = { workspace = true }
+testcontainers-modules = { workspace = true }
+tracing = { workspace = true }
+futures = { workspace = true }
+futures-timer = { workspace = true }
+tokio = { workspace = true, features = ["macros", "net", "io-util", "time"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "net", "io-util"] }
+tracing-subscriber = { workspace = true }
+reqwest = { workspace = true }

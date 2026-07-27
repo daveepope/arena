@@ -1,5 +1,5 @@
 {
-  "checksum": "82a65bf8bb975a3f57a32c317533509e55e877fb6a371b6c3b46f7757977e93e",
+  "checksum": "df0919b7e1278caf27bd36819e7951d171ea360b61e50f6573da4428cd3b1dc1",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -1352,6 +1352,84 @@
             {
               "id": "tokio 1.52.1",
               "target": "tokio"
+            },
+            {
+              "id": "tracing-subscriber 0.3.23",
+              "target": "tracing_subscriber"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "proc_macro_deps": {
+          "common": [
+            {
+              "id": "async-trait 0.1.89",
+              "target": "async_trait"
+            }
+          ],
+          "selects": {}
+        },
+        "version": "3.3.0"
+      },
+      "license": "todo",
+      "license_ids": [],
+      "license_file": null
+    },
+    "arena-smtp 3.3.0": {
+      "name": "arena-smtp",
+      "version": "3.3.0",
+      "package_url": null,
+      "repository": null,
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "arena_smtp",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "arena_smtp",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "futures 0.3.32",
+              "target": "futures"
+            },
+            {
+              "id": "futures-timer 3.0.3",
+              "target": "futures_timer"
+            },
+            {
+              "id": "testcontainers-modules 0.15.0",
+              "target": "testcontainers_modules"
+            },
+            {
+              "id": "tokio 1.52.1",
+              "target": "tokio"
+            },
+            {
+              "id": "tracing 0.1.44",
+              "target": "tracing"
+            }
+          ],
+          "selects": {}
+        },
+        "deps_dev": {
+          "common": [
+            {
+              "id": "reqwest 0.12.28",
+              "target": "reqwest"
             },
             {
               "id": "tracing-subscriber 0.3.23",
@@ -33203,6 +33281,7 @@
     "arena-mssql 3.3.0": "arena-mssql",
     "arena-oauth 3.3.0": "arena-oauth",
     "arena-postgres 3.3.0": "arena-postgres",
+    "arena-smtp 3.3.0": "arena-smtp",
     "arena-temporal 3.3.0": "arena-temporal"
   },
   "conditions": {

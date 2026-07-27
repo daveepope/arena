@@ -32,3 +32,8 @@ tag = "4.14.0"
 id = "temporal"
 image = "temporalio/temporal"
 tag = "1.8.0"
+
+[[image]]
+id = "smtp"
+image = "axllent/mailpit"
+tag = "v1.30.5"

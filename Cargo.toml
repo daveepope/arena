@@ -9,6 +9,7 @@ members = [
     "arena-http",
     "arena-oauth",
     "arena-temporal",
+    "arena-smtp",
     "arena-executable-component",
     "arena-container",
     "arena-containerized-component",
@@ -25,6 +26,7 @@ arena-localstack = { path = "arena-localstack" }
 arena-postgres = { path = "arena-postgres" }
 arena-mssql = { path = "arena-mssql" }
 arena-temporal = { path = "arena-temporal" }
+arena-smtp = { path = "arena-smtp" }
 arena-executable-component = { path = "arena-executable-component" }
 arena-http = { path = "arena-http" }
 arena-oauth = { path = "arena-oauth" }
