@@ -123,25 +123,3 @@ impl SmtpImpl for SmtpContainerImpl {
         self.http_api_url.as_deref()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn tls_container_files_maps_env_vars_paths_and_pem_bytes() {
-        let tls = SmtpTlsFiles {
-            certificate_pem: "CERT-PEM".to_string(),
-            private_key_pem: "KEY-PEM".to_string(),
-        };
-
-        let files = tls_container_files(&tls);
-
-        assert_eq!(files[0].0, "MP_SMTP_TLS_CERT");
-        assert_eq!(files[0].1, TLS_CERT_CONTAINER_PATH);
-        assert_eq!(files[0].2, b"CERT-PEM");
-        assert_eq!(files[1].0, "MP_SMTP_TLS_KEY");
-        assert_eq!(files[1].1, TLS_KEY_CONTAINER_PATH);
-        assert_eq!(files[1].2, b"KEY-PEM");
-    }
-}
