@@ -201,11 +201,7 @@ impl ExecutableComponentBuilder {
                 .current_dir(source_dir)
                 .output()
                 .expect("failed to run cmake"),
-            BuildTool::Bazel { target, args } => std::process::Command::new("bazel")
-                .arg("build")
-                .args(args)
-                .arg(target)
-                .current_dir(source_dir)
+            BuildTool::Bazel { target, args } => Self::build_bazel_command(source_dir, target, args)
                 .output()
                 .expect("failed to run bazel build"),
             BuildTool::Custom { command, args } => std::process::Command::new(command)
@@ -214,5 +210,37 @@ impl ExecutableComponentBuilder {
                 .output()
                 .expect(&format!("failed to run custom build command: {}", command)),
         }
+    }
+
+    fn build_bazel_command(
+        source_dir: &PathBuf,
+        target: &str,
+        args: &[String],
+    ) -> std::process::Command {
+        let mut cmd = std::process::Command::new("bazel");
+        cmd.arg("build").args(args).arg(target).current_dir(source_dir);
+        cmd
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_bazel_command_target_and_args_returns_bazel_build_invocation() {
+        let source_dir = PathBuf::from("/tmp/example-source");
+        let args = vec!["--config=ci".to_string()];
+
+        let cmd = ExecutableComponentBuilder::build_bazel_command(
+            &source_dir,
+            "//foo:bar",
+            &args,
+        );
+
+        assert_eq!(cmd.get_program(), "bazel");
+        let cmd_args: Vec<&str> = cmd.get_args().map(|a| a.to_str().unwrap()).collect();
+        assert_eq!(cmd_args, vec!["build", "--config=ci", "//foo:bar"]);
+        assert_eq!(cmd.get_current_dir(), Some(source_dir.as_path()));
     }
 }

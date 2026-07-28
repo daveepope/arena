@@ -1,4 +1,4 @@
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@crates//:defs.bzl", "all_crate_deps")
 
 rust_library(
@@ -11,4 +11,11 @@ rust_library(
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
+)
+
+rust_test(
+    name = "executable_component_lib_unit_test",
+    crate = ":arena_executable_component",
+    size = "small",
+    edition = "2021",
 )
