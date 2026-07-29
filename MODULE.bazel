@@ -92,6 +92,7 @@ arena_java_maven.install(
         "org.springframework.boot:spring-boot-starter-jdbc:3.5.3",
         "org.springframework.boot:spring-boot-starter-validation:3.5.3",
         "org.springframework.boot:spring-boot-starter-oauth2-resource-server:3.5.3",
+        "org.springframework.boot:spring-boot-starter-mail:3.5.3",
         "org.postgresql:postgresql:42.7.12",
         "com.microsoft.sqlserver:mssql-jdbc:12.8.2.jre11",
         "software.amazon.awssdk:eventbridge:2.29.29",

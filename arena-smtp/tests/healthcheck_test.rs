@@ -60,6 +60,38 @@ async fn default_readiness_check_accepts_real_smtp_banner() {
 }
 
 #[tokio::test]
+async fn default_readiness_check_implicit_tls_ready_without_banner() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap().to_string();
+
+    tokio::spawn(async move {
+        loop {
+            match listener.accept().await {
+                Ok((socket, _)) => {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    drop(socket);
+                }
+                Err(_) => break,
+            }
+        }
+    });
+
+    let mut dep = SmtpDependency::builder("smtp-implicit-tls-ready")
+        .with_implicit_tls()
+        .with_impl(FixedAddressSmtpImpl {
+            smtp_address: addr,
+            http_api_url: "http://127.0.0.1:8025".to_string(),
+        })
+        .build();
+
+    tokio::time::timeout(Duration::from_secs(5), dep.start())
+        .await
+        .expect("implicit tls readiness should complete on connect without a banner");
+
+    dep.stop().await;
+}
+
+#[tokio::test]
 async fn default_readiness_check_retries_after_dropped_connection() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap().to_string();
