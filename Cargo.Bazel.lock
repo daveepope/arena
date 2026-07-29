@@ -1,5 +1,5 @@
 {
-  "checksum": "194bd28114daeb52d81af42753db5f9773a2099c509966eb90d141a2cc4863df",
+  "checksum": "10b7e5309041b00e050d05f3e7dcaec1a3114df5d9624a00f569b6af8208d392",
   "crates": {
     "addr2line 0.26.1": {
       "name": "addr2line",
@@ -843,9 +843,9 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arena 3.4.0": {
+    "arena 3.5.0": {
       "name": "arena",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -911,15 +911,15 @@
           ],
           "selects": {}
         },
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-container 3.4.0": {
+    "arena-container 3.5.0": {
       "name": "arena-container",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -956,7 +956,7 @@
         "deps": {
           "common": [
             {
-              "id": "arena-container 3.4.0",
+              "id": "arena-container 3.5.0",
               "target": "build_script_build"
             },
             {
@@ -980,7 +980,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -997,9 +997,9 @@
       "license_ids": [],
       "license_file": null
     },
-    "arena-containerized-component 3.4.0": {
+    "arena-containerized-component 3.5.0": {
       "name": "arena-containerized-component",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1069,15 +1069,55 @@
           ],
           "selects": {}
         },
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-examples 3.4.0": {
+    "arena-cryptography 3.5.0": {
+      "name": "arena-cryptography",
+      "version": "3.5.0",
+      "package_url": null,
+      "repository": null,
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "arena_cryptography",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "arena_cryptography",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "rcgen 0.14.7",
+              "target": "rcgen"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "3.5.0"
+      },
+      "license": "todo",
+      "license_ids": [],
+      "license_file": null
+    },
+    "arena-examples 3.5.0": {
       "name": "arena-examples",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1175,15 +1215,15 @@
           ],
           "selects": {}
         },
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-executable-component 3.4.0": {
+    "arena-executable-component 3.5.0": {
       "name": "arena-executable-component",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1245,15 +1285,15 @@
           ],
           "selects": {}
         },
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-ffi 3.4.0": {
+    "arena-ffi 3.5.0": {
       "name": "arena-ffi",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1318,15 +1358,15 @@
           ],
           "selects": {}
         },
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "license": null,
       "license_ids": [],
       "license_file": null
     },
-    "arena-http 3.4.0": {
+    "arena-http 3.5.0": {
       "name": "arena-http",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1404,15 +1444,15 @@
           ],
           "selects": {}
         },
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-kafka 3.4.0": {
+    "arena-kafka 3.5.0": {
       "name": "arena-kafka",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1482,15 +1522,15 @@
           ],
           "selects": {}
         },
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-localstack 3.4.0": {
+    "arena-localstack 3.5.0": {
       "name": "arena-localstack",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1592,15 +1632,15 @@
           ],
           "selects": {}
         },
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-mssql 3.4.0": {
+    "arena-mssql 3.5.0": {
       "name": "arena-mssql",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1670,15 +1710,15 @@
           ],
           "selects": {}
         },
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-oauth 3.4.0": {
+    "arena-oauth 3.5.0": {
       "name": "arena-oauth",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1725,10 +1765,6 @@
             {
               "id": "rand 0.8.6",
               "target": "rand"
-            },
-            {
-              "id": "rcgen 0.14.7",
-              "target": "rcgen"
             },
             {
               "id": "reqwest 0.12.28",
@@ -1784,15 +1820,15 @@
           ],
           "selects": {}
         },
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-postgres 3.4.0": {
+    "arena-postgres 3.5.0": {
       "name": "arena-postgres",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1858,15 +1894,15 @@
           ],
           "selects": {}
         },
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-profile 3.4.0": {
+    "arena-profile 3.5.0": {
       "name": "arena-profile",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1915,15 +1951,15 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-smtp 3.4.0": {
+    "arena-smtp 3.5.0": {
       "name": "arena-smtp",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1993,15 +2029,15 @@
           ],
           "selects": {}
         },
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-temporal 3.4.0": {
+    "arena-temporal 3.5.0": {
       "name": "arena-temporal",
-      "version": "3.4.0",
+      "version": "3.5.0",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -2079,7 +2115,7 @@
           ],
           "selects": {}
         },
-        "version": "3.4.0"
+        "version": "3.5.0"
       },
       "license": "todo",
       "license_ids": [],
@@ -5663,7 +5699,7 @@
               "target": "cexpr"
             },
             {
-              "id": "clang-sys 1.8.1",
+              "id": "clang-sys 1.9.1",
               "target": "clang_sys"
             },
             {
@@ -5713,7 +5749,7 @@
         "link_deps": {
           "common": [
             {
-              "id": "clang-sys 1.8.1",
+              "id": "clang-sys 1.9.1",
               "target": "clang_sys"
             }
           ],
@@ -5788,7 +5824,7 @@
               "target": "cexpr"
             },
             {
-              "id": "clang-sys 1.8.1",
+              "id": "clang-sys 1.9.1",
               "target": "clang_sys"
             },
             {
@@ -5838,7 +5874,7 @@
         "link_deps": {
           "common": [
             {
-              "id": "clang-sys 1.8.1",
+              "id": "clang-sys 1.9.1",
               "target": "clang_sys"
             }
           ],
@@ -7196,14 +7232,14 @@
       ],
       "license_file": "LICENSE.txt"
     },
-    "clang-sys 1.8.1": {
+    "clang-sys 1.9.1": {
       "name": "clang-sys",
-      "version": "1.8.1",
+      "version": "1.9.1",
       "package_url": "https://github.com/KyleMayes/clang-sys",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/clang-sys/1.8.1/download",
-          "sha256": "0b023947811758c97c59bf9d1c188fd619ad4718dcaa767947df1cadb14f39f4"
+          "url": "https://static.crates.io/crates/clang-sys/1.9.1/download",
+          "sha256": "157a8ba7b480713b56f4c09fd13fc3e0a22a5dfab8097ba61cbc5feef950788a"
         }
       },
       "targets": [
@@ -7260,7 +7296,7 @@
         "deps": {
           "common": [
             {
-              "id": "clang-sys 1.8.1",
+              "id": "clang-sys 1.9.1",
               "target": "build_script_build"
             },
             {
@@ -7279,7 +7315,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "1.8.1"
+        "version": "1.9.1"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -39021,21 +39057,22 @@
   },
   "binary_crates": [],
   "workspace_members": {
-    "arena 3.4.0": "arena",
-    "arena-container 3.4.0": "arena-container",
-    "arena-containerized-component 3.4.0": "arena-containerized-component",
-    "arena-examples 3.4.0": "examples",
-    "arena-executable-component 3.4.0": "arena-executable-component",
-    "arena-ffi 3.4.0": "arena-ffi",
-    "arena-http 3.4.0": "arena-http",
-    "arena-kafka 3.4.0": "arena-kafka",
-    "arena-localstack 3.4.0": "arena-localstack",
-    "arena-mssql 3.4.0": "arena-mssql",
-    "arena-oauth 3.4.0": "arena-oauth",
-    "arena-postgres 3.4.0": "arena-postgres",
-    "arena-profile 3.4.0": "arena-profile",
-    "arena-smtp 3.4.0": "arena-smtp",
-    "arena-temporal 3.4.0": "arena-temporal",
+    "arena 3.5.0": "arena",
+    "arena-container 3.5.0": "arena-container",
+    "arena-containerized-component 3.5.0": "arena-containerized-component",
+    "arena-cryptography 3.5.0": "arena-cryptography",
+    "arena-examples 3.5.0": "examples",
+    "arena-executable-component 3.5.0": "arena-executable-component",
+    "arena-ffi 3.5.0": "arena-ffi",
+    "arena-http 3.5.0": "arena-http",
+    "arena-kafka 3.5.0": "arena-kafka",
+    "arena-localstack 3.5.0": "arena-localstack",
+    "arena-mssql 3.5.0": "arena-mssql",
+    "arena-oauth 3.5.0": "arena-oauth",
+    "arena-postgres 3.5.0": "arena-postgres",
+    "arena-profile 3.5.0": "arena-profile",
+    "arena-smtp 3.5.0": "arena-smtp",
+    "arena-temporal 3.5.0": "arena-temporal",
     "direct-cargo-bazel-deps 0.0.1": ""
   },
   "conditions": {

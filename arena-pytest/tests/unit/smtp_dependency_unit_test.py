@@ -7,6 +7,17 @@ def test_build_minimal_name_serializes_type_and_identifier():
     assert config["identifier"].startswith("arena-smtp-smtp-")
     assert "image" not in config
     assert "port" not in config
+    assert "tls_mode" not in config
+
+
+def test_with_starttls_sets_starttls_mode():
+    config = SmtpDependencyBuilder("smtp").with_starttls().build()._for_ffi()
+    assert config["tls_mode"] == "starttls"
+
+
+def test_with_implicit_tls_sets_implicit_mode():
+    config = SmtpDependencyBuilder("smtp").with_implicit_tls().build()._for_ffi()
+    assert config["tls_mode"] == "implicit"
 
 
 def test_build_with_overrides_serializes_configured_fields():

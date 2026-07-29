@@ -8,9 +8,17 @@ rust_library(
     deps = all_crate_deps(normal = True) + [
         "//arena",
         "//arena-container:arena_container",
+        "//arena-cryptography:arena_cryptography",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
+)
+
+rust_test(
+    name = "arena_smtp_lib_unit_test",
+    crate = ":arena_smtp",
+    size = "small",
+    edition = "2021",
 )
 
 rust_test(

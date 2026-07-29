@@ -12,6 +12,7 @@ members = [
     "arena-smtp",
     "arena-executable-component",
     "arena-container",
+    "arena-cryptography",
     "arena-containerized-component",
     "arena-profile",
     "arena-ffi",
@@ -19,7 +20,7 @@ members = [
 ]
 
 [workspace.package]
-version = "3.4.0"
+version = "3.5.0"
 [workspace.dependencies]
 arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }
@@ -32,6 +33,7 @@ arena-executable-component = { path = "arena-executable-component" }
 arena-http = { path = "arena-http" }
 arena-oauth = { path = "arena-oauth" }
 arena-container = { path = "arena-container" }
+arena-cryptography = { path = "arena-cryptography" }
 arena-containerized-component = { path = "arena-containerized-component" }
 arena-profile = { path = "arena-profile" }
 inferno = "0.12.8"

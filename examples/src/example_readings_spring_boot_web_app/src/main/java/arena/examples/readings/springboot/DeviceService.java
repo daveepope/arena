@@ -20,11 +20,15 @@ public class DeviceService {
 
   private final JdbcTemplate pg;
   private final DeviceWorkflowClientFactory workflows;
+  private final ProvisionedEmailSender provisionedEmailSender;
 
   public DeviceService(
-      @Qualifier("postgresJdbcTemplate") JdbcTemplate pg, DeviceWorkflowClientFactory workflows) {
+      @Qualifier("postgresJdbcTemplate") JdbcTemplate pg,
+      DeviceWorkflowClientFactory workflows,
+      ProvisionedEmailSender provisionedEmailSender) {
     this.pg = pg;
     this.workflows = workflows;
+    this.provisionedEmailSender = provisionedEmailSender;
   }
 
   public List<DeviceRow> listDevices() {
@@ -46,6 +50,10 @@ public class DeviceService {
       pg.update("delete from instrument_reading.device where id = ?", id);
       throw new ResponseStatusException(
           HttpStatus.BAD_GATEWAY, "failed to start device workflow for device " + id, e);
+    }
+    try {
+      provisionedEmailSender.sendDeviceProvisionedEmail(id, req.name());
+    } catch (RuntimeException ignored) {
     }
     return new CreateDeviceResponse(id, req.name());
   }

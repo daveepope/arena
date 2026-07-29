@@ -9,6 +9,19 @@ use async_trait::async_trait;
 use futures_timer::Delay;
 use std::time::{Duration, Instant};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SmtpTlsMode {
+    StartTls,
+    Implicit,
+}
+
+#[derive(Debug, Clone)]
+pub struct SmtpTlsConfig {
+    pub mode: SmtpTlsMode,
+    pub certificate_pem: String,
+    pub private_key_pem: String,
+}
+
 #[async_trait]
 pub trait SmtpImpl: Send + Sync {
     async fn start(
@@ -18,6 +31,7 @@ pub trait SmtpImpl: Send + Sync {
         image_name: &str,
         image_tag: &str,
         container_name: &str,
+        tls: Option<&SmtpTlsConfig>,
     );
     async fn stop(&mut self);
     fn smtp_address(&self) -> Option<&str>;
@@ -36,6 +50,7 @@ pub struct SmtpDependency {
     image_name: String,
     image_tag: String,
     container_name: Option<String>,
+    active_tls: Option<SmtpTlsConfig>,
     readiness_check: Box<dyn ReadinessCheck>,
 }
 
@@ -50,7 +65,23 @@ impl SmtpDependency {
         image_name: String,
         image_tag: String,
         container_name: Option<String>,
+        tls_mode: Option<SmtpTlsMode>,
     ) -> Self {
+        let active_tls = tls_mode.map(|mode| {
+            let (certificate_pem, private_key_pem) =
+                arena_cryptography::ephemeral_tls::localhost_self_signed_pem_pair().unwrap_or_else(
+                    |e| panic!("[Smtp-{identifier}] ephemeral TLS certificate generation failed: {e}"),
+                );
+            SmtpTlsConfig {
+                mode,
+                certificate_pem,
+                private_key_pem,
+            }
+        });
+        let implicit_tls = matches!(
+            active_tls.as_ref().map(|tls| tls.mode),
+            Some(SmtpTlsMode::Implicit)
+        );
         Self {
             identifier,
             smtp_impl,
@@ -60,10 +91,11 @@ impl SmtpDependency {
             image_name,
             image_tag,
             container_name,
+            active_tls,
             running: false,
             needs_teardown: false,
             children_started: false,
-            readiness_check: Box::new(DefaultSmtpReadinessCheck),
+            readiness_check: Box::new(DefaultSmtpReadinessCheck::new(implicit_tls)),
         }
     }
 
@@ -180,6 +212,7 @@ impl RunnableDependency for SmtpDependency {
                 &image_name,
                 &image_tag,
                 &container_name,
+                self.active_tls.as_ref(),
             )
             .await;
         tracing::debug!(
@@ -277,6 +310,7 @@ impl RunnableDependency for SmtpDependency {
                 &image_name,
                 &image_tag,
                 &container_name,
+                self.active_tls.as_ref(),
             )
             .await;
         self.wait_until_ready().await;

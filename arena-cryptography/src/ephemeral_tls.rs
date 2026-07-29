@@ -17,7 +17,7 @@ pub fn localhost_self_signed_pem_pair() -> Result<(String, String), String> {
     params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
 
     let mut dn = DistinguishedName::new();
-    dn.push(DnType::CommonName, "arena-oauth-ephemeral");
+    dn.push(DnType::CommonName, "arena-ephemeral");
     params.distinguished_name = dn;
 
     let cert = params

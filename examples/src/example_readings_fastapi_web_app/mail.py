@@ -1,4 +1,5 @@
 import smtplib
+import ssl
 from email.message import EmailMessage
 
 
@@ -15,5 +16,9 @@ def send_device_provisioned_email(
     message.set_content(
         f"Device {device_name} (id={device_id}) has been provisioned."
     )
+    tls_context = ssl.create_default_context()
+    tls_context.check_hostname = False
+    tls_context.verify_mode = ssl.CERT_NONE
     with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as client:
+        client.starttls(context=tls_context)
         client.send_message(message)

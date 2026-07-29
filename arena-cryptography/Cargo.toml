@@ -1,0 +1,13 @@
+[package]
+name = "arena-cryptography"
+version.workspace = true
+edition = "2021"
+authors = ["David Pope"]
+description = "Shared cryptographic helpers for Arena modules (ephemeral self-signed TLS material, etc.)."
+license = "todo"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+rcgen = { workspace = true }
