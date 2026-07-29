@@ -8,7 +8,7 @@ fn minimal_smtp_config() -> SmtpDependencyConfig {
         port: None,
         ui_port: None,
         container_name: None,
-        starttls: false,
+        tls_mode: None,
     }
 }
 
@@ -25,6 +25,20 @@ fn build_image_and_port_overrides_apply() {
     config.port = Some(11025);
     config.ui_port = Some(18025);
     config.container_name = Some("smtp-box".to_string());
-    config.starttls = true;
+    config.tls_mode = Some("starttls".to_string());
     assert!(build(&config, Some("arena-net")).is_ok());
+}
+
+#[test]
+fn build_implicit_tls_mode_returns_dependency() {
+    let mut config = minimal_smtp_config();
+    config.tls_mode = Some("implicit".to_string());
+    assert!(build(&config, None).is_ok());
+}
+
+#[test]
+fn build_unknown_tls_mode_returns_error() {
+    let mut config = minimal_smtp_config();
+    config.tls_mode = Some("mtls".to_string());
+    assert!(build(&config, None).is_err());
 }

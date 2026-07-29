@@ -31,7 +31,11 @@ class SmtpDependencyBuilder:
         return self
 
     def with_starttls(self) -> "SmtpDependencyBuilder":
-        self._config["starttls"] = True
+        self._config["tls_mode"] = "starttls"
+        return self
+
+    def with_implicit_tls(self) -> "SmtpDependencyBuilder":
+        self._config["tls_mode"] = "implicit"
         return self
 
     def build(self) -> "SmtpDependency":

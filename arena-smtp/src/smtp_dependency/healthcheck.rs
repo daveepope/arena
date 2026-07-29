@@ -5,7 +5,15 @@ use std::time::{Duration, Instant};
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 
-pub(super) struct DefaultSmtpReadinessCheck;
+pub(super) struct DefaultSmtpReadinessCheck {
+    implicit_tls: bool,
+}
+
+impl DefaultSmtpReadinessCheck {
+    pub(super) fn new(implicit_tls: bool) -> Self {
+        Self { implicit_tls }
+    }
+}
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -22,7 +30,7 @@ impl ReadinessCheck for DefaultSmtpReadinessCheck {
         let start = Instant::now();
 
         loop {
-            match probe_once(smtp_address).await {
+            match probe_once(smtp_address, self.implicit_tls).await {
                 Ok(()) => return Ok(()),
                 Err(err) => {
                     if start.elapsed() >= timeout {
@@ -44,11 +52,15 @@ impl ReadinessCheck for DefaultSmtpReadinessCheck {
     }
 }
 
-async fn probe_once(smtp_address: &str) -> Result<(), String> {
+async fn probe_once(smtp_address: &str, implicit_tls: bool) -> Result<(), String> {
     let mut stream = tokio::time::timeout(PROBE_TIMEOUT, TcpStream::connect(smtp_address))
         .await
         .map_err(|_| "connect timed out".to_string())?
         .map_err(|err| err.to_string())?;
+
+    if implicit_tls {
+        return Ok(());
+    }
 
     let mut buffer = [0u8; 3];
     tokio::time::timeout(PROBE_TIMEOUT, stream.read_exact(&mut buffer))

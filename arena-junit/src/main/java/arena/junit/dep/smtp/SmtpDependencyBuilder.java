@@ -40,7 +40,12 @@ public final class SmtpDependencyBuilder {
   }
 
   public SmtpDependencyBuilder withStarttls() {
-    config.put("starttls", true);
+    config.put("tls_mode", "starttls");
+    return this;
+  }
+
+  public SmtpDependencyBuilder withImplicitTls() {
+    config.put("tls_mode", "implicit");
     return this;
   }
 

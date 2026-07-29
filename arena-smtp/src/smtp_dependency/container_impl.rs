@@ -1,4 +1,4 @@
-use crate::smtp_dependency::{SmtpImpl, SmtpTlsFiles};
+use crate::smtp_dependency::{SmtpImpl, SmtpTlsConfig, SmtpTlsMode};
 use async_trait::async_trait;
 use testcontainers_modules::testcontainers::core::ContainerPort;
 use testcontainers_modules::testcontainers::ImageExt;
@@ -11,7 +11,7 @@ const UI_CONTAINER_PORT: u16 = 8025;
 const TLS_CERT_CONTAINER_PATH: &str = "/tmp/arena-smtp-tls-cert.pem";
 const TLS_KEY_CONTAINER_PATH: &str = "/tmp/arena-smtp-tls-key.pem";
 
-fn tls_container_files(tls: &SmtpTlsFiles) -> [(&'static str, &'static str, Vec<u8>); 2] {
+fn tls_container_files(tls: &SmtpTlsConfig) -> [(&'static str, &'static str, Vec<u8>); 2] {
     [
         (
             "MP_SMTP_TLS_CERT",
@@ -53,7 +53,7 @@ impl SmtpImpl for SmtpContainerImpl {
         image_name: &str,
         image_tag: &str,
         container_name: &str,
-        tls: Option<&SmtpTlsFiles>,
+        tls: Option<&SmtpTlsConfig>,
     ) {
         if self.container.is_some() {
             return;
@@ -76,6 +76,9 @@ impl SmtpImpl for SmtpContainerImpl {
         if let Some(tls) = tls {
             for (env_var, path, bytes) in tls_container_files(tls) {
                 request = request.with_env_var(env_var, path).with_copy_to(path, bytes);
+            }
+            if tls.mode == SmtpTlsMode::Implicit {
+                request = request.with_env_var("MP_SMTP_REQUIRE_TLS", "true");
             }
         }
 

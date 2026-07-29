@@ -1,5 +1,5 @@
 use crate::smtp_dependency::container_impl::SmtpContainerImpl;
-use crate::smtp_dependency::{SmtpDependency, SmtpImpl};
+use crate::smtp_dependency::{SmtpDependency, SmtpImpl, SmtpTlsMode};
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
 
@@ -13,7 +13,7 @@ pub struct SmtpDependencyBuilder {
     image_tag: Option<String>,
     container_name: Option<String>,
     network: Option<String>,
-    starttls: bool,
+    tls_mode: Option<SmtpTlsMode>,
     readiness_check: Option<Box<dyn ReadinessCheck>>,
 }
 
@@ -32,7 +32,7 @@ impl SmtpDependencyBuilder {
             image_tag: None,
             container_name: None,
             network: None,
-            starttls: false,
+            tls_mode: None,
             readiness_check: None,
         }
     }
@@ -88,7 +88,12 @@ impl SmtpDependencyBuilder {
     }
 
     pub fn with_starttls(mut self) -> Self {
-        self.starttls = true;
+        self.tls_mode = Some(SmtpTlsMode::StartTls);
+        self
+    }
+
+    pub fn with_implicit_tls(mut self) -> Self {
+        self.tls_mode = Some(SmtpTlsMode::Implicit);
         self
     }
 
@@ -127,7 +132,7 @@ impl SmtpDependencyBuilder {
             image_name,
             image_tag,
             self.container_name,
-            self.starttls,
+            self.tls_mode,
         );
 
         if let Some(check) = self.readiness_check {

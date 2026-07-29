@@ -17,13 +17,19 @@ final class SmtpDependencyBuilderSerializationTest {
     assertTrue(config.path("identifier").asText().startsWith("arena-smtp-smtp-"));
     assertFalse(config.has("image"));
     assertFalse(config.has("port"));
-    assertFalse(config.has("starttls"));
+    assertFalse(config.has("tls_mode"));
   }
 
   @Test
-  void withStarttls_setsFlag() {
+  void withStarttls_setsStarttlsMode() {
     ObjectNode config = new SmtpDependencyBuilder("smtp").withStarttls().build().forFfi();
-    assertTrue(config.path("starttls").asBoolean());
+    assertEquals("starttls", config.path("tls_mode").asText());
+  }
+
+  @Test
+  void withImplicitTls_setsImplicitMode() {
+    ObjectNode config = new SmtpDependencyBuilder("smtp").withImplicitTls().build().forFfi();
+    assertEquals("implicit", config.path("tls_mode").asText());
   }
 
   @Test

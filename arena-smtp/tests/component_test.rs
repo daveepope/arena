@@ -228,3 +228,32 @@ async fn smtp_dependency_with_starttls_advertises_starttls_component_test() {
         Err(panic_payload) => std::panic::resume_unwind(panic_payload),
     }
 }
+
+#[tokio::test]
+async fn smtp_dependency_with_implicit_tls_becomes_ready_component_test() {
+    init_test_logging();
+
+    let mut smtp = SmtpDependency::builder("")
+        .with_implicit_tls()
+        .with_port(12027)
+        .with_ui_port(18027)
+        .build();
+
+    let start_outcome = std::panic::AssertUnwindSafe(async { smtp.start().await })
+        .catch_unwind()
+        .await;
+
+    let smtp_address = smtp.smtp_address().map(|s| s.to_string());
+
+    tokio::time::timeout(Duration::from_secs(10), smtp.stop())
+        .await
+        .unwrap_or_else(|_| panic!("smtp stop timed out"));
+
+    if let Err(panic_payload) = start_outcome {
+        std::panic::resume_unwind(panic_payload);
+    }
+    assert!(
+        smtp_address.is_some(),
+        "smtp address missing after start() with implicit tls"
+    );
+}
