@@ -278,7 +278,7 @@ jobs:
           steps.paths.outputs.rust_crates == 'true' ||
           steps.paths.outputs.version_file == 'true'
         run: |
-          CARGO_BAZEL_REPIN=1 bazel build //... --config=ci
+          CARGO_BAZEL_REPIN=1 bazel build //... --config=ci --lockfile_mode=update
           bazel mod deps --lockfile_mode=update
           if ! git diff --quiet Cargo.Bazel.lock Cargo.lock MODULE.bazel.lock; then
             echo "Lockfiles are out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //... && bazel mod deps --lockfile_mode=update"
