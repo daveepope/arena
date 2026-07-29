@@ -9,6 +9,7 @@ license = "todo"
 [dependencies]
 arena = { workspace = true }
 arena-container = { workspace = true }
+arena-cryptography = { workspace = true }
 async-trait = { workspace = true }
 testcontainers-modules = { workspace = true }
 tracing = { workspace = true }

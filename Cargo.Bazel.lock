@@ -1,5 +1,5 @@
 {
-  "checksum": "360506edbdd55a174e5ab3c4f59d96391e236e262c651365f2c1e47a401302db",
+  "checksum": "6cd03689c6388f95fb877b20304b2195cb84d4ddbef03a6378b2f1e30854d39a",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -476,10 +476,6 @@
               "target": "bollard"
             },
             {
-              "id": "rcgen 0.14.7",
-              "target": "rcgen"
-            },
-            {
               "id": "tracing 0.1.44",
               "target": "tracing"
             }
@@ -585,6 +581,46 @@
           ],
           "selects": {}
         },
+        "version": "3.5.0"
+      },
+      "license": "todo",
+      "license_ids": [],
+      "license_file": null
+    },
+    "arena-cryptography 3.5.0": {
+      "name": "arena-cryptography",
+      "version": "3.5.0",
+      "package_url": null,
+      "repository": null,
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "arena_cryptography",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "arena_cryptography",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "rcgen 0.14.7",
+              "target": "rcgen"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
         "version": "3.5.0"
       },
       "license": "todo",
@@ -33272,6 +33308,7 @@
     "arena 3.5.0": "arena",
     "arena-container 3.5.0": "arena-container",
     "arena-containerized-component 3.5.0": "arena-containerized-component",
+    "arena-cryptography 3.5.0": "arena-cryptography",
     "arena-examples 3.5.0": "examples",
     "arena-executable-component 3.5.0": "arena-executable-component",
     "arena-ffi 3.5.0": "arena-ffi",

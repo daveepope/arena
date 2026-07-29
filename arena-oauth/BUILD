@@ -8,6 +8,7 @@ rust_library(
     deps = all_crate_deps(normal = True) + [
         "//arena",
         "//arena-container:arena_container",
+        "//arena-cryptography:arena_cryptography",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],

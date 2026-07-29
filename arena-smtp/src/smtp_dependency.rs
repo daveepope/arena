@@ -69,7 +69,7 @@ impl SmtpDependency {
     ) -> Self {
         let active_tls = tls_mode.map(|mode| {
             let (certificate_pem, private_key_pem) =
-                arena_container::ephemeral_tls::localhost_self_signed_pem_pair().unwrap_or_else(
+                arena_cryptography::ephemeral_tls::localhost_self_signed_pem_pair().unwrap_or_else(
                     |e| panic!("[Smtp-{identifier}] ephemeral TLS certificate generation failed: {e}"),
                 );
             SmtpTlsConfig {

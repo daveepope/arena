@@ -1,4 +1,4 @@
-use arena_container::ephemeral_tls::localhost_self_signed_pem_pair;
+use arena_cryptography::ephemeral_tls::localhost_self_signed_pem_pair;
 
 #[test]
 fn localhost_self_signed_pem_pair_returns_valid_pems() {

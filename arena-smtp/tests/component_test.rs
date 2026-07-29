@@ -101,7 +101,7 @@ async fn send_probe_message(smtp_address: &str, subject: &str) -> Result<(), Str
     Ok(())
 }
 
-async fn ehlo_extensions(smtp_address: &str) -> Result<String, String> {
+async fn read_ehlo_capabilities(smtp_address: &str) -> Result<String, String> {
     let mut stream = TcpStream::connect(smtp_address)
         .await
         .map_err(|err| err.to_string())?;
@@ -208,11 +208,11 @@ async fn smtp_dependency_with_starttls_advertises_starttls_component_test() {
         .to_string();
 
     let outcome = std::panic::AssertUnwindSafe(async {
-        let extensions = ehlo_extensions(&smtp_address).await?;
-        if extensions.contains("STARTTLS") {
+        let capabilities = read_ehlo_capabilities(&smtp_address).await?;
+        if capabilities.contains("STARTTLS") {
             Ok(())
         } else {
-            Err(format!("EHLO did not advertise STARTTLS: {extensions}"))
+            Err(format!("EHLO did not advertise STARTTLS: {capabilities}"))
         }
     })
     .catch_unwind()

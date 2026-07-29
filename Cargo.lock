@@ -74,7 +74,6 @@ name = "arena-container"
 version = "3.5.0"
 dependencies = [
  "bollard",
- "rcgen",
  "tokio",
  "tracing",
 ]
@@ -93,6 +92,13 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "arena-cryptography"
+version = "3.5.0"
+dependencies = [
+ "rcgen",
 ]
 
 [[package]]
@@ -243,6 +249,7 @@ version = "3.5.0"
 dependencies = [
  "arena",
  "arena-container",
+ "arena-cryptography",
  "async-trait",
  "axum",
  "axum-server",
@@ -282,6 +289,7 @@ version = "3.5.0"
 dependencies = [
  "arena",
  "arena-container",
+ "arena-cryptography",
  "async-trait",
  "futures",
  "futures-timer",

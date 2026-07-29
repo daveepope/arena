@@ -47,14 +47,6 @@ rust_test(
 )
 
 rust_test(
-    name = "ephemeral_tls_test",
-    srcs = ["tests/ephemeral_tls_test.rs"],
-    size = "small",
-    edition = "2021",
-    deps = [":arena_container"],
-)
-
-rust_test(
     name = "arena_container_unit_test",
     crate = ":arena_container",
     size = "small",
