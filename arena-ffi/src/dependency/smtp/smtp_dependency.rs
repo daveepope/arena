@@ -15,6 +15,8 @@ pub struct SmtpDependencyConfig {
     pub ui_port: Option<u16>,
     #[serde(default)]
     pub container_name: Option<String>,
+    #[serde(default)]
+    pub tls_mode: Option<String>,
 }
 
 pub fn build(config: &SmtpDependencyConfig, network: Option<&str>) -> Result<Dependency, String> {
@@ -36,6 +38,12 @@ pub fn build(config: &SmtpDependencyConfig, network: Option<&str>) -> Result<Dep
     }
     if let Some(ref container_name) = config.container_name {
         builder = builder.with_container_name(container_name);
+    }
+    match config.tls_mode.as_deref() {
+        None => {}
+        Some("starttls") => builder = builder.with_starttls(),
+        Some("implicit") => builder = builder.with_implicit_tls(),
+        Some(other) => return Err(format!("unknown smtp tls_mode: {other}")),
     }
     Ok(Box::new(builder.build()))
 }

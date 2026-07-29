@@ -27,6 +27,8 @@ import arena.junit.dep.MssqlDependency;
 import arena.junit.dep.MssqlDependencyBuilder;
 import arena.junit.dep.PostgresDependency;
 import arena.junit.dep.PostgresDependencyBuilder;
+import arena.junit.dep.smtp.SmtpDependency;
+import arena.junit.dep.smtp.SmtpDependencyBuilder;
 import arena.junit.dep.temporal.TemporalDependency;
 import arena.junit.dep.temporal.TemporalDependencyBuilder;
 import arena.junit.exec.ExecutableComponent;
@@ -88,6 +90,8 @@ public final class ComponentTest {
   private static final int LOCALSTACK_HOST_PORT = RT.localstackHostPort;
   private static final int TEMPORAL_GRPC_PORT = RT.temporalGrpcPort;
   private static final int TEMPORAL_UI_PORT = RT.temporalUiPort;
+  private static final int SMTP_HOST_PORT = RT.smtpPort;
+  private static final int SMTP_UI_PORT = RT.smtpUiPort;
   private static final String TEMPORAL_TARGET = "127.0.0.1:" + TEMPORAL_GRPC_PORT;
   private static final int OAUTH_PORT = RT.oauthPort;
   private static final String OAUTH_ISSUER = RT.oauthIssuer;
@@ -157,6 +161,14 @@ public final class ComponentTest {
           .withImage("1.8.0")
           .withPort(TEMPORAL_GRPC_PORT)
           .withUiPort(TEMPORAL_UI_PORT)
+          .build();
+
+  @ArenaDependency
+  static final SmtpDependency SMTP =
+      new SmtpDependencyBuilder("example-api-smtp")
+          .withPort(SMTP_HOST_PORT)
+          .withUiPort(SMTP_UI_PORT)
+          .withStarttls()
           .build();
 
   @ArenaPlaybook
@@ -282,6 +294,13 @@ public final class ComponentTest {
   }
 
   @Test
+  void createDeviceSendsProvisionedEmailOverStarttls() throws Exception {
+    String deviceName = "Mail Probe Device " + UUID.randomUUID().toString().substring(0, 8);
+    apiClient().createDevice(deviceName);
+    waitDeviceProvisionedEmail(deviceName);
+  }
+
+  @Test
   @Playbook(CalibrationApiErrorPathPlaybook.class)
   void httpPlaybookVerifyCountMismatchRaises(ActiveHttpPlaybook activeHttpPlaybook) {
     assertThrows(
@@ -384,6 +403,8 @@ public final class ComponentTest {
                 + MSSQL_DB_PASS
                 + ";TrustServerCertificate=True;")
         .withEnvVar("TEMPORAL_TARGET", TEMPORAL_TARGET)
+        .withEnvVar("SMTP_HOST", "127.0.0.1")
+        .withEnvVar("SMTP_PORT", String.valueOf(SMTP_HOST_PORT))
         .withEnvVar("OAUTH_ISSUER_URL", OAUTH_ISSUER)
         .withEnvVar("OAUTH_TLS_CA_FILE", OAUTH_CA_PATH)
         .withEnvVar("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
@@ -469,6 +490,28 @@ public final class ComponentTest {
 
   private static ApiClient apiClient() {
     return new ApiClient("http://127.0.0.1:" + WEB_APP_PORT, accessToken, MAPPER);
+  }
+
+  private static void waitDeviceProvisionedEmail(String needle) throws Exception {
+    String url = "http://127.0.0.1:" + SMTP_UI_PORT + "/api/v1/messages";
+    HttpClient client = HttpClient.newHttpClient();
+    long deadline = System.currentTimeMillis() + 10_000L;
+    while (System.currentTimeMillis() < deadline) {
+      HttpResponse<String> response =
+          client.send(
+              HttpRequest.newBuilder()
+                  .uri(URI.create(url))
+                  .GET()
+                  .timeout(Duration.ofSeconds(5))
+                  .build(),
+              HttpResponse.BodyHandlers.ofString());
+      if (response.statusCode() == 200 && response.body().contains(needle)) {
+        return;
+      }
+      Thread.sleep(100L);
+    }
+    throw new AssertionError(
+        "device provisioned email containing " + needle + " was not captured");
   }
 
   private static JsonNode waitReadingCreatedOnQueue(int expectedId) throws Exception {

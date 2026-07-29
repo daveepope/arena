@@ -262,6 +262,7 @@ def closed_arena() -> ClosedArena:
         SmtpDependencyBuilder(DEP_NAME_SMTP)
         .with_port(SMTP_HOST_PORT)
         .with_ui_port(SMTP_UI_PORT)
+        .with_starttls()
         .build()
     )
 

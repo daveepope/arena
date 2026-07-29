@@ -4,7 +4,7 @@ use arena::dependency::RunnableDependency;
 use async_trait::async_trait;
 
 use crate::builder::OauthDependencyBuilder;
-use crate::ephemeral_tls;
+use arena_cryptography::ephemeral_tls;
 use crate::keys::RsaKeyPair;
 use crate::oauth_common::OauthListenAddr;
 use crate::oauth_server::OauthServer;

@@ -9,6 +9,7 @@ license = "todo"
 [dependencies]
 arena = { workspace = true }
 arena-container = { workspace = true }
+arena-cryptography = { workspace = true }
 async-trait = { workspace = true }
 axum = { workspace = true, features = ["macros", "json"] }
 axum-server = { workspace = true, default-features = false, features = ["tls-rustls"] }
@@ -17,7 +18,6 @@ base64 = { workspace = true }
 jsonwebtoken = { workspace = true }
 tracing = { workspace = true }
 rand = { workspace = true }
-rcgen = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 rsa = { workspace = true }
 rustls = { workspace = true }

@@ -169,7 +169,7 @@ def test_get_device_state_unknown_device_returns_not_found(api_client: ApiClient
     assert r.status_code == 404
 
 
-def test_create_device_sends_provisioned_email(api_client: ApiClient):
+def test_create_device_sends_provisioned_email_over_starttls(api_client: ApiClient):
     device_name = f"Mail Probe Device {os.urandom(4).hex()}"
     api_client.create_device(device_name)
     _wait_device_provisioned_email(device_name)

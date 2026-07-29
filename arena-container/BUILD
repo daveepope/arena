@@ -47,6 +47,13 @@ rust_test(
 )
 
 rust_test(
+    name = "arena_container_unit_test",
+    crate = ":arena_container",
+    size = "small",
+    edition = "2021",
+)
+
+rust_test(
     name = "network_component_test",
     srcs = ["tests/network_component_test.rs"],
     size = "medium",
