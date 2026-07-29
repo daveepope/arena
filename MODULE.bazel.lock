@@ -446,24 +446,9 @@
         "recordedFileInputs": {
           "@@//Cargo.Bazel.lock": "754abd2cb4db03325baaf6778c46805fe27b9ef2d3c0edc8f410610145458bd6",
           "@@//Cargo.toml": "6a0ae41b2d91cf002bff46b94d9f716184516e1913b8e37bb22979acf0e5ad79",
-          "@@//arena-mssql/Cargo.toml": "33599f2f1f6cf85cd187835cd6b699ba53579790d505ab1273d9bf296a233fe4",
-          "@@//arena/Cargo.toml": "488a9c65141ff5d76ba36a5d2f9af0fc9dfa4a04be8a2c66ae425ca7271b6535",
-          "@@//arena-localstack/Cargo.toml": "88b8d1d2723fa51b22548f2b6a441295716e200c03fe7be74a2deb65bfb609e9",
-          "@@//arena-http/Cargo.toml": "7b676cc14984d5e312851d4720c83fd9b91f4f8dda6f49a14f8a9d70d0ba8554",
-          "@@//arena-oauth/Cargo.toml": "1f658e812f0de03075a8b9d20330133f298927f3116767e0f6e46d9ea54bb391",
-          "@@//MODULE.bazel": "e8c7cc73ee7e409d7963728f2a9f9baa710476464da17611b450e3c1b620e8e8",
-          "@@//arena-executable-component/Cargo.toml": "bef1ee2d6340b4de680398b9f67d51689e48bdc9e59cc142ca75e0a0aeb72af4",
-          "@@//arena-temporal/Cargo.toml": "abdd125f04b9688f43d28fafdf66e4f2f2f11141073a926983f63cd4f9ce425b",
-          "@@//arena-ffi/Cargo.toml": "fa124ae34041e92c7bce61ea95c50b9210dbe6431840afff11ae1648a0c9a64f",
           "@@//Cargo.lock": "6d44e9b48db0142be1e4674002aeab8c646d97b9973375b66697733650de5b87",
-          "@@//arena-kafka/Cargo.toml": "9856537f0aef7dc17dfa7d533a63fa733d766cebd58040d2886847ce5402942f",
-          "@@//arena-postgres/Cargo.toml": "7b416782348f723cb26142d487c510c43fbd57857b8297121b472dc77ff9a05d",
-          "@@//arena-containerized-component/Cargo.toml": "bf413591b64de49e1028f163228b3fcccb61bc803792b43fbdbb4e892e52ccfa",
-          "@@//arena-profile/Cargo.toml": "94283468d77330acb88aa883a357c755625391bc35e422cafa14179b789f6472",
-          "@@//arena-smtp/Cargo.toml": "ec85d93f875145c4e3f4f8b05acb625bde5758fdbae87767451775f986bde797",
-          "@@rules_rust~~rust_host_tools~rust_host_tools//rust_host_tools": "ENOENT",
-          "@@//examples/Cargo.toml": "1e24a3e93757fd83d68fcf01fe482601318c205e9c8a129a9b1d1fa0cfad5dc0",
-          "@@//arena-container/Cargo.toml": "6820ffaadc2f0bf0bd0dbcb356cde679eeb4357a3ae4a6bec3f807789e004073"
+          "@@//MODULE.bazel": "e8c7cc73ee7e409d7963728f2a9f9baa710476464da17611b450e3c1b620e8e8",
+          "@@rules_rust~~rust_host_tools~rust_host_tools//rust_host_tools": "ENOENT"
         },
         "recordedDirentsInputs": {},
         "envVariables": {
@@ -471,7 +456,7 @@
           "CARGO_BAZEL_GENERATOR_SHA256": null,
           "CARGO_BAZEL_GENERATOR_URL": null,
           "CARGO_BAZEL_ISOLATED": null,
-          "CARGO_BAZEL_REPIN": "1",
+          "CARGO_BAZEL_REPIN": null,
           "CARGO_BAZEL_REPIN_ONLY": null,
           "CARGO_BAZEL_TIMEOUT": null,
           "REPIN": null
