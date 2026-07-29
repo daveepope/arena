@@ -350,6 +350,9 @@ jobs:
             echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
+      - name: Allow perf to read CPU counters (cap_perfmon on the perf binary only)
+        run: sudo setcap cap_perfmon+ep "$(which perf)"
+
       - name: Build and test
         run: |
           bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
