@@ -112,7 +112,7 @@ let smtp: Dependency = Box::new(
 // and smtp.http_api_url() is the HTTP API used to read captured messages.
 ```
 
-Call `.with_starttls()` on the builder to run the server with STARTTLS advertised (a self-signed certificate is generated and injected automatically). The same option is available on the Python (`.with_starttls()`) and Java (`.withStarttls()`) builders.
+For TLS, call `.with_starttls()` to advertise STARTTLS (the client connects in plaintext and upgrades on the same port), or `.with_implicit_tls()` to require TLS on connect (no plaintext phase). Either way a self-signed certificate is generated and injected automatically. Both options are available on the Python and Java builders.
 
 ### Python (arena-pytest)
 
