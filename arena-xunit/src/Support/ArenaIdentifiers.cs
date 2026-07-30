@@ -1,10 +1,11 @@
 using System;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 
 namespace ArenaXunit.Support;
 
-internal static class ArenaIdentifiers
+public static class ArenaIdentifiers
 {
     private static readonly object Lock = new object();
     private static int _counter;
@@ -18,11 +19,19 @@ internal static class ArenaIdentifiers
             _counter++;
         }
         var slug = ToSlug(name);
+        if (string.IsNullOrEmpty(slug))
+            slug = "default";
         var combined = seed + _counter;
-        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(combined.ToString()));
+        var hashBytes = ComputeHash(combined.ToString());
         var suffix = Convert.ToBase64String(hashBytes).Replace("+", "").Replace("/", "").Replace("=", "").ToLower();
         var truncatedSuffix = suffix.Length > 6 ? suffix.Substring(0, 6) : suffix.PadRight(6, 'x');
         return $"{module}-{slug}-{truncatedSuffix}";
+    }
+
+    private static byte[] ComputeHash(string input)
+    {
+        using var sha = SHA256.Create();
+        return sha.ComputeHash(Encoding.UTF8.GetBytes(input));
     }
 
     private static long InitializeSeed()
@@ -35,9 +44,9 @@ internal static class ArenaIdentifiers
             if (!_seed.HasValue)
             {
                 var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                var processId = Environment.ProcessId;
+                var processId = (long)Process.GetCurrentProcess().Id;
                 var random = new Random();
-                _seed = timestamp ^ (long)processId ^ random.Next();
+                _seed = timestamp ^ processId ^ random.Next();
             }
         }
         return _seed.Value;
@@ -50,10 +59,10 @@ internal static class ArenaIdentifiers
         {
             if (char.IsLetterOrDigit(c))
                 builder.Append(c);
-            else if (!char.IsWhiteSpace(builder[^1]))
+            else if (builder.Length > 0 && !char.IsWhiteSpace(builder[builder.Length - 1]))
                 builder.Append('-');
         }
-        if (builder.Length > 0 && builder[^1] == '-')
+        if (builder.Length > 0 && builder[builder.Length - 1] == '-')
             builder.Length--;
         return builder.ToString();
     }

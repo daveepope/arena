@@ -1,9 +1,8 @@
 using System;
-using System.Runtime.CompilerServices;
 
 namespace ArenaXunit;
 
-[AttributeUsage(AttributeTargets.Method, AllowMultiple = true, Inherited = true)]
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = true, Inherited = true)]
 public class PlaybookAttribute : Attribute
 {
     public Type PlaybookType { get; }

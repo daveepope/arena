@@ -6,7 +6,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Xunit.Sdk;
 
-namespace ArenaXunit.ComponentTest;
+namespace ArenaXunit.UnitTest;
 
 public class Program
 {

@@ -47,8 +47,8 @@ public sealed class OauthDependency : IArenaMatchPiece
         [JsonProperty("port")] public int Port { get; set; }
         [JsonProperty("listen_ip")] public string? ListenIp { get; set; }
         [JsonProperty("metadata_base_url")] public string? MetadataBaseUrl { get; set; }
-        [JsonProperty("server_tls_cert")] public string? ServerTlsCert { get; set; }
-        [JsonProperty("server_tls_key")] public string? ServerTlsKey { get; set; }
+        [JsonProperty("server_tls_certificate_pem")] public string? ServerTlsCert { get; set; }
+        [JsonProperty("server_tls_private_key_pem")] public string? ServerTlsKey { get; set; }
     }
 }
 

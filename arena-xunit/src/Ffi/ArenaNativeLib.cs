@@ -71,7 +71,7 @@ internal static class ArenaNativeLib
 
             try
             {
-                _libHandle = NativeLibrary.Load(path);
+                _libHandle = LoadLibrary(path);
             }
             catch (Exception ex)
             {
@@ -102,15 +102,71 @@ internal static class ArenaNativeLib
         }
     }
 
+    private static IntPtr LoadLibrary(string path)
+    {
+        var os = Environment.OSVersion.Platform;
+        if (os == PlatformID.Unix || os == PlatformID.MacOSX)
+        {
+            var handle = dlopen(path, 0x00001 | 0x00002);
+            if (handle == IntPtr.Zero)
+            {
+                var err = dlerror();
+                var errMsg = err != IntPtr.Zero ? Marshal.PtrToStringUTF8(err) : "dlopen failed";
+                throw new ArenaBindingError($"dlopen failed: {errMsg}");
+            }
+            return handle;
+        }
+        if (os == PlatformID.Win32NT)
+        {
+            var handle = LoadLibraryEx(path, IntPtr.Zero, 0);
+            if (handle == IntPtr.Zero)
+            {
+                var code = Marshal.GetLastWin32Error();
+                throw new ArenaBindingError($"LoadLibraryEx failed with error {code}");
+            }
+            return handle;
+        }
+        throw new ArenaBindingError($"Unsupported platform: {os}");
+    }
+
     private static void LoadFunction<T>(out T? func, string name) where T : Delegate
     {
-        var ptr = NativeLibrary.GetExport(_libHandle, name);
+        var ptr = GetExport(name);
         if (ptr == IntPtr.Zero)
         {
             throw new ArenaBindingError($"export '{name}' not found in arena shared library");
         }
         func = Marshal.GetDelegateForFunctionPointer<T>(ptr);
     }
+
+    private static IntPtr GetExport(string name)
+    {
+        var os = Environment.OSVersion.Platform;
+        if (os == PlatformID.Unix || os == PlatformID.MacOSX)
+        {
+            return dlsym(_libHandle, name);
+        }
+        if (os == PlatformID.Win32NT)
+        {
+            return GetProcAddress(_libHandle, name);
+        }
+        return IntPtr.Zero;
+    }
+
+    [DllImport("libdl", EntryPoint = "dlopen", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr dlopen(string filename, int flag);
+
+    [DllImport("libdl", EntryPoint = "dlsym", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr dlsym(IntPtr handle, string symbol);
+
+    [DllImport("libdl", EntryPoint = "dlerror", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr dlerror();
+
+    [DllImport("kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr LoadLibraryEx(string lpFileName, IntPtr hFile, uint dwFlags);
+
+    [DllImport("kernel32", SetLastError = true, CharSet = CharSet.Ansi)]
+    private static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
 
     internal static IntPtr arena_open(string name, string configJson, out IntPtr errOut) =>
         _arena_open!.Invoke(name, configJson, out errOut);

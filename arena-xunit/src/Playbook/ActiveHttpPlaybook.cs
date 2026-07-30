@@ -35,7 +35,7 @@ public sealed class ActiveHttpPlaybook : ActivePlaybook
     private sealed class VerifySpec
     {
         [JsonProperty("method")] public string? Method { get; set; }
-        [JsonProperty("path")] public string? Path { get; set; }
+        [JsonProperty("url_path")] public string? Path { get; set; }
         [JsonProperty("expected_count")] public int? ExpectedCount { get; set; }
     }
 
@@ -43,7 +43,7 @@ public sealed class ActiveHttpPlaybook : ActivePlaybook
     private sealed class VerifyAtLeastSpec
     {
         [JsonProperty("method")] public string? Method { get; set; }
-        [JsonProperty("path")] public string? Path { get; set; }
-        [JsonProperty("min_count")] public int? MinCount { get; set; }
+        [JsonProperty("url_path")] public string? Path { get; set; }
+        [JsonProperty("minimum_count")] public int? MinCount { get; set; }
     }
 }

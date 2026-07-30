@@ -4,7 +4,7 @@ using ArenaXunit.Ffi;
 
 namespace ArenaXunit.Playbook;
 
-public class ActivePlaybook : IDisposable, IAsyncDisposable
+public class ActivePlaybook : IDisposable, System.IAsyncDisposable
 {
     protected readonly IntPtr _handle;
     private bool _disposed;
@@ -28,16 +28,20 @@ public class ActivePlaybook : IDisposable, IAsyncDisposable
         }
     }
 
-    public ValueTask DisposeAsync()
-    {
-        Dispose();
-        return default;
-    }
-
     public Task VerifyAtLeast(string path, int minCount)
     {
         var http = this as ActiveHttpPlaybook;
-        http?.VerifyAtLeast("POST", path, minCount);
+        if (http == null)
+        {
+            throw new InvalidOperationException("VerifyAtLeast is only supported on HTTP playbooks");
+        }
+        http.VerifyAtLeast("POST", path, minCount);
         return Task.CompletedTask;
+    }
+
+    public System.Threading.Tasks.ValueTask DisposeAsync()
+    {
+        Dispose();
+        return default;
     }
 }

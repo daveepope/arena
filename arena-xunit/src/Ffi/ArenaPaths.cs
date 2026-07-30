@@ -53,6 +53,4 @@ internal static class ArenaPaths
             return new[] { "arena_ffi_shared.dll", "arena_ffi.dll" };
         return new[] { "libarena_ffi_shared.so", "libarena_ffi.so" };
     }
-
-    private static string PlatformLibraryName() => PlatformLibraryNames()[0];
 }

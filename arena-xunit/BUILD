@@ -47,15 +47,15 @@ import_library(
 )
 
 filegroup(
-    name = "xunit_execution_netstandard",
-    srcs = ["@xunit_extensibility//:lib/netstandard1.1/xunit.execution.dotnet.dll"],
+    name = "xunit_core_netstandard",
+    srcs = ["@xunit_extensibility_core//:lib/netstandard1.1/xunit.core.dll"],
 )
 
 import_library(
     name = "xunit_extensibility_core_lib",
-    library_name = "xunit.execution.dotnet",
-    libs = [":xunit_execution_netstandard"],
-    refs = [":xunit_execution_netstandard"],
+    library_name = "xunit.core",
+    libs = [":xunit_core_netstandard"],
+    refs = [":xunit_core_netstandard"],
 )
 
 filegroup(
@@ -82,18 +82,6 @@ import_library(
     refs = [":xunit_runner_reporters_netstandard"],
 )
 
-filegroup(
-    name = "xunit_core_netstandard",
-    srcs = ["@xunit_extensibility_core//:lib/netstandard1.1/xunit.core.dll"],
-)
-
-import_library(
-    name = "xunit_extensibility_core_runtime_lib",
-    library_name = "xunit.core",
-    libs = [":xunit_core_netstandard"],
-    refs = [":xunit_core_netstandard"],
-)
-
 csharp_library(
     name = "arena_xunit_lib",
     srcs = _ARENA_XUNIT_SRCS,
@@ -102,6 +90,8 @@ csharp_library(
     deps = [
         ":xunit_core_lib",
         ":xunit_extensibility_lib",
+        ":xunit_extensibility_core_lib",
+        ":xunit_abstractions_lib",
         ":newtonsoft_json_lib",
         ":ms_logging_abstractions_lib",
     ],
@@ -113,6 +103,7 @@ csharp_test(
     size = "small",
     target_frameworks = ["net8.0"],
     srcs = glob(["tests/Unit/**/*.cs"]),
+    data = [":xunit_core_netstandard"],
     deps = [
         ":arena_xunit_lib",
         ":xunit_core_lib",
@@ -120,9 +111,9 @@ csharp_test(
         ":xunit_abstractions_lib",
         ":xunit_extensibility_lib",
         ":xunit_extensibility_core_lib",
-        ":xunit_extensibility_core_runtime_lib",
         ":xunit_runner_utility_lib",
         ":xunit_runner_reporters_lib",
+        ":newtonsoft_json_lib",
     ],
 )
 
@@ -132,9 +123,16 @@ csharp_test(
     tags = ["component_test"],
     target_frameworks = ["net8.0"],
     srcs = glob(["tests/Component/**/*.cs"]),
-    data = ["//arena-ffi:arena_ffi_shared"],
+    data = ["//arena-ffi:arena_ffi_shared", ":xunit_core_netstandard"],
     deps = [
         ":arena_xunit_lib",
+        ":xunit_core_lib",
         ":xunit_assert_lib",
+        ":xunit_abstractions_lib",
+        ":xunit_extensibility_lib",
+        ":xunit_extensibility_core_lib",
+        ":xunit_runner_utility_lib",
+        ":xunit_runner_reporters_lib",
+        ":newtonsoft_json_lib",
     ],
 )
