@@ -1,4 +1,3 @@
-load("@arena_version//:defs.bzl", "ARENA_VERSION")
 load("@rules_dotnet//dotnet:defs.bzl", "csharp_library", "csharp_test", "import_library")
 
 _ARENA_XUNIT_SRCS = glob(["src/**/*.cs"])
@@ -87,7 +86,7 @@ csharp_library(
     srcs = _ARENA_XUNIT_SRCS,
     target_frameworks = ["netstandard2.0"],
     visibility = ["//visibility:public"],
-    compiler_options = ["/langversion:latest"],
+    compiler_options = ["/langversion:latest", "/debug:pdbonly"],
     deps = [
         ":xunit_core_lib",
         ":xunit_extensibility_lib",

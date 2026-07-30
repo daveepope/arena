@@ -60,88 +60,88 @@ public class ApiClient
 
     public async Task<bool> StopDeviceAsync(int deviceId)
     {
-        var response = await _client.DeleteAsync($"/devices/{deviceId}");
+        var response = await _client.DeleteAsync($"/Devices/{deviceId}");
         return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NoContent;
     }
 
     public async Task<CreateReadingResponse> CreateReadingAsync(CreateReadingRequest request)
     {
-        return await PostJsonAsync<CreateReadingRequest, CreateReadingResponse>("/readings", request);
+        return await PostJsonAsync<CreateReadingRequest, CreateReadingResponse>("/Readings", request);
     }
 
     public async Task<HttpResponseMessage> PostReadingRawAsync(CreateReadingRequest request)
     {
-        return await PostJsonRawAsync<CreateReadingRequest>("/readings", request);
+        return await PostJsonRawAsync<CreateReadingRequest>("/Readings", request);
     }
 
     public async Task<CreateDeviceResponse> CreateDeviceAsync(CreateDeviceRequest request)
     {
-        return await PostJsonAsync<CreateDeviceRequest, CreateDeviceResponse>("/devices", request);
+        return await PostJsonAsync<CreateDeviceRequest, CreateDeviceResponse>("/Devices", request);
     }
 
-    public async Task RequestStateTransitionAsync(int deviceId, DeviceStateTransitionRequest request)
+    public async Task SetDeviceStateAsync(int deviceId, SetDeviceStateRequest request)
     {
-        var response = await _client.PostAsJsonAsync($"/devices/{deviceId}/transition", request);
+        var response = await _client.PostAsJsonAsync($"/Devices/{deviceId}/state", request);
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task<DeviceStateResponse> GetDeviceAsync(int deviceId)
+    public async Task<DeviceStateResponse> GetDeviceStateAsync(int deviceId)
     {
-        return await GetJsonAsync<DeviceStateResponse>($"/devices/{deviceId}");
+        return await GetJsonAsync<DeviceStateResponse>($"/Devices/{deviceId}/state");
     }
 
-    public async Task<HttpResponseMessage> GetDeviceRawAsync(object deviceId)
+    public async Task<HttpResponseMessage> GetDeviceStateRawAsync(object deviceId)
     {
-        return await GetRawAsync($"/devices/{deviceId}");
+        return await GetRawAsync($"/Devices/{deviceId}/state");
     }
 
-    public async Task<List<CreateReadingResponse>> ListReadingsAsync(string deviceId)
+    public async Task<List<ReadingRow>> ListReadingsAsync()
     {
-        return await GetJsonAsync<List<CreateReadingResponse>>($"/readings?device_id={deviceId}");
+        return await GetJsonAsync<List<ReadingRow>>("/Readings");
     }
 }
 
 public class CreateReadingRequest
 {
-    public string DeviceId { get; set; } = default!;
-    public double TemperatureC { get; set; }
+    public string UserName { get; set; } = default!;
+    public int Value { get; set; }
+    public string? Comment { get; set; }
+    public int DeviceId { get; set; }
 }
 
 public class CreateReadingResponse
 {
-    public string? Id { get; set; }
-    public string DeviceId { get; set; } = default!;
-    public double TemperatureC { get; set; }
-    public string Status { get; set; } = default!;
-    public string? Error { get; set; }
+    public int Id { get; set; }
+    public bool Valid { get; set; }
 }
 
 public class CreateDeviceRequest
 {
     public string Name { get; set; } = default!;
-    public string Location { get; set; } = default!;
-    public string Type { get; set; } = default!;
-    public string TargetState { get; set; } = default!;
 }
 
 public class CreateDeviceResponse
 {
     public int Id { get; set; }
     public string Name { get; set; } = default!;
-    public string Location { get; set; } = default!;
-    public string Type { get; set; } = default!;
-    public string State { get; set; } = default!;
 }
 
-public class DeviceStateTransitionRequest
+public class SetDeviceStateRequest
 {
-    public string TargetState { get; set; } = default!;
+    public string Target { get; set; } = default!;
 }
 
 public class DeviceStateResponse
 {
-    public int Id { get; set; }
-    public string Name { get; set; } = default!;
+    public int DeviceId { get; set; }
     public string State { get; set; } = default!;
-    public string? Error { get; set; }
+    public int TransitionCount { get; set; }
+}
+
+public class ReadingRow
+{
+    public int Id { get; set; }
+    public string UserName { get; set; } = default!;
+    public int Value { get; set; }
+    public string? Comment { get; set; }
 }
