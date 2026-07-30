@@ -27,9 +27,9 @@ final class ReadinessChecksFfiSerializationTest {
         ReadinessChecksFfi.forExecutable(
             List.of(
                 new ReadinessChecksFfi.ReadinessEntry(
-                    TcpReadinessCheck.create(), "127.0.0.1:2525", 5_000L)));
+                    TcpReadinessCheck.create(), "127.0.0.1:2525", 3L)));
     assertEquals(1, out.size());
     assertEquals("tcp", out.get(0).path("kind").asText());
-    assertEquals(5_000, out.get(0).path("timeout_ms").asInt());
+    assertEquals(3, out.get(0).path("timeout_ms").asInt());
   }
 }

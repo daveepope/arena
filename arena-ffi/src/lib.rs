@@ -12,7 +12,7 @@ pub(crate) mod strings;
 
 mod containerized_component;
 mod executable_component;
-mod healthcheck;
+pub mod healthcheck;
 mod kafka_dependency;
 mod managed_playbook;
 mod matches;

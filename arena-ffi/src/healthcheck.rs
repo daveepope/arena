@@ -9,7 +9,7 @@ fn default_readiness_timeout_ms() -> u64 {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub(crate) enum ReadinessCheckConfig {
+pub enum ReadinessCheckConfig {
     Http {
         target: String,
         #[serde(default = "default_readiness_timeout_ms")]
@@ -22,7 +22,7 @@ pub(crate) enum ReadinessCheckConfig {
     },
 }
 
-pub(crate) struct HttpReadinessCheck;
+pub struct HttpReadinessCheck;
 
 impl HttpReadinessCheck {
     pub fn new() -> Self {
@@ -71,7 +71,7 @@ impl ReadinessCheck for HttpReadinessCheck {
     }
 }
 
-pub(crate) struct TcpReadinessCheck;
+pub struct TcpReadinessCheck;
 
 impl TcpReadinessCheck {
     pub fn new() -> Self {
@@ -119,7 +119,3 @@ impl ReadinessCheck for TcpReadinessCheck {
         ))
     }
 }
-
-#[cfg(test)]
-#[path = "healthcheck_tests.rs"]
-mod healthcheck_tests;

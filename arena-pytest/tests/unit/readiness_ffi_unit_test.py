@@ -12,5 +12,5 @@ def test_http_check_serializes_kind_http():
 
 
 def test_tcp_check_serializes_kind_tcp():
-    out = readiness_checks_for_ffi([(TcpReadinessCheck.create(), "127.0.0.1:2525", 5_000)])
-    assert out == [{"kind": "tcp", "target": "127.0.0.1:2525", "timeout_ms": 5_000}]
+    out = readiness_checks_for_ffi([(TcpReadinessCheck.create(), "127.0.0.1:2525", 3)])
+    assert out == [{"kind": "tcp", "target": "127.0.0.1:2525", "timeout_ms": 3}]
