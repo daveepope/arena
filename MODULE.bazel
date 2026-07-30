@@ -12,6 +12,7 @@ bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "rules_java", version = "9.0.0")
 bazel_dep(name = "rules_jvm_external", version = "6.6")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
+bazel_dep(name = "rules_dotnet", version = "4.5.0")
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
@@ -163,3 +164,24 @@ crate.from_cargo(
 )
 inject_repo(crate, "openssl")
 use_repo(crate, "crates")
+
+# .NET toolchain and nuget deps (for arena-xunit).
+dotnet = use_extension("@rules_dotnet//dotnet:extensions.bzl", "dotnet")
+dotnet.toolchain(
+    version = "8.0.x",
+    platforms = ["linux-x64", "macos-x64", "macos-arm64", "windows-x64"],
+)
+use_repo(dotnet, "dotnet_sdk_8.0.100")
+
+nuget = use_extension("@rules_dotnet//dotnet:extensions.bzl", "nuget")
+nuget.download(
+    name = "nuget",
+    packages = [
+        "xunit.core:2.9.0",
+        "xunit.assert:2.9.0",
+        "xunit.runner.visualstudio:2.8.2",
+        "Newtonsoft.Json:13.0.3",
+        "Microsoft.Extensions.Logging.Abstractions:6.0.4",
+    ],
+)
+use_repo(nuget, "nuget")
