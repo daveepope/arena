@@ -15,27 +15,22 @@ import_library(
 import_library(
     name = "xunit_assert_lib",
     library_name = "xunit.assert",
-    libs = ["@xunit_assert//:libs"],
-    refs = ["@xunit_assert//:refs"],
+    libs = ["@xunit_assert//:libs_netstandard1.1_files"],
+    refs = ["@xunit_assert//:refs_netstandard1.1_files"],
 )
 
 import_library(
     name = "xunit_abstractions_lib",
     library_name = "xunit.abstractions",
-    libs = ["@xunit_abstractions//:libs"],
-    refs = ["@xunit_abstractions//:refs"],
-)
-
-filegroup(
-    name = "xunit_execution_netstandard",
-    srcs = ["@xunit_extensibility//:lib/netstandard1.1/xunit.execution.dotnet.dll"],
+    libs = ["@xunit_abstractions//:libs_netstandard2.0_files"],
+    refs = ["@xunit_abstractions//:refs_netstandard2.0_files"],
 )
 
 import_library(
     name = "xunit_extensibility_lib",
     library_name = "xunit.execution.dotnet",
-    libs = [":xunit_execution_netstandard"],
-    refs = [":xunit_execution_netstandard"],
+    libs = ["@xunit_extensibility//:libs_netstandard1.1_files"],
+    refs = ["@xunit_extensibility//:refs_netstandard1.1_files"],
 )
 
 filegroup(
@@ -77,141 +72,141 @@ import_library(
 import_library(
     name = "newtonsoft_json_lib",
     library_name = "Newtonsoft.Json",
-    libs = ["@newtonsoft_json//:libs"],
-    refs = ["@newtonsoft_json//:refs"],
+    libs = ["@newtonsoft_json//:libs_net6.0_files"],
+    refs = ["@newtonsoft_json//:refs_net6.0_files"],
 )
 
 import_library(
     name = "ms_logging_abstractions_lib",
     library_name = "Microsoft.Extensions.Logging.Abstractions",
-    libs = ["@ms_logging_abstractions//:libs"],
-    refs = ["@ms_logging_abstractions//:refs"],
+    libs = ["@ms_logging_abstractions//:libs_net6.0_files"],
+    refs = ["@ms_logging_abstractions//:refs_net6.0_files"],
 )
 
 import_library(
     name = "npgsql_lib",
     library_name = "Npgsql",
-    libs = ["@npgsql//:libs"],
-    refs = ["@npgsql//:refs"],
+    libs = ["@npgsql//:libs_net8.0_files"],
+    refs = ["@npgsql//:refs_net8.0_files"],
 )
 
 import_library(
     name = "sqlclient_lib",
     library_name = "Microsoft.Data.SqlClient",
-    libs = ["@sqlclient//:libs"],
-    refs = ["@sqlclient//:refs"],
+    libs = ["@sqlclient//:libs_net8.0_files"],
+    refs = ["@sqlclient//:refs_net8.0_files"],
 )
 
 import_library(
     name = "aws_core_lib",
     library_name = "AWSSDK.Core",
-    libs = ["@aws_core//:libs"],
-    refs = ["@aws_core//:refs"],
+    libs = ["@aws_core//:libs_net8.0_files"],
+    refs = ["@aws_core//:refs_net8.0_files"],
 )
 
 import_library(
     name = "aws_eventbridge_lib",
     library_name = "AWSSDK.EventBridge",
-    libs = ["@aws_eventbridge//:libs"],
-    refs = ["@aws_eventbridge//:refs"],
+    libs = ["@aws_eventbridge//:libs_net8.0_files"],
+    refs = ["@aws_eventbridge//:refs_net8.0_files"],
 )
 
 import_library(
     name = "aws_sqs_lib",
     library_name = "AWSSDK.SQS",
-    libs = ["@aws_sqs//:libs"],
-    refs = ["@aws_sqs//:refs"],
+    libs = ["@aws_sqs//:libs_net8.0_files"],
+    refs = ["@aws_sqs//:refs_net8.0_files"],
 )
 
 import_library(
     name = "jwt_lib",
     library_name = "System.IdentityModel.Tokens.Jwt",
-    libs = ["@jwt//:libs"],
-    refs = ["@jwt//:refs"],
+    libs = ["@jwt//:libs_net8.0_files"],
+    refs = ["@jwt//:refs_net8.0_files"],
 )
 
 import_library(
     name = "ms_identitymodel_tokens_lib",
     library_name = "Microsoft.IdentityModel.Tokens",
-    libs = ["@ms_identitymodel_tokens//:libs"],
-    refs = ["@ms_identitymodel_tokens//:refs"],
+    libs = ["@ms_identitymodel_tokens//:libs_net8.0_files"],
+    refs = ["@ms_identitymodel_tokens//:refs_net8.0_files"],
 )
 
 import_library(
     name = "ms_extensions_configuration_lib",
     library_name = "Microsoft.Extensions.Configuration",
-    libs = ["@ms_extensions_configuration//:libs"],
-    refs = ["@ms_extensions_configuration//:refs"],
+    libs = ["@ms_extensions_configuration//:libs_net8.0_files"],
+    refs = ["@ms_extensions_configuration//:refs_net8.0_files"],
 )
 
 import_library(
     name = "ms_extensions_configuration_abstractions_lib",
     library_name = "Microsoft.Extensions.Configuration.Abstractions",
-    libs = ["@ms_extensions_configuration_abstractions//:libs"],
-    refs = ["@ms_extensions_configuration_abstractions//:refs"],
+    libs = ["@ms_extensions_configuration_abstractions//:libs_net8.0_files"],
+    refs = ["@ms_extensions_configuration_abstractions//:refs_net8.0_files"],
 )
 
 import_library(
     name = "ms_extensions_configuration_binder_lib",
     library_name = "Microsoft.Extensions.Configuration.Binder",
-    libs = ["@ms_extensions_configuration_binder//:libs"],
-    refs = ["@ms_extensions_configuration_binder//:refs"],
+    libs = ["@ms_extensions_configuration_binder//:libs_net8.0_files"],
+    refs = ["@ms_extensions_configuration_binder//:refs_net8.0_files"],
 )
 
 import_library(
     name = "ms_extensions_dependency_injection_lib",
     library_name = "Microsoft.Extensions.DependencyInjection",
-    libs = ["@ms_extensions_dependency_injection//:libs"],
-    refs = ["@ms_extensions_dependency_injection//:refs"],
+    libs = ["@ms_extensions_dependency_injection//:libs_net8.0_files"],
+    refs = ["@ms_extensions_dependency_injection//:refs_net8.0_files"],
 )
 
 import_library(
     name = "ms_extensions_dependency_injection_abstractions_lib",
     library_name = "Microsoft.Extensions.DependencyInjection.Abstractions",
-    libs = ["@ms_extensions_dependency_injection_abstractions//:libs"],
-    refs = ["@ms_extensions_dependency_injection_abstractions//:refs"],
+    libs = ["@ms_extensions_dependency_injection_abstractions//:libs_net8.0_files"],
+    refs = ["@ms_extensions_dependency_injection_abstractions//:refs_net8.0_files"],
 )
 
 import_library(
     name = "ms_extensions_hosting_lib",
     library_name = "Microsoft.Extensions.Hosting",
-    libs = ["@ms_extensions_hosting//:libs"],
-    refs = ["@ms_extensions_hosting//:refs"],
+    libs = ["@ms_extensions_hosting//:libs_net8.0_files"],
+    refs = ["@ms_extensions_hosting//:refs_net8.0_files"],
 )
 
 import_library(
     name = "ms_extensions_hosting_abstractions_lib",
     library_name = "Microsoft.Extensions.Hosting.Abstractions",
-    libs = ["@ms_extensions_hosting_abstractions//:libs"],
-    refs = ["@ms_extensions_hosting_abstractions//:refs"],
+    libs = ["@ms_extensions_hosting_abstractions//:libs_net8.0_files"],
+    refs = ["@ms_extensions_hosting_abstractions//:refs_net8.0_files"],
 )
 
 import_library(
     name = "ms_extensions_http_lib",
     library_name = "Microsoft.Extensions.Http",
-    libs = ["@ms_extensions_http//:libs"],
-    refs = ["@ms_extensions_http//:refs"],
+    libs = ["@ms_extensions_http//:libs_net8.0_files"],
+    refs = ["@ms_extensions_http//:refs_net8.0_files"],
 )
 
 import_library(
     name = "temporalio_lib",
     library_name = "Temporalio",
-    libs = ["@temporalio//:libs"],
-    refs = ["@temporalio//:refs"],
+    libs = ["@temporalio//:libs_netcoreapp3.1_files"],
+    refs = ["@temporalio//:refs_netcoreapp3.1_files"],
 )
 
 import_library(
     name = "ms_aspnetcore_app_ref_lib",
     library_name = "Microsoft.AspNetCore.App.Ref",
-    libs = ["@ms_aspnetcore_app_ref//:libs"],
-    refs = ["@ms_aspnetcore_app_ref//:refs"],
+    libs = ["@ms_aspnetcore_app_ref//:libs_net8.0_files"],
+    refs = ["@ms_aspnetcore_app_ref//:refs_net8.0_files"],
 )
 
 import_library(
     name = "ms_netcore_app_ref_lib",
     library_name = "Microsoft.NETCore.App.Ref",
-    libs = ["@ms_netcore_app_ref//:libs"],
-    refs = ["@ms_netcore_app_ref//:refs"],
+    libs = ["@ms_netcore_app_ref//:libs_net8.0_files"],
+    refs = ["@ms_netcore_app_ref//:refs_net8.0_files"],
 )
 
 filegroup(

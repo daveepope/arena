@@ -13,36 +13,36 @@ import_library(
 import_library(
     name = "xunit_extensibility_lib",
     library_name = "xunit.extensibility.execution",
-    libs = ["@xunit_extensibility//:libs"],
-    refs = ["@xunit_extensibility//:refs"],
+    libs = ["@xunit_extensibility//:libs_netstandard1.1_files"],
+    refs = ["@xunit_extensibility//:refs_netstandard1.1_files"],
 )
 
 import_library(
     name = "xunit_assert_lib",
     library_name = "xunit.assert",
-    libs = ["@xunit_assert//:libs"],
-    refs = ["@xunit_assert//:refs"],
+    libs = ["@xunit_assert//:libs_netstandard1.1_files"],
+    refs = ["@xunit_assert//:refs_netstandard1.1_files"],
 )
 
 import_library(
     name = "newtonsoft_json_lib",
     library_name = "Newtonsoft.Json",
-    libs = ["@newtonsoft_json//:libs"],
-    refs = ["@newtonsoft_json//:refs"],
+    libs = ["@newtonsoft_json//:libs_netstandard2.0_files"],
+    refs = ["@newtonsoft_json//:refs_netstandard2.0_files"],
 )
 
 import_library(
     name = "ms_logging_abstractions_lib",
     library_name = "Microsoft.Extensions.Logging.Abstractions",
-    libs = ["@ms_logging_abstractions//:libs"],
-    refs = ["@ms_logging_abstractions//:refs"],
+    libs = ["@ms_logging_abstractions//:libs_netstandard2.0_files"],
+    refs = ["@ms_logging_abstractions//:refs_netstandard2.0_files"],
 )
 
 import_library(
     name = "xunit_abstractions_lib",
     library_name = "xunit.abstractions",
-    libs = ["@xunit_abstractions//:libs"],
-    refs = ["@xunit_abstractions//:refs"],
+    libs = ["@xunit_abstractions//:libs_netstandard2.0_files"],
+    refs = ["@xunit_abstractions//:refs_netstandard2.0_files"],
 )
 
 filegroup(
