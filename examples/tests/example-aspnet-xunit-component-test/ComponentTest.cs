@@ -205,7 +205,7 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
     [Fact]
     public async Task createReading_publishesEventAndListsViaHttp()
     {
-        await using var pb = arena.GetPlaybook(typeof(Playbooks.EventsPurgePlaybook)).Run(arena);
+        using var pb = arena.GetPlaybook(typeof(Playbooks.EventsPurgePlaybook)).Run(arena);
         var reading = new CreateReadingRequest
         {
             DeviceId = "device-1",
@@ -239,7 +239,7 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
     [Fact]
     public async Task postReading_returns500_whenCalibrationOutage_active()
     {
-        await using var pb = arena.GetPlaybook(typeof(Playbooks.CalibrationOutagePlaybook)).Run(arena);
+        using var pb = arena.GetPlaybook(typeof(Playbooks.CalibrationOutagePlaybook)).Run(arena);
         var reading = new CreateReadingRequest { DeviceId = "device-1", TemperatureC = 21.0 };
         var response = await api.PostReadingRawAsync(reading);
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
@@ -249,7 +249,7 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
     public async Task postReading_succeedsAfterOutage_playbookIsolation()
     {
         {
-            await using var pb = arena.GetPlaybook(typeof(Playbooks.CalibrationOutagePlaybook)).Run(arena);
+            using var pb = arena.GetPlaybook(typeof(Playbooks.CalibrationOutagePlaybook)).Run(arena);
             var response = await api.PostReadingRawAsync(new CreateReadingRequest { DeviceId = "d", TemperatureC = 20.0 });
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         }
@@ -260,7 +260,7 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
     [Fact]
     public async Task createReading_withValidationDbScopedPlaybook()
     {
-        await using var pb = arena.GetPlaybook(typeof(Playbooks.ResetValidationDbPlaybook)).Run(arena);
+        using var pb = arena.GetPlaybook(typeof(Playbooks.ResetValidationDbPlaybook)).Run(arena);
         var reading = new CreateReadingRequest { DeviceId = "device-2", TemperatureC = 22.0 };
         var created = await api.CreateReadingAsync(reading);
         Assert.NotNull(created.Id);
@@ -270,8 +270,8 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
     [Fact]
     public async Task postReading_returns500_underStackedPlaybooks()
     {
-        await using var pb1 = arena.GetPlaybook(typeof(Playbooks.CalibrationOutagePlaybook)).Run(arena);
-        await using var pb2 = arena.GetPlaybook(typeof(Playbooks.ResetValidationDbPlaybook)).Run(arena);
+        using var pb1 = arena.GetPlaybook(typeof(Playbooks.CalibrationOutagePlaybook)).Run(arena);
+        using var pb2 = arena.GetPlaybook(typeof(Playbooks.ResetValidationDbPlaybook)).Run(arena);
         var response = await api.PostReadingRawAsync(new CreateReadingRequest { DeviceId = "d", TemperatureC = 20.0 });
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
     }
@@ -279,7 +279,7 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
     [Fact]
     public async Task postReading_succeedsAfterCalibrationFlakySequence()
     {
-        await using var pb = arena.GetPlaybook(typeof(Playbooks.CalibrationFlakyPlaybook)).Run(arena);
+        using var pb = arena.GetPlaybook(typeof(Playbooks.CalibrationFlakyPlaybook)).Run(arena);
         for (int attempt = 0; attempt < 3; attempt++)
         {
             try
@@ -298,7 +298,7 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
     [Fact]
     public async Task httpPlaybook_verifyAtLeast_succeedsWithTraffic()
     {
-        await using var pb = arena.GetPlaybook(typeof(Playbooks.TrafficVerifyAtLeast)).Run(arena);
+        using var pb = arena.GetPlaybook(typeof(Playbooks.TrafficVerifyAtLeast)).Run(arena);
         await api.GetRawAsync("/api/health").ConfigureAwait(false);
         await api.GetRawAsync("/api/health").ConfigureAwait(false);
         await pb.VerifyAtLeast("/api/v1/calibrate", 1);
@@ -307,7 +307,7 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
     [Fact]
     public async Task httpPlaybook_verifyCountMismatch_raises()
     {
-        await using var pb = arena.GetPlaybook(typeof(Playbooks.TrafficVerifyAtLeast)).Run(arena);
+        using var pb = arena.GetPlaybook(typeof(Playbooks.TrafficVerifyAtLeast)).Run(arena);
         await Assert.ThrowsAsync<Exception>(async () => await pb.VerifyAtLeast("/api/v1/calibrate", 100));
     }
 
