@@ -1,0 +1,51 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+
+namespace ArenaExamples.Test.Shared;
+
+public class ApiClient
+{
+    private readonly HttpClient _client;
+
+    public ApiClient(string baseUrl, string accessToken)
+    {
+        _client = new HttpClient
+        {
+            BaseAddress = new Uri(baseUrl),
+        };
+        _client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+    }
+
+    public async Task<string> GetAsync(string path)
+    {
+        var response = await _client.GetAsync(path);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    public async Task<TResponse> GetJsonAsync<TResponse>(string path)
+    {
+        var json = await GetAsync(path);
+        return JsonSerializer.Deserialize<TResponse>(json)!;
+    }
+
+    public async Task<TResponse> PostJsonAsync<TRequest, TResponse>(string path, TRequest request)
+    {
+        var response = await _client.PostAsJsonAsync(path, request);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<TResponse>(json)!;
+    }
+
+    public async Task<HttpResponseMessage> PostJsonRawAsync<TRequest>(string path, TRequest request)
+    {
+        return await _client.PostAsJsonAsync(path, request);
+    }
+
+    public async Task DeleteAsync(string path)
+    {
+        await _client.DeleteAsync(path);
+    }
+}

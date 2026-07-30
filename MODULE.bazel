@@ -182,6 +182,12 @@ nuget.download(
         "xunit.runner.visualstudio:2.8.2",
         "Newtonsoft.Json:13.0.3",
         "Microsoft.Extensions.Logging.Abstractions:6.0.4",
+        "Npgsql:8.0.4",
+        "Microsoft.Data.SqlClient:5.2.2",
+        "AWSSDK.EventBridge:3.7.400",
+        "AWSSDK.SQS:3.7.403.30",
+        "System.IdentityModel.Tokens.Jwt:8.0.1",
+        "Microsoft.NET.Test.Sdk:17.11.0",
     ],
 )
 use_repo(nuget, "nuget")
