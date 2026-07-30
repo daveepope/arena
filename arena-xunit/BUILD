@@ -48,6 +48,7 @@ import_library(
 filegroup(
     name = "xunit_core_netstandard",
     srcs = ["@xunit_extensibility_core//:lib/netstandard1.1/xunit.core.dll"],
+    visibility = ["//visibility:public"],
 )
 
 import_library(

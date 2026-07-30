@@ -44,16 +44,16 @@ public class ArenaLifecycleComponentTest : IClassFixture<ArenaLifecycleComponent
 {
     private readonly OpenArena _arena;
 
-    internal ArenaLifecycleComponentTest(Fixture fixture)
+    public ArenaLifecycleComponentTest(Fixture fixture)
     {
         _arena = fixture.Arena;
     }
 
-    internal class Fixture : ArenaCollectionFixture<EmptyMatchTopology>
+    public class Fixture : ArenaCollectionFixture<EmptyMatchTopology>
     {
     }
 
-    internal class EmptyMatchTopology : IArenaTopology
+    public class EmptyMatchTopology : IArenaTopology
     {
         public Match Configure() => new MatchBuilder("lifecycle-empty-match").Build();
     }
@@ -74,8 +74,10 @@ public class ArenaLifecycleComponentTest : IClassFixture<ArenaLifecycleComponent
     [Fact]
     public void openArena_methodsAfterDispose_throwObjectDisposedException()
     {
-        ((IDisposable)_arena).Dispose();
-        Assert.Throws<ObjectDisposedException>(() => _arena.GetPlaybook(typeof(object)));
+        var closedArena = new ClosedArena("dispose-test", new MatchBuilder("dispose-test-match").Build());
+        var openArena = closedArena.OpenAsync().Result;
+        ((IDisposable)openArena).Dispose();
+        Assert.Throws<ObjectDisposedException>(() => openArena.GetPlaybook(typeof(object)));
     }
 }
 
@@ -83,11 +85,18 @@ public class ArenaOauthComponentTest : IClassFixture<ArenaOauthComponentTest.Fix
 {
     private static readonly int _port = TestRuntime.AllocatePort();
 
-    internal class Fixture : ArenaCollectionFixture<OauthMatchTopology>
+    private readonly Fixture _fixture;
+
+    public ArenaOauthComponentTest(Fixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    public class Fixture : ArenaCollectionFixture<OauthMatchTopology>
     {
     }
 
-    internal class OauthMatchTopology : IArenaTopology
+    public class OauthMatchTopology : IArenaTopology
     {
         public Match Configure()
         {
@@ -101,27 +110,34 @@ public class ArenaOauthComponentTest : IClassFixture<ArenaOauthComponentTest.Fix
     }
 
     [Fact]
-    internal void openArena_withOauthDependency_opensAndClosesSuccessfully(Fixture fixture)
+    internal void openArena_withOauthDependency_opensAndClosesSuccessfully()
     {
-        Assert.NotNull(fixture.Arena);
+        Assert.NotNull(_fixture.Arena);
     }
 }
 
 public class ArenaDisposeComponentTest : IClassFixture<ArenaDisposeComponentTest.Fixture>
 {
-    internal class Fixture : ArenaCollectionFixture<DisposeMatchTopology>
+    private readonly Fixture _fixture;
+
+    public ArenaDisposeComponentTest(Fixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    public class Fixture : ArenaCollectionFixture<DisposeMatchTopology>
     {
     }
 
-    internal class DisposeMatchTopology : IArenaTopology
+    public class DisposeMatchTopology : IArenaTopology
     {
         public Match Configure() => new MatchBuilder("lifecycle-dispose-match").Build();
     }
 
     [Fact]
-    internal void openArena_dispose_canBeCalledMultipleTimes(Fixture fixture)
+    internal void openArena_dispose_canBeCalledMultipleTimes()
     {
-        var arena = fixture.Arena;
+        var arena = _fixture.Arena;
         ((IDisposable)arena).Dispose();
         ((IDisposable)arena).Dispose();
     }

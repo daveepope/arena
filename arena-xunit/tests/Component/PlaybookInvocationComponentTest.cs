@@ -54,11 +54,11 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
         }
     }
 
-    internal class Fixture : ArenaCollectionFixture<TestTopology>
+    public class Fixture : ArenaCollectionFixture<TestTopology>
     {
     }
 
-    internal class TestTopology : IArenaTopology
+    public class TestTopology : IArenaTopology
     {
         public Match Configure()
         {
@@ -75,7 +75,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
         }
     }
 
-    internal PlaybookInvocationComponentTest(Fixture fixture)
+    public PlaybookInvocationComponentTest(Fixture fixture)
     {
         _arena = fixture.Arena;
     }

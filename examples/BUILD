@@ -741,6 +741,7 @@ csharp_test(
         ":instrument_reading_db_schema",
         ":arena_config",
         ":validation_db_schema",
+        "//arena-xunit:xunit_core_netstandard",
     ],
     deps = [
         ":xunit_shared",
