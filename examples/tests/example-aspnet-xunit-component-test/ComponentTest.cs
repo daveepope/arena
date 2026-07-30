@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -10,11 +9,10 @@ using Amazon.SQS;
 using Amazon.SQS.Model;
 using ArenaExamples.Test.Shared;
 using ArenaXunit;
-using ArenaXunit.Component;
 using ArenaXunit.Dep;
+using ArenaXunit.Topology;
 using ArenaXunit.Playbook;
 using ArenaXunit.Xunit;
-using ArenaXunit.Topology;
 using Xunit;
 
 namespace ArenaExamples.ComponentTest;
@@ -28,20 +26,27 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
     private static int LocalstackPort { get; } = EphemeralTestRuntime.AllocatePort();
     private static int TemporalPort { get; } = EphemeralTestRuntime.AllocatePort();
     private static int SmtpPort { get; } = EphemeralTestRuntime.AllocatePort();
+    private static int SmtpUiPort { get; } = EphemeralTestRuntime.AllocatePort();
     private static int OauthPort { get; } = EphemeralTestRuntime.AllocatePort();
-
-    private readonly OpenArena arena;
-    private readonly ApiClient api;
 
     private static string PostgresHost { get; } = "127.0.0.1";
     private static string MssqlHost { get; } = "127.0.0.1";
 
+    private const string QueueName = "readings-events-queue";
+    private const string EventBusName = "example-api-events";
+    private const string EventSource = "readings.api";
+    private const string EventRuleName = "readings-event-rule";
+    private const string Region = "us-east-1";
 
+    private readonly OpenArena arena;
+    private readonly ApiClient api;
+    private readonly string smtpUiBaseUrl;
 
     public AspNetComponentTests(AspNetComponentTests.Fixture collection)
     {
         this.arena = collection.Arena;
         this.api = collection.ApiClient;
+        this.smtpUiBaseUrl = $"http://127.0.0.1:{SmtpUiPort}";
     }
 
     public void Dispose()
@@ -53,32 +58,59 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
         public Match Configure()
         {
             Environment.SetEnvironmentVariable("WEB_APP_PORT", WebAppPort.ToString());
-            Environment.SetEnvironmentVariable("CALIBRATION_URL", $"http://127.0.0.1:{CalibrationPort}/api/v1/calibrate");
-            Environment.SetEnvironmentVariable("LOCALSTACK_HOST", $"127.0.0.1:{LocalstackPort}");
-            Environment.SetEnvironmentVariable("LOCALSTACK_REGION", "us-east-1");
-            Environment.SetEnvironmentVariable("AWS_REGION", "us-east-1");
-            Environment.SetEnvironmentVariable("LOCALSTACK_SQS_ENDPOINT", $"http://127.0.0.1:{LocalstackPort}");
-            Environment.SetEnvironmentVariable("SMTP_HOST", "127.0.0.1");
-            Environment.SetEnvironmentVariable("SMTP_PORT", SmtpPort.ToString());
-            Environment.SetEnvironmentVariable("SMTP_FROM", "test@example.com");
-            Environment.SetEnvironmentVariable("TEMPORAL_HOST", "127.0.0.1");
-            Environment.SetEnvironmentVariable("TEMPORAL_PORT", TemporalPort.ToString());
-            Environment.SetEnvironmentVariable("JWT_ISSUER", "test-issuer");
-            Environment.SetEnvironmentVariable("JWT_AUDIENCE", "test-audience");
-            Environment.SetEnvironmentVariable("JWT_KEY", "super-secret-key-that-is-long-enough-for-jwt-signing-purposes");
-            Environment.SetEnvironmentVariable("VALIDATION_DB_HOST", MssqlHost);
-            Environment.SetEnvironmentVariable("VALIDATION_DB_PORT", MssqlPort.ToString());
-            Environment.SetEnvironmentVariable("VALIDATION_DB_USER", "sa");
-            Environment.SetEnvironmentVariable("VALIDATION_DB_PASSWORD", "Password123!");
-            Environment.SetEnvironmentVariable("VALIDATION_DB_NAME", "testdb");
+            Environment.SetEnvironmentVariable("CALIBRATION_URL", $"http://127.0.0.1:{CalibrationPort}");
             Environment.SetEnvironmentVariable("POSTGRES_HOST", PostgresHost);
             Environment.SetEnvironmentVariable("POSTGRES_PORT", PostgresPort.ToString());
             Environment.SetEnvironmentVariable("POSTGRES_DB", "testdb");
             Environment.SetEnvironmentVariable("POSTGRES_USER", "test");
             Environment.SetEnvironmentVariable("POSTGRES_PASSWORD", "test");
+            Environment.SetEnvironmentVariable("POSTGRES_CONNECTION_STRING",
+                $"host={PostgresHost} port={PostgresPort} user=test password=test dbname=testdb");
+            Environment.SetEnvironmentVariable("MSSQL_HOST", MssqlHost);
+            Environment.SetEnvironmentVariable("MSSQL_PORT", MssqlPort.ToString());
+            Environment.SetEnvironmentVariable("MSSQL_DB_NAME", "testdb");
+            Environment.SetEnvironmentVariable("MSSQL_DB_USER", "sa");
+            Environment.SetEnvironmentVariable("MSSQL_DB_PASSWORD", "Password123!");
+            Environment.SetEnvironmentVariable("MSSQL_CONNECTION_STRING",
+                $"Server=tcp:{MssqlHost},{MssqlPort};Database=testdb;User Id=sa;Password=Password123!;TrustServerCertificate=True;");
+            Environment.SetEnvironmentVariable("TEMPORAL_HOST", "127.0.0.1");
+            Environment.SetEnvironmentVariable("TEMPORAL_PORT", TemporalPort.ToString());
+            Environment.SetEnvironmentVariable("TEMPORAL_TARGET", $"127.0.0.1:{TemporalPort}");
+            Environment.SetEnvironmentVariable("SMTP_HOST", "127.0.0.1");
+            Environment.SetEnvironmentVariable("SMTP_PORT", SmtpPort.ToString());
+            Environment.SetEnvironmentVariable("SMTP_FROM", "test@example.com");
+            Environment.SetEnvironmentVariable("LOCALSTACK_HOST", $"127.0.0.1:{LocalstackPort}");
+            Environment.SetEnvironmentVariable("LOCALSTACK_REGION", Region);
+            Environment.SetEnvironmentVariable("AWS_REGION", Region);
+            Environment.SetEnvironmentVariable("AWS_ENDPOINT_URL", $"http://127.0.0.1:{LocalstackPort}");
+            Environment.SetEnvironmentVariable("AWS_DEFAULT_REGION", Region);
+            Environment.SetEnvironmentVariable("AWS_ACCESS_KEY_ID", "test");
+            Environment.SetEnvironmentVariable("AWS_SECRET_ACCESS_KEY", "test");
+            Environment.SetEnvironmentVariable("EVENT_BUS_NAME", EventBusName);
+            Environment.SetEnvironmentVariable("EVENT_SOURCE", EventSource);
             Environment.SetEnvironmentVariable("OAUTH_URL", $"http://127.0.0.1:{OauthPort}");
+            Environment.SetEnvironmentVariable("OAUTH_ISSUER", $"http://127.0.0.1:{OauthPort}");
             Environment.SetEnvironmentVariable("OAUTH_CLIENT_ID", "test-client");
             Environment.SetEnvironmentVariable("OAUTH_CLIENT_SECRET", "test-secret");
+
+            var eventRule = new EventRuleSpec
+            {
+                Name = EventRuleName,
+                EventBus = EventBusName,
+                EventPattern = JsonSerializer.Serialize(new { source = new[] { EventSource } }),
+                Targets = new List<EventRuleTarget>
+                {
+                    EventRuleTargetBuilder.SqsQueue("target-queue", QueueName),
+                },
+            };
+
+            var localstack = new LocalstackDependencyBuilder("test-localstack")
+                .WithPort(LocalstackPort)
+                .WithServices("sqs", "events")
+                .WithQueue(QueueName)
+                .WithEventBus(EventBusName)
+                .WithEventRule(eventRule)
+                .Build();
 
             var match = new MatchBuilder("aspnet")
                 .AddDependency(new PostgresDependencyBuilder("test-postgres")
@@ -87,9 +119,7 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
                 .AddDependency(new MssqlDependencyBuilder("test-mssql")
                     .WithPort(MssqlPort)
                     .Build())
-                .AddDependency(new LocalstackDependencyBuilder("test-localstack")
-                    .WithPort(LocalstackPort)
-                    .Build())
+                .AddDependency(localstack)
                 .AddDependency(new TemporalDependencyBuilder("test-temporal")
                     .WithPort(TemporalPort)
                     .Build())
@@ -98,20 +128,17 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
                     .Build())
                 .AddDependency(new SmtpDependencyBuilder("test-smtp")
                     .WithPort(SmtpPort)
+                    .WithUiPort(SmtpUiPort)
+                    .WithStarttls()
                     .Build())
                 .AddDependency(new HttpDependencyBuilder("test-calibration")
                     .WithPort(CalibrationPort)
                     .Build())
-                .AddComponent(new ExecutableComponentBuilder("test-webapp")
-                    .WithExecutablePath("/path/to/app")
-                    .WithEnv("DOTNET_RUNNING_IN_TESTS", "1")
-                    .Build())
-                .RegisterPlaybook(new Playbooks.CalibrationHappyPathPlaybook("test-calibration"), false)
+                .RegisterPlaybook(new Playbooks.CalibrationHappyPathPlaybook("test-calibration"), true)
                 .RegisterPlaybook(new Playbooks.CalibrationOutagePlaybook("test-calibration"), false)
                 .RegisterPlaybook(new Playbooks.CalibrationFlakyPlaybook("test-calibration"), false)
                 .RegisterPlaybook(new Playbooks.ResetValidationDbPlaybook("test-mssql"), false)
-                .RegisterPlaybook(new Playbooks.EventsPurgePlaybook("test-localstack"), false)
-                .RegisterPlaybook(new Playbooks.TrafficVerifyAtLeast("test-calibration"), false)
+                .RegisterPlaybook(new Playbooks.EventsPurgePlaybook("test-localstack"), true)
                 .Build();
             return match;
         }
@@ -144,215 +171,195 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
         }
     }
 
-    private async Task PollSqsForEventAsync(string topic, int maxAttempts = 30)
+    private async Task<JsonElement> WaitReadingCreatedEventAsync(int expectedId, int maxAttempts = 30)
     {
         var endpoint = new Uri($"http://127.0.0.1:{LocalstackPort}");
         var client = new AmazonSQSClient(new AmazonSQSConfig { ServiceURL = endpoint.ToString() });
-        var queueName = $"{topic}.queue";
-        try { await client.DeleteQueueAsync(queueName).ConfigureAwait(false); } catch { }
-        await client.CreateQueueAsync(queueName);
-        await client.SetQueueAttributesAsync(queueName, new Dictionary<string, string>
-        {
-            ["RedrivePolicy"] = "{}"
-        });
-        var attrs = (await client.GetQueueAttributesAsync(new GetQueueAttributesRequest
-        {
-            QueueUrl = await GetQueueUrl(client, queueName),
-            AttributeNames = new List<string> { "QueueArn" }
-        })).Attributes["QueueArn"];
+        var queueUrl = (await client.GetQueueUrlAsync(QueueName)).QueueUrl;
 
-        // Use SNS to send message to queue (simulating topic subscription)
         for (int i = 0; i < maxAttempts; i++)
         {
             var resp = await client.ReceiveMessageAsync(new ReceiveMessageRequest
             {
-                QueueUrl = await GetQueueUrl(client, queueName),
+                QueueUrl = queueUrl,
                 MaxNumberOfMessages = 1,
-                WaitTimeSeconds = 1
+                WaitTimeSeconds = 2,
+                VisibilityTimeout = 10,
             }).ConfigureAwait(false);
-            if (resp.Messages.Count > 0) return;
+
+            foreach (var msg in resp.Messages)
+            {
+                var body = JsonSerializer.Deserialize<JsonElement>(msg.Body);
+                var detailType = body.TryGetProperty("detail-type", out var dt) ? dt.GetString() : null;
+                if (detailType != "ReadingCreated")
+                {
+                    await client.DeleteMessageAsync(queueUrl, msg.ReceiptHandle).ConfigureAwait(false);
+                    continue;
+                }
+
+                var detail = body.TryGetProperty("detail", out var d) ? d : JsonDocument.Parse("{}").RootElement;
+                var id = detail.TryGetProperty("id", out var idProp) ? idProp.GetInt32() : -1;
+
+                await client.DeleteMessageAsync(queueUrl, msg.ReceiptHandle).ConfigureAwait(false);
+
+                if (id == expectedId)
+                {
+                    return detail;
+                }
+            }
+
+            await Task.Delay(100).ConfigureAwait(false);
         }
-        throw new TimeoutException($"No messages received from {queueName} within timeout");
+
+        throw new TimeoutException($"SQS did not receive ReadingCreated for id={expectedId}");
     }
 
-    private async Task<string> GetQueueUrl(AmazonSQSClient client, string queueName)
+    private async Task<bool> WaitDeviceProvisionedEmailAsync(string deviceName, int maxAttempts = 30)
     {
-        var resp = await client.GetQueueUrlAsync(queueName).ConfigureAwait(false);
-        return resp.QueueUrl;
-    }
-
-    private async Task<string> PollSmtpForEmailAsync(string recipient, int maxAttempts = 30)
-    {
+        using var client = new HttpClient();
         for (int i = 0; i < maxAttempts; i++)
         {
             try
             {
-                var response = await api.GetRawAsync($"/api/smtp-mailbox/{Uri.EscapeDataString(recipient)}").ConfigureAwait(false);
+                var response = await client.GetAsync($"{smtpUiBaseUrl}/api/v1/messages").ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
-                    var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    var emails = JsonSerializer.Deserialize<List<JsonElement>>(json);
-                    if (emails != null && emails.Count > 0)
-                        return emails[0].GetProperty("Body").GetString();
+                    var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    if (text.Contains(deviceName))
+                    {
+                        return true;
+                    }
                 }
             }
-            catch { }
-            await Task.Delay(500).ConfigureAwait(false);
+            catch
+            {
+            }
+            await Task.Delay(100).ConfigureAwait(false);
         }
-        throw new TimeoutException($"No email received for {recipient}");
+        return false;
     }
 
     [Fact]
-    public async Task createReading_publishesEventAndListsViaHttp()
+    public async Task CreateReadingPublishesEventAndListsViaHttp()
     {
-        using var pb = arena.GetPlaybook(typeof(Playbooks.EventsPurgePlaybook)).Run(arena);
+        using var pb = arena.GetPlaybook<Playbooks.EventsPurgePlaybook>().Run(arena);
         var reading = new CreateReadingRequest
         {
-            DeviceId = "device-1",
-            TemperatureC = 21.5
+            UserName = "Test User",
+            Value = 77,
+            Comment = "sqs happy path",
+            DeviceId = 1,
         };
         var created = await api.CreateReadingAsync(reading);
-        Assert.NotNull(created.Id);
+        Assert.True(created.Id > 0);
 
-        await PollSqsForEventAsync("readings-topic");
+        var consumed = await WaitReadingCreatedEventAsync(created.Id);
+        Assert.Equal(created.Id, consumed.TryGetProperty("id", out var id) ? id.GetInt32() : -1);
+        Assert.Equal("Test User", consumed.TryGetProperty("user_name", out var un) ? un.GetString() : "");
+        Assert.Equal(77, consumed.TryGetProperty("value", out var v) ? v.GetInt32() : -1);
+        Assert.Equal("sqs happy path", consumed.TryGetProperty("comment", out var c) ? c.GetString() : "");
 
-        var listed = await api.ListReadingsAsync("device-1");
-        Assert.Single(listed);
-        Assert.Equal("device-1", listed[0].DeviceId);
+        var listed = await api.ListReadingsAsync();
+        Assert.Contains(listed, r => r.Id == created.Id && r.Value == 77);
     }
 
     [Fact]
-    public async Task createMultipleReadings_areListed()
+    public async Task CreateMultipleReadingsReturnsAllReadings()
     {
-        for (int i = 0; i < 3; i++)
-        {
-            await api.CreateReadingAsync(new CreateReadingRequest
-            {
-                DeviceId = "device-1",
-                TemperatureC = 20.0 + i
-            });
-        }
-        var listed = await api.ListReadingsAsync("device-1");
-        Assert.Equal(3, listed.Count);
+        await api.CreateReadingAsync(new CreateReadingRequest { UserName = "User1", Value = 1, DeviceId = 1 });
+        await api.CreateReadingAsync(new CreateReadingRequest { UserName = "User2", Value = 2, DeviceId = 1 });
+        var listed = await api.ListReadingsAsync();
+        Assert.True(listed.Count >= 2);
     }
 
     [Fact]
-    public async Task postReading_returns500_whenCalibrationOutage_active()
+    public async Task PostReadingReturns500WhenCalibrationOutageActive()
     {
-        using var pb = arena.GetPlaybook(typeof(Playbooks.CalibrationOutagePlaybook)).Run(arena);
-        var reading = new CreateReadingRequest { DeviceId = "device-1", TemperatureC = 21.0 };
-        var response = await api.PostReadingRawAsync(reading);
+        using var pb = arena.GetPlaybook<Playbooks.CalibrationOutagePlaybook>().Run(arena);
+        var response = await api.PostReadingRawAsync(new CreateReadingRequest { UserName = "Outage User", Value = 99, DeviceId = 1 });
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
     }
 
     [Fact]
-    public async Task postReading_succeedsAfterOutage_playbookIsolation()
+    public async Task PostReadingSucceedsAfterOutagePlaybookScope()
     {
         {
-            using var pb = arena.GetPlaybook(typeof(Playbooks.CalibrationOutagePlaybook)).Run(arena);
-            var response = await api.PostReadingRawAsync(new CreateReadingRequest { DeviceId = "d", TemperatureC = 20.0 });
+            using var pb = arena.GetPlaybook<Playbooks.CalibrationOutagePlaybook>().Run(arena);
+            var response = await api.PostReadingRawAsync(new CreateReadingRequest { UserName = "Outage", Value = 1, DeviceId = 1 });
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         }
-        var ok = await api.CreateReadingAsync(new CreateReadingRequest { DeviceId = "d", TemperatureC = 20.0 });
-        Assert.NotNull(ok.Id);
+        var ok = await api.CreateReadingAsync(new CreateReadingRequest { UserName = "Recovery", Value = 17, DeviceId = 1 });
+        Assert.True(ok.Id > 0);
     }
 
     [Fact]
-    public async Task createReading_withValidationDbScopedPlaybook()
+    public async Task CreateReadingWithValidationDbScopedPlaybook()
     {
-        using var pb = arena.GetPlaybook(typeof(Playbooks.ResetValidationDbPlaybook)).Run(arena);
-        var reading = new CreateReadingRequest { DeviceId = "device-2", TemperatureC = 22.0 };
+        using var pb = arena.GetPlaybook<Playbooks.ResetValidationDbPlaybook>().Run(arena);
+        var reading = new CreateReadingRequest { UserName = "Scoped User", Value = 7, DeviceId = 2 };
         var created = await api.CreateReadingAsync(reading);
-        Assert.NotNull(created.Id);
-        Assert.Equal("device-2", created.DeviceId);
+        Assert.True(created.Id > 0);
+        var listed = await api.ListReadingsAsync();
+        Assert.Contains(listed, r => r.Id == created.Id);
     }
 
     [Fact]
-    public async Task postReading_returns500_underStackedPlaybooks()
+    public async Task PostReadingReturns500UnderStackedPlaybooks()
     {
-        using var pb1 = arena.GetPlaybook(typeof(Playbooks.CalibrationOutagePlaybook)).Run(arena);
-        using var pb2 = arena.GetPlaybook(typeof(Playbooks.ResetValidationDbPlaybook)).Run(arena);
-        var response = await api.PostReadingRawAsync(new CreateReadingRequest { DeviceId = "d", TemperatureC = 20.0 });
+        using var pb1 = arena.GetPlaybook<Playbooks.CalibrationOutagePlaybook>().Run(arena);
+        using var pb2 = arena.GetPlaybook<Playbooks.ResetValidationDbPlaybook>().Run(arena);
+        var response = await api.PostReadingRawAsync(new CreateReadingRequest { UserName = "Stack Outage", Value = 1, DeviceId = 1 });
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
     }
 
     [Fact]
-    public async Task postReading_succeedsAfterCalibrationFlakySequence()
+    public async Task PostReadingSucceedsAfterCalibrationFlakySequence()
     {
-        using var pb = arena.GetPlaybook(typeof(Playbooks.CalibrationFlakyPlaybook)).Run(arena);
-        for (int attempt = 0; attempt < 3; attempt++)
-        {
-            try
-            {
-                var created = await api.CreateReadingAsync(new CreateReadingRequest { DeviceId = "d", TemperatureC = 20.0 });
-                Assert.NotNull(created.Id);
-                return;
-            }
-            catch (Exception ex) when (ex is TaskCanceledException || ex.Message.Contains("503") || ex.Message.Contains("500"))
-            {
-            }
-        }
-        throw new InvalidOperationException("Reading creation did not succeed within allowed attempts under flaky calibration");
+        using var pb = arena.GetPlaybook<Playbooks.CalibrationFlakyPlaybook>().Run(arena);
+        Assert.Equal(HttpStatusCode.InternalServerError,
+            (await api.PostReadingRawAsync(new CreateReadingRequest { UserName = "Flaky1", Value = 1, DeviceId = 1 })).StatusCode);
+        Assert.Equal(HttpStatusCode.InternalServerError,
+            (await api.PostReadingRawAsync(new CreateReadingRequest { UserName = "Flaky2", Value = 2, DeviceId = 1 })).StatusCode);
+        var ok = await api.CreateReadingAsync(new CreateReadingRequest { UserName = "Flaky3", Value = 3, DeviceId = 1 });
+        Assert.True(ok.Id > 0);
     }
 
     [Fact]
-    public async Task httpPlaybook_verifyAtLeast_succeedsWithTraffic()
+    public async Task SetDeviceStateAppliesRequestedState()
     {
-        using var pb = arena.GetPlaybook(typeof(Playbooks.TrafficVerifyAtLeast)).Run(arena);
-        await api.GetRawAsync("/api/health").ConfigureAwait(false);
-        await api.GetRawAsync("/api/health").ConfigureAwait(false);
-        await pb.VerifyAtLeast("/api/v1/calibrate", 1);
+        var created = await api.CreateDeviceAsync(new CreateDeviceRequest { Name = "Test Device" });
+        Assert.True(created.Id > 0);
+
+        var state = await api.GetDeviceStateAsync(created.Id);
+        Assert.Equal("OFF", state.State);
+
+        await api.SetDeviceStateAsync(created.Id, new SetDeviceStateRequest { Target = "ON" });
+        state = await api.GetDeviceStateAsync(created.Id);
+        Assert.Equal("ON", state.State);
+
+        await api.SetDeviceStateAsync(created.Id, new SetDeviceStateRequest { Target = "ERROR" });
+        state = await api.GetDeviceStateAsync(created.Id);
+        Assert.Equal("ERROR", state.State);
+
+        var stopped = await api.StopDeviceAsync(created.Id);
+        Assert.True(stopped);
     }
 
     [Fact]
-    public async Task httpPlaybook_verifyCountMismatch_raises()
+    public async Task GetDeviceStateUnknownDeviceReturnsNotFound()
     {
-        using var pb = arena.GetPlaybook(typeof(Playbooks.TrafficVerifyAtLeast)).Run(arena);
-        await Assert.ThrowsAsync<Exception>(async () => await pb.VerifyAtLeast("/api/v1/calibrate", 100));
-    }
-
-    [Fact]
-    public async Task createDevice_requestTransition_appliesState()
-    {
-        var device = new CreateDeviceRequest
-        {
-            Name = "sensor-1",
-            Location = "room-A",
-            Type = "temperature",
-            TargetState = "ACTIVE"
-        };
-        var created = await api.CreateDeviceAsync(device);
-        Assert.Equal("PENDING", created.State);
-
-        await api.RequestStateTransitionAsync(created.Id, new DeviceStateTransitionRequest { TargetState = "ACTIVE" });
-        var fetched = await api.GetDeviceAsync(created.Id);
-        Assert.Equal("ACTIVE", fetched.State);
-    }
-
-    [Fact]
-    public async Task getDeviceState_unknownDevice_returnsNotFound()
-    {
-        var response = await api.GetDeviceRawAsync("nonexistent-device-id");
+        var response = await api.GetDeviceStateRawAsync(999_999_999);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
-    public async Task createDevice_sendsProvisionedEmail_overStarttls()
+    public async Task CreateDeviceSendsProvisionedEmail()
     {
-        var device = new CreateDeviceRequest
-        {
-            Name = "email-test-device",
-            Location = "room-B",
-            Type = "temperature",
-            TargetState = "ACTIVE"
-        };
-        await api.CreateDeviceAsync(device);
-        await Task.Delay(500).ConfigureAwait(false);
+        var deviceName = $"Email Test Device {Guid.NewGuid():N}";
+        var created = await api.CreateDeviceAsync(new CreateDeviceRequest { Name = deviceName });
+        Assert.True(created.Id > 0);
 
-        var emailBody = await PollSmtpForEmailAsync("admin@example.com");
-        Assert.Contains("Provisioned", emailBody);
-        Assert.Contains("email-test-device", emailBody);
+        var emailFound = await WaitDeviceProvisionedEmailAsync(deviceName);
+        Assert.True(emailFound, $"Provisioned email for {deviceName} was not captured");
     }
 }
-
-

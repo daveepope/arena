@@ -10,7 +10,7 @@ public static class Playbooks
         public CalibrationHappyPathPlaybook(string dependencyIdentifier)
             : base("test-calibration-api-happy-path", dependencyIdentifier,
                 BuildMappings(dep => dep
-                    .Post("/api/v1/calibrate")
+                    .Post("/api/v1/validate")
                     .WillReturn(HttpResponse.OkJson(new { valid = true }))))
         {
         }
@@ -21,7 +21,7 @@ public static class Playbooks
         public CalibrationOutagePlaybook(string dependencyIdentifier)
             : base("test-calibration-api-error-path", dependencyIdentifier,
                 BuildMappings(dep => dep
-                    .Post("/api/v1/calibrate")
+                    .Post("/api/v1/validate")
                     .WillReturn(HttpResponse.ServerError())))
         {
         }
@@ -32,7 +32,7 @@ public static class Playbooks
         public CalibrationFlakyPlaybook(string dependencyIdentifier)
             : base("test-calibration-api-flaky-path", dependencyIdentifier,
                 BuildMappings(dep => dep
-                    .Post("/api/v1/calibrate")
+                    .Post("/api/v1/validate")
                     .WillReturn(HttpResponse.ServerError())
                     .ThenReturn(HttpResponse.Status(503))
                     .ThenReturn(HttpResponse.OkJson(new { valid = true }))))
