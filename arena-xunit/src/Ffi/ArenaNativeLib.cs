@@ -166,13 +166,13 @@ internal static class ArenaNativeLib
         return IntPtr.Zero;
     }
 
-    [DllImport("libdl", EntryPoint = "dlopen", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("libc", EntryPoint = "dlopen", CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr dlopen(string filename, int flag);
 
-    [DllImport("libdl", EntryPoint = "dlsym", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("libc", EntryPoint = "dlsym", CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr dlsym(IntPtr handle, string symbol);
 
-    [DllImport("libdl", EntryPoint = "dlerror", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("libc", EntryPoint = "dlerror", CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr dlerror();
 
     [DllImport("kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
