@@ -17,7 +17,7 @@ public sealed class ActiveHttpPlaybook : ActivePlaybook
             Path = path,
             ExpectedCount = expectedCount,
         });
-        ArenaBindings.HttpPlaybookVerify(BaseHandle(), spec);
+        ArenaBindings.HttpPlaybookVerify(_handle, spec);
     }
 
     public void VerifyAtLeast(string method, string path, int minCount)
@@ -28,12 +28,7 @@ public sealed class ActiveHttpPlaybook : ActivePlaybook
             Path = path,
             MinCount = minCount,
         });
-        ArenaBindings.HttpPlaybookVerify(BaseHandle(), spec);
-    }
-
-    private IntPtr BaseHandle()
-    {
-        return this.GetHandle();
+        ArenaBindings.HttpPlaybookVerify(_handle, spec);
     }
 
     [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
@@ -50,15 +45,5 @@ public sealed class ActiveHttpPlaybook : ActivePlaybook
         [JsonProperty("method")] public string? Method { get; set; }
         [JsonProperty("path")] public string? Path { get; set; }
         [JsonProperty("min_count")] public int? MinCount { get; set; }
-    }
-}
-
-internal static class ActivePlaybookExtensions
-{
-    public static IntPtr GetHandle(this ActivePlaybook pb)
-    {
-        var field = pb.GetType().GetField("_handle",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        return field != null ? (IntPtr)field.GetValue(pb)! : IntPtr.Zero;
     }
 }

@@ -1,6 +1,6 @@
 namespace ArenaXunit.Ffi;
 
-internal enum ArenaLogLevel : int
+public enum ArenaLogLevel : int
 {
     Trace = 0,
     Debug = 1,

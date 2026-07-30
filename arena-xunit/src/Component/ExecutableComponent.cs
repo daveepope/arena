@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using ArenaXunit.Match;
+using ArenaXunit.Topology;
 using ArenaXunit.Support;
 using Newtonsoft.Json;
 

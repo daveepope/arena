@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ArenaXunit.Ffi;
-using ArenaXunit.Match;
 using ArenaXunit.Playbook;
 using ArenaXunit.Support;
+using ArenaXunit.Topology;
 using Microsoft.Extensions.Logging;
 
 namespace ArenaXunit;

@@ -18,7 +18,7 @@ internal delegate void ArenaLogCallback(
 internal static class ArenaLogTarget
 {
     private static readonly object Lock = new object();
-    private static readonly Dictionary<ulong, LogEntry> Entries = new Dictionary<ulong>();
+    private static readonly Dictionary<ulong, LogEntry> Entries = new Dictionary<ulong, LogEntry>();
 
     public static ulong RegisterForLogger(ILogger logger, ArenaLogLevel level)
     {

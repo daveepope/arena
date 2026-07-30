@@ -1,34 +1,47 @@
+using System.Threading.Tasks;
+using Temporalio.Workflows;
+using Temporalio.Exceptions;
 namespace ArenaExamples.Readings.Aspnet.Workflows;
 
-public class DeviceState
-{
-    public string CurrentState { get; set; } = "OFF";
-    public int TransitionCount { get; set; }
-}
-
-[Temporal.Workflow]
+[Workflow]
 public class DeviceLifecycleWorkflow
 {
-    private DeviceState _state = new DeviceState();
+    private string _currentState = "OFF";
+    private int _transitionCount;
 
+    public async Task Run()
+    {
+        while (true)
+        {
+            await Task.Delay(1000);
+        }
+    }
+
+    [WorkflowQuery]
     public string QuerySnapshot()
     {
-        return System.Text.Json.JsonSerializer.Serialize(_state);
+        return System.Text.Json.JsonSerializer.Serialize(new
+        {
+            CurrentState = _currentState,
+            TransitionCount = _transitionCount
+        });
     }
 
+    [WorkflowSignal]
     public async Task RequestTransition(string target)
     {
-        if (_state.CurrentState == target)
+        if (_currentState == target)
             return;
 
-        await DeviceActivities.Transition(_state.CurrentState, target);
-        _state.CurrentState = target;
-        _state.TransitionCount++;
+        await DeviceActivities.Transition(_currentState, target);
+        _currentState = target;
+        _transitionCount++;
     }
 
+    [WorkflowSignal]
     public async Task Stop()
     {
-        await DeviceActivities.Stop(_state.CurrentState);
-        throw new Temporal.WorkflowFailedException("Device stopped");
+        await DeviceActivities.Stop(_currentState);
+        throw new ApplicationFailureException("Device stopped");
     }
 }

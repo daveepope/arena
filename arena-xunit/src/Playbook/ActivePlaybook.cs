@@ -1,11 +1,12 @@
 using System;
+using System.Threading.Tasks;
 using ArenaXunit.Ffi;
 
 namespace ArenaXunit.Playbook;
 
-public sealed class ActivePlaybook : IDisposable
+public class ActivePlaybook : IDisposable, IAsyncDisposable
 {
-    private readonly IntPtr _handle;
+    protected readonly IntPtr _handle;
     private bool _disposed;
 
     internal ActivePlaybook(IntPtr handle)
@@ -25,5 +26,18 @@ public sealed class ActivePlaybook : IDisposable
         catch
         {
         }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Dispose();
+        return default;
+    }
+
+    public Task VerifyAtLeast(string path, int minCount)
+    {
+        var http = this as ActiveHttpPlaybook;
+        http?.VerifyAtLeast("POST", path, minCount);
+        return Task.CompletedTask;
     }
 }

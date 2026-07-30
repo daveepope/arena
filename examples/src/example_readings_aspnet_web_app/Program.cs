@@ -1,5 +1,8 @@
+using System;
+using System.Net.Http;
 using ArenaExamples.Readings.Aspnet.Services;
 using Temporalio.Client;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,27 +25,27 @@ builder.Services.AddHttpClient("JwtValidation", c =>
         c.BaseAddress = new Uri(builder.Configuration["OAUTH_ISSUER_URL"]!);
         if (cert is not null)
         {
-            var handler = c.CreateHandler();
-            if (handler is System.Net.Http.HttpClientHandler h)
-                h.ServerCertificateCustomValidationCallback = (msg, cert2, chain, err) => err == System.Net.Security.SslPolicyErrors.None || cert2 == cert;
+            var handler = new System.Net.Http.HttpClientHandler();
+            handler.ServerCertificateCustomValidationCallback = (msg, cert2, chain, err) => err == System.Net.Security.SslPolicyErrors.None || cert2 == cert;
+            c = new System.Net.Http.HttpClient(handler);
         }
     }
 });
 
-builder.Services.AddSingleton<IReadingsService>(_ => new ReadingsService(
-    builder.Configuration["POSTGRES_CONNECTION_STRING"]!,
-    builder.Configuration["MSSQL_CONNECTION_STRING"]!,
-    builder.Configuration["CALIBRATION_URL"]!,
-    _));
 builder.Services.AddSingleton<IEventBridgePublisher>(_ => new EventBridgePublisher(
     builder.Configuration["AWS_ENDPOINT_URL"]!,
     builder.Configuration["EVENT_BUS_NAME"]!,
     builder.Configuration["EVENT_SOURCE"]!));
+builder.Services.AddSingleton<IReadingsService>(sp => new ReadingsService(
+    builder.Configuration["POSTGRES_CONNECTION_STRING"]!,
+    builder.Configuration["MSSQL_CONNECTION_STRING"]!,
+    builder.Configuration["CALIBRATION_URL"]!,
+    sp.GetRequiredService<IEventBridgePublisher>()));
 builder.Services.AddSingleton<ISmtpClientService>(_ => new SmtpClientService(
     builder.Configuration["SMTP_HOST"]!,
     int.Parse(builder.Configuration["SMTP_PORT"]!)));
 
-var temporalClient = await TemporalClient.ConnectAsync(new TemporalClient.Options
+var temporalClient = await TemporalClient.ConnectAsync(new TemporalClientConnectOptions
 {
     TargetHost = builder.Configuration["TEMPORAL_TARGET"]
 });

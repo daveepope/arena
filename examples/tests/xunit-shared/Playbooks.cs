@@ -1,38 +1,73 @@
+using System.Collections.Generic;
 using ArenaXunit.Playbook;
 
 namespace ArenaExamples.Test.Shared;
 
-public class CalibrationApiHappyPathPlaybook : ManagedHttpPlaybook
+public static class Playbooks
 {
-    public CalibrationApiHappyPathPlaybook(string dependencyIdentifier, string validatePath)
-        : base("example-api-calibration-api-happy-path", dependencyIdentifier,
-            new HttpPlaybookBuilder(dependencyIdentifier)
-                .Post(validatePath)
-                .WillReturn(HttpResponse.OkJson(new { valid = true })))
+    public sealed class CalibrationHappyPathPlaybook : ManagedHttpPlaybook
     {
+        public CalibrationHappyPathPlaybook(string dependencyIdentifier)
+            : base("test-calibration-api-happy-path", dependencyIdentifier,
+                BuildMappings(dep => dep
+                    .Post("/api/v1/calibrate")
+                    .WillReturn(HttpResponse.OkJson(new { valid = true }))))
+        {
+        }
     }
-}
 
-public class CalibrationApiErrorPathPlaybook : ManagedHttpPlaybook
-{
-    public CalibrationApiErrorPathPlaybook(string dependencyIdentifier, string validatePath)
-        : base("example-api-calibration-api-error-path", dependencyIdentifier,
-            new HttpPlaybookBuilder(dependencyIdentifier)
-                .Post(validatePath)
-                .WillReturn(HttpResponse.ServerError()))
+    public sealed class CalibrationOutagePlaybook : ManagedHttpPlaybook
     {
+        public CalibrationOutagePlaybook(string dependencyIdentifier)
+            : base("test-calibration-api-error-path", dependencyIdentifier,
+                BuildMappings(dep => dep
+                    .Post("/api/v1/calibrate")
+                    .WillReturn(HttpResponse.ServerError())))
+        {
+        }
     }
-}
 
-public class CalibrationApiFlakyPlaybook : ManagedHttpPlaybook
-{
-    public CalibrationApiFlakyPlaybook(string dependencyIdentifier, string validatePath)
-        : base("example-api-calibration-api-flaky-path", dependencyIdentifier,
-            new HttpPlaybookBuilder(dependencyIdentifier)
-                .Post(validatePath)
-                .WillReturn(HttpResponse.ServerError())
-                .WillReturn(new HttpResponseObj(503, null, "text/plain"))
-                .WillReturn(HttpResponse.OkJson(new { valid = true })))
+    public sealed class CalibrationFlakyPlaybook : ManagedHttpPlaybook
     {
+        public CalibrationFlakyPlaybook(string dependencyIdentifier)
+            : base("test-calibration-api-flaky-path", dependencyIdentifier,
+                BuildMappings(dep => dep
+                    .Post("/api/v1/calibrate")
+                    .WillReturn(HttpResponse.ServerError())
+                    .ThenReturn(HttpResponse.Status(503))
+                    .ThenReturn(HttpResponse.OkJson(new { valid = true }))))
+        {
+        }
+    }
+
+    public sealed class ResetValidationDbPlaybook : ManagedMssqlPlaybook
+    {
+        public ResetValidationDbPlaybook(string dependencyIdentifier)
+            : base("test-validation-db-scoped", dependencyIdentifier)
+        {
+        }
+    }
+
+    public sealed class EventsPurgePlaybook : ManagedLocalstackPlaybook
+    {
+        public EventsPurgePlaybook(string dependencyIdentifier)
+            : base("test-events-purge", dependencyIdentifier)
+        {
+        }
+    }
+
+    public sealed class TrafficVerifyAtLeast : ManagedHttpPlaybook
+    {
+        public TrafficVerifyAtLeast(string dependencyIdentifier)
+            : base("test-traffic-verify", dependencyIdentifier, new List<object>())
+        {
+        }
+    }
+
+    private static List<object> BuildMappings(System.Func<HttpPlaybookBuilder, HttpMappingBuilder> configure)
+    {
+        var builder = new HttpPlaybookBuilder(string.Empty);
+        var mapping = configure(builder);
+        return mapping.BuildMappings();
     }
 }

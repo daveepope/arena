@@ -1,58 +1,140 @@
 load("@arena_version//:defs.bzl", "ARENA_VERSION")
-load("@rules_dotnet//dotnet:defs.bzl", "dotnet_library", "dotnet_test", "dotnet_nuget_package")
+load("@rules_dotnet//dotnet:defs.bzl", "csharp_library", "csharp_test", "import_library")
 
 _ARENA_XUNIT_SRCS = glob(["src/**/*.cs"])
 
-dotnet_library(
-    name = "arena_xunit_lib",
-    srcs = _ARENA_XUNIT_SRCS,
-    netstandard_tfm = "netstandard2.0",
-    visibility = ["//visibility:public"],
-    deps = [
-        "@nuget//:xunit.core",
-        "@nuget//:Newtonsoft.Json",
-        "@nuget//:Microsoft.Extensions.Logging.Abstractions",
-    ],
+# Import nuget packages from MODULE.bazel nuget_archive repos
+import_library(
+    name = "xunit_core_lib",
+    library_name = "xunit.core",
+    libs = ["@xunit_core//:libs"],
+    refs = ["@xunit_core//:refs"],
 )
 
-dotnet_test(
+import_library(
+    name = "xunit_extensibility_lib",
+    library_name = "xunit.extensibility.execution",
+    libs = ["@xunit_extensibility//:libs"],
+    refs = ["@xunit_extensibility//:refs"],
+)
+
+import_library(
+    name = "xunit_assert_lib",
+    library_name = "xunit.assert",
+    libs = ["@xunit_assert//:libs"],
+    refs = ["@xunit_assert//:refs"],
+)
+
+import_library(
+    name = "newtonsoft_json_lib",
+    library_name = "Newtonsoft.Json",
+    libs = ["@newtonsoft_json//:libs"],
+    refs = ["@newtonsoft_json//:refs"],
+)
+
+import_library(
+    name = "ms_logging_abstractions_lib",
+    library_name = "Microsoft.Extensions.Logging.Abstractions",
+    libs = ["@ms_logging_abstractions//:libs"],
+    refs = ["@ms_logging_abstractions//:refs"],
+)
+
+import_library(
+    name = "xunit_abstractions_lib",
+    library_name = "xunit.abstractions",
+    libs = ["@xunit_abstractions//:libs"],
+    refs = ["@xunit_abstractions//:refs"],
+)
+
+filegroup(
+    name = "xunit_execution_netstandard",
+    srcs = ["@xunit_extensibility//:lib/netstandard1.1/xunit.execution.dotnet.dll"],
+)
+
+import_library(
+    name = "xunit_extensibility_core_lib",
+    library_name = "xunit.execution.dotnet",
+    libs = [":xunit_execution_netstandard"],
+    refs = [":xunit_execution_netstandard"],
+)
+
+filegroup(
+    name = "xunit_runner_utility_netstandard",
+    srcs = ["@xunit_runner_utility//:lib/netstandard1.5/xunit.runner.utility.netstandard15.dll"],
+)
+
+import_library(
+    name = "xunit_runner_utility_lib",
+    library_name = "xunit.runner.utility.netstandard15",
+    libs = [":xunit_runner_utility_netstandard"],
+    refs = [":xunit_runner_utility_netstandard"],
+)
+
+filegroup(
+    name = "xunit_runner_reporters_netstandard",
+    srcs = ["@xunit_runner_reporters//:lib/netstandard1.1/xunit.runner.reporters.netstandard11.dll"],
+)
+
+import_library(
+    name = "xunit_runner_reporters_lib",
+    library_name = "xunit.runner.reporters.netstandard11",
+    libs = [":xunit_runner_reporters_netstandard"],
+    refs = [":xunit_runner_reporters_netstandard"],
+)
+
+filegroup(
+    name = "xunit_core_netstandard",
+    srcs = ["@xunit_extensibility_core//:lib/netstandard1.1/xunit.core.dll"],
+)
+
+import_library(
+    name = "xunit_extensibility_core_runtime_lib",
+    library_name = "xunit.core",
+    libs = [":xunit_core_netstandard"],
+    refs = [":xunit_core_netstandard"],
+)
+
+csharp_library(
+    name = "arena_xunit_lib",
+    srcs = _ARENA_XUNIT_SRCS,
+    target_frameworks = ["net8.0"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":xunit_core_lib",
+        ":xunit_extensibility_lib",
+        ":newtonsoft_json_lib",
+        ":ms_logging_abstractions_lib",
+    ],
+    data = ["//arena-ffi:arena_ffi_shared"],
+)
+
+csharp_test(
     name = "arena_xunit_unit_test",
     size = "small",
+    target_frameworks = ["net8.0"],
     srcs = glob(["tests/Unit/**/*.cs"]),
     deps = [
         ":arena_xunit_lib",
-        "@nuget//:xunit.assert",
-        "@nuget//:xunit.runner.visualstudio",
+        ":xunit_core_lib",
+        ":xunit_assert_lib",
+        ":xunit_abstractions_lib",
+        ":xunit_extensibility_lib",
+        ":xunit_extensibility_core_lib",
+        ":xunit_extensibility_core_runtime_lib",
+        ":xunit_runner_utility_lib",
+        ":xunit_runner_reporters_lib",
     ],
 )
 
-dotnet_test(
+csharp_test(
     name = "arena_xunit_lifecycle_component_test",
     size = "small",
     tags = ["component_test"],
+    target_frameworks = ["net8.0"],
     srcs = glob(["tests/Component/**/*.cs"]),
     data = ["//arena-ffi:arena_ffi_shared"],
     deps = [
         ":arena_xunit_lib",
-        "@nuget//:xunit.assert",
-        "//examples:ephemeral_test_runtime_dotnet",
-    ],
-)
-
-dotnet_nuget_package(
-    name = "arena_xunit_nuget",
-    package = ":arena_xunit_lib",
-    id = "Arena.Xunit",
-    version = ARENA_VERSION,
-    tags = ["manual"],
-    summary = "xUnit API and fixtures for Arena (via the C FFI)",
-    authors = ["Arena contributors"],
-    license_url = "https://github.com/daveepope/arena/blob/main/LICENSE",
-    project_url = "https://github.com/daveepope/arena",
-    package_refs = [
-        "@nuget//:xunit.core",
-    ],
-    deps = [
-        "//arena-ffi:arena_ffi_shared",
+        ":xunit_assert_lib",
     ],
 )

@@ -1,3 +1,5 @@
+using System;
+using System.Threading.Tasks;
 using ArenaExamples.Readings.Aspnet.Models;
 using ArenaExamples.Readings.Aspnet.Workflows;
 using Temporalio.Client;
@@ -17,7 +19,7 @@ public class DeviceWorkflowService : IDeviceWorkflowService
     private readonly ITemporalClient _client;
     private readonly string _taskQueue;
 
-    public DeviceWorkflowService(TemporalClient client)
+    public DeviceWorkflowService(ITemporalClient client)
     {
         _client = client;
         _taskQueue = "arena-example-device-lifecycle";
@@ -26,11 +28,12 @@ public class DeviceWorkflowService : IDeviceWorkflowService
     public async Task StartDeviceAsync(int deviceId)
     {
         var workflowId = $"device-{deviceId}";
-        await _client.StartWorkflowAsync(new WorkflowStartOptions<DeviceLifecycleWorkflow, DeviceStateResponse?>
+        var options = new WorkflowOptions
         {
             Id = workflowId,
             TaskQueue = _taskQueue
-        });
+        };
+        await _client.StartWorkflowAsync((DeviceLifecycleWorkflow wf) => wf.Run(), options);
     }
 
     public async Task<bool> SignalTransitionAsync(int deviceId, string target)
@@ -38,7 +41,8 @@ public class DeviceWorkflowService : IDeviceWorkflowService
         var workflowId = $"device-{deviceId}";
         try
         {
-            await _client.SignalWorkflowAsync(workflowId, nameof(DeviceLifecycleWorkflow.RequestTransition), target);
+            var handle = _client.GetWorkflowHandle<DeviceLifecycleWorkflow>(workflowId);
+            await handle.SignalAsync((DeviceLifecycleWorkflow wf) => wf.RequestTransition(target));
             return true;
         }
         catch
@@ -52,8 +56,8 @@ public class DeviceWorkflowService : IDeviceWorkflowService
         var workflowId = $"device-{deviceId}";
         try
         {
-            var handle = _client.GetWorkflowHandle(workflowId);
-            var result = await handle.QueryAsync(nameof(DeviceLifecycleWorkflow.QuerySnapshot));
+            var handle = _client.GetWorkflowHandle<DeviceLifecycleWorkflow>(workflowId);
+            var result = await handle.QueryAsync((DeviceLifecycleWorkflow wf) => wf.QuerySnapshot());
             var state = System.Text.Json.JsonSerializer.Deserialize<DeviceState>(result);
             if (state == null)
                 return null;
@@ -75,7 +79,8 @@ public class DeviceWorkflowService : IDeviceWorkflowService
         var workflowId = $"device-{deviceId}";
         try
         {
-            await _client.SignalWorkflowAsync(workflowId, nameof(DeviceLifecycleWorkflow.Stop));
+            var handle = _client.GetWorkflowHandle<DeviceLifecycleWorkflow>(workflowId);
+            await handle.SignalAsync((DeviceLifecycleWorkflow wf) => wf.Stop());
             return true;
         }
         catch

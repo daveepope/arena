@@ -1,17 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using ArenaXunit.Xunit;
 
 namespace ArenaXunit;
 
-public abstract class ArenaCollectionFixture<TTopology> : IAsyncLifetime where TTopology : class, IArenaTopology, new()
+public abstract class ArenaCollectionFixture<TTopology> : IDisposable where TTopology : class, IArenaTopology, new()
 {
     private static readonly object Lock = new object();
-    private static readonly Dictionary<Type, SharedArena> SharedArenas = new Dictionary<Type>();
+    private static readonly Dictionary<Type, SharedArena> SharedArenas = new Dictionary<Type, SharedArena>();
 
     public OpenArena Arena { get; private set; } = default!;
 
-    public Task InitializeAsync()
+    public ArenaCollectionFixture()
     {
         var topologyType = typeof(TTopology);
         lock (Lock)
@@ -30,16 +31,15 @@ public abstract class ArenaCollectionFixture<TTopology> : IAsyncLifetime where T
             }
             Arena = SharedArenas[topologyType].Arena;
         }
-        return Task.CompletedTask;
     }
 
-    public Task DisposeAsync()
+    public void Dispose()
     {
         var topologyType = typeof(TTopology);
         lock (Lock)
         {
             if (!SharedArenas.ContainsKey(topologyType))
-                return Task.CompletedTask;
+                return;
 
             var shared = SharedArenas[topologyType];
             shared.RefCount--;
@@ -50,7 +50,6 @@ public abstract class ArenaCollectionFixture<TTopology> : IAsyncLifetime where T
                 SharedArenas.Remove(topologyType);
             }
         }
-        return Task.CompletedTask;
     }
 
     private sealed class SharedArena

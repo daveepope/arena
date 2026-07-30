@@ -90,17 +90,6 @@ internal static class ArenaBindings
         return json;
     }
 
-    private static ArenaBindingError TakeErr(out IntPtr errOut, string operation)
-    {
-        if (errOut != IntPtr.Zero)
-        {
-            var message = Marshal.PtrToStringUTF8(errOut) ?? operation;
-            ArenaNativeLib.arena_free_string(errOut);
-            return new ArenaBindingError(message);
-        }
-        return new ArenaBindingError(operation);
-    }
-
     private static ArenaBindingError TakeErr(IntPtr errOut, string operation)
     {
         if (errOut != IntPtr.Zero)

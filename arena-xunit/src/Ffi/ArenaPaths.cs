@@ -14,41 +14,45 @@ internal static class ArenaPaths
         var assemblyDir = Path.GetDirectoryName(typeof(ArenaPaths).Assembly.Location);
         if (!string.IsNullOrEmpty(assemblyDir))
         {
-            var platformName = PlatformLibraryName();
-            var candidate = Path.Combine(assemblyDir, platformName);
-            if (File.Exists(candidate))
-                return candidate;
+            foreach (var name in PlatformLibraryNames())
+            {
+                var candidate = Path.Combine(assemblyDir, name);
+                if (File.Exists(candidate))
+                    return candidate;
+            }
         }
 
         var runfilesRoot = Environment.GetEnvironmentVariable("RUNFILES_DIR");
         if (!string.IsNullOrEmpty(runfilesRoot))
         {
-            var paths = new[]
+            var bases = new[] { "arena/arena-ffi", "_main/arena-ffi" };
+            foreach (var basePath in bases)
             {
-                Path.Combine(runfilesRoot, "arena", "arena-ffi", PlatformLibraryName()),
-                Path.Combine(runfilesRoot, "_main", "arena-ffi", PlatformLibraryName()),
-            };
-            foreach (var path in paths)
-            {
-                if (File.Exists(path))
-                    return path;
+                foreach (var name in PlatformLibraryNames())
+                {
+                    var path = Path.Combine(runfilesRoot, basePath, name);
+                    if (File.Exists(path))
+                        return path;
+                }
             }
         }
 
         return null;
     }
 
-    private static string PlatformLibraryName()
+    private static string[] PlatformLibraryNames()
     {
         var os = Environment.OSVersion.Platform;
         if (os == PlatformID.Unix || os == PlatformID.MacOSX)
         {
             if (os == PlatformID.MacOSX)
-                return "libarena_ffi_shared.dylib";
-            return "libarena_ffi_shared.so";
+                return new[] { "libarena_ffi_shared.dylib", "libarena_ffi.dylib" };
+            return new[] { "libarena_ffi_shared.so", "libarena_ffi.so" };
         }
         if (os == PlatformID.Win32NT)
-            return "arena_ffi_shared.dll";
-        return "libarena_ffi_shared.so";
+            return new[] { "arena_ffi_shared.dll", "arena_ffi.dll" };
+        return new[] { "libarena_ffi_shared.so", "libarena_ffi.so" };
     }
+
+    private static string PlatformLibraryName() => PlatformLibraryNames()[0];
 }
