@@ -3,7 +3,6 @@ using System.Net;
 using System.Net.Sockets;
 using ArenaXunit;
 using ArenaXunit.Dep;
-using ArenaXunit.Xunit;
 using ArenaXunit.Topology;
 using Xunit;
 
@@ -53,9 +52,8 @@ public class ArenaLifecycleComponentTest : IClassFixture<ArenaLifecycleComponent
     {
     }
 
-    public class EmptyMatchTopology : IArenaTopology
+    public class EmptyMatchTopology
     {
-        public Match Configure() => new MatchBuilder("lifecycle-empty-match").Build();
     }
 
     [Fact]
@@ -96,17 +94,13 @@ public class ArenaOauthComponentTest : IClassFixture<ArenaOauthComponentTest.Fix
     {
     }
 
-    public class OauthMatchTopology : IArenaTopology
+    public class OauthMatchTopology
     {
-        public Match Configure()
-        {
-            return new MatchBuilder("lifecycle-oauth-match")
-                .AddDependency(new OauthDependencyBuilder("test-oauth")
-                    .WithPort(_port)
-                    .WithListenIp("0.0.0.0")
-                    .Build())
-                .Build();
-        }
+        [ArenaDependency]
+        public static readonly OauthDependency Oauth = new OauthDependencyBuilder("test-oauth")
+            .WithPort(_port)
+            .WithListenIp("0.0.0.0")
+            .Build();
     }
 
     [Fact]
@@ -129,9 +123,8 @@ public class ArenaDisposeComponentTest : IClassFixture<ArenaDisposeComponentTest
     {
     }
 
-    public class DisposeMatchTopology : IArenaTopology
+    public class DisposeMatchTopology
     {
-        public Match Configure() => new MatchBuilder("lifecycle-dispose-match").Build();
     }
 
     [Fact]
@@ -147,12 +140,23 @@ public class ArenaCollectionSharingComponentTest
 {
     private static int _sharedTopologyOpenCount = 0;
 
-    internal class SharedTopologyConfig : IArenaTopology
+    internal class SharedTopologyConfig
     {
-        public Match Configure()
+        private static readonly object Lock = new object();
+
+        [ArenaDependency]
+        public static readonly StubDependency Stub = new StubDependency();
+
+        public class StubDependency : ArenaXunit.Topology.IArenaMatchPiece
         {
-            _sharedTopologyOpenCount++;
-            return new MatchBuilder("shared-lifecycle-match").Build();
+            public string ForFfi()
+            {
+                lock (Lock)
+                {
+                    _sharedTopologyOpenCount++;
+                }
+                return "{}";
+            }
         }
     }
 

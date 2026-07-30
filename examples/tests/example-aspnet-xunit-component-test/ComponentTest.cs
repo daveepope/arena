@@ -10,9 +10,7 @@ using Amazon.SQS.Model;
 using ArenaExamples.Test.Shared;
 using ArenaXunit;
 using ArenaXunit.Dep;
-using ArenaXunit.Topology;
 using ArenaXunit.Playbook;
-using ArenaXunit.Xunit;
 using Xunit;
 
 namespace ArenaExamples.ComponentTest;
@@ -53,9 +51,9 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
     {
     }
 
-    public class TestTopology : IArenaTopology
+    public class TestTopology
     {
-        public Match Configure()
+        static TestTopology()
         {
             Environment.SetEnvironmentVariable("WEB_APP_PORT", WebAppPort.ToString());
             Environment.SetEnvironmentVariable("CALIBRATION_URL", $"http://127.0.0.1:{CalibrationPort}");
@@ -92,8 +90,11 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
             Environment.SetEnvironmentVariable("OAUTH_ISSUER", $"http://127.0.0.1:{OauthPort}");
             Environment.SetEnvironmentVariable("OAUTH_CLIENT_ID", "test-client");
             Environment.SetEnvironmentVariable("OAUTH_CLIENT_SECRET", "test-secret");
+        }
 
-            var eventRule = new EventRuleSpec
+        private static EventRuleSpec CreateEventRuleSpec()
+        {
+            return new EventRuleSpec
             {
                 Name = EventRuleName,
                 EventBus = EventBusName,
@@ -103,45 +104,63 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
                     EventRuleTargetBuilder.SqsQueue("target-queue", QueueName),
                 },
             };
-
-            var localstack = new LocalstackDependencyBuilder("test-localstack")
-                .WithPort(LocalstackPort)
-                .WithServices("sqs", "events")
-                .WithQueue(QueueName)
-                .WithEventBus(EventBusName)
-                .WithEventRule(eventRule)
-                .Build();
-
-            var match = new MatchBuilder("aspnet")
-                .AddDependency(new PostgresDependencyBuilder("test-postgres")
-                    .WithPort(PostgresPort)
-                    .Build())
-                .AddDependency(new MssqlDependencyBuilder("test-mssql")
-                    .WithPort(MssqlPort)
-                    .Build())
-                .AddDependency(localstack)
-                .AddDependency(new TemporalDependencyBuilder("test-temporal")
-                    .WithPort(TemporalPort)
-                    .Build())
-                .AddDependency(new OauthDependencyBuilder("test-oauth")
-                    .WithPort(OauthPort)
-                    .Build())
-                .AddDependency(new SmtpDependencyBuilder("test-smtp")
-                    .WithPort(SmtpPort)
-                    .WithUiPort(SmtpUiPort)
-                    .WithStarttls()
-                    .Build())
-                .AddDependency(new HttpDependencyBuilder("test-calibration")
-                    .WithPort(CalibrationPort)
-                    .Build())
-                .RegisterPlaybook(new Playbooks.CalibrationHappyPathPlaybook("test-calibration"), true)
-                .RegisterPlaybook(new Playbooks.CalibrationOutagePlaybook("test-calibration"), false)
-                .RegisterPlaybook(new Playbooks.CalibrationFlakyPlaybook("test-calibration"), false)
-                .RegisterPlaybook(new Playbooks.ResetValidationDbPlaybook("test-mssql"), false)
-                .RegisterPlaybook(new Playbooks.EventsPurgePlaybook("test-localstack"), true)
-                .Build();
-            return match;
         }
+
+        [ArenaDependency]
+        public static readonly PostgresDependency Postgres = new PostgresDependencyBuilder("test-postgres")
+            .WithPort(PostgresPort)
+            .Build();
+
+        [ArenaDependency]
+        public static readonly MssqlDependency Mssql = new MssqlDependencyBuilder("test-mssql")
+            .WithPort(MssqlPort)
+            .Build();
+
+        [ArenaDependency]
+        public static readonly LocalstackDependency Localstack = new LocalstackDependencyBuilder("test-localstack")
+            .WithPort(LocalstackPort)
+            .WithServices("sqs", "events")
+            .WithQueue(QueueName)
+            .WithEventBus(EventBusName)
+            .WithEventRule(CreateEventRuleSpec())
+            .Build();
+
+        [ArenaDependency]
+        public static readonly TemporalDependency Temporal = new TemporalDependencyBuilder("test-temporal")
+            .WithPort(TemporalPort)
+            .Build();
+
+        [ArenaDependency]
+        public static readonly OauthDependency Oauth = new OauthDependencyBuilder("test-oauth")
+            .WithPort(OauthPort)
+            .Build();
+
+        [ArenaDependency]
+        public static readonly SmtpDependency Smtp = new SmtpDependencyBuilder("test-smtp")
+            .WithPort(SmtpPort)
+            .WithUiPort(SmtpUiPort)
+            .WithStarttls()
+            .Build();
+
+        [ArenaDependency]
+        public static readonly HttpDependency Calibration = new HttpDependencyBuilder("test-calibration")
+            .WithPort(CalibrationPort)
+            .Build();
+
+        [Playbook(typeof(Playbooks.CalibrationHappyPathPlaybook))]
+        public static readonly Playbooks.CalibrationHappyPathPlaybook CalibrationHappyPath = new(Calibration.Identifier);
+
+        [Playbook(typeof(Playbooks.CalibrationOutagePlaybook), ExecOnDependencyStart = false)]
+        public static readonly Playbooks.CalibrationOutagePlaybook CalibrationOutage = new(Calibration.Identifier);
+
+        [Playbook(typeof(Playbooks.CalibrationFlakyPlaybook), ExecOnDependencyStart = false)]
+        public static readonly Playbooks.CalibrationFlakyPlaybook CalibrationFlaky = new(Calibration.Identifier);
+
+        [Playbook(typeof(Playbooks.ResetValidationDbPlaybook), ExecOnDependencyStart = false)]
+        public static readonly Playbooks.ResetValidationDbPlaybook ResetValidationDb = new(Mssql.Identifier);
+
+        [Playbook(typeof(Playbooks.EventsPurgePlaybook))]
+        public static readonly Playbooks.EventsPurgePlaybook EventsPurge = new(Localstack.Identifier);
     }
 
     public class Fixture : ArenaCollectionFixture<TestTopology>

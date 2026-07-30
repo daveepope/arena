@@ -6,8 +6,6 @@ using System.Threading.Tasks;
 using ArenaXunit;
 using ArenaXunit.Dep;
 using ArenaXunit.Playbook;
-using ArenaXunit.Topology;
-using ArenaXunit.Xunit;
 using Xunit;
 
 namespace ArenaXunit.ComponentTest;
@@ -18,7 +16,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
 
     private readonly OpenArena _arena;
 
-    private class CalibrationHappyPathPlaybook : ManagedHttpPlaybook
+    public class CalibrationHappyPathPlaybook : ManagedHttpPlaybook
     {
         public CalibrationHappyPathPlaybook(string depId)
             : base("playbook-invocation-session-default", depId,
@@ -30,7 +28,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
         }
     }
 
-    private class ScopedOutagePlaybook : ManagedHttpPlaybook
+    public class ScopedOutagePlaybook : ManagedHttpPlaybook
     {
         public ScopedOutagePlaybook(string depId)
             : base("playbook-invocation-scoped-outage", depId,
@@ -42,7 +40,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
         }
     }
 
-    private class VerifyPlaybook : ManagedHttpPlaybook
+    public class VerifyPlaybook : ManagedHttpPlaybook
     {
         public VerifyPlaybook(string depId)
             : base("playbook-invocation-verify", depId,
@@ -58,21 +56,21 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
     {
     }
 
-    public class TestTopology : IArenaTopology
+    public class TestTopology
     {
-        public Match Configure()
-        {
-            var httpDep = new HttpDependencyBuilder("playbook-invocation-http")
-                .WithPort(_httpPort)
-                .Build();
+        [ArenaDependency]
+        public static readonly HttpDependency HttpDep = new HttpDependencyBuilder("playbook-invocation-http")
+            .WithPort(_httpPort)
+            .Build();
 
-            return new MatchBuilder("playbook-invocation-match")
-                .AddDependency(httpDep)
-                .RegisterPlaybook(new CalibrationHappyPathPlaybook(httpDep.Identifier), true)
-                .RegisterPlaybook(new ScopedOutagePlaybook(httpDep.Identifier), false)
-                .RegisterPlaybook(new VerifyPlaybook(httpDep.Identifier), false)
-                .Build();
-        }
+        [Playbook(typeof(CalibrationHappyPathPlaybook))]
+        public static readonly CalibrationHappyPathPlaybook CalibrationHappyPath = new(HttpDep.Identifier);
+
+        [Playbook(typeof(ScopedOutagePlaybook), ExecOnDependencyStart = false)]
+        public static readonly ScopedOutagePlaybook ScopedOutage = new(HttpDep.Identifier);
+
+        [Playbook(typeof(VerifyPlaybook), ExecOnDependencyStart = false)]
+        public static readonly VerifyPlaybook Verify = new(HttpDep.Identifier);
     }
 
     public PlaybookInvocationComponentTest(Fixture fixture)
