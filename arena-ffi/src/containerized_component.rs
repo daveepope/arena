@@ -3,7 +3,7 @@ use arena_containerized_component::containerized_component::ContainerizedCompone
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::healthcheck::{HttpReadinessCheck, ReadinessCheckConfig};
+use crate::healthcheck::{HttpReadinessCheck, ReadinessCheckConfig, TcpReadinessCheck};
 use crate::runtime_args::RuntimeArgConfig;
 
 #[derive(Debug, Deserialize)]
@@ -72,6 +72,13 @@ pub(crate) async fn build(config: &ContainerizedComponentConfig) -> Result<Compo
                 ReadinessCheckConfig::Http { target, timeout_ms } => {
                     builder.with_readiness_check_timeout(
                         HttpReadinessCheck::new(),
+                        target.as_str(),
+                        *timeout_ms,
+                    )
+                }
+                ReadinessCheckConfig::Tcp { target, timeout_ms } => {
+                    builder.with_readiness_check_timeout(
+                        TcpReadinessCheck::new(),
                         target.as_str(),
                         *timeout_ms,
                     )

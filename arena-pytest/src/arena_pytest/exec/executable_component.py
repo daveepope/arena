@@ -1,9 +1,9 @@
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from arena_pytest.ffi._ffi_readiness import ReadinessCheckEntry, readiness_checks_for_ffi
 from arena_pytest.support._identifier import build as _build_identifier
-from arena_pytest.readiness import HttpReadinessCheck
+from arena_pytest.readiness import HttpReadinessCheck, TcpReadinessCheck
 
 
 class BuildTool(Enum):
@@ -55,7 +55,7 @@ class ExecutableComponentBuilder:
 
     def with_readiness_check(
         self,
-        check: HttpReadinessCheck,
+        check: Union[HttpReadinessCheck, TcpReadinessCheck],
         target: str,
         timeout_ms: int = 10_000,
     ) -> "ExecutableComponentBuilder":

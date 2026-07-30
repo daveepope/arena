@@ -87,7 +87,7 @@ from arena_pytest.oauth import (
 from arena_pytest.dep.postgres import PostgresDependency, PostgresDependencyBuilder
 from arena_pytest.dep.smtp import SmtpDependency, SmtpDependencyBuilder
 from arena_pytest.dep.temporal import TemporalDependency, TemporalDependencyBuilder
-from arena_pytest.readiness import HttpReadinessCheck, ReadinessCheck
+from arena_pytest.readiness import HttpReadinessCheck, ReadinessCheck, TcpReadinessCheck
 
 __all__ = [
     "ArenaBindingError",
@@ -159,6 +159,7 @@ __all__ = [
     "SmtpDependency",
     "SmtpDependencyBuilder",
     "HttpReadinessCheck",
+    "TcpReadinessCheck",
     "ReadinessCheck",
     "arena",
     "arena_ffi",
