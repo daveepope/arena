@@ -1,10 +1,26 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace ArenaXunit.Ffi;
 
 internal static class ArenaBindings
 {
+    private static string PtrToStringUTF8(IntPtr ptr)
+    {
+        if (ptr == IntPtr.Zero)
+            return "";
+
+        int len = 0;
+        IntPtr current = ptr;
+        while (Marshal.ReadByte(current, len) != 0)
+            len++;
+
+        byte[] buffer = new byte[len];
+        Marshal.Copy(ptr, buffer, 0, len);
+        return Encoding.UTF8.GetString(buffer);
+    }
+
     internal static IntPtr OpenArena(string name, string configJson, ArenaLogLevel level)
     {
         ArenaNativeLib.arena_set_log_level((int)level);
@@ -85,7 +101,7 @@ internal static class ArenaBindings
         var ptr = ArenaNativeLib.arena_oauth_loopback_tls_pem_json(out var errOut);
         if (ptr == IntPtr.Zero)
             throw TakeErr(errOut, "arena_oauth_loopback_tls_pem_json failed");
-        var json = Marshal.PtrToStringUTF8(ptr) ?? string.Empty;
+        var json = PtrToStringUTF8(ptr) ?? string.Empty;
         ArenaNativeLib.arena_free_string(ptr);
         return json;
     }
@@ -94,7 +110,7 @@ internal static class ArenaBindings
     {
         if (errOut != IntPtr.Zero)
         {
-            var message = Marshal.PtrToStringUTF8(errOut) ?? operation;
+            var message = PtrToStringUTF8(errOut) ?? operation;
             ArenaNativeLib.arena_free_string(errOut);
             return new ArenaBindingError(message);
         }

@@ -85,8 +85,9 @@ import_library(
 csharp_library(
     name = "arena_xunit_lib",
     srcs = _ARENA_XUNIT_SRCS,
-    target_frameworks = ["net8.0"],
+    target_frameworks = ["netstandard2.0"],
     visibility = ["//visibility:public"],
+    compiler_options = ["/langversion:latest"],
     deps = [
         ":xunit_core_lib",
         ":xunit_extensibility_lib",

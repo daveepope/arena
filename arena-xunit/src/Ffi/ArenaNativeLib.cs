@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace ArenaXunit.Ffi;
 
@@ -8,6 +9,18 @@ internal static class ArenaNativeLib
     private const string LibName = "arena_ffi";
     private static IntPtr _libHandle = IntPtr.Zero;
     private static bool _initialized = false;
+
+    private static string PtrToStringUTF8(IntPtr ptr)
+    {
+        if (ptr == IntPtr.Zero)
+            return "";
+        int len = 0;
+        while (Marshal.ReadByte(ptr, len) != 0)
+            len++;
+        byte[] buffer = new byte[len];
+        Marshal.Copy(ptr, buffer, 0, len);
+        return Encoding.UTF8.GetString(buffer);
+    }
 
     private delegate IntPtr arena_open_fn(string name, string configJson, out IntPtr errOut);
     private delegate void arena_close_fn(IntPtr handle);
@@ -111,7 +124,7 @@ internal static class ArenaNativeLib
             if (handle == IntPtr.Zero)
             {
                 var err = dlerror();
-                var errMsg = err != IntPtr.Zero ? Marshal.PtrToStringUTF8(err) : "dlopen failed";
+                var errMsg = err != IntPtr.Zero ? PtrToStringUTF8(err) : "dlopen failed";
                 throw new ArenaBindingError($"dlopen failed: {errMsg}");
             }
             return handle;

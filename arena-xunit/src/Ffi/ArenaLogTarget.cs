@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
 using Microsoft.Extensions.Logging;
 
 namespace ArenaXunit.Ffi;
@@ -18,6 +19,18 @@ internal delegate void ArenaLogCallback(
 internal static class ArenaLogTarget
 {
     private static readonly object Lock = new object();
+
+    private static string PtrToStringUTF8(IntPtr ptr)
+    {
+        if (ptr == IntPtr.Zero)
+            return "";
+        int len = 0;
+        while (Marshal.ReadByte(ptr, len) != 0)
+            len++;
+        byte[] buffer = new byte[len];
+        Marshal.Copy(ptr, buffer, 0, len);
+        return Encoding.UTF8.GetString(buffer);
+    }
     private static readonly Dictionary<ulong, LogEntry> Entries = new Dictionary<ulong, LogEntry>();
 
     public static ulong RegisterForLogger(ILogger logger, ArenaLogLevel level)
@@ -61,7 +74,7 @@ internal static class ArenaLogTarget
             var gcHandle = GCHandle.FromIntPtr(userData);
             var context = (LogContext)gcHandle.Target!;
             var logLevel = MapLogLevel(level);
-            var message = Marshal.PtrToStringUTF8(messageUtf8) ?? string.Empty;
+            var message = PtrToStringUTF8(messageUtf8) ?? string.Empty;
             context.Logger.Log(logLevel, 0, message, null, (s, e) => message);
         }
         catch

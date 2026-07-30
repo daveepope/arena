@@ -4,7 +4,7 @@ using ArenaXunit.Ffi;
 
 namespace ArenaXunit.Playbook;
 
-public class ActivePlaybook : IDisposable, System.IAsyncDisposable
+public class ActivePlaybook : IDisposable
 {
     protected readonly IntPtr _handle;
     private bool _disposed;
@@ -39,9 +39,4 @@ public class ActivePlaybook : IDisposable, System.IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    public System.Threading.Tasks.ValueTask DisposeAsync()
-    {
-        Dispose();
-        return default;
-    }
 }
