@@ -1,59 +1,32 @@
 using ArenaXunit.Topology;
 using ArenaXunit.Support;
-using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace ArenaXunit.Dep;
 
 public sealed class PostgresDependency : IArenaMatchPiece
 {
+    private readonly JObject _config;
     public string Type => "postgres";
-    public string Identifier { get; }
-    public int Port { get; }
+    public string Identifier => _config["identifier"]!.Value<string>();
+    public int Port => (int)_config["port"]!;
 
-    internal PostgresDependency(string identifier, int port)
-    {
-        Identifier = identifier;
-        Port = port;
-    }
+    internal PostgresDependency(JObject config) => _config = config;
 
-    public string ForFfi()
-    {
-        return ArenaJson.Serialize(new PostgresConfig
-        {
-            Type = Type,
-            Identifier = Identifier,
-            Port = Port,
-        });
-    }
-
-    [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-    private sealed class PostgresConfig
-    {
-        [JsonProperty("type")] public string Type { get; set; } = default!;
-        [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
-        [JsonProperty("port")] public int Port { get; set; }
-    }
+    public string ForFfi() => ArenaJson.Serialize(_config);
 }
 
 public sealed class PostgresDependencyBuilder
 {
-    private readonly string _name;
-    private int _port = 5432;
+    private readonly JObject _config = ArenaJson.Object();
 
     public PostgresDependencyBuilder(string name)
     {
-        _name = name;
+        _config["type"] = "postgres";
+        _config["identifier"] = ArenaIdentifiers.Build("arena-postgres", name);
+        _config["port"] = 5432;
     }
 
-    public PostgresDependencyBuilder WithPort(int port)
-    {
-        _port = port;
-        return this;
-    }
-
-    public PostgresDependency Build()
-    {
-        var identifier = ArenaIdentifiers.Build("arena-postgres", _name);
-        return new PostgresDependency(identifier, _port);
-    }
+    public PostgresDependencyBuilder WithPort(int port) { _config["port"] = port; return this; }
+    public PostgresDependency Build() => new PostgresDependency((JObject)_config.DeepClone());
 }

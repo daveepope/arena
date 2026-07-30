@@ -1,3 +1,0 @@
-load(":framework_preprocessor_defines.bzl", "test_framework_preprocessor_defines")
-
-test_framework_preprocessor_defines()

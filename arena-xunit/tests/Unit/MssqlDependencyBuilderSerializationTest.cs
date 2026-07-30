@@ -10,7 +10,7 @@ namespace ArenaXunit.UnitTest;
 public class MssqlDependencyBuilderSerializationTest
 {
     [Fact]
-    public void build_default_port_serializes_correct_json()
+    public void Build_DefaultPort_SerializesCorrectJson()
     {
         var dep = new MssqlDependencyBuilder("test").Build();
         var json = dep.ForFfi();
@@ -21,7 +21,7 @@ public class MssqlDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_custom_port_serializes_correct_json()
+    public void Build_CustomPort_SerializesCorrectJson()
     {
         var dep = new MssqlDependencyBuilder("test").WithPort(1533).Build();
         var json = dep.ForFfi();
@@ -30,7 +30,7 @@ public class MssqlDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_encryption_off_serializes_correct_json()
+    public void Build_EncryptionOff_SerializesCorrectJson()
     {
         var dep = new MssqlDependencyBuilder("test").WithEncryption(MssqlEncryption.Off).Build();
         var json = dep.ForFfi();
@@ -39,7 +39,7 @@ public class MssqlDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_encryption_on_serializes_correct_json()
+    public void Build_EncryptionOn_SerializesCorrectJson()
     {
         var dep = new MssqlDependencyBuilder("test").WithEncryption(MssqlEncryption.On).Build();
         var json = dep.ForFfi();
@@ -48,7 +48,7 @@ public class MssqlDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_encryption_strict_serializes_correct_json()
+    public void Build_EncryptionStrict_SerializesCorrectJson()
     {
         var dep = new MssqlDependencyBuilder("test").WithEncryption(MssqlEncryption.Strict).Build();
         var json = dep.ForFfi();
@@ -57,7 +57,7 @@ public class MssqlDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_identifier_matches_pattern()
+    public void Build_Identifier_MatchesPattern()
     {
         var dep = new MssqlDependencyBuilder("test").Build();
         Assert.StartsWith("arena-mssql-", dep.Identifier);

@@ -10,7 +10,7 @@ namespace ArenaXunit.UnitTest;
 public class HttpDependencyBuilderSerializationTest
 {
     [Fact]
-    public void build_default_port_serializes_correct_json()
+    public void Build_DefaultPort_SerializesCorrectJson()
     {
         var dep = new HttpDependencyBuilder("test").Build();
         var json = dep.ForFfi();
@@ -21,7 +21,7 @@ public class HttpDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_custom_port_serializes_correct_json()
+    public void Build_CustomPort_SerializesCorrectJson()
     {
         var dep = new HttpDependencyBuilder("test").WithPort(9900).Build();
         var json = dep.ForFfi();
@@ -30,7 +30,7 @@ public class HttpDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_listen_ip_serializes_correct_json()
+    public void Build_WithListenIp_SerializesCorrectJson()
     {
         var dep = new HttpDependencyBuilder("test").WithListenIp("0.0.0.0").Build();
         var json = dep.ForFfi();
@@ -39,7 +39,7 @@ public class HttpDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_identifier_matches_pattern()
+    public void Build_Identifier_MatchesPattern()
     {
         var dep = new HttpDependencyBuilder("test").Build();
         Assert.StartsWith("arena-http-", dep.Identifier);

@@ -10,7 +10,7 @@ namespace ArenaXunit.UnitTest;
 public class PostgresDependencyBuilderSerializationTest
 {
     [Fact]
-    public void build_default_port_serializes_correct_json()
+    public void Build_DefaultPort_SerializesCorrectJson()
     {
         var dep = new PostgresDependencyBuilder("test").Build();
         var json = dep.ForFfi();
@@ -21,7 +21,7 @@ public class PostgresDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_custom_port_serializes_correct_json()
+    public void Build_CustomPort_SerializesCorrectJson()
     {
         var dep = new PostgresDependencyBuilder("test").WithPort(5532).Build();
         var json = dep.ForFfi();
@@ -30,7 +30,7 @@ public class PostgresDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_identifier_matches_pattern()
+    public void Build_Identifier_MatchesPattern()
     {
         var dep = new PostgresDependencyBuilder("test").Build();
         Assert.StartsWith("arena-postgres-", dep.Identifier);

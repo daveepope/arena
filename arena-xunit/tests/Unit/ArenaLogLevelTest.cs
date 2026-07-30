@@ -6,37 +6,37 @@ namespace ArenaXunit.UnitTest;
 public class ArenaLogLevelTest
 {
     [Fact]
-    public void trace_has_value_zero()
+    public void Trace_HasValueZero()
     {
         Assert.Equal(0, (int)ArenaLogLevel.Trace);
     }
 
     [Fact]
-    public void debug_has_value_one()
+    public void Debug_HasValueOne()
     {
         Assert.Equal(1, (int)ArenaLogLevel.Debug);
     }
 
     [Fact]
-    public void info_has_value_two()
+    public void Info_HasValueTwo()
     {
         Assert.Equal(2, (int)ArenaLogLevel.Info);
     }
 
     [Fact]
-    public void warn_has_value_three()
+    public void Warn_HasValueThree()
     {
         Assert.Equal(3, (int)ArenaLogLevel.Warn);
     }
 
     [Fact]
-    public void error_has_value_four()
+    public void Error_HasValueFour()
     {
         Assert.Equal(4, (int)ArenaLogLevel.Error);
     }
 
     [Fact]
-    public void critical_has_value_five()
+    public void Critical_HasValueFive()
     {
         Assert.Equal(5, (int)ArenaLogLevel.Critical);
     }

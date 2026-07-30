@@ -6,7 +6,7 @@ namespace ArenaXunit.UnitTest;
 public class HttpPlaybookBuilderPutDeleteTest
 {
     [Fact]
-    public void put_mapping_sets_method_to_put()
+    public void PutMapping_SetsMethodToPut()
     {
         var builder = new Playbook.HttpPlaybookBuilder("dep-id")
             .Put("/resource")
@@ -18,7 +18,7 @@ public class HttpPlaybookBuilderPutDeleteTest
     }
 
     [Fact]
-    public void delete_mapping_sets_method_to_delete()
+    public void DeleteMapping_SetsMethodToDelete()
     {
         var builder = new Playbook.HttpPlaybookBuilder("dep-id")
             .Delete("/resource/1")
@@ -30,7 +30,7 @@ public class HttpPlaybookBuilderPutDeleteTest
     }
 
     [Fact]
-    public void then_return_adds_response_to_list()
+    public void ThenReturn_AddsResponseToList()
     {
         var builder = new Playbook.HttpPlaybookBuilder("dep-id")
             .Get("/api")
@@ -44,7 +44,7 @@ public class HttpPlaybookBuilderPutDeleteTest
     }
 
     [Fact]
-    public void duplicate_mapping_does_not_add_duplicate()
+    public void DuplicateMapping_DoesNotAddDuplicate()
     {
         var m2 = new Playbook.HttpPlaybookBuilder("dep-id")
             .Get("/api")

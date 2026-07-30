@@ -79,7 +79,6 @@ internal static class ArenaLogTarget
         }
         catch
         {
-            // Swallow logging errors to avoid corrupting FFI callbacks
         }
     }
 

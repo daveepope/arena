@@ -1,99 +1,44 @@
 using ArenaXunit.Topology;
 using ArenaXunit.Support;
-using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace ArenaXunit.Dep;
 
 public sealed class OauthDependency : IArenaMatchPiece
 {
+    private readonly JObject _config;
     public string Type => "oauth";
-    public string Identifier { get; }
-    public int Port { get; }
-    public string? ListenIp { get; }
-    public string? MetadataBaseUrl { get; }
-    public string? ServerTlsCert { get; }
-    public string? ServerTlsKey { get; }
+    public string Identifier => _config["identifier"]!.Value<string>();
+    public int Port => (int)_config["port"]!;
+    public string? ListenIp => (string?)_config["listen_ip"];
+    public string? MetadataBaseUrl => (string?)_config["metadata_base_url"];
+    public string? ServerTlsCert => (string?)_config["server_tls_certificate_pem"];
+    public string? ServerTlsKey => (string?)_config["server_tls_private_key_pem"];
 
-    internal OauthDependency(string identifier, int port, string? listenIp, string? metadataBaseUrl,
-        string? serverTlsCert, string? serverTlsKey)
-    {
-        Identifier = identifier;
-        Port = port;
-        ListenIp = listenIp;
-        MetadataBaseUrl = metadataBaseUrl;
-        ServerTlsCert = serverTlsCert;
-        ServerTlsKey = serverTlsKey;
-    }
+    internal OauthDependency(JObject config) => _config = config;
 
-    public string ForFfi()
-    {
-        return ArenaJson.Serialize(new OauthConfig
-        {
-            Type = Type,
-            Identifier = Identifier,
-            Port = Port,
-            ListenIp = ListenIp,
-            MetadataBaseUrl = MetadataBaseUrl,
-            ServerTlsCert = ServerTlsCert,
-            ServerTlsKey = ServerTlsKey,
-        });
-    }
-
-    [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-    private sealed class OauthConfig
-    {
-        [JsonProperty("type")] public string Type { get; set; } = default!;
-        [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
-        [JsonProperty("port")] public int Port { get; set; }
-        [JsonProperty("listen_ip")] public string? ListenIp { get; set; }
-        [JsonProperty("metadata_base_url")] public string? MetadataBaseUrl { get; set; }
-        [JsonProperty("server_tls_certificate_pem")] public string? ServerTlsCert { get; set; }
-        [JsonProperty("server_tls_private_key_pem")] public string? ServerTlsKey { get; set; }
-    }
+    public string ForFfi() => ArenaJson.Serialize(_config);
 }
 
 public sealed class OauthDependencyBuilder
 {
-    private readonly string _name;
-    private int _port = 9443;
-    private string? _listenIp;
-    private string? _metadataBaseUrl;
-    private string? _serverTlsCert;
-    private string? _serverTlsKey;
+    private readonly JObject _config = ArenaJson.Object();
 
     public OauthDependencyBuilder(string name)
     {
-        _name = name;
+        _config["type"] = "oauth";
+        _config["identifier"] = ArenaIdentifiers.Build("arena-oauth", name);
+        _config["port"] = 9443;
     }
 
-    public OauthDependencyBuilder WithPort(int port)
-    {
-        _port = port;
-        return this;
-    }
-
-    public OauthDependencyBuilder WithListenIp(string listenIp)
-    {
-        _listenIp = listenIp;
-        return this;
-    }
-
-    public OauthDependencyBuilder WithMetadataBaseUrl(string url)
-    {
-        _metadataBaseUrl = url;
-        return this;
-    }
-
+    public OauthDependencyBuilder WithPort(int port) { _config["port"] = port; return this; }
+    public OauthDependencyBuilder WithListenIp(string listenIp) { _config["listen_ip"] = listenIp; return this; }
+    public OauthDependencyBuilder WithMetadataBaseUrl(string url) { _config["metadata_base_url"] = url; return this; }
     public OauthDependencyBuilder WithServerTlsPem(string cert, string key)
     {
-        _serverTlsCert = cert;
-        _serverTlsKey = key;
+        _config["server_tls_certificate_pem"] = cert;
+        _config["server_tls_private_key_pem"] = key;
         return this;
     }
-
-    public OauthDependency Build()
-    {
-        var identifier = ArenaIdentifiers.Build("arena-oauth", _name);
-        return new OauthDependency(identifier, _port, _listenIp, _metadataBaseUrl, _serverTlsCert, _serverTlsKey);
-    }
+    public OauthDependency Build() => new OauthDependency((JObject)_config.DeepClone());
 }

@@ -7,7 +7,7 @@ namespace ArenaXunit.UnitTest;
 public class RegisteredPlaybookTest
 {
     [Fact]
-    public void to_config_http_playbook_returns_http_kind()
+    public void ToConfig_HttpPlaybook_ReturnsHttpKind()
     {
         var playbook = new TestManagedHttpPlaybook("id", "dep-id");
         var rp = new RegisteredPlaybook(playbook, false);
@@ -17,7 +17,7 @@ public class RegisteredPlaybookTest
     }
 
     [Fact]
-    public void to_config_mssql_playbook_returns_mssql_kind()
+    public void ToConfig_MssqlPlaybook_ReturnsMssqlKind()
     {
         var playbook = new TestManagedMssqlPlaybook("id", "dep-id");
         var rp = new RegisteredPlaybook(playbook, true);
@@ -27,7 +27,7 @@ public class RegisteredPlaybookTest
     }
 
     [Fact]
-    public void to_config_localstack_playbook_returns_localstack_kind()
+    public void ToConfig_LocalstackPlaybook_ReturnsLocalstackKind()
     {
         var playbook = new TestManagedLocalstackPlaybook("id", "dep-id");
         var rp = new RegisteredPlaybook(playbook, false);
@@ -37,7 +37,7 @@ public class RegisteredPlaybookTest
     }
 
     [Fact]
-    public void to_config_exec_on_dependency_start_preserved()
+    public void ToConfig_ExecOnDependencyStart_Preserved()
     {
         var playbook = new TestManagedHttpPlaybook("id", "dep-id");
         var rp = new RegisteredPlaybook(playbook, true);

@@ -10,7 +10,7 @@ namespace ArenaXunit.UnitTest;
 public class SmtpDependencyBuilderSerializationTest
 {
     [Fact]
-    public void build_default_port_serializes_correct_json()
+    public void Build_DefaultPort_SerializesCorrectJson()
     {
         var dep = new SmtpDependencyBuilder("test").Build();
         var json = dep.ForFfi();
@@ -22,7 +22,7 @@ public class SmtpDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_custom_port_serializes_correct_json()
+    public void Build_CustomPort_SerializesCorrectJson()
     {
         var dep = new SmtpDependencyBuilder("test").WithPort(1125).Build();
         var json = dep.ForFfi();
@@ -31,7 +31,7 @@ public class SmtpDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_custom_ui_port_serializes_correct_json()
+    public void Build_CustomUiPort_SerializesCorrectJson()
     {
         var dep = new SmtpDependencyBuilder("test").WithUiPort(8125).Build();
         var json = dep.ForFfi();
@@ -40,7 +40,7 @@ public class SmtpDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_starttls_serializes_correct_json()
+    public void Build_WithStarttls_SerializesCorrectJson()
     {
         var dep = new SmtpDependencyBuilder("test").WithStarttls().Build();
         var json = dep.ForFfi();
@@ -49,7 +49,7 @@ public class SmtpDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_implicit_tls_serializes_correct_json()
+    public void Build_WithImplicitTls_SerializesCorrectJson()
     {
         var dep = new SmtpDependencyBuilder("test").WithImplicitTls().Build();
         var json = dep.ForFfi();
@@ -58,7 +58,7 @@ public class SmtpDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_image_serializes_correct_json()
+    public void Build_WithImage_SerializesCorrectJson()
     {
         var dep = new SmtpDependencyBuilder("test").WithImage("custom:tag").Build();
         var json = dep.ForFfi();
@@ -67,7 +67,7 @@ public class SmtpDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_container_name_serializes_correct_json()
+    public void Build_WithContainerName_SerializesCorrectJson()
     {
         var dep = new SmtpDependencyBuilder("test").WithContainerName("my-container").Build();
         var json = dep.ForFfi();
@@ -76,7 +76,7 @@ public class SmtpDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_identifier_matches_pattern()
+    public void Build_Identifier_MatchesPattern()
     {
         var dep = new SmtpDependencyBuilder("test").Build();
         Assert.StartsWith("arena-smtp-", dep.Identifier);

@@ -1,7 +1,0 @@
-exports_files(
-    [
-        "shim.cs",
-        "shim.fs",
-    ],
-    visibility = ["//visibility:public"],
-)

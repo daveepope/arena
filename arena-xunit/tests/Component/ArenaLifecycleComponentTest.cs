@@ -57,20 +57,20 @@ public class ArenaLifecycleComponentTest : IClassFixture<ArenaLifecycleComponent
     }
 
     [Fact]
-    public void openArena_withEmptyMatch_opensAndClosesSuccessfully()
+    public void OpenArena_WithEmptyMatch_OpensAndClosesSuccessfully()
     {
         Assert.NotNull(_arena);
     }
 
     [Fact]
-    public void openArena_getPlaybook_withNoPlaybooksRegistered_returnsNull()
+    public void OpenArena_GetPlaybook_WithNoPlaybooksRegistered_ReturnsNull()
     {
         var playbook = _arena.GetPlaybook(typeof(object));
         Assert.Null(playbook);
     }
 
     [Fact]
-    public void openArena_methodsAfterDispose_throwObjectDisposedException()
+    public void OpenArena_MethodsAfterDispose_ThrowObjectDisposedException()
     {
         var closedArena = new ClosedArena("dispose-test", new MatchBuilder("dispose-test-match").Build());
         var openArena = closedArena.OpenAsync().Result;
@@ -104,7 +104,7 @@ public class ArenaOauthComponentTest : IClassFixture<ArenaOauthComponentTest.Fix
     }
 
     [Fact]
-    internal void openArena_withOauthDependency_opensAndClosesSuccessfully()
+    internal void OpenArena_WithOauthDependency_OpensAndClosesSuccessfully()
     {
         Assert.NotNull(_fixture.Arena);
     }
@@ -128,7 +128,7 @@ public class ArenaDisposeComponentTest : IClassFixture<ArenaDisposeComponentTest
     }
 
     [Fact]
-    internal void openArena_dispose_canBeCalledMultipleTimes()
+    internal void OpenArena_Dispose_CanBeCalledMultipleTimes()
     {
         var arena = _fixture.Arena;
         ((IDisposable)arena).Dispose();
@@ -147,7 +147,7 @@ public class ArenaCollectionSharingComponentTest
     }
 
     [Fact]
-    public void collectionFixture_sharesArenaForSameTopology()
+    public void CollectionFixture_SharesArenaForSameTopology()
     {
         var fixture1 = new ConcreteFixture();
         Assert.NotNull(fixture1.Arena);

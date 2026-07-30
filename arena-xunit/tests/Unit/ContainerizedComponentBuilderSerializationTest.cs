@@ -8,7 +8,7 @@ namespace ArenaXunit.UnitTest;
 public class ContainerizedComponentBuilderSerializationTest
 {
     [Fact]
-    public void build_with_containerfile_serializes_correct_json()
+    public void Build_WithContainerfile_SerializesCorrectJson()
     {
         var comp = new ContainerizedComponentBuilder("test").WithContainerfile("./Dockerfile").Build();
         var json = comp.ForFfi();
@@ -19,7 +19,7 @@ public class ContainerizedComponentBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_env_serializes_correct_json()
+    public void Build_WithEnv_SerializesCorrectJson()
     {
         var comp = new ContainerizedComponentBuilder("test")
             .WithContainerfile("./Dockerfile")
@@ -32,7 +32,7 @@ public class ContainerizedComponentBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_args_serializes_correct_json()
+    public void Build_WithArgs_SerializesCorrectJson()
     {
         var comp = new ContainerizedComponentBuilder("test")
             .WithContainerfile("./Dockerfile")
@@ -46,14 +46,14 @@ public class ContainerizedComponentBuilderSerializationTest
     }
 
     [Fact]
-    public void build_without_containerfile_throws()
+    public void Build_WithoutContainerfile_Throws()
     {
         var builder = new ContainerizedComponentBuilder("test");
         Assert.Throws<System.InvalidOperationException>(() => builder.Build());
     }
 
     [Fact]
-    public void build_identifier_matches_pattern()
+    public void Build_IdentifierMatchesPattern()
     {
         var comp = new ContainerizedComponentBuilder("test").WithContainerfile("./Dockerfile").Build();
         Assert.StartsWith("arena-container-", comp.Identifier);
