@@ -1,14 +1,11 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading.Tasks;
 using ArenaXunit;
 using ArenaXunit.Dep;
 using ArenaXunit.Xunit;
 using ArenaXunit.Topology;
 using Xunit;
-
-
 
 namespace ArenaXunit.ComponentTest;
 
@@ -43,108 +40,98 @@ public static class TestRuntime
     }
 }
 
-public class ArenaLifecycleComponentTest
+public class ArenaLifecycleComponentTest : IClassFixture<ArenaLifecycleComponentTest.Fixture>
 {
-    private static int _failures = 0;
+    private readonly OpenArena _arena;
 
-    public static async Task RunAll()
+    internal ArenaLifecycleComponentTest(Fixture fixture)
     {
-        await RunTest("openArena_withEmptyMatch_opensAndClosesSuccessfully", async () => await openArena_withEmptyMatch_opensAndClosesSuccessfully());
-        await RunTest("openArena_withOauthDependency_opensAndClosesSuccessfully", async () => await openArena_withOauthDependency_opensAndClosesSuccessfully());
-        await RunTest("openArena_getPlaybook_withNoPlaybooksRegistered_returnsNull", async () => await openArena_getPlaybook_withNoPlaybooksRegistered_returnsNull());
-        await RunTest("openArena_dispose_canBeCalledMultipleTimes", async () => await openArena_dispose_canBeCalledMultipleTimes());
-        await RunTest("openArena_methodsAfterDispose_throwObjectDisposedException", async () => await openArena_methodsAfterDispose_throwObjectDisposedException());
-        await RunTest("collectionFixture_opensArenaOnceForSharedTopology", async () => await collectionFixture_opensArenaOnceForSharedTopology());
-
-        Console.WriteLine($"Tests completed: failures={_failures}");
-        Environment.Exit(_failures > 0 ? 1 : 0);
+        _arena = fixture.Arena;
     }
 
-    private static async Task RunTest(string name, Func<Task> test)
+    internal class Fixture : ArenaCollectionFixture<EmptyMatchTopology>
     {
-        try
-        {
-            await test();
-            Console.WriteLine($"PASSED: {name}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"FAILED: {name}: {ex.Message}");
-            _failures++;
-        }
     }
 
-    public static async Task openArena_withEmptyMatch_opensAndClosesSuccessfully()
+    internal class EmptyMatchTopology : IArenaTopology
     {
-        var match = new MatchBuilder("lifecycle-empty-match")
-            .Build();
-
-        var closed = new ClosedArena("test-arena-empty", match);
-        var arena = await closed.OpenAsync();
-        Assert.NotNull(arena);
-
-        arena.Dispose();
+        public Match Configure() => new MatchBuilder("lifecycle-empty-match").Build();
     }
 
-    public static async Task openArena_withOauthDependency_opensAndClosesSuccessfully()
+    [Fact]
+    public void openArena_withEmptyMatch_opensAndClosesSuccessfully()
     {
-        var port = TestRuntime.AllocatePort();
-
-        var match = new MatchBuilder("lifecycle-oauth-match")
-            .AddDependency(new OauthDependencyBuilder("test-oauth")
-                .WithPort(port)
-                .WithListenIp("0.0.0.0")
-                .Build())
-            .Build();
-
-        var closed = new ClosedArena("test-arena-oauth", match);
-        var arena = await closed.OpenAsync();
-        Assert.NotNull(arena);
-
-        arena.Dispose();
+        Assert.NotNull(_arena);
     }
 
-    public static async Task openArena_getPlaybook_withNoPlaybooksRegistered_returnsNull()
+    [Fact]
+    public void openArena_getPlaybook_withNoPlaybooksRegistered_returnsNull()
     {
-        var match = new MatchBuilder("lifecycle-no-playbooks")
-            .Build();
-
-        var closed = new ClosedArena("test-arena-no-pbs", match);
-        var arena = await closed.OpenAsync();
-
-        var playbook = arena.GetPlaybook(typeof(object));
+        var playbook = _arena.GetPlaybook(typeof(object));
         Assert.Null(playbook);
-
-        arena.Dispose();
     }
 
-    public static async Task openArena_dispose_canBeCalledMultipleTimes()
+    [Fact]
+    public void openArena_methodsAfterDispose_throwObjectDisposedException()
     {
-        var match = new MatchBuilder("lifecycle-dispose-twice")
-            .Build();
-
-        var closed = new ClosedArena("test-arena-dispose-twice", match);
-        var arena = await closed.OpenAsync();
-
-        arena.Dispose();
-        arena.Dispose();
+        ((IDisposable)_arena).Dispose();
+        Assert.Throws<ObjectDisposedException>(() => _arena.GetPlaybook(typeof(object)));
     }
+}
 
-    public static async Task openArena_methodsAfterDispose_throwObjectDisposedException()
+public class ArenaOauthComponentTest : IClassFixture<ArenaOauthComponentTest.Fixture>
+{
+    private static readonly int _port = TestRuntime.AllocatePort();
+
+    internal class Fixture : ArenaCollectionFixture<OauthMatchTopology>
     {
-        var match = new MatchBuilder("lifecycle-disposed-error")
-            .Build();
-
-        var closed = new ClosedArena("test-arena-disposed", match);
-        var arena = await closed.OpenAsync();
-        arena.Dispose();
-
-        Assert.Throws<ObjectDisposedException>(() => arena.GetPlaybook(typeof(object)));
     }
 
+    internal class OauthMatchTopology : IArenaTopology
+    {
+        public Match Configure()
+        {
+            return new MatchBuilder("lifecycle-oauth-match")
+                .AddDependency(new OauthDependencyBuilder("test-oauth")
+                    .WithPort(_port)
+                    .WithListenIp("0.0.0.0")
+                    .Build())
+                .Build();
+        }
+    }
+
+    [Fact]
+    internal void openArena_withOauthDependency_opensAndClosesSuccessfully(Fixture fixture)
+    {
+        Assert.NotNull(fixture.Arena);
+    }
+}
+
+public class ArenaDisposeComponentTest : IClassFixture<ArenaDisposeComponentTest.Fixture>
+{
+    internal class Fixture : ArenaCollectionFixture<DisposeMatchTopology>
+    {
+    }
+
+    internal class DisposeMatchTopology : IArenaTopology
+    {
+        public Match Configure() => new MatchBuilder("lifecycle-dispose-match").Build();
+    }
+
+    [Fact]
+    internal void openArena_dispose_canBeCalledMultipleTimes(Fixture fixture)
+    {
+        var arena = fixture.Arena;
+        ((IDisposable)arena).Dispose();
+        ((IDisposable)arena).Dispose();
+    }
+}
+
+public class ArenaCollectionSharingComponentTest
+{
     private static int _sharedTopologyOpenCount = 0;
 
-    public class SharedTopologyConfig : IArenaTopology
+    internal class SharedTopologyConfig : IArenaTopology
     {
         public Match Configure()
         {
@@ -153,7 +140,12 @@ public class ArenaLifecycleComponentTest
         }
     }
 
-    public static async Task collectionFixture_opensArenaOnceForSharedTopology()
+    internal class ConcreteFixture : ArenaCollectionFixture<SharedTopologyConfig>
+    {
+    }
+
+    [Fact]
+    public void collectionFixture_opensArenaOnceForSharedTopology()
     {
         _sharedTopologyOpenCount = 0;
 
@@ -169,9 +161,5 @@ public class ArenaLifecycleComponentTest
         Assert.NotNull(fixture2.Arena);
 
         fixture2.Dispose();
-    }
-
-    private class ConcreteFixture : ArenaCollectionFixture<SharedTopologyConfig>
-    {
     }
 }

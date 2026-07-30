@@ -6,7 +6,7 @@ using ArenaXunit.Topology;
 
 namespace ArenaXunit;
 
-public sealed class OpenArena
+public sealed class OpenArena : IDisposable
 {
     private readonly IntPtr _handle;
     private readonly ulong _logToken;
@@ -52,6 +52,11 @@ public sealed class OpenArena
         return pb;
     }
 
+    public T? GetPlaybook<T>() where T : class, Playbook.IPlaybook
+    {
+        return GetPlaybook(typeof(T)) as T;
+    }
+
     public ActivePlaybook? GetSessionPlaybook(Type playbookType)
     {
         ThrowIfDisposed();
@@ -59,11 +64,21 @@ public sealed class OpenArena
         return pb;
     }
 
+    public T? GetSessionPlaybook<T>() where T : ActivePlaybook
+    {
+        return GetSessionPlaybook(typeof(T)) as T;
+    }
+
     public bool PlaybookExecOnDependencyStart(Type playbookType)
     {
         ThrowIfDisposed();
         _playbookExecOnStart.TryGetValue(playbookType, out var val);
         return val;
+    }
+
+    public bool PlaybookExecOnDependencyStart<T>()
+    {
+        return PlaybookExecOnDependencyStart(typeof(T));
     }
 
     public void Dispose()

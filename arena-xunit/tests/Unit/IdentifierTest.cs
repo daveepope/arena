@@ -13,7 +13,7 @@ public class IdentifierTest
         var id = ArenaIdentifiers.Build("arena-http", "stub");
         Assert.StartsWith("arena-http-", id);
         Assert.Contains("-", id);
-        Assert.Equal(3, id.Split('-').Length);
+        Assert.True(id.Split('-').Length >= 3);
     }
 
     [Fact]

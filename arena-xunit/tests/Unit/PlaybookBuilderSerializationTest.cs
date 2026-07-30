@@ -48,7 +48,22 @@ public class PlaybookBuilderSerializationTest
     }
 
     [Fact]
-    public void http_playbook_build_expect_never_called_sets_flag()
+    public void http_playbook_build_expect_called_sets_kind_exactly()
+    {
+        var builder = new HttpPlaybookBuilder("dep-id")
+            .Get("/check")
+            .ExpectCalled(2);
+        var mappings = builder.BuildMappings();
+        var expect = mappings[0].GetType().GetProperty("Expect")?.GetValue(mappings[0]);
+        Assert.NotNull(expect);
+        var kind = expect.GetType().GetProperty("Kind")?.GetValue(expect);
+        Assert.Equal("exactly", kind);
+        var count = expect.GetType().GetProperty("Count")?.GetValue(expect);
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public void http_playbook_build_expect_never_called_sets_kind_never()
     {
         var builder = new HttpPlaybookBuilder("dep-id")
             .Get("/never")
@@ -56,7 +71,7 @@ public class PlaybookBuilderSerializationTest
         var mappings = builder.BuildMappings();
         var expect = mappings[0].GetType().GetProperty("Expect")?.GetValue(mappings[0]);
         Assert.NotNull(expect);
-        var neverCalled = expect.GetType().GetProperty("NeverCalled")?.GetValue(expect);
-        Assert.True(neverCalled);
+        var kind = expect.GetType().GetProperty("Kind")?.GetValue(expect);
+        Assert.Equal("never", kind);
     }
 }

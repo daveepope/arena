@@ -10,12 +10,18 @@ public sealed class HttpDependency : IArenaMatchPiece
     public string Identifier { get; }
     public int Port { get; }
     public string? ListenIp { get; }
+    public string? ContainerName { get; }
+    public string? ImageName { get; }
+    public string? ImageTag { get; }
 
-    internal HttpDependency(string identifier, int port, string? listenIp)
+    internal HttpDependency(string identifier, int port, string? listenIp, string? containerName, string? imageName, string? imageTag)
     {
         Identifier = identifier;
         Port = port;
         ListenIp = listenIp;
+        ContainerName = containerName;
+        ImageName = imageName;
+        ImageTag = imageTag;
     }
 
     public string ForFfi()
@@ -26,6 +32,9 @@ public sealed class HttpDependency : IArenaMatchPiece
             Identifier = Identifier,
             Port = Port,
             ListenIp = ListenIp,
+            ContainerName = ContainerName,
+            ImageName = ImageName,
+            ImageTag = ImageTag,
         });
     }
 
@@ -36,6 +45,9 @@ public sealed class HttpDependency : IArenaMatchPiece
         [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
         [JsonProperty("port")] public int Port { get; set; }
         [JsonProperty("listen_ip")] public string? ListenIp { get; set; }
+        [JsonProperty("container_name")] public string? ContainerName { get; set; }
+        [JsonProperty("image_name")] public string? ImageName { get; set; }
+        [JsonProperty("image_tag")] public string? ImageTag { get; set; }
     }
 }
 
@@ -44,6 +56,9 @@ public sealed class HttpDependencyBuilder
     private readonly string _name;
     private int _port = 8080;
     private string? _listenIp;
+    private string? _containerName;
+    private string? _imageName;
+    private string? _imageTag;
 
     public HttpDependencyBuilder(string name)
     {
@@ -62,9 +77,27 @@ public sealed class HttpDependencyBuilder
         return this;
     }
 
+    public HttpDependencyBuilder WithContainerName(string containerName)
+    {
+        _containerName = containerName;
+        return this;
+    }
+
+    public HttpDependencyBuilder WithImageName(string imageName)
+    {
+        _imageName = imageName;
+        return this;
+    }
+
+    public HttpDependencyBuilder WithImageTag(string imageTag)
+    {
+        _imageTag = imageTag;
+        return this;
+    }
+
     public HttpDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-http", _name);
-        return new HttpDependency(identifier, _port, _listenIp);
+        return new HttpDependency(identifier, _port, _listenIp, _containerName, _imageName, _imageTag);
     }
 }

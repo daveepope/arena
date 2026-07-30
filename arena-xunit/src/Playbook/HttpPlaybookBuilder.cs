@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json;
 
 namespace ArenaXunit.Playbook;
@@ -90,15 +91,30 @@ public sealed class HttpMappingBuilder
 
     private void CommitMapping()
     {
+        if (_mappings.Any(m =>
+        {
+            var mc = m as MappingConfig;
+            return mc != null && mc.Method == _method && mc.Path == _path;
+        }))
+            return;
+
+        ExpectConfig? expect = null;
+        if (_expectCalled.HasValue)
+        {
+            expect = new ExpectConfig { Kind = "exactly", Count = _expectCalled.Value };
+        }
+        else if (_expectNeverCalled)
+        {
+            expect = new ExpectConfig { Kind = "never" };
+        }
+
         _mappings.Add(new MappingConfig
         {
             DependencyIdentifier = _dependencyIdentifier,
             Method = _method,
             Path = _path,
             Responses = _responses,
-            Expect = _expectCalled.HasValue
-                ? new ExpectConfig { Called = _expectCalled.Value }
-                : (_expectNeverCalled ? new ExpectConfig { NeverCalled = true } : null),
+            Expect = expect,
         });
     }
 
@@ -107,7 +123,7 @@ public sealed class HttpMappingBuilder
     {
         [JsonProperty("dependency_identifier")] public string? DependencyIdentifier { get; set; }
         [JsonProperty("method")] public string? Method { get; set; }
-        [JsonProperty("path")] public string? Path { get; set; }
+        [JsonProperty("url_path")] public string? Path { get; set; }
         [JsonProperty("responses")] public List<HttpResponseObj>? Responses { get; set; }
         [JsonProperty("expect")] public ExpectConfig? Expect { get; set; }
     }
@@ -115,7 +131,7 @@ public sealed class HttpMappingBuilder
     [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
     private sealed class ExpectConfig
     {
-        [JsonProperty("called")] public int? Called { get; set; }
-        [JsonProperty("never_called")] public bool? NeverCalled { get; set; }
+        [JsonProperty("kind")] public string? Kind { get; set; }
+        [JsonProperty("count")] public int? Count { get; set; }
     }
 }
