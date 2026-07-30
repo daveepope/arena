@@ -15,9 +15,13 @@ public static class EphemeralTestRuntime
         lock (Lock)
         {
             if (_nextPort.HasValue)
-                return _nextPort.Value++;
+            {
+                var p = _nextPort.Value;
+                _nextPort = p + 1;
+                return p;
+            }
             var port = FindOpenPort();
-            _nextPort = port;
+            _nextPort = port + 1;
             return port;
         }
     }

@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
 using ArenaXunit.Ffi;
-using ArenaXunit.Match;
 using ArenaXunit.Playbook;
-using ArenaXunit.Support;
-using Microsoft.Extensions.Logging;
+using ArenaXunit.Topology;
 
 namespace ArenaXunit;
 
@@ -14,6 +12,8 @@ public sealed class OpenArena
     private readonly ulong _logToken;
     private readonly Match _match;
     private readonly Dictionary<Type, ActivePlaybook> _sessionPlaybooks;
+    private readonly Dictionary<Type, Playbook.IPlaybook> _registeredPlaybooks;
+    private readonly Dictionary<Type, bool> _playbookExecOnStart;
     private bool _disposed;
 
     internal OpenArena(IntPtr handle, ulong logToken, Match match, Dictionary<Type, ActivePlaybook> sessionPlaybooks)
@@ -22,7 +22,16 @@ public sealed class OpenArena
         _logToken = logToken;
         _match = match;
         _sessionPlaybooks = sessionPlaybooks;
+        _registeredPlaybooks = new Dictionary<Type, Playbook.IPlaybook>();
+        _playbookExecOnStart = new Dictionary<Type, bool>();
+        foreach (var reg in match.Playbooks)
+        {
+            _registeredPlaybooks[reg.Playbook.GetType()] = reg.Playbook;
+            _playbookExecOnStart[reg.Playbook.GetType()] = reg.ExecOnDependencyStart;
+        }
     }
+
+    internal IntPtr Handle => _handle;
 
     public void SoftReset(string dependencyIdentifier)
     {
@@ -36,7 +45,14 @@ public sealed class OpenArena
         ArenaBindings.HardReset(_handle, dependencyIdentifier);
     }
 
-    public ActivePlaybook? GetPlaybook(Type playbookType)
+    public Playbook.IPlaybook? GetPlaybook(Type playbookType)
+    {
+        ThrowIfDisposed();
+        _registeredPlaybooks.TryGetValue(playbookType, out var pb);
+        return pb;
+    }
+
+    public ActivePlaybook? GetSessionPlaybook(Type playbookType)
     {
         ThrowIfDisposed();
         _sessionPlaybooks.TryGetValue(playbookType, out var pb);
@@ -46,12 +62,8 @@ public sealed class OpenArena
     public bool PlaybookExecOnDependencyStart(Type playbookType)
     {
         ThrowIfDisposed();
-        foreach (var reg in _match.Playbooks)
-        {
-            if (reg.Playbook.GetType() == playbookType)
-                return reg.ExecOnDependencyStart;
-        }
-        return false;
+        _playbookExecOnStart.TryGetValue(playbookType, out var val);
+        return val;
     }
 
     public void Dispose()
@@ -61,9 +73,7 @@ public sealed class OpenArena
         _disposed = true;
 
         foreach (var pb in _sessionPlaybooks.Values)
-        {
             pb.Dispose();
-        }
         _sessionPlaybooks.Clear();
 
         try

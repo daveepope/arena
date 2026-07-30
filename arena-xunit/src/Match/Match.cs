@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
-namespace ArenaXunit.Match;
+namespace ArenaXunit.Topology;
 
 public sealed class Match
 {
@@ -29,8 +30,8 @@ public sealed class Match
         {
             MatchName = Name,
             Network = Network,
-            Dependencies = Dependencies.Select(d => new { d.ForFfi() }).ToList(),
-            Components = Components.Select(c => new { c.ForFfi() }).ToList(),
+            Dependencies = Dependencies.Select(d => JToken.Parse(d.ForFfi())).ToList(),
+            Components = Components.Select(c => JToken.Parse(c.ForFfi())).ToList(),
             Playbooks = Playbooks.Select(p => p.ToConfig()).ToList(),
         };
         return ArenaXunit.Support.ArenaJson.Serialize(obj);
@@ -41,8 +42,8 @@ public sealed class Match
     {
         [JsonProperty("match_name")] public string MatchName { get; set; } = default!;
         [JsonProperty("network")] public string? Network { get; set; }
-        [JsonProperty("dependencies")] public List<object> Dependencies { get; set; } = default!;
-        [JsonProperty("components")] public List<object> Components { get; set; } = default!;
+        [JsonProperty("dependencies")] public List<JToken> Dependencies { get; set; } = default!;
+        [JsonProperty("components")] public List<JToken> Components { get; set; } = default!;
         [JsonProperty("playbooks")] public List<object> Playbooks { get; set; } = default!;
     }
 }

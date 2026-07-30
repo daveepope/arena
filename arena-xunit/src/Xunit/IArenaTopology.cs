@@ -1,4 +1,4 @@
-using ArenaXunit.Match;
+using ArenaXunit.Topology;
 
 namespace ArenaXunit.Xunit;
 

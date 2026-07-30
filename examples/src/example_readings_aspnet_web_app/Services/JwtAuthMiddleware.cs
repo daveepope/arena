@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Threading.Tasks;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Security.Cryptography.X509Certificates;
@@ -47,12 +52,19 @@ public class JwtAuthMiddleware
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var jwks = await GetJwksAsync();
-            var validationParameters = new System.IdentityModel.Tokens.Jwt.SecurityTokenValidatorParameters
+            var validationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
             {
                 RequireExpirationTime = true,
                 ValidateLifetime = true,
                 ValidIssuer = _issuerUrl,
-                Configuration = new Microsoft.IdentityModel.Tokens.SecurityKeyProviderConfiguration(jwks.Keys)
+                ValidateIssuer = true,
+                ValidateAudience = false,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKeys = jwks.Keys.Select(k => new Microsoft.IdentityModel.Tokens.RsaSecurityKey(new System.Security.Cryptography.RSAParameters
+                {
+                    Modulus = Convert.FromBase64String(k.N),
+                    Exponent = Convert.FromBase64String(k.E)
+                })).ToList()
             };
 
             var result = await tokenHandler.ValidateTokenAsync(token, validationParameters);
@@ -67,13 +79,14 @@ public class JwtAuthMiddleware
             if (!string.IsNullOrEmpty(_requiredScopes))
             {
                 var required = _requiredScopes.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                var scopeClaim = result.Claims.FirstOrDefault(c => c.Type == "scope")?.Value;
-                if (!string.IsNullOrEmpty(scopeClaim))
+                var scopeClaim = result.Claims.FirstOrDefault(c => c.Key == "scope");
+                if (scopeClaim.Value != null)
                 {
-                    var actual = scopeClaim.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    var scopeStr = scopeClaim.Value.ToString();
+                    var actual = scopeStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                     foreach (var r in required)
                     {
-                        if (!actual.Contains(r))
+                        if (!actual.Any(a => a == r))
                         {
                             context.Response.StatusCode = 403;
                             context.Response.ContentType = "application/json";

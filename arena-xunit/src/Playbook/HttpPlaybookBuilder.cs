@@ -63,6 +63,17 @@ public sealed class HttpMappingBuilder
         return this;
     }
 
+    public HttpMappingBuilder ThenReturn(HttpResponseObj response)
+    {
+        return WillReturn(response);
+    }
+
+    public List<object> BuildMappings()
+    {
+        CommitMapping();
+        return new List<object>(_mappings);
+    }
+
     public HttpMappingBuilder ExpectCalled(int count)
     {
         _expectCalled = count;

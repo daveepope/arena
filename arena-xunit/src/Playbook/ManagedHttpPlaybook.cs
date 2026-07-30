@@ -1,5 +1,6 @@
+using System;
 using System.Collections.Generic;
-using Newtonsoft.Json;
+using ArenaXunit.Ffi;
 
 namespace ArenaXunit.Playbook;
 
@@ -9,16 +10,16 @@ public abstract class ManagedHttpPlaybook : IPlaybook
     public string DependencyIdentifier { get; }
     public List<object> Mappings { get; }
 
-    protected ManagedHttpPlaybook(string identifier, string dependencyIdentifier, HttpPlaybookBuilder builder)
+    protected ManagedHttpPlaybook(string identifier, string dependencyIdentifier, List<object> mappings)
     {
         Identifier = identifier;
         DependencyIdentifier = dependencyIdentifier;
-        Mappings = builder.BuildMappings();
+        Mappings = mappings;
     }
 
     public ActivePlaybook Run(OpenArena arena)
     {
-        return new ActiveHttpPlaybook(IntPtr.Zero);
+        return ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier);
     }
 }
 
@@ -35,7 +36,7 @@ public abstract class ManagedMssqlPlaybook : IPlaybook
 
     public ActivePlaybook Run(OpenArena arena)
     {
-        return new ActiveMssqlPlaybook(IntPtr.Zero);
+        return ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier);
     }
 }
 
@@ -52,6 +53,6 @@ public abstract class ManagedLocalstackPlaybook : IPlaybook
 
     public ActivePlaybook Run(OpenArena arena)
     {
-        return new ActivePlaybook(IntPtr.Zero);
+        return ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier);
     }
 }

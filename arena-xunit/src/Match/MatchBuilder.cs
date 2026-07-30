@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace ArenaXunit.Match;
+namespace ArenaXunit.Topology;
 
 public sealed class MatchBuilder
 {
@@ -46,7 +46,7 @@ public sealed class MatchBuilder
     }
 }
 
-internal sealed class RegisteredPlaybook
+public sealed class RegisteredPlaybook
 {
     public RegisteredPlaybook(Playbook.IPlaybook playbook, bool execOnDependencyStart)
     {
@@ -59,7 +59,7 @@ internal sealed class RegisteredPlaybook
 
     public object ToConfig()
     {
-        return playbookType switch
+        return Playbook switch
         {
             Playbook.ManagedHttpPlaybook http => new
             {
@@ -91,12 +91,4 @@ internal sealed class RegisteredPlaybook
             }
         };
     }
-
-    private string playbookType => Playbook switch
-    {
-        Playbook.ManagedHttpPlaybook => "http",
-        Playbook.ManagedMssqlPlaybook => "mssql",
-        Playbook.ManagedLocalstackPlaybook => "localstack",
-        _ => "unknown"
-    };
 }

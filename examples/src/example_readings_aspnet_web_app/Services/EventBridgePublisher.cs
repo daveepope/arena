@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Amazon;
 using Amazon.EventBridge;
 using Amazon.EventBridge.Model;
@@ -23,8 +25,7 @@ public class EventBridgePublisher : IEventBridgePublisher
 
         var config = new AmazonEventBridgeConfig
         {
-            ServiceURL = awsEndpointUrl,
-            ForcePathStyle = true
+            ServiceURL = awsEndpointUrl
         };
         _client = new AmazonEventBridgeClient("test", "test", config);
     }

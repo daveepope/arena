@@ -16,14 +16,7 @@ public sealed class ActiveMssqlPlaybook : ActivePlaybook
             Query = query,
             ExpectedValue = expectedValue,
         });
-        ArenaBindings.MssqlPlaybookVerify(GetHandle(), spec);
-    }
-
-    private IntPtr GetHandle()
-    {
-        var field = this.GetType().GetField("_handle",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        return field != null ? (IntPtr)field.GetValue(this)! : IntPtr.Zero;
+        ArenaBindings.MssqlPlaybookVerify(_handle, spec);
     }
 
     [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
