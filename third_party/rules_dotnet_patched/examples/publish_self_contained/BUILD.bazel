@@ -1,0 +1,20 @@
+load(
+    "@rules_dotnet//dotnet:defs.bzl",
+    "csharp_binary",
+    "publish_binary",
+)
+
+csharp_binary(
+    name = "hello",
+    srcs = ["hello.cs"],
+    target_frameworks = ["net9.0"],
+    deps = [
+    ],
+)
+
+publish_binary(
+    name = "publish_self_contained",
+    binary = ":hello",
+    self_contained = True,
+    target_framework = "net9.0",
+)

@@ -106,7 +106,7 @@ internal static class ArenaBindings
         return json;
     }
 
-    private static ArenaBindingError TakeErr(IntPtr errOut, string operation)
+    internal static ArenaBindingError TakeErr(IntPtr errOut, string operation)
     {
         if (errOut != IntPtr.Zero)
         {

@@ -19,7 +19,10 @@ public abstract class ManagedHttpPlaybook : IPlaybook
 
     public ActivePlaybook Run(OpenArena arena)
     {
-        return ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier);
+        var handle = Ffi.ArenaNativeLib.arena_match_playbook_run(arena.Handle, Identifier, out var errOut);
+        if (handle == IntPtr.Zero)
+            throw Ffi.ArenaBindings.TakeErr(errOut, "arena_match_playbook_run failed");
+        return new ActiveHttpPlaybook(handle);
     }
 }
 
@@ -36,7 +39,10 @@ public abstract class ManagedMssqlPlaybook : IPlaybook
 
     public ActivePlaybook Run(OpenArena arena)
     {
-        return ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier);
+        var handle = Ffi.ArenaNativeLib.arena_match_playbook_run(arena.Handle, Identifier, out var errOut);
+        if (handle == IntPtr.Zero)
+            throw Ffi.ArenaBindings.TakeErr(errOut, "arena_match_playbook_run failed");
+        return new ActiveMssqlPlaybook(handle);
     }
 }
 
@@ -53,6 +59,9 @@ public abstract class ManagedLocalstackPlaybook : IPlaybook
 
     public ActivePlaybook Run(OpenArena arena)
     {
-        return ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier);
+        var handle = Ffi.ArenaNativeLib.arena_match_playbook_run(arena.Handle, Identifier, out var errOut);
+        if (handle == IntPtr.Zero)
+            throw Ffi.ArenaBindings.TakeErr(errOut, "arena_match_playbook_run failed");
+        return new ActiveLocalstackPlaybook(handle);
     }
 }

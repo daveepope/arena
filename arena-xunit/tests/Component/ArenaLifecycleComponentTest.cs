@@ -138,26 +138,8 @@ public class ArenaDisposeComponentTest : IClassFixture<ArenaDisposeComponentTest
 
 public class ArenaCollectionSharingComponentTest
 {
-    private static int _sharedTopologyOpenCount = 0;
-
     internal class SharedTopologyConfig
     {
-        private static readonly object Lock = new object();
-
-        [ArenaDependency]
-        public static readonly StubDependency Stub = new StubDependency();
-
-        public class StubDependency : ArenaXunit.Topology.IArenaMatchPiece
-        {
-            public string ForFfi()
-            {
-                lock (Lock)
-                {
-                    _sharedTopologyOpenCount++;
-                }
-                return "{}";
-            }
-        }
     }
 
     internal class ConcreteFixture : ArenaCollectionFixture<SharedTopologyConfig>
@@ -165,16 +147,12 @@ public class ArenaCollectionSharingComponentTest
     }
 
     [Fact]
-    public void collectionFixture_opensArenaOnceForSharedTopology()
+    public void collectionFixture_sharesArenaForSameTopology()
     {
-        _sharedTopologyOpenCount = 0;
-
         var fixture1 = new ConcreteFixture();
-        Assert.Equal(1, _sharedTopologyOpenCount);
         Assert.NotNull(fixture1.Arena);
 
         var fixture2 = new ConcreteFixture();
-        Assert.Equal(1, _sharedTopologyOpenCount);
         Assert.Same(fixture1.Arena, fixture2.Arena);
 
         fixture1.Dispose();

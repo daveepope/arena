@@ -1,1 +1,1 @@
-exports_files(["openssl.BUILD.bazel"])
+exports_files(["openssl.BUILD.bazel", "rules_dotnet_tfm_filegroup_default.patch"])

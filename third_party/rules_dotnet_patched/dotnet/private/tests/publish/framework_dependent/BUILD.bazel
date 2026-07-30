@@ -1,0 +1,61 @@
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+load(
+    "//dotnet:defs.bzl",
+    "csharp_binary",
+    "publish_binary",
+)
+
+publish_binary(
+    name = "framework_dependent",
+    binary = "//dotnet/private/tests/publish/app_to_publish",
+    roll_forward_behavior = "Major",
+    self_contained = False,
+    target_framework = "net6.0",
+)
+
+# This target is only here to provide the dotnet toolchain
+# to the sh_test target. I could not figure out a better way
+# to supply the dotnet toolchain to the sh_test target without
+# having to create a custom rule
+csharp_binary(
+    name = "toolchain_provider",
+    srcs = ["hello.cs"],
+    target_frameworks = ["net6.0"],
+    deps = [
+    ],
+)
+
+# We tar the output to because that way we can strip the
+# prefix of the files and avoid long path issues on Windows.
+# This also makes sure that it's possible to tar the output
+# of the publish without any problems
+pkg_tar(
+    name = "tar",
+    srcs = [":framework_dependent"],
+    include_runfiles = True,
+    mode = "0755",
+    package_dir = "/",
+    strip_prefix = select(
+        {
+            "//dotnet/private:linux-x64": "framework_dependent/publish/linux-x64",
+            "//dotnet/private:linux-arm64": "framework_dependent/publish/linux-arm64",
+            "//dotnet/private:osx-x64": "framework_dependent/publish/osx-x64",
+            "//dotnet/private:osx-arm64": "framework_dependent/publish/osx-arm64",
+            "//dotnet/private:windows-x64": "framework_dependent/publish/win-x64",
+            "//dotnet/private:windows-arm64": "framework_dependent/publish/win-arm64",
+        },
+    ),
+)
+
+sh_test(
+    name = "framework_dependent_test",
+    srcs = [
+        "test.sh",
+    ],
+    args = ["$(DOTNET_BIN)"],
+    data = [
+        ":tar",
+        "//dotnet:resolved_toolchain",
+    ],
+    toolchains = ["//dotnet:resolved_toolchain"],
+)

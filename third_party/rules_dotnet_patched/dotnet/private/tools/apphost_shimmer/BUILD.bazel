@@ -1,0 +1,17 @@
+load(
+    "//dotnet:defs.bzl",
+    "csharp_binary",
+)
+
+csharp_binary(
+    name = "apphost_shimmer",
+    srcs = [
+        "AppHostShellShimMaker.cs",
+        "Program.cs",
+    ],
+    include_host_model_dll = True,
+    target_frameworks = ["net6.0"],
+    visibility = ["//visibility:public"],
+    deps = [
+    ],
+)

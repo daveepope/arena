@@ -1,0 +1,29 @@
+load(
+    "@rules_dotnet//dotnet:defs.bzl",
+    "csharp_binary",
+    "publish_binary",
+)
+
+# bazel run //examples:hello
+csharp_binary(
+    name = "aspnetcore",
+    srcs = [
+        "Controllers/WeatherForecastController.cs",
+        "Program.cs",
+        "WeatherForecast.cs",
+    ],
+    appsetting_files = [
+        "appsettings.json",
+    ] + glob(["appsettings.*.json"]),
+    project_sdk = "web",
+    target_frameworks = ["net9.0"],
+    deps = [
+    ],
+)
+
+publish_binary(
+    name = "publish",
+    binary = ":aspnetcore",
+    self_contained = True,
+    target_framework = "net9.0",
+)
