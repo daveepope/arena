@@ -2,6 +2,7 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library", "java_test")
+load("@rules_dotnet//dotnet:defs.bzl", "dotnet_library", "dotnet_binary", "dotnet_test")
 load("@crates//:defs.bzl", "all_crate_deps")
 
 filegroup(
@@ -447,6 +448,67 @@ java_test(
     ],
 )
 
+dotnet_library(
+    name = "xunit_shared",
+    srcs = glob(["tests/xunit-shared/**/*.cs"]),
+    deps = [
+        "//arena-xunit:arena_xunit_lib",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+dotnet_library(
+    name = "ephemeral_test_runtime_dotnet",
+    srcs = ["tests/xunit-shared/EphemeralTestRuntime.cs"],
+    visibility = ["//visibility:public"],
+)
+
+dotnet_library(
+    name = "example_readings_aspnet_web_app_lib",
+    srcs = glob(
+        ["src/example_readings_aspnet_web_app/**/*.cs"],
+        exclude = ["src/example_readings_aspnet_web_app/Program.cs"],
+    ),
+    deps = [
+        ":xunit_shared",
+        "//arena-xunit:arena_xunit_lib",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+dotnet_binary(
+    name = "example-readings-aspnet-web-app",
+    srcs = ["src/example_readings_aspnet_web_app/Program.cs"],
+    deps = [
+        ":example_readings_aspnet_web_app_lib",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+dotnet_test(
+    name = "example-aspnet-xunit-component-test",
+    size = "medium",
+    tags = [
+        "component_test",
+        "example_component",
+    ],
+    srcs = glob(["tests/example-aspnet-xunit-component-test/**/*.cs"]),
+    data = [
+        ":example-readings-aspnet-web-app",
+        "//arena-ffi:arena_ffi_shared",
+        ":instrument_reading_db_schema",
+        ":arena_config",
+        ":validation_db_schema",
+    ],
+    deps = [
+        ":xunit_shared",
+        ":ephemeral_test_runtime_dotnet",
+        ":example_readings_aspnet_web_app_lib",
+        "//arena-xunit:arena_xunit_lib",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 test_suite(
     name = "example_component_tests",
     tags = ["component_test"],
@@ -456,6 +518,7 @@ test_suite(
         ":example-axum-component-test",
         ":example-axum-junit-component-test",
         ":example-spring-boot-component-test",
+        ":example-aspnet-xunit-component-test",
     ],
     visibility = ["//visibility:public"],
 )
