@@ -2,12 +2,17 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple, Union
 
-from arena_pytest.readiness import HttpReadinessCheck
+from arena_pytest.readiness import HttpReadinessCheck, TcpReadinessCheck
 
 ReadinessCheckEntry = Union[
-    Tuple[HttpReadinessCheck, str],
-    Tuple[HttpReadinessCheck, str, int],
+    Tuple[Union[HttpReadinessCheck, TcpReadinessCheck], str],
+    Tuple[Union[HttpReadinessCheck, TcpReadinessCheck], str, int],
 ]
+
+_KIND_BY_CHECK_TYPE = {
+    HttpReadinessCheck: "http",
+    TcpReadinessCheck: "tcp",
+}
 
 
 def readiness_checks_for_ffi(
@@ -16,9 +21,10 @@ def readiness_checks_for_ffi(
     out: List[Dict[str, Any]] = []
     for entry in readiness_checks:
         if len(entry) == 2:
-            _, target = entry
+            check, target = entry
             timeout_ms = 10_000
         else:
-            _, target, timeout_ms = entry
-        out.append({"kind": "http", "target": target, "timeout_ms": timeout_ms})
+            check, target, timeout_ms = entry
+        kind = _KIND_BY_CHECK_TYPE[type(check)]
+        out.append({"kind": kind, "target": target, "timeout_ms": timeout_ms})
     return out

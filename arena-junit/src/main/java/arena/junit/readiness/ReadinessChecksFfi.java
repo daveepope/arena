@@ -17,6 +17,12 @@ public final class ReadinessChecksFfi {
         n.put("target", e.target());
         n.put("timeout_ms", e.timeoutMs());
         out.add(n);
+      } else if (e.check() instanceof TcpReadinessCheck) {
+        ObjectNode n = ArenaJson.object();
+        n.put("kind", "tcp");
+        n.put("target", e.target());
+        n.put("timeout_ms", e.timeoutMs());
+        out.add(n);
       }
     }
     return out;

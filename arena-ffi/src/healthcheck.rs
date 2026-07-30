@@ -15,6 +15,11 @@ pub(crate) enum ReadinessCheckConfig {
         #[serde(default = "default_readiness_timeout_ms")]
         timeout_ms: u64,
     },
+    Tcp {
+        target: String,
+        #[serde(default = "default_readiness_timeout_ms")]
+        timeout_ms: u64,
+    },
 }
 
 pub(crate) struct HttpReadinessCheck;
@@ -65,3 +70,56 @@ impl ReadinessCheck for HttpReadinessCheck {
         ))
     }
 }
+
+pub(crate) struct TcpReadinessCheck;
+
+impl TcpReadinessCheck {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[async_trait]
+impl ReadinessCheck for TcpReadinessCheck {
+    async fn is_ready(
+        &self,
+        identifier: &str,
+        target: &str,
+        timeout_ms: u64,
+    ) -> Result<(), String> {
+        let start = std::time::Instant::now();
+        let timeout = Duration::from_millis(timeout_ms);
+        let poll_interval = Duration::from_millis(100);
+
+        while start.elapsed() < timeout {
+            match tokio::net::TcpStream::connect(target).await {
+                Ok(_) => {
+                    tracing::info!(
+                        identifier = %identifier,
+                        target = %target,
+                        "tcp readiness passed"
+                    );
+                    return Ok(());
+                }
+                Err(e) => {
+                    tracing::trace!(
+                        identifier = %identifier,
+                        target = %target,
+                        error = %e,
+                        "tcp readiness poll failed"
+                    );
+                }
+            }
+            tokio::time::sleep(poll_interval).await;
+        }
+
+        Err(format!(
+            "[{}] TCP healthcheck timed out after {:?}",
+            identifier, timeout
+        ))
+    }
+}
+
+#[cfg(test)]
+#[path = "healthcheck_tests.rs"]
+mod healthcheck_tests;

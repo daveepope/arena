@@ -195,7 +195,7 @@
     "//tools:arena_version.bzl%arena_version": {
       "general": {
         "bzlTransitiveDigest": "DKya/O7/G21oGTUpyPEcPOtxkNd6MuOComr8gCuG21I=",
-        "usagesDigest": "k+hU2ur5pxVDc3iE4cT3kVS2NtccL6/dHAg/j+KBWaM=",
+        "usagesDigest": "QgX7cNZ8V0osKAVk32GJmeTTu6fu7dbskiG9d/HqO+w=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
