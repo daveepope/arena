@@ -8,6 +8,7 @@ import_library(
     library_name = "xunit.core",
     libs = ["@xunit_core//:libs"],
     refs = ["@xunit_core//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -15,6 +16,7 @@ import_library(
     library_name = "xunit.extensibility.execution",
     libs = ["@xunit_extensibility//:libs"],
     refs = ["@xunit_extensibility//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -22,6 +24,7 @@ import_library(
     library_name = "xunit.assert",
     libs = ["@xunit_assert//:libs"],
     refs = ["@xunit_assert//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -29,6 +32,7 @@ import_library(
     library_name = "Newtonsoft.Json",
     libs = ["@newtonsoft_json//:libs"],
     refs = ["@newtonsoft_json//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -36,6 +40,7 @@ import_library(
     library_name = "Microsoft.Extensions.Logging.Abstractions",
     libs = ["@ms_logging_abstractions//:libs"],
     refs = ["@ms_logging_abstractions//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -43,6 +48,7 @@ import_library(
     library_name = "xunit.abstractions",
     libs = ["@xunit_abstractions//:libs"],
     refs = ["@xunit_abstractions//:refs"],
+    tags = ["manual"],
 )
 
 filegroup(
@@ -56,6 +62,7 @@ import_library(
     library_name = "xunit.core",
     libs = [":xunit_core_netstandard"],
     refs = [":xunit_core_netstandard"],
+    tags = ["manual"],
 )
 
 filegroup(
@@ -68,6 +75,7 @@ import_library(
     library_name = "xunit.runner.utility.netstandard15",
     libs = [":xunit_runner_utility_netstandard"],
     refs = [":xunit_runner_utility_netstandard"],
+    tags = ["manual"],
 )
 
 filegroup(
@@ -80,6 +88,7 @@ import_library(
     library_name = "xunit.runner.reporters.netstandard11",
     libs = [":xunit_runner_reporters_netstandard"],
     refs = [":xunit_runner_reporters_netstandard"],
+    tags = ["manual"],
 )
 
 csharp_library(

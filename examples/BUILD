@@ -10,6 +10,7 @@ import_library(
     library_name = "xunit.core",
     libs = ["@xunit_core//:libs"],
     refs = ["@xunit_core//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -17,6 +18,7 @@ import_library(
     library_name = "xunit.assert",
     libs = ["@xunit_assert//:libs"],
     refs = ["@xunit_assert//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -24,6 +26,7 @@ import_library(
     library_name = "xunit.abstractions",
     libs = ["@xunit_abstractions//:libs"],
     refs = ["@xunit_abstractions//:refs"],
+    tags = ["manual"],
 )
 
 filegroup(
@@ -36,6 +39,7 @@ import_library(
     library_name = "xunit.execution.dotnet",
     libs = [":xunit_execution_netstandard"],
     refs = [":xunit_execution_netstandard"],
+    tags = ["manual"],
 )
 
 filegroup(
@@ -48,6 +52,7 @@ import_library(
     library_name = "xunit.runner.utility.netstandard15",
     libs = [":xunit_runner_utility_netstandard"],
     refs = [":xunit_runner_utility_netstandard"],
+    tags = ["manual"],
 )
 
 filegroup(
@@ -60,6 +65,7 @@ import_library(
     library_name = "xunit.runner.reporters.netstandard11",
     libs = [":xunit_runner_reporters_netstandard"],
     refs = [":xunit_runner_reporters_netstandard"],
+    tags = ["manual"],
 )
 
 filegroup(
@@ -72,6 +78,7 @@ import_library(
     library_name = "xunit.core",
     libs = [":xunit_core_netstandard"],
     refs = [":xunit_core_netstandard"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -79,6 +86,7 @@ import_library(
     library_name = "Newtonsoft.Json",
     libs = ["@newtonsoft_json//:libs"],
     refs = ["@newtonsoft_json//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -86,6 +94,7 @@ import_library(
     library_name = "Microsoft.Extensions.Logging.Abstractions",
     libs = ["@ms_logging_abstractions//:libs"],
     refs = ["@ms_logging_abstractions//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -93,6 +102,7 @@ import_library(
     library_name = "Npgsql",
     libs = ["@npgsql//:libs"],
     refs = ["@npgsql//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -100,6 +110,7 @@ import_library(
     library_name = "Microsoft.Data.SqlClient",
     libs = ["@sqlclient//:libs"],
     refs = ["@sqlclient//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -107,6 +118,7 @@ import_library(
     library_name = "AWSSDK.Core",
     libs = ["@aws_core//:libs"],
     refs = ["@aws_core//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -114,6 +126,7 @@ import_library(
     library_name = "AWSSDK.EventBridge",
     libs = ["@aws_eventbridge//:libs"],
     refs = ["@aws_eventbridge//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -121,6 +134,7 @@ import_library(
     library_name = "AWSSDK.SQS",
     libs = ["@aws_sqs//:libs"],
     refs = ["@aws_sqs//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -128,6 +142,7 @@ import_library(
     library_name = "System.IdentityModel.Tokens.Jwt",
     libs = ["@jwt//:libs"],
     refs = ["@jwt//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -135,6 +150,7 @@ import_library(
     library_name = "Microsoft.IdentityModel.Tokens",
     libs = ["@ms_identitymodel_tokens//:libs"],
     refs = ["@ms_identitymodel_tokens//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -142,6 +158,7 @@ import_library(
     library_name = "Microsoft.Extensions.Configuration",
     libs = ["@ms_extensions_configuration//:libs"],
     refs = ["@ms_extensions_configuration//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -149,6 +166,7 @@ import_library(
     library_name = "Microsoft.Extensions.Configuration.Abstractions",
     libs = ["@ms_extensions_configuration_abstractions//:libs"],
     refs = ["@ms_extensions_configuration_abstractions//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -156,6 +174,7 @@ import_library(
     library_name = "Microsoft.Extensions.Configuration.Binder",
     libs = ["@ms_extensions_configuration_binder//:libs"],
     refs = ["@ms_extensions_configuration_binder//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -163,6 +182,7 @@ import_library(
     library_name = "Microsoft.Extensions.DependencyInjection",
     libs = ["@ms_extensions_dependency_injection//:libs"],
     refs = ["@ms_extensions_dependency_injection//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -170,6 +190,7 @@ import_library(
     library_name = "Microsoft.Extensions.DependencyInjection.Abstractions",
     libs = ["@ms_extensions_dependency_injection_abstractions//:libs"],
     refs = ["@ms_extensions_dependency_injection_abstractions//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -177,6 +198,7 @@ import_library(
     library_name = "Microsoft.Extensions.Hosting",
     libs = ["@ms_extensions_hosting//:libs"],
     refs = ["@ms_extensions_hosting//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -184,6 +206,7 @@ import_library(
     library_name = "Microsoft.Extensions.Hosting.Abstractions",
     libs = ["@ms_extensions_hosting_abstractions//:libs"],
     refs = ["@ms_extensions_hosting_abstractions//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -191,6 +214,7 @@ import_library(
     library_name = "Microsoft.Extensions.Http",
     libs = ["@ms_extensions_http//:libs"],
     refs = ["@ms_extensions_http//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -198,6 +222,7 @@ import_library(
     library_name = "Temporalio",
     libs = ["@temporalio//:libs"],
     refs = ["@temporalio//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -205,6 +230,7 @@ import_library(
     library_name = "Microsoft.AspNetCore.App.Ref",
     libs = ["@ms_aspnetcore_app_ref//:libs"],
     refs = ["@ms_aspnetcore_app_ref//:refs"],
+    tags = ["manual"],
 )
 
 import_library(
@@ -212,6 +238,7 @@ import_library(
     library_name = "Microsoft.NETCore.App.Ref",
     libs = ["@ms_netcore_app_ref//:libs"],
     refs = ["@ms_netcore_app_ref//:refs"],
+    tags = ["manual"],
 )
 
 filegroup(
