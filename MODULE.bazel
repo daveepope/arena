@@ -182,13 +182,6 @@ nuget_archive = use_repo_rule("@rules_dotnet//dotnet:defs.bzl", "nuget_archive")
 
 # xUnit
 nuget_archive(
-    name = "xunit_core",
-    id = "xunit.core",
-    sources = ["https://api.nuget.org/v3/index.json"],
-    version = "2.9.2",
-)
-
-nuget_archive(
     name = "xunit_extensibility",
     id = "xunit.extensibility.execution",
     sources = ["https://api.nuget.org/v3/index.json"],

@@ -59,12 +59,12 @@ internal static class ArenaBindings
         ArenaNativeLib.arena_dispatcher_component_allow_json_set(json);
     }
 
-    internal static Playbook.ActivePlaybook MatchPlaybookRun(IntPtr arena, string identifier)
+    internal static IntPtr MatchPlaybookRun(IntPtr arena, string identifier)
     {
         var handle = ArenaNativeLib.arena_match_playbook_run(arena, identifier, out var errOut);
         if (handle == IntPtr.Zero)
             throw TakeErr(errOut, "arena_match_playbook_run failed");
-        return new Playbook.ActivePlaybook(handle);
+        return handle;
     }
 
     internal static void ActivePlaybookDrop(IntPtr handle)

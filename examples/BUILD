@@ -6,14 +6,6 @@ load("@rules_dotnet//dotnet:defs.bzl", "csharp_library", "csharp_binary", "cshar
 load("@crates//:defs.bzl", "all_crate_deps")
 
 import_library(
-    name = "xunit_core_lib",
-    library_name = "xunit.core",
-    libs = ["@xunit_core//:libs"],
-    refs = ["@xunit_core//:refs"],
-    tags = ["manual"],
-)
-
-import_library(
     name = "xunit_assert_lib",
     library_name = "xunit.assert",
     libs = ["@xunit_assert//:libs"],
@@ -690,7 +682,6 @@ csharp_library(
     srcs = glob(["tests/xunit-shared/**/*.cs"]),
     deps = [
         "//arena-xunit:arena_xunit_lib",
-        ":xunit_core_lib",
         ":xunit_assert_lib",
         ":xunit_abstractions_lib",
         ":xunit_extensibility_lib",
@@ -772,7 +763,6 @@ csharp_test(
     ],
     deps = [
         ":xunit_shared",
-        ":xunit_core_lib",
         ":xunit_assert_lib",
         ":xunit_abstractions_lib",
         ":xunit_extensibility_lib",

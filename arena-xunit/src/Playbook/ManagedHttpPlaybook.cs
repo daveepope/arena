@@ -19,7 +19,7 @@ public abstract class ManagedHttpPlaybook : IPlaybook
 
     public ActivePlaybook Run(OpenArena arena)
     {
-        return ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier);
+        return new ActiveHttpPlaybook(ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier));
     }
 }
 
@@ -36,7 +36,7 @@ public abstract class ManagedMssqlPlaybook : IPlaybook
 
     public ActivePlaybook Run(OpenArena arena)
     {
-        return ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier);
+        return new ActiveMssqlPlaybook(ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier));
     }
 }
 
@@ -53,6 +53,6 @@ public abstract class ManagedLocalstackPlaybook : IPlaybook
 
     public ActivePlaybook Run(OpenArena arena)
     {
-        return ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier);
+        return new ActiveLocalstackPlaybook(ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier));
     }
 }

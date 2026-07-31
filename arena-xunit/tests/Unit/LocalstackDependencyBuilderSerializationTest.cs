@@ -56,7 +56,19 @@ public class LocalstackDependencyBuilderSerializationTest
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
         Assert.NotNull(obj["queues"]);
-        Assert.Equal("myqueue", obj["queues"][0]);
+        Assert.Equal("myqueue", obj["queues"][0]["name"]);
+        Assert.Equal(false, obj["queues"][0]["fifo"]);
+    }
+
+    [Fact]
+    public void build_with_fifo_queue_serializes_correct_json()
+    {
+        var dep = new LocalstackDependencyBuilder("test").WithFifoQueue("myqueue.fifo").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.NotNull(obj["queues"]);
+        Assert.Equal("myqueue.fifo", obj["queues"][0]["name"]);
+        Assert.Equal(true, obj["queues"][0]["fifo"]);
     }
 
     [Fact]
@@ -66,7 +78,7 @@ public class LocalstackDependencyBuilderSerializationTest
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
         Assert.NotNull(obj["event_buses"]);
-        Assert.Equal("my-bus", obj["event_buses"][0]);
+        Assert.Equal("my-bus", obj["event_buses"][0]["name"]);
     }
 
     [Fact]

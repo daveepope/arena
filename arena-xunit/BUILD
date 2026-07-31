@@ -4,14 +4,6 @@ _ARENA_XUNIT_SRCS = glob(["src/**/*.cs"])
 
 # Import nuget packages from MODULE.bazel nuget_archive repos
 import_library(
-    name = "xunit_core_lib",
-    library_name = "xunit.core",
-    libs = ["@xunit_core//:libs"],
-    refs = ["@xunit_core//:refs"],
-    tags = ["manual"],
-)
-
-import_library(
     name = "xunit_extensibility_lib",
     library_name = "xunit.extensibility.execution",
     libs = ["@xunit_extensibility//:libs"],
@@ -98,7 +90,6 @@ csharp_library(
     visibility = ["//visibility:public"],
     compiler_options = ["/langversion:latest", "/debug:pdbonly"],
     deps = [
-        ":xunit_core_lib",
         ":xunit_extensibility_lib",
         ":xunit_extensibility_core_lib",
         ":xunit_abstractions_lib",
@@ -116,7 +107,6 @@ csharp_test(
     data = [":xunit_core_netstandard"],
     deps = [
         ":arena_xunit_lib",
-        ":xunit_core_lib",
         ":xunit_assert_lib",
         ":xunit_abstractions_lib",
         ":xunit_extensibility_lib",
@@ -136,7 +126,6 @@ csharp_test(
     data = ["//arena-ffi:arena_ffi_shared", ":xunit_core_netstandard"],
     deps = [
         ":arena_xunit_lib",
-        ":xunit_core_lib",
         ":xunit_assert_lib",
         ":xunit_abstractions_lib",
         ":xunit_extensibility_lib",

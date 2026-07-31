@@ -5,6 +5,18 @@ using Newtonsoft.Json;
 
 namespace ArenaXunit.Dep;
 
+public sealed class QueueSpec
+{
+    public string Name { get; }
+    public bool Fifo { get; }
+
+    public QueueSpec(string name, bool fifo = false)
+    {
+        Name = name;
+        Fifo = fifo;
+    }
+}
+
 public class EventRuleTarget
 {
     public string TargetId { get; set; } = default!;
@@ -62,6 +74,19 @@ internal sealed class LocalstackTargetConfig
     [JsonProperty("function_name")] public string? FunctionName { get; set; }
 }
 
+[JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
+internal sealed class LocalstackQueueConfig
+{
+    [JsonProperty("name")] public string Name { get; set; } = default!;
+    [JsonProperty("fifo")] public bool Fifo { get; set; }
+}
+
+[JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
+internal sealed class LocalstackEventBusConfig
+{
+    [JsonProperty("name")] public string Name { get; set; } = default!;
+}
+
 public sealed class LocalstackDependency : IArenaMatchPiece
 {
     public string Type => "localstack";
@@ -70,8 +95,8 @@ public sealed class LocalstackDependency : IArenaMatchPiece
     public string EndpointUrl { get; }
 
     private readonly List<string> _services;
-    private readonly List<string> _queues;
-    private readonly List<string> _eventBuses;
+    private readonly List<LocalstackQueueConfig> _queues;
+    private readonly List<LocalstackEventBusConfig> _eventBuses;
     private readonly List<LocalstackRuleConfig> _eventRules;
     private readonly string? _image;
     private readonly string? _containerName;
@@ -80,8 +105,8 @@ public sealed class LocalstackDependency : IArenaMatchPiece
         string identifier,
         int port,
         List<string> services,
-        List<string> queues,
-        List<string> eventBuses,
+        List<LocalstackQueueConfig> queues,
+        List<LocalstackEventBusConfig> eventBuses,
         List<LocalstackRuleConfig> eventRules,
         string? image,
         string? containerName)
@@ -123,8 +148,8 @@ public sealed class LocalstackDependency : IArenaMatchPiece
         [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
         [JsonProperty("port")] public int Port { get; set; }
         [JsonProperty("services")] public List<string>? Services { get; set; }
-        [JsonProperty("queues")] public List<string>? Queues { get; set; }
-        [JsonProperty("event_buses")] public List<string>? EventBuses { get; set; }
+        [JsonProperty("queues")] public List<LocalstackQueueConfig>? Queues { get; set; }
+        [JsonProperty("event_buses")] public List<LocalstackEventBusConfig>? EventBuses { get; set; }
         [JsonProperty("event_rules")] public List<LocalstackRuleConfig>? EventRules { get; set; }
         [JsonProperty("image")] public string? Image { get; set; }
         [JsonProperty("container_name")] public string? ContainerName { get; set; }
@@ -136,7 +161,7 @@ public sealed class LocalstackDependencyBuilder
     private readonly string _name;
     private int _port = 4566;
     private readonly List<string> _services = new();
-    private readonly List<string> _queues = new();
+    private readonly List<QueueSpec> _queues = new();
     private readonly List<string> _eventBuses = new();
     private readonly List<EventRuleSpec> _eventRules = new();
     private string? _image;
@@ -167,7 +192,17 @@ public sealed class LocalstackDependencyBuilder
 
     public LocalstackDependencyBuilder WithQueue(string name)
     {
-        _queues.Add(name);
+        return WithQueueSpec(new QueueSpec(name));
+    }
+
+    public LocalstackDependencyBuilder WithFifoQueue(string name)
+    {
+        return WithQueueSpec(new QueueSpec(name, fifo: true));
+    }
+
+    public LocalstackDependencyBuilder WithQueueSpec(QueueSpec spec)
+    {
+        _queues.Add(spec);
         return this;
     }
 
@@ -221,12 +256,24 @@ public sealed class LocalstackDependencyBuilder
             });
         }
 
+        var queues = new List<LocalstackQueueConfig>();
+        foreach (var spec in _queues)
+        {
+            queues.Add(new LocalstackQueueConfig { Name = spec.Name, Fifo = spec.Fifo });
+        }
+
+        var eventBuses = new List<LocalstackEventBusConfig>();
+        foreach (var name in _eventBuses)
+        {
+            eventBuses.Add(new LocalstackEventBusConfig { Name = name });
+        }
+
         return new LocalstackDependency(
             identifier,
             _port,
             new List<string>(_services),
-            new List<string>(_queues),
-            new List<string>(_eventBuses),
+            queues,
+            eventBuses,
             rules,
             _image,
             _containerName);

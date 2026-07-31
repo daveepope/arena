@@ -78,12 +78,20 @@ public sealed class ClosedArena
         {
             if (registered.ExecOnDependencyStart)
             {
-                var active = ArenaBindings.MatchPlaybookRun(handle, registered.Playbook.Identifier);
-                result[registered.Playbook.GetType()] = active;
+                var playbookHandle = ArenaBindings.MatchPlaybookRun(handle, registered.Playbook.Identifier);
+                result[registered.Playbook.GetType()] = WrapActivePlaybook(registered.Playbook, playbookHandle);
             }
         }
         return result;
     }
+
+    private static ActivePlaybook WrapActivePlaybook(Playbook.IPlaybook playbook, IntPtr handle) => playbook switch
+    {
+        ManagedHttpPlaybook => new ActiveHttpPlaybook(handle),
+        ManagedMssqlPlaybook => new ActiveMssqlPlaybook(handle),
+        ManagedLocalstackPlaybook => new ActiveLocalstackPlaybook(handle),
+        _ => throw new InvalidOperationException($"unsupported playbook type: {playbook.GetType()}"),
+    };
 
     private static ILogger CreateDefaultLogger()
     {
