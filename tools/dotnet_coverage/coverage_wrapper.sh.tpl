@@ -22,5 +22,5 @@ COVERAGE_TOOL="$(rlocation TEMPLATED_coverage_tool)"
 LCOV_CONVERTER="$(rlocation TEMPLATED_lcov_converter)"
 COBERTURA_FILE="$COVERAGE_DIR/dotnet_coverage.cobertura.xml"
 
-"$COVERAGE_TOOL" collect -f cobertura -if "**/*.dll" -o "$COBERTURA_FILE" -- "$BINARY" "$@"
+"$COVERAGE_TOOL" collect -f cobertura TEMPLATED_include_files_args -o "$COBERTURA_FILE" -- "$BINARY" "$@"
 "$LCOV_CONVERTER" "$COBERTURA_FILE" "$COVERAGE_OUTPUT_FILE"

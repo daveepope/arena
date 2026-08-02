@@ -22,6 +22,8 @@ def convert(cobertura_path: str, lcov_path: str) -> None:
             continue
         if filename.startswith("./"):
             filename = filename[2:]
+        if "/tests/" in filename:
+            continue
 
         lines_elem = cls.find("lines")
         if lines_elem is None:

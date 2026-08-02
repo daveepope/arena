@@ -30,6 +30,20 @@ def _transitive_pdbs(binary_info):
         pdbs.extend(runtime_dep.pdbs)
     return pdbs
 
+_UNSCOPED_WILDCARDS = ["*.dll", "**/*.dll"]
+
+def _shell_single_quote(s):
+    return "'" + s.replace("'", "'\\''") + "'"
+
+def _include_files_args(patterns):
+    for pattern in patterns:
+        if pattern in _UNSCOPED_WILDCARDS:
+            fail(("instrument_files pattern %r is an unscoped wildcard: it also " +
+                  "matches the vendored .NET runtime shipped in the test's " +
+                  "runfiles, which is unstable to instrument and can exhaust " +
+                  "host memory. Scope it to this target's own assembly instead.") % pattern)
+    return " ".join(["-if %s" % _shell_single_quote(pattern) for pattern in patterns])
+
 def _dotnet_coverage_test_impl(ctx):
     binary = ctx.attr.binary
     binary_info = binary[DotnetBinaryInfo]
@@ -42,6 +56,7 @@ def _dotnet_coverage_test_impl(ctx):
             "TEMPLATED_binary": to_rlocation_path(ctx, binary.files_to_run.executable),
             "TEMPLATED_coverage_tool": to_rlocation_path(ctx, ctx.executable._coverage_tool),
             "TEMPLATED_lcov_converter": to_rlocation_path(ctx, ctx.executable._lcov_converter),
+            "TEMPLATED_include_files_args": _include_files_args(ctx.attr.instrument_files),
         },
         is_executable = True,
     )
@@ -68,6 +83,11 @@ _dotnet_coverage_test = rule(
             providers = [DotnetBinaryInfo],
             doc = "A testonly csharp_binary to run, and to instrument under `bazel coverage`.",
         ),
+        "instrument_files": attr.string_list(
+            mandatory = True,
+            allow_empty = False,
+            doc = "`dotnet-coverage collect -if` glob(s) scoping which assemblies to instrument.",
+        ),
         "_coverage_tool": attr.label(
             default = Label("//tools/dotnet_coverage:dotnet_coverage_tool"),
             executable = True,
@@ -86,8 +106,8 @@ _dotnet_coverage_test = rule(
     },
 )
 
-def dotnet_coverage_test(name, **kwargs):
-    """Drop-in replacement for `csharp_test` that produces real data under `bazel coverage`."""
+def dotnet_coverage_test(name, instrument_files, **kwargs):
+    """`csharp_test` replacement that produces real data under `bazel coverage`."""
     test_kwargs = {}
     for attr_name in _TEST_ONLY_ATTRS:
         if attr_name in kwargs:
@@ -102,5 +122,6 @@ def dotnet_coverage_test(name, **kwargs):
     _dotnet_coverage_test(
         name = name,
         binary = ":%s_bin" % name,
+        instrument_files = instrument_files,
         **test_kwargs
     )

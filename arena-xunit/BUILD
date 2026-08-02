@@ -104,6 +104,7 @@ dotnet_coverage_test(
     name = "arena_xunit_unit_test",
     size = "small",
     target_frameworks = ["net8.0"],
+    instrument_files = ["**/arena_xunit_lib.dll"],
     srcs = glob(["tests/Unit/**/*.cs"]),
     data = [":xunit_core_netstandard"],
     deps = [
