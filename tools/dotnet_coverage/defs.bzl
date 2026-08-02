@@ -21,6 +21,7 @@ source lines. A rules_dotnet upgrade could rename or remove these.
 load("@rules_dotnet//dotnet:defs.bzl", "csharp_binary")
 load("@rules_dotnet//dotnet/private:common.bzl", "to_rlocation_path")
 load("@rules_dotnet//dotnet/private:providers.bzl", "DotnetBinaryInfo")
+load(":instrument_files.bzl", "include_files_args")
 
 _TEST_ONLY_ATTRS = ["size", "timeout", "flaky", "shard_count", "local", "tags", "args"]
 
@@ -29,20 +30,6 @@ def _transitive_pdbs(binary_info):
     for runtime_dep in binary_info.transitive_runtime_deps:
         pdbs.extend(runtime_dep.pdbs)
     return pdbs
-
-_UNSCOPED_WILDCARDS = ["*.dll", "**/*.dll"]
-
-def _shell_single_quote(s):
-    return "'" + s.replace("'", "'\\''") + "'"
-
-def _include_files_args(patterns):
-    for pattern in patterns:
-        if pattern in _UNSCOPED_WILDCARDS:
-            fail(("instrument_files pattern %r is an unscoped wildcard: it also " +
-                  "matches the vendored .NET runtime shipped in the test's " +
-                  "runfiles, which is unstable to instrument and can exhaust " +
-                  "host memory. Scope it to this target's own assembly instead.") % pattern)
-    return " ".join(["-if %s" % _shell_single_quote(pattern) for pattern in patterns])
 
 def _dotnet_coverage_test_impl(ctx):
     binary = ctx.attr.binary
@@ -56,7 +43,7 @@ def _dotnet_coverage_test_impl(ctx):
             "TEMPLATED_binary": to_rlocation_path(ctx, binary.files_to_run.executable),
             "TEMPLATED_coverage_tool": to_rlocation_path(ctx, ctx.executable._coverage_tool),
             "TEMPLATED_lcov_converter": to_rlocation_path(ctx, ctx.executable._lcov_converter),
-            "TEMPLATED_include_files_args": _include_files_args(ctx.attr.instrument_files),
+            "TEMPLATED_include_files_args": include_files_args(ctx.attr.instrument_files),
         },
         is_executable = True,
     )
@@ -69,7 +56,7 @@ def _dotnet_coverage_test_impl(ctx):
 
     return [
         DefaultInfo(executable = wrapper, runfiles = runfiles),
-        coverage_common.instrumented_files_info(ctx, dependency_attributes = ["binary"]),
+        coverage_common.instrumented_files_info(ctx, dependency_attributes = ["binary"], extensions = ["cs"]),
     ]
 
 _dotnet_coverage_test = rule(

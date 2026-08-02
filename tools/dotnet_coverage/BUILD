@@ -1,7 +1,10 @@
 load("@rules_dotnet//dotnet:defs.bzl", "dotnet_tool")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+load(":instrument_files_test.bzl", "instrument_files_test_suite")
 
 package(default_visibility = ["//visibility:public"])
+
+instrument_files_test_suite(name = "instrument_files_test")
 
 dotnet_tool(
     name = "dotnet_coverage_tool",
