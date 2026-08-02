@@ -298,6 +298,14 @@ nuget_archive(
     version = "8.0.1",
 )
 
+# Coverage
+nuget_archive(
+    name = "dotnet_coverage",
+    id = "dotnet-coverage",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "18.9.0",
+)
+
 # Test SDK
 nuget_archive(
     name = "mstest",

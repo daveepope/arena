@@ -1,4 +1,5 @@
 load("@rules_dotnet//dotnet:defs.bzl", "csharp_library", "csharp_test", "import_library")
+load("//tools/dotnet_coverage:defs.bzl", "dotnet_coverage_test")
 
 _ARENA_XUNIT_SRCS = glob(["src/**/*.cs"])
 
@@ -99,7 +100,7 @@ csharp_library(
     data = ["//arena-ffi:arena_ffi_shared"],
 )
 
-csharp_test(
+dotnet_coverage_test(
     name = "arena_xunit_unit_test",
     size = "small",
     target_frameworks = ["net8.0"],
