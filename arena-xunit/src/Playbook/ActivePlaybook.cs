@@ -7,11 +7,13 @@ namespace ArenaXunit.Playbook;
 public class ActivePlaybook : IDisposable
 {
     protected readonly IntPtr _handle;
+    private readonly ActivePlaybookHandle _safeHandle;
     private bool _disposed;
 
     internal ActivePlaybook(IntPtr handle)
     {
         _handle = handle;
+        _safeHandle = new ActivePlaybookHandle(handle);
     }
 
     public void Dispose()
@@ -19,13 +21,7 @@ public class ActivePlaybook : IDisposable
         if (_disposed)
             return;
         _disposed = true;
-        try
-        {
-            ArenaBindings.ActivePlaybookDrop(_handle);
-        }
-        catch
-        {
-        }
+        _safeHandle.Dispose();
     }
 
     public Task VerifyAtLeast(string path, int minCount)

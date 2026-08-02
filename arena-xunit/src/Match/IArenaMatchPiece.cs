@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace ArenaXunit.Topology;
+namespace ArenaXunit;
 
 public interface IArenaMatchPiece
 {

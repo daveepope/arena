@@ -1,66 +1,98 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using ArenaXunit.Xunit;
+using System.Threading;
 
 namespace ArenaXunit;
 
-public abstract class ArenaCollectionFixture<TTopology> : IDisposable where TTopology : class, IArenaTopology, new()
+public abstract class ArenaCollectionFixture : IDisposable
 {
-    private static readonly object Lock = new object();
-    private static readonly Dictionary<Type, SharedArena> SharedArenas = new Dictionary<Type, SharedArena>();
+    private static readonly ConcurrentDictionary<Type, Lazy<SharedArena>> SharedArenas = new();
 
-    public OpenArena Arena { get; private set; } = default!;
+    private readonly Lazy<SharedArena> _sharedEntry;
+    private readonly SharedArena _shared;
 
-    public ArenaCollectionFixture()
+    protected ArenaCollectionFixture()
     {
-        var topologyType = typeof(TTopology);
-        lock (Lock)
+        var key = GetType();
+        while (true)
         {
-            if (!SharedArenas.ContainsKey(topologyType))
+            var lazy = SharedArenas.GetOrAdd(
+                key,
+                _ => new Lazy<SharedArena>(OpenSharedArena, LazyThreadSafetyMode.ExecutionAndPublication));
+            var shared = lazy.Value;
+            if (shared.TryAddRef())
             {
-                var topology = new TTopology();
-                var match = topology.Configure();
-                var closed = new ClosedArena(topologyType.Name, match);
-                var arena = closed.OpenAsync().GetAwaiter().GetResult();
-                SharedArenas[topologyType] = new SharedArena(arena, 1);
+                _sharedEntry = lazy;
+                _shared = shared;
+                return;
             }
-            else
-            {
-                SharedArenas[topologyType].RefCount++;
-            }
-            Arena = SharedArenas[topologyType].Arena;
+
+            RemoveStaleEntry(key, lazy);
         }
     }
 
+    public OpenArena Arena => _shared.Arena;
+
+    protected abstract Match Configure();
+
     public void Dispose()
     {
-        var topologyType = typeof(TTopology);
-        lock (Lock)
-        {
-            if (!SharedArenas.ContainsKey(topologyType))
-                return;
+        if (!_shared.Release())
+            return;
 
-            var shared = SharedArenas[topologyType];
-            shared.RefCount--;
+        RemoveStaleEntry(GetType(), _sharedEntry);
+    }
 
-            if (shared.RefCount <= 0)
-            {
-                shared.Arena.Dispose();
-                SharedArenas.Remove(topologyType);
-            }
-        }
+    private static void RemoveStaleEntry(Type key, Lazy<SharedArena> lazy)
+    {
+        ((ICollection<KeyValuePair<Type, Lazy<SharedArena>>>)SharedArenas)
+            .Remove(new KeyValuePair<Type, Lazy<SharedArena>>(key, lazy));
+    }
+
+    private SharedArena OpenSharedArena()
+    {
+        var match = Configure();
+        var closed = new ClosedArena(GetType().Name, match);
+        var arena = closed.OpenAsync().GetAwaiter().GetResult();
+        return new SharedArena(arena);
     }
 
     private sealed class SharedArena
     {
-        public SharedArena(OpenArena arena, int refCount)
+        private readonly object _lock = new object();
+        private int _refCount;
+        private bool _disposed;
+
+        public SharedArena(OpenArena arena)
         {
             Arena = arena;
-            RefCount = refCount;
         }
 
         public OpenArena Arena { get; }
-        public int RefCount { get; set; }
+
+        public bool TryAddRef()
+        {
+            lock (_lock)
+            {
+                if (_disposed)
+                    return false;
+                _refCount++;
+                return true;
+            }
+        }
+
+        public bool Release()
+        {
+            lock (_lock)
+            {
+                _refCount--;
+                if (_refCount > 0)
+                    return false;
+                _disposed = true;
+                Arena.Dispose();
+                return true;
+            }
+        }
     }
 }

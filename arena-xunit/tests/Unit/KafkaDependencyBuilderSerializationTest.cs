@@ -10,7 +10,7 @@ namespace ArenaXunit.UnitTest;
 public class KafkaDependencyBuilderSerializationTest
 {
     [Fact]
-    public void build_default_port_serializes_correct_json()
+    public void Build_DefaultPort_SerializesCorrectJson()
     {
         var dep = new KafkaDependencyBuilder("test").Build();
         var json = dep.ForFfi();
@@ -21,7 +21,7 @@ public class KafkaDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_custom_port_serializes_correct_json()
+    public void Build_CustomPort_SerializesCorrectJson()
     {
         var dep = new KafkaDependencyBuilder("test").WithPort(9192).Build();
         var json = dep.ForFfi();
@@ -30,25 +30,25 @@ public class KafkaDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_zookeeper_flavor_serializes_correct_json()
+    public void Build_ApacheNativeFlavor_SerializesCorrectJson()
     {
-        var dep = new KafkaDependencyBuilder("test").WithFlavor(KafkaFlavor.Zookeeper).Build();
+        var dep = new KafkaDependencyBuilder("test").WithFlavor(KafkaFlavor.ApacheNative).Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Equal("zookeeper", obj["flavor"]);
+        Assert.Equal("apache_native", obj["flavor"]);
     }
 
     [Fact]
-    public void build_kraft_flavor_serializes_correct_json()
+    public void Build_ConfluentFlavor_SerializesCorrectJson()
     {
-        var dep = new KafkaDependencyBuilder("test").WithFlavor(KafkaFlavor.KRaft).Build();
+        var dep = new KafkaDependencyBuilder("test").WithFlavor(KafkaFlavor.Confluent).Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Equal("kraft", obj["flavor"]);
+        Assert.Equal("confluent", obj["flavor"]);
     }
 
     [Fact]
-    public void build_identifier_matches_pattern()
+    public void Build_Identifier_MatchesPattern()
     {
         var dep = new KafkaDependencyBuilder("test").Build();
         Assert.StartsWith("arena-kafka-", dep.Identifier);

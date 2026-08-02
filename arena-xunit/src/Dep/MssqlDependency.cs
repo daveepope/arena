@@ -1,14 +1,11 @@
-using ArenaXunit.Topology;
 using ArenaXunit.Support;
-using Newtonsoft.Json;
 
 namespace ArenaXunit.Dep;
 
 public enum MssqlEncryption
 {
     Off,
-    On,
-    Strict
+    On
 }
 
 public sealed class MssqlDependency : IArenaMatchPiece
@@ -27,28 +24,7 @@ public sealed class MssqlDependency : IArenaMatchPiece
 
     public string ForFfi()
     {
-        return ArenaJson.Serialize(new MssqlConfig
-        {
-            Type = Type,
-            Identifier = Identifier,
-            Port = Port,
-            Encryption = Encryption switch
-            {
-                MssqlEncryption.Off => "off",
-                MssqlEncryption.On => "on",
-                MssqlEncryption.Strict => "strict",
-                _ => "off"
-            },
-        });
-    }
-
-    [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-    private sealed class MssqlConfig
-    {
-        [JsonProperty("type")] public string Type { get; set; } = default!;
-        [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
-        [JsonProperty("port")] public int Port { get; set; }
-        [JsonProperty("encryption")] public string? Encryption { get; set; }
+        return ArenaJson.Serialize(this);
     }
 }
 

@@ -2,14 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using ArenaXunit.Playbook;
 
 namespace ArenaXunit.Xunit;
 
 internal static class PlaybookScope
 {
-    private static readonly object Lock = new object();
-    private static readonly Dictionary<string, List<ActivePlaybook>> _activePlaybooks = new();
+    private static readonly AsyncLocal<List<ActivePlaybook>?> ActivePlaybooks = new();
 
     public static void BeforeTest(MethodInfo method, Type testClass)
     {
@@ -21,7 +21,8 @@ internal static class PlaybookScope
         if (arena == null)
             return;
 
-        var scopeKey = BuildScopeKey(testClass, method);
+        var active = new List<ActivePlaybook>();
+        ActivePlaybooks.Value = active;
         try
         {
             foreach (var playbookType in attributes.Select(a => a.PlaybookType))
@@ -40,49 +41,39 @@ internal static class PlaybookScope
                         $"[Playbook]: playbook {playbookType.Name} was registered with execOnDependencyStart=true and cannot be scoped per-test");
                 }
 
-                var active = pb.Run(arena);
-                lock (Lock)
-                {
-                    if (!_activePlaybooks.ContainsKey(scopeKey))
-                    {
-                        _activePlaybooks[scopeKey] = new List<ActivePlaybook>();
-                    }
-                    _activePlaybooks[scopeKey].Add(active);
-                }
+                active.Add(pb.Run(arena));
             }
         }
         catch
         {
-            DisposeAll(scopeKey);
+            DisposeAll(active);
+            ActivePlaybooks.Value = null;
             throw;
         }
     }
 
     public static void AfterTest(MethodInfo method, Type testClass)
     {
-        var scopeKey = BuildScopeKey(testClass, method);
-        DisposeAll(scopeKey);
+        var active = ActivePlaybooks.Value;
+        if (active == null)
+            return;
+        DisposeAll(active);
+        ActivePlaybooks.Value = null;
     }
 
-    private static void DisposeAll(string scopeKey)
+    private static void DisposeAll(List<ActivePlaybook> active)
     {
-        lock (Lock)
+        for (var i = active.Count - 1; i >= 0; i--)
         {
-            if (_activePlaybooks.TryGetValue(scopeKey, out var list))
+            try
             {
-                for (var i = list.Count - 1; i >= 0; i--)
-                {
-                    try
-                    {
-                        list[i].Dispose();
-                    }
-                    catch
-                    {
-                    }
-                }
-                _activePlaybooks.Remove(scopeKey);
+                active[i].Dispose();
+            }
+            catch
+            {
             }
         }
+        active.Clear();
     }
 
     private static IEnumerable<PlaybookAttribute> GetPlaybookAttributes(MethodInfo method, Type testClass)
@@ -95,11 +86,6 @@ internal static class PlaybookScope
         var classAttrs = testClass.GetCustomAttributes(typeof(PlaybookAttribute), true)
             .Cast<PlaybookAttribute>();
         return classAttrs;
-    }
-
-    private static string BuildScopeKey(Type testClass, MethodInfo method)
-    {
-        return $"{testClass.FullName}.{method.Name}";
     }
 
     private static OpenArena? ResolveOpenArenaFromStaticField(Type testClass)

@@ -1,4 +1,3 @@
-using ArenaXunit.Topology;
 using ArenaXunit.Support;
 using Newtonsoft.Json;
 
@@ -11,8 +10,8 @@ public sealed class OauthDependency : IArenaMatchPiece
     public int Port { get; }
     public string? ListenIp { get; }
     public string? MetadataBaseUrl { get; }
-    public string? ServerTlsCert { get; }
-    public string? ServerTlsKey { get; }
+    [JsonProperty("server_tls_certificate_pem")] public string? ServerTlsCert { get; }
+    [JsonProperty("server_tls_private_key_pem")] public string? ServerTlsKey { get; }
 
     internal OauthDependency(string identifier, int port, string? listenIp, string? metadataBaseUrl,
         string? serverTlsCert, string? serverTlsKey)
@@ -27,28 +26,7 @@ public sealed class OauthDependency : IArenaMatchPiece
 
     public string ForFfi()
     {
-        return ArenaJson.Serialize(new OauthConfig
-        {
-            Type = Type,
-            Identifier = Identifier,
-            Port = Port,
-            ListenIp = ListenIp,
-            MetadataBaseUrl = MetadataBaseUrl,
-            ServerTlsCert = ServerTlsCert,
-            ServerTlsKey = ServerTlsKey,
-        });
-    }
-
-    [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-    private sealed class OauthConfig
-    {
-        [JsonProperty("type")] public string Type { get; set; } = default!;
-        [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
-        [JsonProperty("port")] public int Port { get; set; }
-        [JsonProperty("listen_ip")] public string? ListenIp { get; set; }
-        [JsonProperty("metadata_base_url")] public string? MetadataBaseUrl { get; set; }
-        [JsonProperty("server_tls_certificate_pem")] public string? ServerTlsCert { get; set; }
-        [JsonProperty("server_tls_private_key_pem")] public string? ServerTlsKey { get; set; }
+        return ArenaJson.Serialize(this);
     }
 }
 

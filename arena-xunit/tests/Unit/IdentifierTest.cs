@@ -8,7 +8,7 @@ namespace ArenaXunit.UnitTest;
 public class IdentifierTest
 {
     [Fact]
-    public void build_single_name_returns_valid_identifier()
+    public void Build_SingleName_ReturnsValidIdentifier()
     {
         var id = ArenaIdentifiers.Build("arena-http", "stub");
         Assert.StartsWith("arena-http-", id);
@@ -17,7 +17,7 @@ public class IdentifierTest
     }
 
     [Fact]
-    public void build_same_input_returns_different_suffixes()
+    public void Build_SameInput_ReturnsDifferentSuffixes()
     {
         var id1 = ArenaIdentifiers.Build("arena-http", "stub");
         var id2 = ArenaIdentifiers.Build("arena-http", "stub");
@@ -26,21 +26,21 @@ public class IdentifierTest
     }
 
     [Fact]
-    public void build_special_chars_converted_to_slug()
+    public void Build_SpecialChars_ConvertedToSlug()
     {
         var id = ArenaIdentifiers.Build("arena-http", "my-stub-test");
         Assert.Contains("my-stub-test", id);
     }
 
     [Fact]
-    public void build_empty_name_returns_identifier()
+    public void Build_EmptyName_ReturnsIdentifier()
     {
         var id = ArenaIdentifiers.Build("arena-http", "");
         Assert.StartsWith("arena-http-", id);
     }
 
     [Fact]
-    public void build_module_prefix_preserved()
+    public void Build_ModulePrefix_Preserved()
     {
         var id1 = ArenaIdentifiers.Build("arena-kafka", "test");
         var id2 = ArenaIdentifiers.Build("arena-postgres", "test");

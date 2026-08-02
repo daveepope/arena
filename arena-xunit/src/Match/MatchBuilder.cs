@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace ArenaXunit.Topology;
+namespace ArenaXunit;
 
 public sealed class MatchBuilder
 {
@@ -59,36 +59,14 @@ public sealed class RegisteredPlaybook
 
     public object ToConfig()
     {
-        return Playbook switch
+        if (Playbook is Playbook.ManagedPlaybook managed)
+            return managed.BuildRegistrationConfig(ExecOnDependencyStart);
+
+        return new
         {
-            Playbook.ManagedHttpPlaybook http => new
-            {
-                identifier = http.Identifier,
-                kind = "http",
-                dependency_identifier = http.DependencyIdentifier,
-                mappings = http.Mappings,
-                exec_on_dependency_start = ExecOnDependencyStart,
-            },
-            Playbook.ManagedMssqlPlaybook mssql => new
-            {
-                identifier = mssql.Identifier,
-                kind = "mssql",
-                dependency_identifier = mssql.DependencyIdentifier,
-                exec_on_dependency_start = ExecOnDependencyStart,
-            },
-            Playbook.ManagedLocalstackPlaybook localstack => new
-            {
-                identifier = localstack.Identifier,
-                kind = "localstack",
-                dependency_identifier = localstack.DependencyIdentifier,
-                exec_on_dependency_start = ExecOnDependencyStart,
-            },
-            _ => new
-            {
-                identifier = Playbook.Identifier,
-                kind = "unknown",
-                exec_on_dependency_start = ExecOnDependencyStart,
-            }
+            identifier = Playbook.Identifier,
+            kind = "unknown",
+            exec_on_dependency_start = ExecOnDependencyStart,
         };
     }
 }

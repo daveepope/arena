@@ -8,7 +8,7 @@ namespace ArenaXunit.UnitTest;
 public class PlaybookBuilderSerializationTest
 {
     [Fact]
-    public void http_playbook_build_post_mapping_serializes_correct_json()
+    public void HttpPlaybookBuild_PostMapping_SerializesCorrectJson()
     {
         var builder = new HttpPlaybookBuilder("dep-id")
             .Post("/api/validate")
@@ -21,7 +21,7 @@ public class PlaybookBuilderSerializationTest
     }
 
     [Fact]
-    public void http_playbook_build_get_mapping_serializes_correct_json()
+    public void HttpPlaybookBuild_GetMapping_SerializesCorrectJson()
     {
         var builder = new HttpPlaybookBuilder("dep-id")
             .Get("/health")
@@ -32,7 +32,7 @@ public class PlaybookBuilderSerializationTest
     }
 
     [Fact]
-    public void http_playbook_build_with_response_serializes_status()
+    public void HttpPlaybookBuild_WithResponse_SerializesStatus()
     {
         var builder = new HttpPlaybookBuilder("dep-id")
             .Post("/api/validate")
@@ -48,7 +48,7 @@ public class PlaybookBuilderSerializationTest
     }
 
     [Fact]
-    public void http_playbook_build_expect_called_sets_kind_exactly()
+    public void HttpPlaybookBuild_ExpectCalled_SetsKindExactly()
     {
         var builder = new HttpPlaybookBuilder("dep-id")
             .Get("/check")
@@ -63,7 +63,7 @@ public class PlaybookBuilderSerializationTest
     }
 
     [Fact]
-    public void http_playbook_build_expect_never_called_sets_kind_never()
+    public void HttpPlaybookBuild_ExpectNeverCalled_SetsKindNever()
     {
         var builder = new HttpPlaybookBuilder("dep-id")
             .Get("/never")

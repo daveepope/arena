@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -18,8 +18,6 @@ internal delegate void ArenaLogCallback(
 
 internal static class ArenaLogTarget
 {
-    private static readonly object Lock = new object();
-
     private static string PtrToStringUTF8(IntPtr ptr)
     {
         if (ptr == IntPtr.Zero)
@@ -31,7 +29,7 @@ internal static class ArenaLogTarget
         Marshal.Copy(ptr, buffer, 0, len);
         return Encoding.UTF8.GetString(buffer);
     }
-    private static readonly Dictionary<ulong, LogEntry> Entries = new Dictionary<ulong, LogEntry>();
+    private static readonly ConcurrentDictionary<ulong, LogEntry> Entries = new();
 
     public static ulong RegisterForLogger(ILogger logger, ArenaLogLevel level)
     {
@@ -44,22 +42,14 @@ internal static class ArenaLogTarget
             userDataHandle.Free();
             throw new ArenaBindingError("arena_add_log_target failed");
         }
-        lock (Lock)
-        {
-            Entries[token] = new LogEntry(callback, userDataHandle);
-        }
+        Entries[token] = new LogEntry(callback, userDataHandle);
         return token;
     }
 
     public static void Unregister(ulong token)
     {
-        LogEntry entry;
-        lock (Lock)
-        {
-            if (!Entries.TryGetValue(token, out entry))
-                return;
-            Entries.Remove(token);
-        }
+        if (!Entries.TryRemove(token, out var entry))
+            return;
         ArenaNativeLib.arena_remove_log_target(token);
         entry.UserDataHandle.Free();
         GC.KeepAlive(entry.Callback);
@@ -79,7 +69,6 @@ internal static class ArenaLogTarget
         }
         catch
         {
-            // Swallow logging errors to avoid corrupting FFI callbacks
         }
     }
 

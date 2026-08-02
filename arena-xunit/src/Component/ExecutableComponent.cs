@@ -1,7 +1,5 @@
 using System.Collections.Generic;
-using ArenaXunit.Topology;
 using ArenaXunit.Support;
-using Newtonsoft.Json;
 
 namespace ArenaXunit.Component;
 
@@ -24,24 +22,7 @@ public sealed class ExecutableComponent : IArenaMatchPiece
 
     public string ForFfi()
     {
-        return ArenaJson.Serialize(new ExecConfig
-        {
-            Type = Type,
-            Identifier = Identifier,
-            ExecutablePath = ExecutablePath,
-            Args = Args,
-            Env = Env,
-        });
-    }
-
-    [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-    private sealed class ExecConfig
-    {
-        [JsonProperty("type")] public string Type { get; set; } = default!;
-        [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
-        [JsonProperty("executable_path")] public string ExecutablePath { get; set; } = default!;
-        [JsonProperty("args")] public List<string>? Args { get; set; }
-        [JsonProperty("env")] public Dictionary<string, string>? Env { get; set; }
+        return ArenaJson.Serialize(this);
     }
 }
 

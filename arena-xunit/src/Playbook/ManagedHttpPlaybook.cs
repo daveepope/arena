@@ -1,58 +1,31 @@
 using System;
 using System.Collections.Generic;
-using ArenaXunit.Ffi;
 
 namespace ArenaXunit.Playbook;
 
-public abstract class ManagedHttpPlaybook : IPlaybook
+public abstract class ManagedHttpPlaybook : ManagedPlaybook
 {
-    public string Identifier { get; }
-    public string DependencyIdentifier { get; }
     public List<object> Mappings { get; }
 
     protected ManagedHttpPlaybook(string identifier, string dependencyIdentifier, List<object> mappings)
+        : base(identifier, dependencyIdentifier)
     {
-        Identifier = identifier;
-        DependencyIdentifier = dependencyIdentifier;
         Mappings = mappings;
     }
 
-    public ActivePlaybook Run(OpenArena arena)
-    {
-        return new ActiveHttpPlaybook(ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier));
-    }
-}
+    internal override string Kind => "http";
 
-public abstract class ManagedMssqlPlaybook : IPlaybook
-{
-    public string Identifier { get; }
-    public string DependencyIdentifier { get; }
-
-    protected ManagedMssqlPlaybook(string identifier, string dependencyIdentifier)
+    internal override object BuildRegistrationConfig(bool execOnDependencyStart)
     {
-        Identifier = identifier;
-        DependencyIdentifier = dependencyIdentifier;
+        return new
+        {
+            identifier = Identifier,
+            kind = Kind,
+            dependency_identifier = DependencyIdentifier,
+            mappings = Mappings,
+            exec_on_dependency_start = execOnDependencyStart,
+        };
     }
 
-    public ActivePlaybook Run(OpenArena arena)
-    {
-        return new ActiveMssqlPlaybook(ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier));
-    }
-}
-
-public abstract class ManagedLocalstackPlaybook : IPlaybook
-{
-    public string Identifier { get; }
-    public string DependencyIdentifier { get; }
-
-    protected ManagedLocalstackPlaybook(string identifier, string dependencyIdentifier)
-    {
-        Identifier = identifier;
-        DependencyIdentifier = dependencyIdentifier;
-    }
-
-    public ActivePlaybook Run(OpenArena arena)
-    {
-        return new ActiveLocalstackPlaybook(ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier));
-    }
+    internal override ActivePlaybook WrapHandle(IntPtr handle) => new ActiveHttpPlaybook(handle);
 }

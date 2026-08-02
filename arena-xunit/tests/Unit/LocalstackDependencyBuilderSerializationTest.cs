@@ -10,7 +10,7 @@ namespace ArenaXunit.UnitTest;
 public class LocalstackDependencyBuilderSerializationTest
 {
     [Fact]
-    public void build_default_port_serializes_correct_json()
+    public void Build_DefaultPort_SerializesCorrectJson()
     {
         var dep = new LocalstackDependencyBuilder("test").Build();
         var json = dep.ForFfi();
@@ -21,7 +21,7 @@ public class LocalstackDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_custom_port_serializes_correct_json()
+    public void Build_CustomPort_SerializesCorrectJson()
     {
         var dep = new LocalstackDependencyBuilder("test").WithPort(4577).Build();
         var json = dep.ForFfi();
@@ -30,7 +30,7 @@ public class LocalstackDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_service_serializes_correct_json()
+    public void Build_WithService_SerializesCorrectJson()
     {
         var dep = new LocalstackDependencyBuilder("test").WithService("sqs").Build();
         var json = dep.ForFfi();
@@ -40,7 +40,7 @@ public class LocalstackDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_services_serializes_correct_json()
+    public void Build_WithServices_SerializesCorrectJson()
     {
         var dep = new LocalstackDependencyBuilder("test").WithServices("sqs", "s3").Build();
         var json = dep.ForFfi();
@@ -50,7 +50,7 @@ public class LocalstackDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_queue_serializes_correct_json()
+    public void Build_WithQueue_SerializesCorrectJson()
     {
         var dep = new LocalstackDependencyBuilder("test").WithQueue("myqueue").Build();
         var json = dep.ForFfi();
@@ -61,7 +61,7 @@ public class LocalstackDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_fifo_queue_serializes_correct_json()
+    public void Build_WithFifoQueue_SerializesCorrectJson()
     {
         var dep = new LocalstackDependencyBuilder("test").WithFifoQueue("myqueue.fifo").Build();
         var json = dep.ForFfi();
@@ -72,7 +72,7 @@ public class LocalstackDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_event_bus_serializes_correct_json()
+    public void Build_WithEventBus_SerializesCorrectJson()
     {
         var dep = new LocalstackDependencyBuilder("test").WithEventBus("my-bus").Build();
         var json = dep.ForFfi();
@@ -82,7 +82,7 @@ public class LocalstackDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_image_serializes_correct_json()
+    public void Build_WithImage_SerializesCorrectJson()
     {
         var dep = new LocalstackDependencyBuilder("test").WithImage("custom:tag").Build();
         var json = dep.ForFfi();
@@ -91,7 +91,7 @@ public class LocalstackDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_container_name_serializes_correct_json()
+    public void Build_WithContainerName_SerializesCorrectJson()
     {
         var dep = new LocalstackDependencyBuilder("test").WithContainerName("my-container").Build();
         var json = dep.ForFfi();
@@ -100,21 +100,21 @@ public class LocalstackDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_endpoint_url_correct()
+    public void Build_EndpointUrl_Correct()
     {
         var dep = new LocalstackDependencyBuilder("test").WithPort(4577).Build();
         Assert.Equal("http://localhost:4577", dep.EndpointUrl);
     }
 
     [Fact]
-    public void build_identifier_matches_pattern()
+    public void Build_Identifier_MatchesPattern()
     {
         var dep = new LocalstackDependencyBuilder("test").Build();
         Assert.StartsWith("arena-localstack-", dep.Identifier);
     }
 
     [Fact]
-    public void build_with_event_rule_sqs_target_serializes_correct_json()
+    public void Build_WithEventRuleSqsTarget_SerializesCorrectJson()
     {
         var target = EventRuleTargetBuilder.SqsQueue("t1", "queue1");
         var rule = new EventRuleSpec
@@ -132,7 +132,7 @@ public class LocalstackDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_event_rule_lambda_target_serializes_correct_json()
+    public void Build_WithEventRuleLambdaTarget_SerializesCorrectJson()
     {
         var target = EventRuleTargetBuilder.Lambda("t2", "func1");
         var rule = new EventRuleSpec

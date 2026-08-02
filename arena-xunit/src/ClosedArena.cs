@@ -4,7 +4,6 @@ using System.Linq;
 using ArenaXunit.Ffi;
 using ArenaXunit.Playbook;
 using ArenaXunit.Support;
-using ArenaXunit.Topology;
 using Microsoft.Extensions.Logging;
 
 namespace ArenaXunit;
@@ -85,13 +84,12 @@ public sealed class ClosedArena
         return result;
     }
 
-    private static ActivePlaybook WrapActivePlaybook(Playbook.IPlaybook playbook, IntPtr handle) => playbook switch
+    private static ActivePlaybook WrapActivePlaybook(Playbook.IPlaybook playbook, IntPtr handle)
     {
-        ManagedHttpPlaybook => new ActiveHttpPlaybook(handle),
-        ManagedMssqlPlaybook => new ActiveMssqlPlaybook(handle),
-        ManagedLocalstackPlaybook => new ActiveLocalstackPlaybook(handle),
-        _ => throw new InvalidOperationException($"unsupported playbook type: {playbook.GetType()}"),
-    };
+        if (playbook is ManagedPlaybook managed)
+            return managed.WrapHandle(handle);
+        throw new InvalidOperationException($"unsupported playbook type: {playbook.GetType()}");
+    }
 
     private static ILogger CreateDefaultLogger()
     {

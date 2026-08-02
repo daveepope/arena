@@ -3,7 +3,7 @@ using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace ArenaXunit.Topology;
+namespace ArenaXunit;
 
 public sealed class Match
 {

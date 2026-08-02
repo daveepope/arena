@@ -9,7 +9,7 @@ public sealed class ActiveMssqlPlaybook : ActivePlaybook
 {
     public ActiveMssqlPlaybook(IntPtr handle) : base(handle) { }
 
-    public void Verify(string query, string expectedValue)
+    public void Verify(string query, int expectedValue)
     {
         var spec = ArenaJson.Serialize(new MssqlVerifySpec
         {
@@ -23,6 +23,6 @@ public sealed class ActiveMssqlPlaybook : ActivePlaybook
     private sealed class MssqlVerifySpec
     {
         [JsonProperty("query")] public string? Query { get; set; }
-        [JsonProperty("expected_value")] public string? ExpectedValue { get; set; }
+        [JsonProperty("expected_value")] public int ExpectedValue { get; set; }
     }
 }

@@ -1,7 +1,5 @@
 using System.Collections.Generic;
-using ArenaXunit.Topology;
 using ArenaXunit.Support;
-using Newtonsoft.Json;
 
 namespace ArenaXunit.Component;
 
@@ -24,24 +22,7 @@ public sealed class ContainerizedComponent : IArenaMatchPiece
 
     public string ForFfi()
     {
-        return ArenaJson.Serialize(new ContainerConfig
-        {
-            Type = Type,
-            Identifier = Identifier,
-            Containerfile = Containerfile,
-            Env = Env,
-            Args = Args,
-        });
-    }
-
-    [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-    private sealed class ContainerConfig
-    {
-        [JsonProperty("type")] public string Type { get; set; } = default!;
-        [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
-        [JsonProperty("containerfile")] public string Containerfile { get; set; } = default!;
-        [JsonProperty("env")] public Dictionary<string, string>? Env { get; set; }
-        [JsonProperty("args")] public List<string>? Args { get; set; }
+        return ArenaJson.Serialize(this);
     }
 }
 

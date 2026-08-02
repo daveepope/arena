@@ -7,7 +7,7 @@ namespace ArenaXunit.UnitTest;
 public class ExecutableComponentBuilderSerializationTest
 {
     [Fact]
-    public void build_with_executable_path_serializes_correct_json()
+    public void Build_WithExecutablePath_SerializesCorrectJson()
     {
         var comp = new ExecutableComponentBuilder("test")
             .WithExecutablePath("./myapp")
@@ -20,7 +20,7 @@ public class ExecutableComponentBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_env_serializes_correct_json()
+    public void Build_WithEnv_SerializesCorrectJson()
     {
         var comp = new ExecutableComponentBuilder("test")
             .WithExecutablePath("./myapp")
@@ -33,7 +33,7 @@ public class ExecutableComponentBuilderSerializationTest
     }
 
     [Fact]
-    public void build_with_args_serializes_correct_json()
+    public void Build_WithArgs_SerializesCorrectJson()
     {
         var comp = new ExecutableComponentBuilder("test")
             .WithExecutablePath("./myapp")
@@ -47,14 +47,14 @@ public class ExecutableComponentBuilderSerializationTest
     }
 
     [Fact]
-    public void build_without_executable_path_throws()
+    public void Build_WithoutExecutablePath_Throws()
     {
         var builder = new ExecutableComponentBuilder("test");
         Assert.Throws<System.InvalidOperationException>(() => builder.Build());
     }
 
     [Fact]
-    public void build_identifier_matches_pattern()
+    public void Build_Identifier_MatchesPattern()
     {
         var comp = new ExecutableComponentBuilder("test")
             .WithExecutablePath("./myapp")

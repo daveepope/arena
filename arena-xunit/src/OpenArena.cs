@@ -2,13 +2,12 @@ using System;
 using System.Collections.Generic;
 using ArenaXunit.Ffi;
 using ArenaXunit.Playbook;
-using ArenaXunit.Topology;
 
 namespace ArenaXunit;
 
 public sealed class OpenArena : IDisposable
 {
-    private readonly IntPtr _handle;
+    private readonly ArenaHandle _handle;
     private readonly ulong _logToken;
     private readonly Match _match;
     private readonly Dictionary<Type, ActivePlaybook> _sessionPlaybooks;
@@ -18,7 +17,7 @@ public sealed class OpenArena : IDisposable
 
     internal OpenArena(IntPtr handle, ulong logToken, Match match, Dictionary<Type, ActivePlaybook> sessionPlaybooks)
     {
-        _handle = handle;
+        _handle = new ArenaHandle(handle);
         _logToken = logToken;
         _match = match;
         _sessionPlaybooks = sessionPlaybooks;
@@ -31,18 +30,18 @@ public sealed class OpenArena : IDisposable
         }
     }
 
-    internal IntPtr Handle => _handle;
+    internal IntPtr Handle => _handle.DangerousGetHandle();
 
     public void SoftReset(string dependencyIdentifier)
     {
         ThrowIfDisposed();
-        ArenaBindings.SoftReset(_handle, dependencyIdentifier);
+        ArenaBindings.SoftReset(Handle, dependencyIdentifier);
     }
 
     public void HardReset(string dependencyIdentifier)
     {
         ThrowIfDisposed();
-        ArenaBindings.HardReset(_handle, dependencyIdentifier);
+        ArenaBindings.HardReset(Handle, dependencyIdentifier);
     }
 
     public Playbook.IPlaybook? GetPlaybook(Type playbookType)
@@ -93,7 +92,7 @@ public sealed class OpenArena : IDisposable
 
         try
         {
-            ArenaBindings.CloseArena(_handle);
+            _handle.Dispose();
         }
         finally
         {

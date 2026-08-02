@@ -2,26 +2,22 @@ using System;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 
 namespace ArenaXunit.Support;
 
 public static class ArenaIdentifiers
 {
-    private static readonly object Lock = new object();
     private static int _counter;
-    private static long? _seed;
+    private static readonly Lazy<long> Seed = new(ComputeSeed, LazyThreadSafetyMode.ExecutionAndPublication);
 
     public static string Build(string module, string name)
     {
-        var seed = InitializeSeed();
-        lock (Lock)
-        {
-            _counter++;
-        }
+        var counter = Interlocked.Increment(ref _counter);
         var slug = ToSlug(name);
         if (string.IsNullOrEmpty(slug))
             slug = "default";
-        var combined = seed + _counter;
+        var combined = Seed.Value + counter;
         var hashBytes = ComputeHash(combined.ToString());
         var suffix = Convert.ToBase64String(hashBytes).Replace("+", "").Replace("/", "").Replace("=", "").ToLower();
         var truncatedSuffix = suffix.Length > 6 ? suffix.Substring(0, 6) : suffix.PadRight(6, 'x');
@@ -34,22 +30,12 @@ public static class ArenaIdentifiers
         return sha.ComputeHash(Encoding.UTF8.GetBytes(input));
     }
 
-    private static long InitializeSeed()
+    private static long ComputeSeed()
     {
-        if (_seed.HasValue)
-            return _seed.Value;
-
-        lock (Lock)
-        {
-            if (!_seed.HasValue)
-            {
-                var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                var processId = (long)Process.GetCurrentProcess().Id;
-                var random = new Random();
-                _seed = timestamp ^ processId ^ random.Next();
-            }
-        }
-        return _seed.Value;
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var processId = (long)Process.GetCurrentProcess().Id;
+        var random = new Random();
+        return timestamp ^ processId ^ random.Next();
     }
 
     private static string ToSlug(string name)

@@ -6,14 +6,14 @@ namespace ArenaXunit.UnitTest;
 public class ArenaBindingErrorTest
 {
     [Fact]
-    public void constructor_with_message_sets_message()
+    public void Constructor_WithMessage_SetsMessage()
     {
         var ex = new ArenaBindingError("test error");
         Assert.Equal("test error", ex.Message);
     }
 
     [Fact]
-    public void constructor_with_inner_sets_inner_exception()
+    public void Constructor_WithInner_SetsInnerException()
     {
         var inner = new System.Exception("inner");
         var ex = new ArenaBindingError("test", inner);
@@ -21,7 +21,7 @@ public class ArenaBindingErrorTest
     }
 
     [Fact]
-    public void inherits_from_exception()
+    public void ArenaBindingError_InheritsFromException()
     {
         var ex = new ArenaBindingError("test");
         Assert.IsAssignableFrom<System.Exception>(ex);

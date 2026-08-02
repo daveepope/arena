@@ -10,7 +10,6 @@ using Amazon.SQS.Model;
 using ArenaExamples.Test.Shared;
 using ArenaXunit;
 using ArenaXunit.Dep;
-using ArenaXunit.Topology;
 using ArenaXunit.Playbook;
 using ArenaXunit.Xunit;
 using Xunit;
@@ -53,9 +52,33 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
     {
     }
 
-    public class TestTopology : IArenaTopology
+    public class Fixture : ArenaCollectionFixture
     {
-        public Match Configure()
+        public ApiClient ApiClient { get; }
+
+        public Fixture() : base()
+        {
+            var authToken = GetAuthToken();
+            ApiClient = new ApiClient($"http://127.0.0.1:{WebAppPort}", authToken);
+        }
+
+        private static string GetAuthToken()
+        {
+            using var client = new HttpClient();
+            var content = new Dictionary<string, string>
+            {
+                ["grant_type"] = "client_credentials",
+                ["client_id"] = "test-client",
+                ["client_secret"] = "test-secret"
+            };
+            var response = client.PostAsync($"http://127.0.0.1:{OauthPort}/oauth/token",
+                new FormUrlEncodedContent(content)).Result;
+            response.EnsureSuccessStatusCode();
+            var json = JsonSerializer.Deserialize<JsonElement>(response.Content.ReadAsStringAsync().Result);
+            return json.GetProperty("access_token").GetString();
+        }
+
+        protected override Match Configure()
         {
             Environment.SetEnvironmentVariable("WEB_APP_PORT", WebAppPort.ToString());
             Environment.SetEnvironmentVariable("CALIBRATION_URL", $"http://127.0.0.1:{CalibrationPort}");
@@ -141,33 +164,6 @@ public class AspNetComponentTests : IClassFixture<AspNetComponentTests.Fixture>,
                 .RegisterPlaybook(new Playbooks.EventsPurgePlaybook("test-localstack"), true)
                 .Build();
             return match;
-        }
-    }
-
-    public class Fixture : ArenaCollectionFixture<TestTopology>
-    {
-        public ApiClient ApiClient { get; }
-
-        public Fixture() : base()
-        {
-            var authToken = GetAuthToken();
-            ApiClient = new ApiClient($"http://127.0.0.1:{WebAppPort}", authToken);
-        }
-
-        private static string GetAuthToken()
-        {
-            using var client = new HttpClient();
-            var content = new Dictionary<string, string>
-            {
-                ["grant_type"] = "client_credentials",
-                ["client_id"] = "test-client",
-                ["client_secret"] = "test-secret"
-            };
-            var response = client.PostAsync($"http://127.0.0.1:{OauthPort}/oauth/token",
-                new FormUrlEncodedContent(content)).Result;
-            response.EnsureSuccessStatusCode();
-            var json = JsonSerializer.Deserialize<JsonElement>(response.Content.ReadAsStringAsync().Result);
-            return json.GetProperty("access_token").GetString();
         }
     }
 

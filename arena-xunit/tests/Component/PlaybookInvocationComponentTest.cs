@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using ArenaXunit;
 using ArenaXunit.Dep;
 using ArenaXunit.Playbook;
-using ArenaXunit.Topology;
 using ArenaXunit.Xunit;
 using Xunit;
 
@@ -54,13 +53,9 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
         }
     }
 
-    public class Fixture : ArenaCollectionFixture<TestTopology>
+    public class Fixture : ArenaCollectionFixture
     {
-    }
-
-    public class TestTopology : IArenaTopology
-    {
-        public Match Configure()
+        protected override Match Configure()
         {
             var httpDep = new HttpDependencyBuilder("playbook-invocation-http")
                 .WithPort(_httpPort)
@@ -81,7 +76,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
     }
 
     [Fact]
-    public void sessionDefaultPlaybook_runsAtArenaOpen()
+    public void SessionDefaultPlaybook_RunsAtArenaOpen()
     {
         var pb = _arena.GetPlaybook(typeof(CalibrationHappyPathPlaybook));
         Assert.NotNull(pb);
@@ -89,7 +84,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
     }
 
     [Fact]
-    public void scopedPlaybook_registeredButNotExecOnStart()
+    public void ScopedPlaybook_RegisteredButNotExecOnStart()
     {
         var pb = _arena.GetPlaybook(typeof(ScopedOutagePlaybook));
         Assert.NotNull(pb);
@@ -97,7 +92,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
     }
 
     [Fact]
-    public async Task scopedPlaybook_manualRun_activatesAndOverrides()
+    public async Task ScopedPlaybook_ManualRun_ActivatesAndOverrides()
     {
         var pb = _arena.GetPlaybook(typeof(ScopedOutagePlaybook));
         Assert.NotNull(pb);
@@ -109,7 +104,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
     }
 
     [Fact]
-    public async Task scopedPlaybook_afterDispose_returnsToSessionDefault()
+    public async Task ScopedPlaybook_AfterDispose_ReturnsToSessionDefault()
     {
         var pb = _arena.GetPlaybook(typeof(ScopedOutagePlaybook));
         Assert.NotNull(pb);
@@ -123,7 +118,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
     }
 
     [Fact]
-    public async Task verifyAtLeast_withTraffic_succeeds()
+    public async Task VerifyAtLeast_WithTraffic_Succeeds()
     {
         var pb = _arena.GetPlaybook(typeof(VerifyPlaybook));
         Assert.NotNull(pb);
@@ -136,7 +131,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
     }
 
     [Fact]
-    public async Task verifyAtLeast_withoutTraffic_throws()
+    public async Task VerifyAtLeast_WithoutTraffic_Throws()
     {
         var pb = _arena.GetPlaybook(typeof(VerifyPlaybook));
         Assert.NotNull(pb);
@@ -147,7 +142,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
     }
 
     [Fact]
-    public async Task verify_failure_closeDoesNotThrow()
+    public async Task Verify_Failure_CloseDoesNotThrow()
     {
         var pb = _arena.GetPlaybook(typeof(VerifyPlaybook));
         Assert.NotNull(pb);

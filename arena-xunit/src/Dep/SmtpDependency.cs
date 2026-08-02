@@ -1,6 +1,4 @@
-using ArenaXunit.Topology;
 using ArenaXunit.Support;
-using Newtonsoft.Json;
 
 namespace ArenaXunit.Dep;
 
@@ -10,48 +8,23 @@ public sealed class SmtpDependency : IArenaMatchPiece
     public string Identifier { get; }
     public int Port { get; }
     public int UiPort { get; }
-
-    private readonly string? _tlsMode;
-    private readonly string? _image;
-    private readonly string? _containerName;
+    public string? TlsMode { get; }
+    public string? Image { get; }
+    public string? ContainerName { get; }
 
     internal SmtpDependency(string identifier, int port, int uiPort, string? tlsMode, string? image, string? containerName)
     {
         Identifier = identifier;
         Port = port;
         UiPort = uiPort;
-        _tlsMode = tlsMode;
-        _image = image;
-        _containerName = containerName;
+        TlsMode = string.IsNullOrEmpty(tlsMode) ? null : tlsMode;
+        Image = string.IsNullOrEmpty(image) ? null : image;
+        ContainerName = string.IsNullOrEmpty(containerName) ? null : containerName;
     }
 
     public string ForFfi()
     {
-        var config = new SmtpConfig
-        {
-            Type = Type,
-            Identifier = Identifier,
-            Port = Port,
-            UiPort = UiPort,
-        };
-
-        if (!string.IsNullOrEmpty(_tlsMode)) config.TlsMode = _tlsMode;
-        if (!string.IsNullOrEmpty(_image)) config.Image = _image;
-        if (!string.IsNullOrEmpty(_containerName)) config.ContainerName = _containerName;
-
-        return ArenaJson.Serialize(config);
-    }
-
-    [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-    private sealed class SmtpConfig
-    {
-        [JsonProperty("type")] public string Type { get; set; } = default!;
-        [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
-        [JsonProperty("port")] public int Port { get; set; }
-        [JsonProperty("ui_port")] public int UiPort { get; set; }
-        [JsonProperty("tls_mode")] public string? TlsMode { get; set; }
-        [JsonProperty("image")] public string? Image { get; set; }
-        [JsonProperty("container_name")] public string? ContainerName { get; set; }
+        return ArenaJson.Serialize(this);
     }
 }
 

@@ -1,4 +1,6 @@
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Serialization;
 
 namespace ArenaXunit.Support;
 
@@ -6,8 +8,12 @@ internal static class ArenaJson
 {
     private static readonly JsonSerializerSettings SerializerSettings = new()
     {
-        ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver(),
+        ContractResolver = new DefaultContractResolver
+        {
+            NamingStrategy = new SnakeCaseNamingStrategy(processDictionaryKeys: true, overrideSpecifiedNames: true),
+        },
         NullValueHandling = NullValueHandling.Ignore,
+        Converters = { new StringEnumConverter(new SnakeCaseNamingStrategy()) },
     };
 
     public static string Serialize(object value)

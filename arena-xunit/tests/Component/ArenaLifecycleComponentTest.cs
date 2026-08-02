@@ -4,7 +4,6 @@ using System.Net.Sockets;
 using ArenaXunit;
 using ArenaXunit.Dep;
 using ArenaXunit.Xunit;
-using ArenaXunit.Topology;
 using Xunit;
 
 namespace ArenaXunit.ComponentTest;
@@ -49,30 +48,26 @@ public class ArenaLifecycleComponentTest : IClassFixture<ArenaLifecycleComponent
         _arena = fixture.Arena;
     }
 
-    public class Fixture : ArenaCollectionFixture<EmptyMatchTopology>
+    public class Fixture : ArenaCollectionFixture
     {
-    }
-
-    public class EmptyMatchTopology : IArenaTopology
-    {
-        public Match Configure() => new MatchBuilder("lifecycle-empty-match").Build();
+        protected override Match Configure() => new MatchBuilder("lifecycle-empty-match").Build();
     }
 
     [Fact]
-    public void openArena_withEmptyMatch_opensAndClosesSuccessfully()
+    public void OpenArena_WithEmptyMatch_OpensAndClosesSuccessfully()
     {
         Assert.NotNull(_arena);
     }
 
     [Fact]
-    public void openArena_getPlaybook_withNoPlaybooksRegistered_returnsNull()
+    public void OpenArena_GetPlaybookWithNoPlaybooksRegistered_ReturnsNull()
     {
         var playbook = _arena.GetPlaybook(typeof(object));
         Assert.Null(playbook);
     }
 
     [Fact]
-    public void openArena_methodsAfterDispose_throwObjectDisposedException()
+    public void OpenArena_MethodsAfterDispose_ThrowObjectDisposedException()
     {
         var closedArena = new ClosedArena("dispose-test", new MatchBuilder("dispose-test-match").Build());
         var openArena = closedArena.OpenAsync().Result;
@@ -92,13 +87,9 @@ public class ArenaOauthComponentTest : IClassFixture<ArenaOauthComponentTest.Fix
         _fixture = fixture;
     }
 
-    public class Fixture : ArenaCollectionFixture<OauthMatchTopology>
+    public class Fixture : ArenaCollectionFixture
     {
-    }
-
-    public class OauthMatchTopology : IArenaTopology
-    {
-        public Match Configure()
+        protected override Match Configure()
         {
             return new MatchBuilder("lifecycle-oauth-match")
                 .AddDependency(new OauthDependencyBuilder("test-oauth")
@@ -110,7 +101,7 @@ public class ArenaOauthComponentTest : IClassFixture<ArenaOauthComponentTest.Fix
     }
 
     [Fact]
-    internal void openArena_withOauthDependency_opensAndClosesSuccessfully()
+    internal void OpenArena_WithOauthDependency_OpensAndClosesSuccessfully()
     {
         Assert.NotNull(_fixture.Arena);
     }
@@ -125,17 +116,13 @@ public class ArenaDisposeComponentTest : IClassFixture<ArenaDisposeComponentTest
         _fixture = fixture;
     }
 
-    public class Fixture : ArenaCollectionFixture<DisposeMatchTopology>
+    public class Fixture : ArenaCollectionFixture
     {
-    }
-
-    public class DisposeMatchTopology : IArenaTopology
-    {
-        public Match Configure() => new MatchBuilder("lifecycle-dispose-match").Build();
+        protected override Match Configure() => new MatchBuilder("lifecycle-dispose-match").Build();
     }
 
     [Fact]
-    internal void openArena_dispose_canBeCalledMultipleTimes()
+    internal void OpenArena_Dispose_CanBeCalledMultipleTimes()
     {
         var arena = _fixture.Arena;
         ((IDisposable)arena).Dispose();
@@ -145,32 +132,28 @@ public class ArenaDisposeComponentTest : IClassFixture<ArenaDisposeComponentTest
 
 public class ArenaCollectionSharingComponentTest
 {
-    private static int _sharedTopologyOpenCount = 0;
+    private static int _sharedMatchOpenCount = 0;
 
-    internal class SharedTopologyConfig : IArenaTopology
+    internal class ConcreteFixture : ArenaCollectionFixture
     {
-        public Match Configure()
+        protected override Match Configure()
         {
-            _sharedTopologyOpenCount++;
+            _sharedMatchOpenCount++;
             return new MatchBuilder("shared-lifecycle-match").Build();
         }
     }
 
-    internal class ConcreteFixture : ArenaCollectionFixture<SharedTopologyConfig>
-    {
-    }
-
     [Fact]
-    public void collectionFixture_opensArenaOnceForSharedTopology()
+    public void CollectionFixture_SharedMatch_OpensArenaOnce()
     {
-        _sharedTopologyOpenCount = 0;
+        _sharedMatchOpenCount = 0;
 
         var fixture1 = new ConcreteFixture();
-        Assert.Equal(1, _sharedTopologyOpenCount);
+        Assert.Equal(1, _sharedMatchOpenCount);
         Assert.NotNull(fixture1.Arena);
 
         var fixture2 = new ConcreteFixture();
-        Assert.Equal(1, _sharedTopologyOpenCount);
+        Assert.Equal(1, _sharedMatchOpenCount);
         Assert.Same(fixture1.Arena, fixture2.Arena);
 
         fixture1.Dispose();

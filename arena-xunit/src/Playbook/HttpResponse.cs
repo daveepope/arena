@@ -10,8 +10,8 @@ public static class HttpResponse
     public static HttpResponseObj Created() => Status(201, null);
     public static HttpResponseObj NoContent() => Status(204, null);
     public static HttpResponseObj Status(int code) => Status(code, null);
-    public static HttpResponseObj Status(int code, string? body) => new(code, body, "text/plain");
-    public static HttpResponseObj StatusJson(int code, object json) => new(code, json, "application/json");
+    public static HttpResponseObj Status(int code, string? body) => new(code, body);
+    public static HttpResponseObj StatusJson(int code, object json) => new(code, json);
     public static HttpResponseObj ServerError() => Status(500, null);
 }
 
@@ -19,13 +19,11 @@ public static class HttpResponse
 public sealed class HttpResponseObj
 {
     [JsonProperty("status")] public int Status { get; }
-    [JsonProperty("body")] public object? Body { get; }
-    [JsonProperty("content_type")] public string? ContentType { get; }
+    [JsonProperty("json_body")] public object? JsonBody { get; }
 
-    public HttpResponseObj(int status, object? body, string? contentType)
+    public HttpResponseObj(int status, object? jsonBody)
     {
         Status = status;
-        Body = body;
-        ContentType = contentType;
+        JsonBody = jsonBody;
     }
 }

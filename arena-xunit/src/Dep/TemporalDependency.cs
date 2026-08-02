@@ -1,6 +1,4 @@
-using ArenaXunit.Topology;
 using ArenaXunit.Support;
-using Newtonsoft.Json;
 
 namespace ArenaXunit.Dep;
 
@@ -18,20 +16,7 @@ public sealed class TemporalDependency : IArenaMatchPiece
 
     public string ForFfi()
     {
-        return ArenaJson.Serialize(new TemporalConfig
-        {
-            Type = Type,
-            Identifier = Identifier,
-            Port = Port,
-        });
-    }
-
-    [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
-    private sealed class TemporalConfig
-    {
-        [JsonProperty("type")] public string Type { get; set; } = default!;
-        [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
-        [JsonProperty("port")] public int Port { get; set; }
+        return ArenaJson.Serialize(this);
     }
 }
 

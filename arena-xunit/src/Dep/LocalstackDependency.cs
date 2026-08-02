@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using ArenaXunit.Topology;
 using ArenaXunit.Support;
 using Newtonsoft.Json;
 
@@ -30,7 +29,7 @@ public class EventRuleSpec
     public string Name { get; set; } = default!;
     public string? EventBus { get; set; }
     public string EventPattern { get; set; } = default!;
-    public List<EventRuleTarget> Targets { get; set; } = default!;
+    public List<EventRuleTarget> Targets { get; set; } = new();
 }
 
 public static class EventRuleTargetBuilder

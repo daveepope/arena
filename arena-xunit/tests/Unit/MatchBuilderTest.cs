@@ -1,7 +1,6 @@
 using System.Linq;
 using ArenaXunit.Component;
 using ArenaXunit.Dep;
-using ArenaXunit.Topology;
 using ArenaXunit.Playbook;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -11,20 +10,20 @@ namespace ArenaXunit.UnitTest;
 public class MatchBuilderTest
 {
     [Fact]
-    public void build_with_name_returns_match()
+    public void Build_WithName_ReturnsMatch()
     {
         var match = new MatchBuilder("my-match").Build();
         Assert.Equal("my-match", match.Name);
     }
 
     [Fact]
-    public void build_with_null_name_throws()
+    public void Build_WithNullName_Throws()
     {
         Assert.Throws<System.ArgumentNullException>(() => new MatchBuilder(null));
     }
 
     [Fact]
-    public void build_with_network_sets_network()
+    public void Build_WithNetwork_SetsNetwork()
     {
         var match = new MatchBuilder("my-match")
             .WithNetwork("my-network")
@@ -33,7 +32,7 @@ public class MatchBuilderTest
     }
 
     [Fact]
-    public void build_with_dependency_adds_to_dependencies()
+    public void Build_WithDependency_AddsToDependencies()
     {
         var dep = new HttpDependencyBuilder("http").Build();
         var match = new MatchBuilder("my-match")
@@ -43,7 +42,7 @@ public class MatchBuilderTest
     }
 
     [Fact]
-    public void build_with_component_adds_to_components()
+    public void Build_WithComponent_AddsToComponents()
     {
         var comp = new ContainerizedComponentBuilder("comp")
             .WithContainerfile("./Dockerfile")
@@ -55,7 +54,7 @@ public class MatchBuilderTest
     }
 
     [Fact]
-    public void build_for_ffi_serializes_correct_json()
+    public void Build_ForFfi_SerializesCorrectJson()
     {
         var dep = new HttpDependencyBuilder("http").Build();
         var match = new MatchBuilder("my-match")
@@ -68,7 +67,7 @@ public class MatchBuilderTest
     }
 
     [Fact]
-    public void build_for_ffi_with_network_includes_network()
+    public void Build_ForFfiWithNetwork_IncludesNetwork()
     {
         var match = new MatchBuilder("my-match")
             .WithNetwork("my-network")

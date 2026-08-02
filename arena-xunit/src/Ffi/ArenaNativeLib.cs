@@ -22,23 +22,41 @@ internal static class ArenaNativeLib
         return Encoding.UTF8.GetString(buffer);
     }
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate IntPtr arena_open_fn(string name, string configJson, out IntPtr errOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void arena_close_fn(IntPtr handle);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_soft_reset_fn(IntPtr handle, string dependencyIdentifier, out IntPtr errOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_hard_reset_fn(IntPtr handle, string dependencyIdentifier, out IntPtr errOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void arena_set_log_level_fn(int level);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate ulong arena_add_log_target_fn(ArenaLogCallback callback, IntPtr userData);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void arena_remove_log_target_fn(ulong token);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate IntPtr arena_dispatcher_default_logging_target_logger_name_utf8_fn();
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_dispatcher_default_logging_target_publish_level_fn(int level);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void arena_dispatcher_dependency_allow_json_set_fn(string jsonUtf8Nullable);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void arena_dispatcher_component_allow_json_set_fn(string jsonUtf8Nullable);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void arena_free_string_fn(IntPtr ptr);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate IntPtr arena_oauth_loopback_tls_pem_json_fn(out IntPtr errOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate IntPtr arena_match_playbook_run_fn(IntPtr arena, string identifier, out IntPtr errOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_active_playbook_drop_fn(IntPtr handle, out IntPtr errOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate IntPtr arena_http_playbook_open_fn(IntPtr arena, string specJson, out IntPtr errOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_http_playbook_verify_fn(IntPtr handle, string specJson, out IntPtr errOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_mssql_playbook_verify_fn(IntPtr handle, string specJson, out IntPtr errOut);
 
     private static arena_open_fn? _arena_open;
