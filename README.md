@@ -97,23 +97,6 @@ open.close().await;
 
 You can also use `with_source_path` / `with_build_tool` on the builder so Arena builds the binary before starting it (see `examples/`).
 
-To test outbound email, add an SMTP mail-capture server dependency. Your app sends mail to it, and you assert on what was captured via its HTTP API:
-
-```rust
-use arena_smtp::SmtpDependency;
-
-let smtp: Dependency = Box::new(
-    SmtpDependency::builder("mail")
-        .with_port(1025)
-        .with_ui_port(8025)
-        .build(),
-);
-// After the arena is open: smtp.smtp_address() is the host:port to send to,
-// and smtp.http_api_url() is the HTTP API used to read captured messages.
-```
-
-For TLS, call `.with_starttls()` to advertise STARTTLS (the client connects in plaintext and upgrades on the same port), or `.with_implicit_tls()` to require TLS on connect (no plaintext phase). Either way a self-signed certificate is generated and injected automatically. Both options are available on the Python and Java builders.
-
 ### Python (arena-pytest)
 
 ```python
@@ -168,19 +151,6 @@ await open_arena.close()
 
 As in Rust, you can point at source plus `with_build_tool(...)` instead of a prebuilt path when you want Arena to compile the component first.
 
-The SMTP mail-capture dependency is available too:
-
-```python
-from arena_pytest import SmtpDependencyBuilder
-
-smtp = (
-    SmtpDependencyBuilder("mail")
-    .with_port(1025)
-    .with_ui_port(8025)
-    .build()
-)
-```
-
 ### Java (arena-junit)
 
 `arena-junit` is a JUnit 5 extension. You point it at the jar your build already produces, so a test runs against the same artifact you ship rather than a separate in-process test context.
@@ -233,17 +203,6 @@ static final ExecutableComponent WEB_APP_2 =
 
 Both instances run in the same sandbox against the same Postgres, so you can test how your service behaves with two copies of itself running, or bring in another team's service and test the two together.
 
-To capture outbound email, add an SMTP dependency the same way:
-
-```java
-@ArenaDependency
-static final SmtpDependency MAIL =
-    new SmtpDependencyBuilder("mail")
-        .withPort(1025)
-        .withUiPort(8025)
-        .build();
-```
-
 #### Building the arena yourself
 
 If you would rather not use field scanning, build the same sandbox by hand with `MatchBuilder` and open it in a plain JUnit lifecycle method:
@@ -290,6 +249,123 @@ final class ReadingsComponentTest {
 
 Use this when you want full control over when the sandbox opens and closes, for example sharing one arena across several test classes yourself instead of letting `@Arena` manage it.
 
+### .NET (arena-xunit)
+
+`arena-xunit` is an xUnit v2 extension targeting `netstandard2.0`, so it works from both .NET Framework and modern .NET test projects. You point it at the executable your build already produces, so a test runs against the same artifact you ship rather than a separate in-process test context.
+
+#### Xunit annotations
+
+Put your dependencies and components as `[ArenaDependency]` / `[ArenaComponent]` static fields on a class that extends `ArenaCollectionFixture`, then have your test class implement xUnit's `IClassFixture<T>` to receive the shared, already-open arena before any test method runs.
+
+```csharp
+public sealed class ReadingsFixture : ArenaCollectionFixture
+{
+    [ArenaDependency]
+    private static readonly PostgresDependency Postgres =
+        new PostgresDependencyBuilder("readings-db")
+            .WithPort(5432)
+            .WithDatabaseName("readings")
+            .WithDatabaseUsername("readings_user")
+            .WithDatabasePassword("readings_password")
+            .Build();
+
+    [ArenaComponent]
+    private static readonly ExecutableComponent WebApp =
+        new ExecutableComponentBuilder("readings-app")
+            .WithExecutablePath("/path/to/readings-app.dll")
+            .WithEnvVar("POSTGRES_CONNECTION_STRING", "host=localhost port=5432 dbname=readings")
+            .WithReadinessCheck(HttpReadinessCheck.Create(), "http://127.0.0.1:8080/health")
+            .Build();
+}
+
+public class ReadingsComponentTests : IClassFixture<ReadingsFixture>
+{
+    private readonly OpenArena _arena;
+
+    public ReadingsComponentTests(ReadingsFixture fixture)
+    {
+        _arena = fixture.Arena;
+    }
+
+    [Fact]
+    public async Task CreateReadingIsListed()
+    {
+        // call the app over HTTP, same as any other component test
+    }
+}
+```
+
+Postgres and the app start at the same time rather than one after the other, so adding another dependency does not add its startup time on top of the rest.
+
+Need a second copy of your service, or a second service alongside it, for a domain test or a scale test? Add another field:
+
+```csharp
+[ArenaComponent]
+private static readonly ExecutableComponent WebApp2 =
+    new ExecutableComponentBuilder("readings-app-2")
+        .WithExecutablePath("/path/to/readings-app.dll")
+        .WithEnvVar("POSTGRES_CONNECTION_STRING", "host=localhost port=5432 dbname=readings")
+        .WithReadinessCheck(HttpReadinessCheck.Create(), "http://127.0.0.1:8081/health")
+        .Build();
+```
+
+Both instances run in the same sandbox against the same Postgres, so you can test how your service behaves with two copies of itself running, or bring in another team's service and test the two together.
+
+#### Building the arena yourself
+
+If you would rather not use field scanning, build the same sandbox by hand with `MatchBuilder` and open it yourself in an xUnit fixture:
+
+```csharp
+public sealed class ReadingsFixture : IAsyncLifetime
+{
+    public OpenArena Arena { get; private set; } = null!;
+
+    public async Task InitializeAsync()
+    {
+        var postgres = new PostgresDependencyBuilder("readings-db")
+            .WithPort(5432)
+            .WithDatabaseName("readings")
+            .Build();
+
+        var webApp = new ExecutableComponentBuilder("readings-app")
+            .WithExecutablePath("/path/to/readings-app.dll")
+            .WithReadinessCheck(HttpReadinessCheck.Create(), "http://127.0.0.1:8080/health")
+            .Build();
+
+        var match = new MatchBuilder("readings")
+            .AddDependency(postgres)
+            .AddComponent(webApp)
+            .Build();
+
+        Arena = await new ClosedArena("readings-arena", match).OpenAsync();
+    }
+
+    public Task DisposeAsync()
+    {
+        Arena.Dispose();
+        return Task.CompletedTask;
+    }
+}
+
+public class ReadingsComponentTests : IClassFixture<ReadingsFixture>
+{
+    private readonly OpenArena _arena;
+
+    public ReadingsComponentTests(ReadingsFixture fixture)
+    {
+        _arena = fixture.Arena;
+    }
+
+    [Fact]
+    public async Task CreateReadingIsListed()
+    {
+        // call the app over HTTP, same as any other component test
+    }
+}
+```
+
+Use this when you want full control over when the sandbox opens and closes, for example sharing one arena across several test classes yourself instead of letting `ArenaCollectionFixture` manage it via attributes.
+
 ## Playbooks
 
 A **playbook** is a named, scoped behavior attached to a dependency in your sandbox. It describes how that dependency should act for the lifetime of the playbook — for example, baseline HTTP responses for a downstream service, resetting MSSQL tables when a scenario begins and ends, or purging localstack resources between scenarios. Playbooks are part of Arena’s lifecycle model: you open them when a scenario needs them and close them when that scenario is done, so the sandbox returns to a known baseline.
@@ -300,9 +376,9 @@ When a playbook is **active**, Arena applies its setup on open and its teardown 
 
 A **managed playbook** is a playbook whose behavior is declared up front as a manifest (mappings, table resets, purge rules, and similar). You **register** managed playbooks on a **match** when you build the sandbox. Arena applies the manifest when the playbook opens and **cleans up after itself when it closes** — mappings removed, tables reset, queues purged, and so on — so you do not hand-roll teardown. That automatic setup and teardown is what **managed** means.
 
-Define sandbox-specific playbooks by **extending** the managed base for the dependency type (`ManagedHttpPlaybook`, `ManagedMssqlPlaybook`, `ManagedLocalstackPlaybook`, and similar in Python and Java). In Rust, build the same manifests with the `Managed*Playbook` types from the dependency crates. Register the instance on the match; Arena executes it through the core runtime.
+Define sandbox-specific playbooks by **extending** the managed base for the dependency type (`ManagedHttpPlaybook`, `ManagedMssqlPlaybook`, `ManagedLocalstackPlaybook`, and similar in Python, Java, and .NET). In Rust, build the same manifests with the `Managed*Playbook` types from the dependency crates. Register the instance on the match; Arena executes it through the core runtime.
 
-Register with **`exec_on_dependency_start`** (Python/Java) or the second argument to **`register_playbook`** (Rust):
+Register with **`exec_on_dependency_start`** (Python/Java), the `ExecOnDependencyStart` property on `[ArenaPlaybook]` (.NET), or the second argument to **`register_playbook`** (Rust):
 
 - **`true`** — run when the dependency starts and stay active for the sandbox session (typical for default dependency behavior, such as a baseline HTTP stub for the whole run).
 - **`false`** — register only; open when you need a shorter-lived scenario.
@@ -313,6 +389,8 @@ Register with **`exec_on_dependency_start`** (Python/Java) or the second argumen
 
 **Java** — subclass a `Managed*Playbook` type and pass an instance to `MatchBuilder.registerPlaybook`.
 
+**.NET** — subclass a `Managed*Playbook` type and pass an instance to `MatchBuilder.RegisterPlaybook`, or declare it as an `[ArenaPlaybook]` static field alongside your dependencies.
+
 ### Scoped activation
 
 For playbooks registered with **`exec_on_dependency_start=false`**, open them only for the period that scenario should apply:
@@ -320,6 +398,7 @@ For playbooks registered with **`exec_on_dependency_start=false`**, open them on
 - **Rust** — obtain the dependency from the open arena, call `.playbook().run().await`, and hold the active playbook until scope ends.
 - **Python** — stack `@playbook(YourPlaybook)` decorators on the callable that should run under that behavior (one playbook class per line).
 - **Java** — stack `@Playbook(YourPlaybook.class)` annotations the same way (one class per line).
+- **.NET** — stack `[Playbook(typeof(YourPlaybook))]` attributes on the test method or class the same way, with `[assembly: PlaybookExecutionAttribute]` declared once per test assembly.
 
 Session-default and scoped playbooks can coexist on one match. Scoped playbooks tear down when they close so the next scenario starts from a clean sandbox state.
 

@@ -2,7 +2,356 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library", "java_test")
+load("@rules_dotnet//dotnet:defs.bzl", "csharp_library", "csharp_binary", "csharp_test", "import_library")
 load("@crates//:defs.bzl", "all_crate_deps")
+
+import_library(
+    name = "xunit_assert_lib",
+    library_name = "xunit.assert",
+    libs = ["@xunit_assert//:libs"],
+    refs = ["@xunit_assert//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "xunit_abstractions_lib",
+    library_name = "xunit.abstractions",
+    libs = ["@xunit_abstractions//:libs"],
+    refs = ["@xunit_abstractions//:refs"],
+    tags = ["manual"],
+)
+
+filegroup(
+    name = "xunit_execution_netstandard",
+    srcs = ["@xunit_extensibility//:lib/netstandard1.1/xunit.execution.dotnet.dll"],
+)
+
+import_library(
+    name = "xunit_extensibility_lib",
+    library_name = "xunit.execution.dotnet",
+    libs = [":xunit_execution_netstandard"],
+    refs = [":xunit_execution_netstandard"],
+    tags = ["manual"],
+)
+
+filegroup(
+    name = "xunit_runner_utility_netstandard",
+    srcs = ["@xunit_runner_utility//:lib/netstandard1.5/xunit.runner.utility.netstandard15.dll"],
+)
+
+import_library(
+    name = "xunit_runner_utility_lib",
+    library_name = "xunit.runner.utility.netstandard15",
+    libs = [":xunit_runner_utility_netstandard"],
+    refs = [":xunit_runner_utility_netstandard"],
+    tags = ["manual"],
+)
+
+filegroup(
+    name = "xunit_runner_reporters_netstandard",
+    srcs = ["@xunit_runner_reporters//:lib/netstandard1.1/xunit.runner.reporters.netstandard11.dll"],
+)
+
+import_library(
+    name = "xunit_runner_reporters_lib",
+    library_name = "xunit.runner.reporters.netstandard11",
+    libs = [":xunit_runner_reporters_netstandard"],
+    refs = [":xunit_runner_reporters_netstandard"],
+    tags = ["manual"],
+)
+
+filegroup(
+    name = "xunit_core_netstandard",
+    srcs = ["@xunit_extensibility_core//:lib/netstandard1.1/xunit.core.dll"],
+)
+
+import_library(
+    name = "xunit_extensibility_core_lib",
+    library_name = "xunit.core",
+    libs = [":xunit_core_netstandard"],
+    refs = [":xunit_core_netstandard"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "newtonsoft_json_lib",
+    library_name = "Newtonsoft.Json",
+    libs = ["@newtonsoft_json//:libs"],
+    refs = ["@newtonsoft_json//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_logging_abstractions_lib",
+    library_name = "Microsoft.Extensions.Logging.Abstractions",
+    libs = ["@ms_logging_abstractions//:libs"],
+    refs = ["@ms_logging_abstractions//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_logging_lib",
+    library_name = "Microsoft.Extensions.Logging",
+    libs = ["@ms_logging//:libs"],
+    refs = ["@ms_logging//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_logging_options_lib",
+    library_name = "Microsoft.Extensions.Options",
+    libs = ["@ms_logging_options//:libs"],
+    refs = ["@ms_logging_options//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_logging_configuration_lib",
+    library_name = "Microsoft.Extensions.Logging.Configuration",
+    libs = ["@ms_logging_configuration//:libs"],
+    refs = ["@ms_logging_configuration//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_logging_options_configuration_extensions_lib",
+    library_name = "Microsoft.Extensions.Options.ConfigurationExtensions",
+    libs = ["@ms_logging_options_configuration_extensions//:libs"],
+    refs = ["@ms_logging_options_configuration_extensions//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_extensions_primitives_lib",
+    library_name = "Microsoft.Extensions.Primitives",
+    libs = ["@ms_extensions_primitives//:libs"],
+    refs = ["@ms_extensions_primitives//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_logging_console_lib",
+    library_name = "Microsoft.Extensions.Logging.Console",
+    libs = ["@ms_logging_console//:libs"],
+    refs = ["@ms_logging_console//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "npgsql_lib",
+    library_name = "Npgsql",
+    libs = ["@npgsql//:libs"],
+    refs = ["@npgsql//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "sqlclient_lib",
+    library_name = "Microsoft.Data.SqlClient",
+    libs = ["@sqlclient//:libs"],
+    refs = ["@sqlclient//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "aws_core_lib",
+    library_name = "AWSSDK.Core",
+    libs = ["@aws_core//:libs"],
+    refs = ["@aws_core//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "aws_eventbridge_lib",
+    library_name = "AWSSDK.EventBridge",
+    libs = ["@aws_eventbridge//:libs"],
+    refs = ["@aws_eventbridge//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "aws_sqs_lib",
+    library_name = "AWSSDK.SQS",
+    libs = ["@aws_sqs//:libs"],
+    refs = ["@aws_sqs//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "polly_lib",
+    library_name = "Polly",
+    libs = ["@polly//:libs"],
+    refs = ["@polly//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "jwt_lib",
+    library_name = "System.IdentityModel.Tokens.Jwt",
+    libs = ["@jwt//:libs"],
+    refs = ["@jwt//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_identitymodel_tokens_lib",
+    library_name = "Microsoft.IdentityModel.Tokens",
+    libs = ["@ms_identitymodel_tokens//:libs"],
+    refs = ["@ms_identitymodel_tokens//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_identitymodel_jsonwebtokens_lib",
+    library_name = "Microsoft.IdentityModel.JsonWebTokens",
+    libs = ["@ms_identitymodel_jsonwebtokens//:libs"],
+    refs = ["@ms_identitymodel_jsonwebtokens//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_identitymodel_logging_lib",
+    library_name = "Microsoft.IdentityModel.Logging",
+    libs = ["@ms_identitymodel_logging//:libs"],
+    refs = ["@ms_identitymodel_logging//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_identitymodel_abstractions_lib",
+    library_name = "Microsoft.IdentityModel.Abstractions",
+    libs = ["@ms_identitymodel_abstractions//:libs"],
+    refs = ["@ms_identitymodel_abstractions//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "system_configuration_configurationmanager_lib",
+    library_name = "System.Configuration.ConfigurationManager",
+    libs = ["@system_configuration_configurationmanager//:libs"],
+    refs = ["@system_configuration_configurationmanager//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_identity_client_lib",
+    library_name = "Microsoft.Identity.Client",
+    libs = ["@ms_identity_client//:libs"],
+    refs = ["@ms_identity_client//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_sqlserver_server_lib",
+    library_name = "Microsoft.SqlServer.Server",
+    libs = ["@ms_sqlserver_server//:libs"],
+    refs = ["@ms_sqlserver_server//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_extensions_configuration_lib",
+    library_name = "Microsoft.Extensions.Configuration",
+    libs = ["@ms_extensions_configuration//:libs"],
+    refs = ["@ms_extensions_configuration//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_extensions_configuration_abstractions_lib",
+    library_name = "Microsoft.Extensions.Configuration.Abstractions",
+    libs = ["@ms_extensions_configuration_abstractions//:libs"],
+    refs = ["@ms_extensions_configuration_abstractions//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_extensions_configuration_binder_lib",
+    library_name = "Microsoft.Extensions.Configuration.Binder",
+    libs = ["@ms_extensions_configuration_binder//:libs"],
+    refs = ["@ms_extensions_configuration_binder//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_extensions_dependency_injection_lib",
+    library_name = "Microsoft.Extensions.DependencyInjection",
+    libs = ["@ms_extensions_dependency_injection//:libs"],
+    refs = ["@ms_extensions_dependency_injection//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_extensions_dependency_injection_abstractions_lib",
+    library_name = "Microsoft.Extensions.DependencyInjection.Abstractions",
+    libs = ["@ms_extensions_dependency_injection_abstractions//:libs"],
+    refs = ["@ms_extensions_dependency_injection_abstractions//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_extensions_hosting_lib",
+    library_name = "Microsoft.Extensions.Hosting",
+    libs = ["@ms_extensions_hosting//:libs"],
+    refs = ["@ms_extensions_hosting//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_extensions_hosting_abstractions_lib",
+    library_name = "Microsoft.Extensions.Hosting.Abstractions",
+    libs = ["@ms_extensions_hosting_abstractions//:libs"],
+    refs = ["@ms_extensions_hosting_abstractions//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_extensions_http_lib",
+    library_name = "Microsoft.Extensions.Http",
+    libs = ["@ms_extensions_http//:libs"],
+    refs = ["@ms_extensions_http//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "temporalio_lib",
+    library_name = "Temporalio",
+    libs = ["@temporalio//:libs"],
+    refs = ["@temporalio//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "google_protobuf_lib",
+    library_name = "Google.Protobuf",
+    libs = ["@google_protobuf//:libs"],
+    refs = ["@google_protobuf//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "nexus_rpc_lib",
+    library_name = "NexusRpc",
+    libs = ["@nexus_rpc//:libs"],
+    refs = ["@nexus_rpc//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_aspnetcore_app_ref_lib",
+    library_name = "Microsoft.AspNetCore.App.Ref",
+    libs = ["@ms_aspnetcore_app_ref//:libs"],
+    refs = ["@ms_aspnetcore_app_ref//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_netcore_app_ref_lib",
+    library_name = "Microsoft.NETCore.App.Ref",
+    libs = ["@ms_netcore_app_ref//:libs"],
+    refs = ["@ms_netcore_app_ref//:refs"],
+    tags = ["manual"],
+)
 
 filegroup(
     name = "instrument_reading_db_schema",
@@ -447,6 +796,133 @@ java_test(
     ],
 )
 
+csharp_library(
+    name = "xunit_shared",
+    target_frameworks = ["net8.0"],
+    srcs = glob(["tests/xunit-shared/**/*.cs"]),
+    deps = [
+        "//arena-xunit:arena_xunit_lib",
+        ":xunit_assert_lib",
+        ":xunit_abstractions_lib",
+        ":xunit_extensibility_lib",
+        ":aws_sqs_lib",
+        ":aws_core_lib",
+        ":polly_lib",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+csharp_library(
+    name = "ephemeral_test_runtime_dotnet",
+    target_frameworks = ["net8.0"],
+    srcs = ["tests/xunit-shared/EphemeralTestRuntime.cs"],
+    visibility = ["//visibility:public"],
+)
+
+csharp_library(
+    name = "example_readings_aspnet_web_app_lib",
+    target_frameworks = ["net8.0"],
+    srcs = glob(
+        ["src/example_readings_aspnet_web_app/**/*.cs"],
+        exclude = ["src/example_readings_aspnet_web_app/Program.cs"],
+    ),
+    deps = [
+        ":xunit_shared",
+        "//arena-xunit:arena_xunit_lib",
+        ":newtonsoft_json_lib",
+        ":npgsql_lib",
+        ":sqlclient_lib",
+        ":aws_core_lib",
+        ":aws_eventbridge_lib",
+        ":aws_sqs_lib",
+        ":ms_identitymodel_tokens_lib",
+        ":ms_identitymodel_jsonwebtokens_lib",
+        ":ms_identitymodel_logging_lib",
+        ":ms_identitymodel_abstractions_lib",
+        ":system_configuration_configurationmanager_lib",
+        ":ms_identity_client_lib",
+        ":ms_sqlserver_server_lib",
+        ":jwt_lib",
+        ":ms_logging_abstractions_lib",
+        ":ms_aspnetcore_app_ref_lib",
+        ":ms_netcore_app_ref_lib",
+        ":ms_extensions_configuration_lib",
+        ":ms_extensions_configuration_abstractions_lib",
+        ":ms_extensions_configuration_binder_lib",
+        ":ms_extensions_dependency_injection_lib",
+        ":ms_extensions_dependency_injection_abstractions_lib",
+        ":ms_extensions_hosting_lib",
+        ":ms_extensions_hosting_abstractions_lib",
+        ":ms_extensions_http_lib",
+        ":temporalio_lib",
+        ":google_protobuf_lib",
+        ":nexus_rpc_lib",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+csharp_binary(
+    name = "example-readings-aspnet-web-app",
+    target_frameworks = ["net8.0"],
+    project_sdk = "web",
+    srcs = ["src/example_readings_aspnet_web_app/Program.cs"],
+    appsetting_files = ["src/example_readings_aspnet_web_app/appsettings.json"],
+    data = ["@temporalio//:runtimes/linux-x64/native/libtemporalio_sdk_core_c_bridge.so"],
+    deps = [
+        ":example_readings_aspnet_web_app_lib",
+        ":temporalio_lib",
+        ":google_protobuf_lib",
+        ":nexus_rpc_lib",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+csharp_test(
+    name = "example-aspnet-xunit-component-test",
+    size = "medium",
+    tags = [
+        "component_test",
+        "example_component",
+    ],
+    target_frameworks = ["net8.0"],
+    srcs = glob(["tests/example-aspnet-xunit-component-test/**/*.cs"]),
+    data = [
+        ":example-readings-aspnet-web-app",
+        "//arena-ffi:arena_ffi_shared",
+        ":instrument_reading_db_schema",
+        ":arena_config",
+        ":validation_db_schema",
+        "//arena-xunit:xunit_core_netstandard",
+    ],
+    deps = [
+        ":xunit_shared",
+        ":xunit_assert_lib",
+        ":xunit_abstractions_lib",
+        ":xunit_extensibility_lib",
+        ":xunit_extensibility_core_lib",
+        ":xunit_runner_utility_lib",
+        ":xunit_runner_reporters_lib",
+        ":example_readings_aspnet_web_app_lib",
+        "//arena-xunit:arena_xunit_lib",
+        ":aws_sqs_lib",
+        ":aws_core_lib",
+        ":polly_lib",
+        ":ms_logging_abstractions_lib",
+        ":ms_logging_lib",
+        ":ms_logging_console_lib",
+        ":ms_logging_options_lib",
+        ":ms_logging_options_configuration_extensions_lib",
+        ":ms_logging_configuration_lib",
+        ":ms_extensions_configuration_lib",
+        ":ms_extensions_configuration_abstractions_lib",
+        ":ms_extensions_configuration_binder_lib",
+        ":ms_extensions_dependency_injection_abstractions_lib",
+        ":ms_extensions_primitives_lib",
+        "//tools/dotnet_xunit_runner:xunit_console_runner",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 test_suite(
     name = "example_component_tests",
     tags = ["component_test"],
@@ -456,6 +932,7 @@ test_suite(
         ":example-axum-component-test",
         ":example-axum-junit-component-test",
         ":example-spring-boot-component-test",
+        ":example-aspnet-xunit-component-test",
     ],
     visibility = ["//visibility:public"],
 )

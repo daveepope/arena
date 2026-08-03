@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsTestProject>true</IsTestProject>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ArenaExamples.ComponentTest</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.0" />
+    <PackageReference Include="AWSSDK.SQS" Version="3.7.502.57" />
+    <PackageReference Include="AWSSDK.EventBridge" Version="3.7.400" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/example_readings_aspnet_web_app/example_readings_aspnet_web_app.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,37 @@
+using ArenaXunit.Ffi;
+using Xunit;
+
+namespace ArenaXunit.UnitTest;
+
+public class ArenaLogLevelTest
+{
+    [Fact]
+    public void Error_Value_IsOne()
+    {
+        Assert.Equal(1, (int)ArenaLogLevel.Error);
+    }
+
+    [Fact]
+    public void Warn_Value_IsTwo()
+    {
+        Assert.Equal(2, (int)ArenaLogLevel.Warn);
+    }
+
+    [Fact]
+    public void Info_Value_IsThree()
+    {
+        Assert.Equal(3, (int)ArenaLogLevel.Info);
+    }
+
+    [Fact]
+    public void Debug_Value_IsFour()
+    {
+        Assert.Equal(4, (int)ArenaLogLevel.Debug);
+    }
+
+    [Fact]
+    public void Trace_Value_IsFive()
+    {
+        Assert.Equal(5, (int)ArenaLogLevel.Trace);
+    }
+}

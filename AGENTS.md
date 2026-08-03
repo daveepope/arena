@@ -11,6 +11,7 @@
 - You will NEVER stray beyond the bounds of the task set out to you
 - If you are not confident in your answers you will say so, honesty is critical!
 - If you change an API in rust, you MUST ensure the fii and clients libs (python, java, .net etc) are updated to reflect this. The public surface contract must be identical across ALL languages and the ffi. 
+- Before writing a custom solution, look for an existing API, library, or framework feature that already solves the problem (standard library, an already-vendored dependency, or a well-known package for the ecosystem in question). Prefer that over hand-rolling equivalent logic. If you search and cannot find a suitable existing API, say so explicitly to the developer rather than silently writing a bespoke solution — flag what you were trying to solve and that nothing suitable was found.
 
 ## AI communication
 
