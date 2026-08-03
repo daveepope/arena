@@ -3,6 +3,7 @@ name: Best Effort Default Container CVE Search
 on:
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, labeled]
   schedule:
     - cron: '17 6 * * *'
   push:
@@ -16,6 +17,9 @@ jobs:
   container-cves:
     name: Best Effort Default Container CVE Search
     runs-on: ubuntu-24.04
+    if: >-
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'default-container-cve-check')
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
