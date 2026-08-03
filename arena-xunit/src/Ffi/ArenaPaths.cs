@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace ArenaXunit.Ffi;
 
@@ -42,14 +43,9 @@ internal static class ArenaPaths
 
     private static string[] PlatformLibraryNames()
     {
-        var os = Environment.OSVersion.Platform;
-        if (os == PlatformID.Unix || os == PlatformID.MacOSX)
-        {
-            if (os == PlatformID.MacOSX)
-                return new[] { "libarena_ffi_shared.dylib", "libarena_ffi.dylib" };
-            return new[] { "libarena_ffi_shared.so", "libarena_ffi.so" };
-        }
-        if (os == PlatformID.Win32NT)
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            return new[] { "libarena_ffi_shared.dylib", "libarena_ffi.dylib" };
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             return new[] { "arena_ffi_shared.dll", "arena_ffi.dll" };
         return new[] { "libarena_ffi_shared.so", "libarena_ffi.so" };
     }
