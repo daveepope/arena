@@ -116,6 +116,8 @@ dotnet_coverage_test(
         ":xunit_runner_utility_lib",
         ":xunit_runner_reporters_lib",
         ":newtonsoft_json_lib",
+        ":ms_logging_abstractions_lib",
+        "//tools/dotnet_xunit_runner:xunit_console_runner",
     ],
 )
 
@@ -135,5 +137,6 @@ csharp_test(
         ":xunit_runner_utility_lib",
         ":xunit_runner_reporters_lib",
         ":newtonsoft_json_lib",
+        "//tools/dotnet_xunit_runner:xunit_console_runner",
     ],
 )

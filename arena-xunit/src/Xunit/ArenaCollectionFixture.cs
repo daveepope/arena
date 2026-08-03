@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
+using ArenaXunit.Ffi;
+using Microsoft.Extensions.Logging;
 
 namespace ArenaXunit;
 
@@ -34,7 +37,53 @@ public abstract class ArenaCollectionFixture : IDisposable
 
     public OpenArena Arena => _shared.Arena;
 
-    protected abstract Match Configure();
+    protected virtual Match Configure()
+    {
+        return BuildMatchFromAttributes();
+    }
+
+    private Match BuildMatchFromAttributes()
+    {
+        var type = GetType();
+        var builder = new MatchBuilder(type.Name);
+        var foundAny = false;
+
+        for (var current = type; current != null && current != typeof(object); current = current.BaseType)
+        {
+            foreach (var field in current.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+            {
+                if (field.GetCustomAttribute<ArenaDependencyAttribute>() != null)
+                {
+                    builder.AddDependency((IArenaMatchPiece)RequireFieldValue(field));
+                    foundAny = true;
+                }
+                else if (field.GetCustomAttribute<ArenaComponentAttribute>() != null)
+                {
+                    builder.AddComponent((IArenaMatchPiece)RequireFieldValue(field));
+                    foundAny = true;
+                }
+                else if (field.GetCustomAttribute<ArenaPlaybookAttribute>() is { } playbookAttribute)
+                {
+                    builder.RegisterPlaybook((Playbook.IPlaybook)RequireFieldValue(field), playbookAttribute.ExecOnDependencyStart);
+                    foundAny = true;
+                }
+            }
+        }
+
+        if (!foundAny)
+        {
+            throw new InvalidOperationException(
+                $"{type.Name} does not override Configure() and declares no [ArenaDependency]/[ArenaComponent]/[ArenaPlaybook] static fields");
+        }
+
+        return builder.Build();
+    }
+
+    private static object RequireFieldValue(FieldInfo field)
+    {
+        return field.GetValue(null)
+            ?? throw new InvalidOperationException($"[Arena*] field '{field.DeclaringType!.Name}.{field.Name}' must not be null");
+    }
 
     public void Dispose()
     {
@@ -53,9 +102,39 @@ public abstract class ArenaCollectionFixture : IDisposable
     private SharedArena OpenSharedArena()
     {
         var match = Configure();
-        var closed = new ClosedArena(GetType().Name, match);
+        var (logger, level) = ResolveLogger();
+        var closed = logger != null
+            ? new ClosedArena(GetType().Name, match, level, logger)
+            : new ClosedArena(GetType().Name, match);
         var arena = closed.OpenAsync().GetAwaiter().GetResult();
         return new SharedArena(arena);
+    }
+
+    private (ILogger? Logger, ArenaLogLevel Level) ResolveLogger()
+    {
+        FieldInfo? found = null;
+
+        for (var current = GetType(); current != null && current != typeof(object); current = current.BaseType)
+        {
+            foreach (var field in current.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+            {
+                if (field.GetCustomAttribute<ArenaLoggerAttribute>() == null)
+                    continue;
+                if (found != null)
+                {
+                    throw new InvalidOperationException(
+                        $"multiple [ArenaLogger] fields found on {GetType().Name}");
+                }
+                found = field;
+            }
+        }
+
+        if (found == null)
+            return (null, ArenaLogLevel.Info);
+
+        var logger = (ILogger)RequireFieldValue(found);
+        var level = found.GetCustomAttribute<ArenaLoggerAttribute>()!.Level;
+        return (logger, level);
     }
 
     private sealed class SharedArena

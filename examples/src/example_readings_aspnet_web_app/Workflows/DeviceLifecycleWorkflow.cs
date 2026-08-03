@@ -9,6 +9,7 @@ public class DeviceLifecycleWorkflow
     private string _currentState = "OFF";
     private int _transitionCount;
 
+    [WorkflowRun]
     public async Task Run()
     {
         while (true)

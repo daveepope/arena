@@ -7,9 +7,25 @@ using ArenaXunit.Playbook;
 
 namespace ArenaXunit.Xunit;
 
-internal static class PlaybookScope
+public static class PlaybookScope
 {
     private static readonly AsyncLocal<List<ActivePlaybook>?> ActivePlaybooks = new();
+
+    public static T GetActive<T>() where T : ActivePlaybook
+    {
+        var active = ActivePlaybooks.Value;
+        if (active != null)
+        {
+            foreach (var playbook in active)
+            {
+                if (playbook is T typed)
+                    return typed;
+            }
+        }
+        throw new InvalidOperationException(
+            $"no active playbook of type {typeof(T).Name} for the current test; " +
+            $"is the test decorated with [Playbook(typeof({typeof(T).Name}))]?");
+    }
 
     public static void BeforeTest(MethodInfo method, Type testClass)
     {

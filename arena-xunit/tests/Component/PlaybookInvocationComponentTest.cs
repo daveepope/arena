@@ -9,13 +9,15 @@ using ArenaXunit.Playbook;
 using ArenaXunit.Xunit;
 using Xunit;
 
+[assembly: PlaybookExecutionAttribute]
+
 namespace ArenaXunit.ComponentTest;
 
 public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationComponentTest.Fixture>
 {
     private static readonly int _httpPort = TestRuntime.AllocatePort();
 
-    private readonly OpenArena _arena;
+    private static OpenArena Arena { get; set; } = null!;
 
     private class CalibrationHappyPathPlaybook : ManagedHttpPlaybook
     {
@@ -72,43 +74,39 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
 
     public PlaybookInvocationComponentTest(Fixture fixture)
     {
-        _arena = fixture.Arena;
+        Arena = fixture.Arena;
     }
 
     [Fact]
     public void SessionDefaultPlaybook_RunsAtArenaOpen()
     {
-        var pb = _arena.GetPlaybook(typeof(CalibrationHappyPathPlaybook));
+        var pb = Arena.GetPlaybook(typeof(CalibrationHappyPathPlaybook));
         Assert.NotNull(pb);
-        Assert.True(_arena.PlaybookExecOnDependencyStart(typeof(CalibrationHappyPathPlaybook)));
+        Assert.True(Arena.PlaybookExecOnDependencyStart(typeof(CalibrationHappyPathPlaybook)));
     }
 
     [Fact]
     public void ScopedPlaybook_RegisteredButNotExecOnStart()
     {
-        var pb = _arena.GetPlaybook(typeof(ScopedOutagePlaybook));
+        var pb = Arena.GetPlaybook(typeof(ScopedOutagePlaybook));
         Assert.NotNull(pb);
-        Assert.False(_arena.PlaybookExecOnDependencyStart(typeof(ScopedOutagePlaybook)));
+        Assert.False(Arena.PlaybookExecOnDependencyStart(typeof(ScopedOutagePlaybook)));
     }
 
     [Fact]
+    [Playbook(typeof(ScopedOutagePlaybook))]
     public async Task ScopedPlaybook_ManualRun_ActivatesAndOverrides()
     {
-        var pb = _arena.GetPlaybook(typeof(ScopedOutagePlaybook));
-        Assert.NotNull(pb);
-        using (var active = pb.Run(_arena))
-        {
-            var response = await PostValidateAsync();
-            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        }
+        var response = await PostValidateAsync();
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
     }
 
     [Fact]
     public async Task ScopedPlaybook_AfterDispose_ReturnsToSessionDefault()
     {
-        var pb = _arena.GetPlaybook(typeof(ScopedOutagePlaybook));
+        var pb = Arena.GetPlaybook(typeof(ScopedOutagePlaybook));
         Assert.NotNull(pb);
-        using (var active = pb.Run(_arena))
+        using (var active = pb.Run(Arena))
         {
             var response = await PostValidateAsync();
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
@@ -118,37 +116,28 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
     }
 
     [Fact]
+    [Playbook(typeof(VerifyPlaybook))]
     public async Task VerifyAtLeast_WithTraffic_Succeeds()
     {
-        var pb = _arena.GetPlaybook(typeof(VerifyPlaybook));
-        Assert.NotNull(pb);
-        using (var active = (ActiveHttpPlaybook)pb.Run(_arena))
-        {
-            var response = await PostValidateAsync();
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            active.Verify("POST", "/api/v1/validate", 1);
-        }
+        var response = await PostValidateAsync();
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        PlaybookScope.GetActive<ActiveHttpPlaybook>().Verify("POST", "/api/v1/validate", 1);
     }
 
     [Fact]
-    public async Task VerifyAtLeast_WithoutTraffic_Throws()
+    [Playbook(typeof(VerifyPlaybook))]
+    public void VerifyAtLeast_WithoutTraffic_Throws()
     {
-        var pb = _arena.GetPlaybook(typeof(VerifyPlaybook));
-        Assert.NotNull(pb);
-        using (var active = (ActiveHttpPlaybook)pb.Run(_arena))
-        {
-            Assert.Throws<ArenaXunit.Ffi.ArenaBindingError>(() => active.VerifyAtLeast("POST", "/api/v1/validate", 1));
-        }
+        Assert.Throws<ArenaXunit.Ffi.ArenaBindingError>(
+            () => PlaybookScope.GetActive<ActiveHttpPlaybook>().VerifyAtLeast("POST", "/api/v1/validate", 1));
     }
 
     [Fact]
-    public async Task Verify_Failure_CloseDoesNotThrow()
+    [Playbook(typeof(VerifyPlaybook))]
+    public void Verify_Failure_DoesNotThrowDuringScopeTeardown()
     {
-        var pb = _arena.GetPlaybook(typeof(VerifyPlaybook));
-        Assert.NotNull(pb);
-        var active = (ActiveHttpPlaybook)pb.Run(_arena);
-        Assert.Throws<ArenaXunit.Ffi.ArenaBindingError>(() => active.Verify("POST", "/api/v1/validate", 1));
-        active.Dispose();
+        Assert.Throws<ArenaXunit.Ffi.ArenaBindingError>(
+            () => PlaybookScope.GetActive<ActiveHttpPlaybook>().Verify("POST", "/api/v1/validate", 1));
     }
 
     private static async Task<HttpResponseMessage> PostValidateAsync()

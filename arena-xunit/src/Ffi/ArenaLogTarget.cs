@@ -31,7 +31,7 @@ internal static class ArenaLogTarget
     }
     private static readonly ConcurrentDictionary<ulong, LogEntry> Entries = new();
 
-    public static ulong RegisterForLogger(ILogger logger, ArenaLogLevel level)
+    public static ulong RegisterForLogger(ILogger logger)
     {
         var context = new LogContext(logger);
         var userDataHandle = GCHandle.Alloc(context);
@@ -69,6 +69,7 @@ internal static class ArenaLogTarget
         }
         catch
         {
+         // TODO why is there an empty catch here?
         }
     }
 
@@ -76,12 +77,11 @@ internal static class ArenaLogTarget
     {
         return level switch
         {
-            0 => LogLevel.Trace,
-            1 => LogLevel.Debug,
-            2 => LogLevel.Information,
-            3 => LogLevel.Warning,
-            4 => LogLevel.Error,
-            5 => LogLevel.Critical,
+            1 => LogLevel.Error,
+            2 => LogLevel.Warning,
+            3 => LogLevel.Information,
+            4 => LogLevel.Debug,
+            5 => LogLevel.Trace,
             _ => LogLevel.Information
         };
     }

@@ -1,5 +1,4 @@
 using ArenaXunit.Component;
-using ArenaXunit.Dep;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
@@ -19,30 +18,86 @@ public class ContainerizedComponentBuilderSerializationTest
     }
 
     [Fact]
-    public void Build_WithEnv_SerializesCorrectJson()
+    public void Build_WithEnvVar_SerializesCorrectJson()
     {
         var comp = new ContainerizedComponentBuilder("test")
             .WithContainerfile("./Dockerfile")
-            .WithEnv("KEY", "value")
+            .WithEnvVar("KEY", "value")
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["env"]);
-        Assert.Equal("value", obj["env"]["key"]);
+        Assert.NotNull(obj["env_vars"]);
+        Assert.Equal("value", obj["env_vars"]["KEY"]);
     }
 
     [Fact]
-    public void Build_WithArgs_SerializesCorrectJson()
+    public void Build_WithRuntimeArg_SerializesCorrectJson()
     {
         var comp = new ContainerizedComponentBuilder("test")
             .WithContainerfile("./Dockerfile")
-            .WithArgs("--flag", "arg1")
+            .WithRuntimeArg("flag", "arg1")
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["args"]);
-        Assert.Equal("--flag", obj["args"][0]);
-        Assert.Equal("arg1", obj["args"][1]);
+        Assert.Single(obj["runtime_args"]);
+        Assert.Equal("flag", obj["runtime_args"][0]["name"]);
+        Assert.Equal("arg1", obj["runtime_args"][0]["value"]);
+    }
+
+    [Fact]
+    public void Build_WithBuildContextImageTagAndNetwork_SerializesCorrectJson()
+    {
+        var comp = new ContainerizedComponentBuilder("test")
+            .WithContainerfile("./Dockerfile")
+            .WithBuildContext("./ctx")
+            .WithImageTag("v1")
+            .WithNetwork("test-net")
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("./ctx", obj["build_context"]);
+        Assert.Equal("v1", obj["image_tag"]);
+        Assert.Equal("test-net", obj["network"]);
+    }
+
+    [Fact]
+    public void Build_WithPortMapping_SerializesHostAndContainerPort()
+    {
+        var comp = new ContainerizedComponentBuilder("test")
+            .WithContainerfile("./Dockerfile")
+            .WithPortMapping(8080, 80)
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Single(obj["port_mappings"]);
+        Assert.Equal(8080, obj["port_mappings"][0]["host_port"]);
+        Assert.Equal(80, obj["port_mappings"][0]["container_port"]);
+    }
+
+    [Fact]
+    public void Build_WithHostMapping_SerializesCorrectJson()
+    {
+        var comp = new ContainerizedComponentBuilder("test")
+            .WithContainerfile("./Dockerfile")
+            .WithHostMapping("host.docker.internal:host-gateway")
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Single(obj["host_mappings"]);
+        Assert.Equal("host.docker.internal:host-gateway", obj["host_mappings"][0]);
+    }
+
+    [Fact]
+    public void Build_WithReadinessCheck_SerializesHttpKind()
+    {
+        var comp = new ContainerizedComponentBuilder("test")
+            .WithContainerfile("./Dockerfile")
+            .WithReadinessCheck(HttpReadinessCheck.Create(), "http://127.0.0.1:8080/health")
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Single(obj["readiness_checks"]);
+        Assert.Equal("http", obj["readiness_checks"][0]["kind"]);
     }
 
     [Fact]

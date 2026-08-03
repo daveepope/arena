@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using ArenaExamples.Readings.Aspnet.Models;
 using ArenaExamples.Readings.Aspnet.Services;
 
@@ -12,10 +13,12 @@ namespace ArenaExamples.Readings.Aspnet.Controllers;
 public class DevicesController : ControllerBase
 {
     private readonly IDevicesService _devicesService;
+    private readonly ILogger<DevicesController> _logger;
 
-    public DevicesController(IDevicesService devicesService)
+    public DevicesController(IDevicesService devicesService, ILogger<DevicesController> logger)
     {
         _devicesService = devicesService;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -38,6 +41,7 @@ public class DevicesController : ControllerBase
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to create device");
             return StatusCode(502, new { error = ex.Message });
         }
     }

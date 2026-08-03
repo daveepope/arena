@@ -90,6 +90,54 @@ import_library(
 )
 
 import_library(
+    name = "ms_logging_lib",
+    library_name = "Microsoft.Extensions.Logging",
+    libs = ["@ms_logging//:libs"],
+    refs = ["@ms_logging//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_logging_options_lib",
+    library_name = "Microsoft.Extensions.Options",
+    libs = ["@ms_logging_options//:libs"],
+    refs = ["@ms_logging_options//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_logging_configuration_lib",
+    library_name = "Microsoft.Extensions.Logging.Configuration",
+    libs = ["@ms_logging_configuration//:libs"],
+    refs = ["@ms_logging_configuration//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_logging_options_configuration_extensions_lib",
+    library_name = "Microsoft.Extensions.Options.ConfigurationExtensions",
+    libs = ["@ms_logging_options_configuration_extensions//:libs"],
+    refs = ["@ms_logging_options_configuration_extensions//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_extensions_primitives_lib",
+    library_name = "Microsoft.Extensions.Primitives",
+    libs = ["@ms_extensions_primitives//:libs"],
+    refs = ["@ms_extensions_primitives//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_logging_console_lib",
+    library_name = "Microsoft.Extensions.Logging.Console",
+    libs = ["@ms_logging_console//:libs"],
+    refs = ["@ms_logging_console//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
     name = "npgsql_lib",
     library_name = "Npgsql",
     libs = ["@npgsql//:libs"],
@@ -130,6 +178,14 @@ import_library(
 )
 
 import_library(
+    name = "polly_lib",
+    library_name = "Polly",
+    libs = ["@polly//:libs"],
+    refs = ["@polly//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
     name = "jwt_lib",
     library_name = "System.IdentityModel.Tokens.Jwt",
     libs = ["@jwt//:libs"],
@@ -142,6 +198,54 @@ import_library(
     library_name = "Microsoft.IdentityModel.Tokens",
     libs = ["@ms_identitymodel_tokens//:libs"],
     refs = ["@ms_identitymodel_tokens//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_identitymodel_jsonwebtokens_lib",
+    library_name = "Microsoft.IdentityModel.JsonWebTokens",
+    libs = ["@ms_identitymodel_jsonwebtokens//:libs"],
+    refs = ["@ms_identitymodel_jsonwebtokens//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_identitymodel_logging_lib",
+    library_name = "Microsoft.IdentityModel.Logging",
+    libs = ["@ms_identitymodel_logging//:libs"],
+    refs = ["@ms_identitymodel_logging//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_identitymodel_abstractions_lib",
+    library_name = "Microsoft.IdentityModel.Abstractions",
+    libs = ["@ms_identitymodel_abstractions//:libs"],
+    refs = ["@ms_identitymodel_abstractions//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "system_configuration_configurationmanager_lib",
+    library_name = "System.Configuration.ConfigurationManager",
+    libs = ["@system_configuration_configurationmanager//:libs"],
+    refs = ["@system_configuration_configurationmanager//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_identity_client_lib",
+    library_name = "Microsoft.Identity.Client",
+    libs = ["@ms_identity_client//:libs"],
+    refs = ["@ms_identity_client//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "ms_sqlserver_server_lib",
+    library_name = "Microsoft.SqlServer.Server",
+    libs = ["@ms_sqlserver_server//:libs"],
+    refs = ["@ms_sqlserver_server//:refs"],
     tags = ["manual"],
 )
 
@@ -214,6 +318,22 @@ import_library(
     library_name = "Temporalio",
     libs = ["@temporalio//:libs"],
     refs = ["@temporalio//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "google_protobuf_lib",
+    library_name = "Google.Protobuf",
+    libs = ["@google_protobuf//:libs"],
+    refs = ["@google_protobuf//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "nexus_rpc_lib",
+    library_name = "NexusRpc",
+    libs = ["@nexus_rpc//:libs"],
+    refs = ["@nexus_rpc//:refs"],
     tags = ["manual"],
 )
 
@@ -686,6 +806,8 @@ csharp_library(
         ":xunit_abstractions_lib",
         ":xunit_extensibility_lib",
         ":aws_sqs_lib",
+        ":aws_core_lib",
+        ":polly_lib",
     ],
     visibility = ["//visibility:public"],
 )
@@ -714,6 +836,12 @@ csharp_library(
         ":aws_eventbridge_lib",
         ":aws_sqs_lib",
         ":ms_identitymodel_tokens_lib",
+        ":ms_identitymodel_jsonwebtokens_lib",
+        ":ms_identitymodel_logging_lib",
+        ":ms_identitymodel_abstractions_lib",
+        ":system_configuration_configurationmanager_lib",
+        ":ms_identity_client_lib",
+        ":ms_sqlserver_server_lib",
         ":jwt_lib",
         ":ms_logging_abstractions_lib",
         ":ms_aspnetcore_app_ref_lib",
@@ -727,6 +855,8 @@ csharp_library(
         ":ms_extensions_hosting_abstractions_lib",
         ":ms_extensions_http_lib",
         ":temporalio_lib",
+        ":google_protobuf_lib",
+        ":nexus_rpc_lib",
     ],
     visibility = ["//visibility:public"],
 )
@@ -737,9 +867,12 @@ csharp_binary(
     project_sdk = "web",
     srcs = ["src/example_readings_aspnet_web_app/Program.cs"],
     appsetting_files = ["src/example_readings_aspnet_web_app/appsettings.json"],
+    data = ["@temporalio//:runtimes/linux-x64/native/libtemporalio_sdk_core_c_bridge.so"],
     deps = [
         ":example_readings_aspnet_web_app_lib",
         ":temporalio_lib",
+        ":google_protobuf_lib",
+        ":nexus_rpc_lib",
     ],
     visibility = ["//visibility:public"],
 )
@@ -773,6 +906,19 @@ csharp_test(
         "//arena-xunit:arena_xunit_lib",
         ":aws_sqs_lib",
         ":aws_core_lib",
+        ":polly_lib",
+        ":ms_logging_abstractions_lib",
+        ":ms_logging_lib",
+        ":ms_logging_console_lib",
+        ":ms_logging_options_lib",
+        ":ms_logging_options_configuration_extensions_lib",
+        ":ms_logging_configuration_lib",
+        ":ms_extensions_configuration_lib",
+        ":ms_extensions_configuration_abstractions_lib",
+        ":ms_extensions_configuration_binder_lib",
+        ":ms_extensions_dependency_injection_abstractions_lib",
+        ":ms_extensions_primitives_lib",
+        "//tools/dotnet_xunit_runner:xunit_console_runner",
     ],
     visibility = ["//visibility:public"],
 )

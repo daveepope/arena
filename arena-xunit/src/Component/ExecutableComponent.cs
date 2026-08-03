@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using ArenaXunit.Support;
+using Newtonsoft.Json;
 
 namespace ArenaXunit.Component;
 
@@ -8,21 +10,52 @@ public sealed class ExecutableComponent : IArenaMatchPiece
     public string Type => "exec";
     public string Identifier { get; }
     public string ExecutablePath { get; }
-    public List<string>? Args { get; }
-    public Dictionary<string, string>? Env { get; }
+    public string? SourcePath { get; }
+    public BuildTool? BuildTool { get; }
+    public IReadOnlyDictionary<string, string> EnvVars { get; }
 
-    internal ExecutableComponent(string identifier, string executablePath, List<string>? args,
-        Dictionary<string, string>? env)
+    private readonly List<RuntimeArgEntry> _runtimeArgs;
+    private readonly List<ReadinessCheckEntry> _readinessChecks;
+
+    internal ExecutableComponent(string identifier, string executablePath, string? sourcePath,
+        BuildTool? buildTool, Dictionary<string, string> envVars, List<RuntimeArgEntry> runtimeArgs,
+        List<ReadinessCheckEntry> readinessChecks)
     {
         Identifier = identifier;
         ExecutablePath = executablePath;
-        Args = args;
-        Env = env;
+        SourcePath = sourcePath;
+        BuildTool = buildTool;
+        EnvVars = envVars;
+        _runtimeArgs = runtimeArgs;
+        _readinessChecks = readinessChecks;
     }
 
     public string ForFfi()
     {
-        return ArenaJson.Serialize(this);
+        return ArenaJson.Serialize(new ExecutableComponentConfig
+        {
+            Type = Type,
+            Identifier = Identifier,
+            ExecutablePath = ExecutablePath,
+            SourcePath = SourcePath,
+            BuildTool = BuildTool?.ForFfi(),
+            EnvVars = EnvVars.ToDictionary(kv => kv.Key, kv => kv.Value),
+            RuntimeArgs = RuntimeArgEntry.Build(_runtimeArgs),
+            ReadinessChecks = ReadinessCheckWireFormat.Build(_readinessChecks),
+        });
+    }
+
+    [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
+    private sealed class ExecutableComponentConfig
+    {
+        [JsonProperty("type")] public string Type { get; set; } = default!;
+        [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
+        [JsonProperty("executable_path")] public string ExecutablePath { get; set; } = default!;
+        [JsonProperty("source_path")] public string? SourcePath { get; set; }
+        [JsonProperty("build_tool")] public object? BuildTool { get; set; }
+        [JsonProperty("env_vars")] public Dictionary<string, string> EnvVars { get; set; } = default!;
+        [JsonProperty("runtime_args")] public List<object> RuntimeArgs { get; set; } = default!;
+        [JsonProperty("readiness_checks")] public List<object>? ReadinessChecks { get; set; }
     }
 }
 
@@ -30,8 +63,11 @@ public sealed class ExecutableComponentBuilder
 {
     private readonly string _name;
     private string? _executablePath;
-    private readonly List<string> _args = new();
-    private readonly Dictionary<string, string> _env = new();
+    private string? _sourcePath;
+    private BuildTool? _buildTool;
+    private readonly Dictionary<string, string> _envVars = new();
+    private readonly List<RuntimeArgEntry> _runtimeArgs = new();
+    private readonly List<ReadinessCheckEntry> _readinessChecks = new();
 
     public ExecutableComponentBuilder(string name)
     {
@@ -44,16 +80,38 @@ public sealed class ExecutableComponentBuilder
         return this;
     }
 
-    public ExecutableComponentBuilder WithArgs(params string[] args)
+    public ExecutableComponentBuilder WithSourcePath(string path)
     {
-        foreach (var arg in args)
-            _args.Add(arg);
+        _sourcePath = path;
         return this;
     }
 
-    public ExecutableComponentBuilder WithEnv(string key, string value)
+    public ExecutableComponentBuilder WithBuildTool(BuildTool buildTool)
     {
-        _env[key] = value;
+        _buildTool = buildTool;
+        return this;
+    }
+
+    public ExecutableComponentBuilder WithEnvVar(string key, string value)
+    {
+        _envVars[key] = value;
+        return this;
+    }
+
+    public ExecutableComponentBuilder WithRuntimeArg(string name, string value)
+    {
+        _runtimeArgs.Add(new RuntimeArgEntry(name, value));
+        return this;
+    }
+
+    public ExecutableComponentBuilder WithReadinessCheck(IArenaReadinessCheck check, string target)
+    {
+        return WithReadinessCheck(check, target, ReadinessCheckWireFormat.DefaultTimeoutMs);
+    }
+
+    public ExecutableComponentBuilder WithReadinessCheck(IArenaReadinessCheck check, string target, long timeoutMs)
+    {
+        _readinessChecks.Add(new ReadinessCheckEntry(check, target, timeoutMs));
         return this;
     }
 
@@ -62,8 +120,8 @@ public sealed class ExecutableComponentBuilder
         if (string.IsNullOrEmpty(_executablePath))
             throw new System.InvalidOperationException("executable path must be set");
         var identifier = ArenaIdentifiers.Build("arena-exec", _name);
-        return new ExecutableComponent(identifier, _executablePath,
-            _args.Count > 0 ? new List<string>(_args) : null,
-            _env.Count > 0 ? new Dictionary<string, string>(_env) : null);
+        return new ExecutableComponent(identifier, _executablePath, _sourcePath, _buildTool,
+            new Dictionary<string, string>(_envVars), new List<RuntimeArgEntry>(_runtimeArgs),
+            new List<ReadinessCheckEntry>(_readinessChecks));
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using ArenaExamples.Readings.Aspnet.Models;
 using ArenaExamples.Readings.Aspnet.Services;
 
@@ -12,10 +13,12 @@ namespace ArenaExamples.Readings.Aspnet.Controllers;
 public class ReadingsController : ControllerBase
 {
     private readonly IReadingsService _readingsService;
+    private readonly ILogger<ReadingsController> _logger;
 
-    public ReadingsController(IReadingsService readingsService)
+    public ReadingsController(IReadingsService readingsService, ILogger<ReadingsController> logger)
     {
         _readingsService = readingsService;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -38,6 +41,7 @@ public class ReadingsController : ControllerBase
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to create reading");
             return StatusCode(500, new { error = ex.Message });
         }
     }

@@ -10,7 +10,7 @@ internal static class ArenaJson
     {
         ContractResolver = new DefaultContractResolver
         {
-            NamingStrategy = new SnakeCaseNamingStrategy(processDictionaryKeys: true, overrideSpecifiedNames: true),
+            NamingStrategy = new SnakeCaseNamingStrategy(processDictionaryKeys: false, overrideSpecifiedNames: true),
         },
         NullValueHandling = NullValueHandling.Ignore,
         Converters = { new StringEnumConverter(new SnakeCaseNamingStrategy()) },

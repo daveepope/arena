@@ -54,8 +54,8 @@ public sealed class ClosedArena
                 ? ArenaJson.Serialize(_logComponentIds) : null);
 
         ulong logToken = _logger != null
-            ? ArenaLogTarget.RegisterForLogger(_logger, _logLevel)
-            : ArenaLogTarget.RegisterForLogger(CreateDefaultLogger(), _logLevel);
+            ? ArenaLogTarget.RegisterForLogger(_logger)
+            : ArenaLogTarget.RegisterForLogger(CreateDefaultLogger());
 
         try
         {

@@ -1,5 +1,8 @@
 using System;
 using System.Net.Http;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+using ArenaExamples.Readings.Aspnet.Controllers;
 using ArenaExamples.Readings.Aspnet.Services;
 using Temporalio.Client;
 using Microsoft.AspNetCore.Builder;
@@ -13,24 +16,25 @@ var builder = WebApplication.CreateBuilder(args);
 var port = int.Parse(builder.Configuration["WEB_APP_PORT"] ?? "3010");
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
-builder.Services.AddControllers();
-builder.Services.AddHttpClient("JwtValidation", c =>
+builder.Services.AddControllers()
+    .AddApplicationPart(typeof(HealthController).Assembly);
+
+var jwtValidationClientBuilder = builder.Services.AddHttpClient("JwtValidation", c =>
 {
-    var tlsCaFile = builder.Configuration["OAUTH_TLS_CA_FILE"];
-    var tlsCaPem = builder.Configuration["OAUTH_TLS_CA_PEM"];
-    if (!string.IsNullOrEmpty(tlsCaFile))
-    {
-        var cert = new System.Security.Cryptography.X509Certificates.X509Certificate2(tlsCaFile);
-        c.DefaultRequestHeaders.Add("User-Agent", "arena-readings-aspnet");
-        c.BaseAddress = new Uri(builder.Configuration["OAUTH_ISSUER_URL"]!);
-        if (cert is not null)
-        {
-            var handler = new System.Net.Http.HttpClientHandler();
-            handler.ServerCertificateCustomValidationCallback = (msg, cert2, chain, err) => err == System.Net.Security.SslPolicyErrors.None || cert2 == cert;
-            c = new System.Net.Http.HttpClient(handler);
-        }
-    }
+    c.DefaultRequestHeaders.Add("User-Agent", "arena-readings-aspnet");
+    c.BaseAddress = new Uri(builder.Configuration["OAUTH_ISSUER_URL"]!);
 });
+
+var tlsCaFile = builder.Configuration["OAUTH_TLS_CA_FILE"];
+if (!string.IsNullOrEmpty(tlsCaFile))
+{
+    var trustedCert = new X509Certificate2(tlsCaFile);
+    jwtValidationClientBuilder.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback = (_, cert, _, errors) =>
+            errors == SslPolicyErrors.None || (cert != null && cert.GetCertHashString() == trustedCert.GetCertHashString()),
+    });
+}
 
 builder.Services.AddSingleton<IEventBridgePublisher>(_ => new EventBridgePublisher(
     builder.Configuration["AWS_ENDPOINT_URL"]!,
@@ -49,9 +53,13 @@ var temporalClient = await TemporalClient.ConnectAsync(new TemporalClientConnect
 {
     TargetHost = builder.Configuration["TEMPORAL_TARGET"]
 });
-builder.Services.AddSingleton(temporalClient);
+builder.Services.AddSingleton<ITemporalClient>(temporalClient);
 builder.Services.AddSingleton<IDeviceWorkflowService, DeviceWorkflowService>();
-builder.Services.AddSingleton<IDevicesService, DevicesService>();
+builder.Services.AddSingleton<IDevicesService>(sp => new DevicesService(
+    builder.Configuration["POSTGRES_CONNECTION_STRING"]!,
+    sp.GetRequiredService<IDeviceWorkflowService>(),
+    sp.GetRequiredService<ISmtpClientService>()));
+builder.Services.AddHostedService<DeviceLifecycleWorkerHostedService>();
 
 builder.Services.AddHttpClient();
 

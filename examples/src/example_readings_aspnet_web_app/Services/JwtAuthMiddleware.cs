@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace ArenaExamples.Readings.Aspnet.Services;
 
@@ -19,14 +20,16 @@ public class JwtAuthMiddleware
     private readonly string _issuerUrl;
     private readonly string? _requiredScopes;
     private readonly HttpClient _httpClient;
+    private readonly ILogger<JwtAuthMiddleware> _logger;
     private volatile JwkSet? _cachedJwks;
 
-    public JwtAuthMiddleware(RequestDelegate next, IConfiguration config, IHttpClientFactory factory)
+    public JwtAuthMiddleware(RequestDelegate next, IConfiguration config, IHttpClientFactory factory, ILogger<JwtAuthMiddleware> logger)
     {
         _next = next;
         _issuerUrl = config["OAUTH_ISSUER_URL"] ?? throw new InvalidOperationException("OAUTH_ISSUER_URL not set");
         _requiredScopes = config["OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES"];
         _httpClient = factory.CreateClient("JwtValidation");
+        _logger = logger;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -62,14 +65,15 @@ public class JwtAuthMiddleware
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKeys = jwks.Keys.Select(k => new Microsoft.IdentityModel.Tokens.RsaSecurityKey(new System.Security.Cryptography.RSAParameters
                 {
-                    Modulus = Convert.FromBase64String(k.N),
-                    Exponent = Convert.FromBase64String(k.E)
+                    Modulus = Microsoft.IdentityModel.Tokens.Base64UrlEncoder.DecodeBytes(k.N),
+                    Exponent = Microsoft.IdentityModel.Tokens.Base64UrlEncoder.DecodeBytes(k.E)
                 })).ToList()
             };
 
             var result = await tokenHandler.ValidateTokenAsync(token, validationParameters);
             if (!result.IsValid)
             {
+                _logger.LogError(result.Exception, "JWT token invalid. ValidIssuer={ValidIssuer}", _issuerUrl);
                 context.Response.StatusCode = 401;
                 context.Response.ContentType = "application/json";
                 await context.Response.WriteAsync("Invalid token");
@@ -99,8 +103,9 @@ public class JwtAuthMiddleware
 
             await _next(context);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "JWT validation failed");
             context.Response.StatusCode = 500;
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsync("Auth failure");
@@ -116,7 +121,7 @@ public class JwtAuthMiddleware
         var response = await _httpClient.GetAsync(jwksUrl);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync();
-        var jwks = JsonSerializer.Deserialize<JwkSet>(json);
+        var jwks = JsonSerializer.Deserialize<JwkSet>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         if (jwks == null)
             throw new InvalidOperationException("Failed to deserialize JWKS");
 

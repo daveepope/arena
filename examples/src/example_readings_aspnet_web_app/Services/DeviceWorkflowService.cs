@@ -22,7 +22,7 @@ public class DeviceWorkflowService : IDeviceWorkflowService
     public DeviceWorkflowService(ITemporalClient client)
     {
         _client = client;
-        _taskQueue = "arena-example-device-lifecycle";
+        _taskQueue = DeviceLifecycleWorkerHostedService.TaskQueue;
     }
 
     public async Task StartDeviceAsync(int deviceId)

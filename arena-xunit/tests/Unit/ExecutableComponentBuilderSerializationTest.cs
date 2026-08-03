@@ -20,30 +20,83 @@ public class ExecutableComponentBuilderSerializationTest
     }
 
     [Fact]
-    public void Build_WithEnv_SerializesCorrectJson()
+    public void Build_WithEnvVar_SerializesCorrectJson()
     {
         var comp = new ExecutableComponentBuilder("test")
             .WithExecutablePath("./myapp")
-            .WithEnv("KEY", "value")
+            .WithEnvVar("KEY", "value")
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["env"]);
-        Assert.Equal("value", obj["env"]["key"]);
+        Assert.NotNull(obj["env_vars"]);
+        Assert.Equal("value", obj["env_vars"]["KEY"]);
     }
 
     [Fact]
-    public void Build_WithArgs_SerializesCorrectJson()
+    public void Build_WithRuntimeArg_SerializesCorrectJson()
     {
         var comp = new ExecutableComponentBuilder("test")
             .WithExecutablePath("./myapp")
-            .WithArgs("--flag", "arg1")
+            .WithRuntimeArg("web_app_port", "8080")
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["args"]);
-        Assert.Equal("--flag", obj["args"][0]);
-        Assert.Equal("arg1", obj["args"][1]);
+        Assert.Single(obj["runtime_args"]);
+        Assert.Equal("web_app_port", obj["runtime_args"][0]["name"]);
+        Assert.Equal("8080", obj["runtime_args"][0]["value"]);
+    }
+
+    [Fact]
+    public void Build_WithSourcePathAndBuildTool_SerializesCorrectJson()
+    {
+        var comp = new ExecutableComponentBuilder("test")
+            .WithExecutablePath("./myapp")
+            .WithSourcePath("./src")
+            .WithBuildTool(BuildTool.Cargo)
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("./src", obj["source_path"]);
+        Assert.Equal("cargo", obj["build_tool"]);
+    }
+
+    [Fact]
+    public void Build_WithCustomBuildTool_SerializesCommandAndArgs()
+    {
+        var comp = new ExecutableComponentBuilder("test")
+            .WithExecutablePath("./myapp")
+            .WithBuildTool(BuildTool.Custom("make", new[] { "release" }))
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("make", obj["build_tool"]["command"]);
+        Assert.Equal("release", obj["build_tool"]["args"][0]);
+    }
+
+    [Fact]
+    public void Build_WithReadinessCheck_SerializesHttpKind()
+    {
+        var comp = new ExecutableComponentBuilder("test")
+            .WithExecutablePath("./myapp")
+            .WithReadinessCheck(HttpReadinessCheck.Create(), "http://127.0.0.1:8080/health", 5000)
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Single(obj["readiness_checks"]);
+        Assert.Equal("http", obj["readiness_checks"][0]["kind"]);
+        Assert.Equal("http://127.0.0.1:8080/health", obj["readiness_checks"][0]["target"]);
+        Assert.Equal(5000, obj["readiness_checks"][0]["timeout_ms"]);
+    }
+
+    [Fact]
+    public void Build_WithoutReadinessCheck_OmitsReadinessChecksField()
+    {
+        var comp = new ExecutableComponentBuilder("test")
+            .WithExecutablePath("./myapp")
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Null(obj["readiness_checks"]);
     }
 
     [Fact]

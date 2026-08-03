@@ -243,7 +243,49 @@ nuget_archive(
     name = "ms_logging_abstractions",
     id = "Microsoft.Extensions.Logging.Abstractions",
     sources = ["https://api.nuget.org/v3/index.json"],
-    version = "6.0.4",
+    version = "8.0.2",
+)
+
+nuget_archive(
+    name = "ms_logging",
+    id = "Microsoft.Extensions.Logging",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "ms_logging_console",
+    id = "Microsoft.Extensions.Logging.Console",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "ms_logging_options",
+    id = "Microsoft.Extensions.Options",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.2",
+)
+
+nuget_archive(
+    name = "ms_logging_options_configuration_extensions",
+    id = "Microsoft.Extensions.Options.ConfigurationExtensions",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.0",
+)
+
+nuget_archive(
+    name = "ms_extensions_primitives",
+    id = "Microsoft.Extensions.Primitives",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.0",
+)
+
+nuget_archive(
+    name = "ms_logging_configuration",
+    id = "Microsoft.Extensions.Logging.Configuration",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
 )
 
 # Database
@@ -296,6 +338,48 @@ nuget_archive(
     id = "Microsoft.IdentityModel.Tokens",
     sources = ["https://api.nuget.org/v3/index.json"],
     version = "8.0.1",
+)
+
+nuget_archive(
+    name = "ms_identitymodel_jsonwebtokens",
+    id = "Microsoft.IdentityModel.JsonWebTokens",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "ms_identitymodel_logging",
+    id = "Microsoft.IdentityModel.Logging",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "ms_identitymodel_abstractions",
+    id = "Microsoft.IdentityModel.Abstractions",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "system_configuration_configurationmanager",
+    id = "System.Configuration.ConfigurationManager",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.0",
+)
+
+nuget_archive(
+    name = "ms_identity_client",
+    id = "Microsoft.Identity.Client",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "4.61.3",
+)
+
+nuget_archive(
+    name = "ms_sqlserver_server",
+    id = "Microsoft.SqlServer.Server",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "1.0.0",
 )
 
 # Coverage
@@ -385,10 +469,31 @@ nuget_archive(
     version = "8.0.1",
 )
 
+nuget_archive(
+    name = "polly",
+    id = "Polly",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.4.2",
+)
+
 # Temporal
 nuget_archive(
     name = "temporalio",
     id = "Temporalio",
     sources = ["https://api.nuget.org/v3/index.json"],
     version = "1.17.0",
+)
+
+nuget_archive(
+    name = "google_protobuf",
+    id = "Google.Protobuf",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "3.26.1",
+)
+
+nuget_archive(
+    name = "nexus_rpc",
+    id = "NexusRpc",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "0.3.0",
 )
