@@ -349,7 +349,7 @@
     "@@rules_dotnet~//dotnet:extensions.bzl%dotnet": {
       "general": {
         "bzlTransitiveDigest": "455CyqHKbuSpans6TInT87vzKVKvfKsBe2ueLAeTx+A=",
-        "usagesDigest": "wKgE/fJXW9RVmPdln7760D2ibJvZ/7RJrodF0/H7iew=",
+        "usagesDigest": "CEqU733mTYEG0lAy8xBshx1PywnqByERtOgQLgIm6bc=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
