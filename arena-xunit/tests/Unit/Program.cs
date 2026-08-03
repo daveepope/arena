@@ -5,5 +5,5 @@ namespace ArenaXunit.UnitTest;
 
 public class Program
 {
-    public static int Main() => XunitConsoleRunner.Run(Assembly.GetExecutingAssembly());
+    public static int Main() => XunitConsoleRunner.Run(Assembly.GetExecutingAssembly(), parallelizeTests: true);
 }

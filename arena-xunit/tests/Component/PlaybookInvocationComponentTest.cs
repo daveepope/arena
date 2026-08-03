@@ -55,6 +55,19 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
         }
     }
 
+    private class UnmetExpectationPlaybook : ManagedHttpPlaybook
+    {
+        public UnmetExpectationPlaybook(string depId)
+            : base("playbook-invocation-unmet-expectation", depId,
+                new HttpPlaybookBuilder(depId)
+                    .Post("/api/v1/validate")
+                    .WillReturn(HttpResponse.OkJson(new { valid = true }))
+                    .ExpectCalled(1)
+                    .BuildMappings())
+        {
+        }
+    }
+
     public class Fixture : ArenaCollectionFixture
     {
         protected override Match Configure()
@@ -68,6 +81,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
                 .RegisterPlaybook(new CalibrationHappyPathPlaybook(httpDep.Identifier), true)
                 .RegisterPlaybook(new ScopedOutagePlaybook(httpDep.Identifier), false)
                 .RegisterPlaybook(new VerifyPlaybook(httpDep.Identifier), false)
+                .RegisterPlaybook(new UnmetExpectationPlaybook(httpDep.Identifier), false)
                 .Build();
         }
     }
@@ -138,6 +152,15 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
     {
         Assert.Throws<ArenaXunit.Ffi.ArenaBindingError>(
             () => PlaybookScope.GetActive<ActiveHttpPlaybook>().Verify("POST", "/api/v1/validate", 1));
+    }
+
+    [Fact]
+    public void ScopedPlaybook_UnmetExpectCalled_ThrowsOnDispose()
+    {
+        var pb = Arena.GetPlaybook(typeof(UnmetExpectationPlaybook));
+        Assert.NotNull(pb);
+        var active = pb!.Run(Arena);
+        Assert.Throws<ArenaXunit.Ffi.ArenaBindingError>(() => active.Dispose());
     }
 
     private static async Task<HttpResponseMessage> PostValidateAsync()

@@ -1,9 +1,10 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Threading;
 using Xunit;
 using Xunit.Abstractions;
@@ -12,12 +13,12 @@ namespace ArenaTools.DotnetXunitRunner;
 
 public static class XunitConsoleRunner
 {
-    public static int Run(Assembly testAssembly)
+    public static int Run(Assembly testAssembly, bool parallelizeTests = false)
     {
         var runfilesRoot = ResolveRunfilesRoot(testAssembly);
         if (!string.IsNullOrEmpty(runfilesRoot))
         {
-            var xunitCorePath = Directory.GetFiles(runfilesRoot, "xunit.core.dll", SearchOption.AllDirectories).FirstOrDefault();
+            var xunitCorePath = FindSingleRunfile(runfilesRoot, "xunit.core.dll");
             if (!string.IsNullOrEmpty(xunitCorePath))
                 Assembly.LoadFrom(xunitCorePath);
         }
@@ -25,7 +26,7 @@ public static class XunitConsoleRunner
         var frontController = new XunitFrontController(
             AppDomainSupport.Denied, testAssembly.Location, testAssembly.Location + ".config", false, null, null, null);
         var messageSink = new ConsoleTestMessageSink();
-        var options = new XunitRunnerOptions();
+        var options = new XunitRunnerOptions(parallelizeTests);
         frontController.RunAll(messageSink, options, options);
 
         messageSink.Finished.Wait();
@@ -45,6 +46,30 @@ public static class XunitConsoleRunner
                 return parent;
         }
         return "";
+    }
+
+    private static string? FindSingleRunfile(string runfilesRoot, string fileName)
+    {
+        var matches = Directory.GetFiles(runfilesRoot, fileName, SearchOption.AllDirectories);
+        if (matches.Length == 0)
+            return null;
+        if (matches.Length == 1)
+            return matches[0];
+
+        // Bazel runfiles trees commonly expose the same file under more than one path
+        // (e.g. a canonical repo-mapped path and an `external/` alias); only treat this
+        // as ambiguous if the matches actually have different contents.
+        var distinctContents = new HashSet<string>();
+        foreach (var match in matches)
+            distinctContents.Add(Convert.ToBase64String(SHA256.HashData(File.ReadAllBytes(match))));
+
+        if (distinctContents.Count > 1)
+        {
+            throw new InvalidOperationException(
+                $"ambiguous runfile lookup for '{fileName}' under '{runfilesRoot}': found {matches.Length} matches " +
+                $"with different contents ({string.Join(", ", matches)}); narrow the search or reference the file directly");
+        }
+        return matches[0];
     }
 }
 
@@ -77,7 +102,14 @@ internal sealed class ConsoleTestMessageSink : IMessageSink
 
 internal sealed class XunitRunnerOptions : ITestFrameworkExecutionOptions, ITestFrameworkDiscoveryOptions
 {
-    public int MaxConcurrency => 1;
+    public XunitRunnerOptions(bool parallelizeTests)
+    {
+        MaxConcurrency = parallelizeTests ? Environment.ProcessorCount : 1;
+        ParallelizeClassLevel = parallelizeTests;
+        ParallelizeTestLevel = parallelizeTests;
+    }
+
+    public int MaxConcurrency { get; }
     public TimeSpan ParallelizeAssemblyLevelTimeout { get; } = TimeSpan.FromSeconds(30);
     public TimeSpan ParallelizeClassLevelTimeout { get; } = TimeSpan.FromSeconds(30);
     public TimeSpan ParallelizeTestLevelTimeout { get; } = TimeSpan.FromSeconds(30);
@@ -86,8 +118,8 @@ internal sealed class XunitRunnerOptions : ITestFrameworkExecutionOptions, ITest
     public bool CollectSourceInformation { get; } = false;
     public bool EnsureTestAssemblyLoadedBeforeDiscovery { get; } = true;
     public bool ParallelizeAssemblyLevel { get; } = false;
-    public bool ParallelizeClassLevel { get; } = false;
-    public bool ParallelizeTestLevel { get; } = false;
+    public bool ParallelizeClassLevel { get; }
+    public bool ParallelizeTestLevel { get; }
     public bool ShouldFailOnNoTests { get; } = true;
     public bool ShouldRunOnRemoteMachine { get; } = false;
     public bool ShadowCopy { get; } = false;

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
-using System.Text;
 using Microsoft.Extensions.Logging;
 
 namespace ArenaXunit.Ffi;
@@ -18,17 +17,6 @@ internal delegate void ArenaLogCallback(
 
 internal static class ArenaLogTarget
 {
-    private static string PtrToStringUTF8(IntPtr ptr)
-    {
-        if (ptr == IntPtr.Zero)
-            return "";
-        int len = 0;
-        while (Marshal.ReadByte(ptr, len) != 0)
-            len++;
-        byte[] buffer = new byte[len];
-        Marshal.Copy(ptr, buffer, 0, len);
-        return Encoding.UTF8.GetString(buffer);
-    }
     private static readonly ConcurrentDictionary<ulong, LogEntry> Entries = new();
 
     public static ulong RegisterForLogger(ILogger logger)
@@ -64,12 +52,12 @@ internal static class ArenaLogTarget
             var gcHandle = GCHandle.FromIntPtr(userData);
             var context = (LogContext)gcHandle.Target!;
             var logLevel = MapLogLevel(level);
-            var message = PtrToStringUTF8(messageUtf8) ?? string.Empty;
+            var message = ArenaNativeStrings.FromUtf8Ptr(messageUtf8);
             context.Logger.Log(logLevel, 0, message, null, (s, e) => message);
         }
-        catch
+        catch (Exception ex)
         {
-         // TODO why is there an empty catch here?
+            Console.Error.WriteLine($"ArenaLogTarget: logger threw while handling a native log callback: {ex}");
         }
     }
 

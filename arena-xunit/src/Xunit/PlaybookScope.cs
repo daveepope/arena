@@ -62,7 +62,7 @@ public static class PlaybookScope
         }
         catch
         {
-            DisposeAll(active);
+            DisposeAll(active, throwOnError: false);
             ActivePlaybooks.Value = null;
             throw;
         }
@@ -73,23 +73,31 @@ public static class PlaybookScope
         var active = ActivePlaybooks.Value;
         if (active == null)
             return;
-        DisposeAll(active);
         ActivePlaybooks.Value = null;
+        DisposeAll(active, throwOnError: true);
     }
 
-    private static void DisposeAll(List<ActivePlaybook> active)
+    private static void DisposeAll(List<ActivePlaybook> active, bool throwOnError)
     {
+        List<Exception>? errors = null;
         for (var i = active.Count - 1; i >= 0; i--)
         {
             try
             {
                 active[i].Dispose();
             }
-            catch
+            catch (Exception ex)
             {
+                (errors ??= new List<Exception>()).Add(ex);
             }
         }
         active.Clear();
+
+        if (!throwOnError || errors == null)
+            return;
+        if (errors.Count == 1)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(errors[0]).Throw();
+        throw new AggregateException("one or more playbooks failed verification on teardown", errors);
     }
 
     private static IEnumerable<PlaybookAttribute> GetPlaybookAttributes(MethodInfo method, Type testClass)

@@ -86,8 +86,18 @@ public sealed class OpenArena : IDisposable
             return;
         _disposed = true;
 
+        List<Exception>? errors = null;
         foreach (var pb in _sessionPlaybooks.Values)
-            pb.Dispose();
+        {
+            try
+            {
+                pb.Dispose();
+            }
+            catch (Exception ex)
+            {
+                (errors ??= new List<Exception>()).Add(ex);
+            }
+        }
         _sessionPlaybooks.Clear();
 
         try
@@ -98,6 +108,12 @@ public sealed class OpenArena : IDisposable
         {
             ArenaLogTarget.Unregister(_logToken);
         }
+
+        if (errors == null)
+            return;
+        if (errors.Count == 1)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(errors[0]).Throw();
+        throw new AggregateException("one or more session playbooks failed verification on arena close", errors);
     }
 
     private void ThrowIfDisposed()

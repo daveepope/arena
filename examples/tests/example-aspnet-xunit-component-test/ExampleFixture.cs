@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
@@ -204,7 +203,7 @@ public sealed class ExampleFixture : ArenaCollectionFixture
 
     private static string ResolveOauthCaCertFilePath()
     {
-        var path = Path.Combine(Path.GetTempPath(), "arena-example-oauth-ca.pem");
+        var path = Path.Combine(Path.GetTempPath(), $"arena-example-oauth-ca-{Environment.ProcessId}.pem");
         File.WriteAllText(path, OauthPem.CertificatePem);
         return path;
     }
@@ -227,32 +226,43 @@ public sealed class ExampleFixture : ArenaCollectionFixture
 
     private static string ResolveSchemaScript(string filename)
     {
-        var runfilesRoot = ResolveRunfilesRoot();
-        var path = Directory.GetFiles(runfilesRoot, filename, SearchOption.AllDirectories).FirstOrDefault();
-        if (string.IsNullOrEmpty(path))
-            throw new InvalidOperationException($"{filename} not found under Bazel runfiles at '{runfilesRoot}'");
+        var path = FindSingleRunfile(filename);
         return File.ReadAllText(path);
     }
 
     private static string ResolveWebAppExecutablePath()
     {
-        const string launcherName = "example-readings-aspnet-web-app.dll.sh";
-        var runfilesRoot = ResolveRunfilesRoot();
-
-        var path = Directory.GetFiles(runfilesRoot, launcherName, SearchOption.AllDirectories).FirstOrDefault();
-        if (string.IsNullOrEmpty(path))
-            throw new InvalidOperationException($"{launcherName} not found under Bazel runfiles at '{runfilesRoot}'");
-        return path;
+        return FindSingleRunfile("example-readings-aspnet-web-app.dll.sh");
     }
 
     private static string ResolveTemporalNativeLibDir()
     {
-        const string nativeLibName = "libtemporalio_sdk_core_c_bridge.so";
-        var runfilesRoot = ResolveRunfilesRoot();
-
-        var path = Directory.GetFiles(runfilesRoot, nativeLibName, SearchOption.AllDirectories).FirstOrDefault();
-        if (string.IsNullOrEmpty(path))
-            throw new InvalidOperationException($"{nativeLibName} not found under Bazel runfiles at '{runfilesRoot}'");
+        var path = FindSingleRunfile("libtemporalio_sdk_core_c_bridge.so");
         return Path.GetDirectoryName(path)!;
+    }
+
+    private static string FindSingleRunfile(string fileName)
+    {
+        var runfilesRoot = ResolveRunfilesRoot();
+        var matches = Directory.GetFiles(runfilesRoot, fileName, SearchOption.AllDirectories);
+        if (matches.Length == 0)
+            throw new InvalidOperationException($"{fileName} not found under Bazel runfiles at '{runfilesRoot}'");
+        if (matches.Length == 1)
+            return matches[0];
+
+        // Bazel runfiles trees commonly expose the same file under more than one path
+        // (e.g. a canonical repo-mapped path and an `external/` alias); only treat this
+        // as ambiguous if the matches actually have different contents.
+        var distinctContents = new HashSet<string>();
+        foreach (var match in matches)
+            distinctContents.Add(Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(match))));
+
+        if (distinctContents.Count > 1)
+        {
+            throw new InvalidOperationException(
+                $"ambiguous runfile lookup for '{fileName}' under '{runfilesRoot}': found {matches.Length} matches " +
+                $"with different contents ({string.Join(", ", matches)}); narrow the search or reference the file directly");
+        }
+        return matches[0];
     }
 }

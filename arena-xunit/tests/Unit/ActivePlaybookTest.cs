@@ -8,28 +8,6 @@ namespace ArenaXunit.UnitTest;
 public class ActivePlaybookTest
 {
     [Fact]
-    public void VerifyAtLeast_OnMssqlPlaybook_ThrowsInvalidOperationException()
-    {
-        using var playbook = new ActiveMssqlPlaybook(IntPtr.Zero);
-        var ex = Assert.Throws<InvalidOperationException>(() => { playbook.VerifyAtLeast("/x", 1); });
-        Assert.Contains("only supported on HTTP playbooks", ex.Message);
-    }
-
-    [Fact]
-    public void VerifyAtLeast_OnLocalstackPlaybook_ThrowsInvalidOperationException()
-    {
-        using var playbook = new ActiveLocalstackPlaybook(IntPtr.Zero);
-        Assert.Throws<InvalidOperationException>(() => { playbook.VerifyAtLeast("/x", 1); });
-    }
-
-    [Fact]
-    public void VerifyAtLeast_OnHttpPlaybook_DoesNotThrowInvalidOperationException()
-    {
-        using var playbook = new ActiveHttpPlaybook(IntPtr.Zero);
-        Assert.Throws<ArenaBindingError>(() => { playbook.VerifyAtLeast("/x", 1); });
-    }
-
-    [Fact]
     public void Dispose_CalledMultipleTimes_DoesNotThrow()
     {
         var playbook = new ActiveLocalstackPlaybook(IntPtr.Zero);

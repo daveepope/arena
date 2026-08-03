@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 using ArenaXunit.Ffi;
 
 namespace ArenaXunit.Playbook;
@@ -21,18 +20,20 @@ public class ActivePlaybook : IDisposable
         if (_disposed)
             return;
         _disposed = true;
-        _safeHandle.Dispose();
-    }
 
-    public Task VerifyAtLeast(string path, int minCount)
-    {
-        var http = this as ActiveHttpPlaybook;
-        if (http == null)
+        if (_safeHandle.IsInvalid)
         {
-            throw new InvalidOperationException("VerifyAtLeast is only supported on HTTP playbooks");
+            _safeHandle.SetHandleAsInvalid();
+            return;
         }
-        http.VerifyAtLeast("POST", path, minCount);
-        return Task.CompletedTask;
-    }
 
+        try
+        {
+            ArenaBindings.ActivePlaybookDrop(_handle);
+        }
+        finally
+        {
+            _safeHandle.SetHandleAsInvalid();
+        }
+    }
 }
