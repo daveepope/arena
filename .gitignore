@@ -18,3 +18,4 @@ venv/
 /bazel-arena
 /bazel-*
 /.bazelrc.user
+/arena-junit/prebuilt/
