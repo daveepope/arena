@@ -1,6 +1,6 @@
 module(
     name = "arena",
-    version = "3.5.6",
+    version = "3.5.7",
 )
 
 arena_version_ext = use_extension("//tools:arena_version.bzl", "arena_version")

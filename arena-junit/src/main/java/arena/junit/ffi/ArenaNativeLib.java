@@ -47,10 +47,10 @@ final class ArenaNativeHolder {
 
   static {
     String path = ArenaPaths.resolveArenaSharedLibrary();
-    if (path == null || path.isEmpty()) {
-      LIB = null;
-    } else {
+    if (path != null && !path.isEmpty()) {
       LIB = Native.load(path, ArenaNativeLib.class);
+    } else {
+      LIB = ArenaPaths.loadFromClasspath(ArenaNativeLib.class);
     }
   }
 

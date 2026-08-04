@@ -68,6 +68,7 @@ def csharp_nuget_package(
         dependencies = "",
         allow_prerelease = False,
         readme = None,
+        native_libs = [],
         tags = None,
         visibility = None):
     """Builds `name.nupkg` from `dll` (a `csharp_library`) and `nuspec_template`.
@@ -162,7 +163,7 @@ def csharp_nuget_package(
     lib_files_name = name + "_lib_files"
     pkg_files(
         name = lib_files_name,
-        srcs = [dll],
+        srcs = [dll] + native_libs,
         strip_prefix = strip_prefix.files_only(),
         prefix = "lib/" + target_framework,
         tags = tags,
