@@ -11,13 +11,19 @@
 [![Supply Chain Protection](https://img.shields.io/github/actions/workflow/status/daveepope/arena/build-test-publish-arena.yml?branch=master&label=Supply%20Chain%20Protection%20(%3C3d))](https://github.com/daveepope/arena/actions/workflows/build-test-publish-arena.yml)
 [![Best Effort Default Container CVE Search](https://github.com/daveepope/arena/actions/workflows/container-cves.yml/badge.svg?branch=master)](https://github.com/daveepope/arena/actions/workflows/container-cves.yml)
 
-Arena is a cross-platform sandboxing framework. It manages the lifecycle of a set of dependencies (databases, brokers, HTTP services) and components (your applications) as a single sandbox you can open, interact with, and close — giving you repeatable, deterministic, multi-service environments with a fast feedback loop. Arena provides top-level clients for Python, Java, Go, and .NET (the Python client `arena-pytest` ships today; Java, Go, and .NET clients are planned). Component testing is one common use case, but Arena is equally at home as a local development sandbox, a scripted scenario driver, or anywhere else you need a reproducible multi-service environment.
+Client packages (all built from the same release, so their versions always match):
+
+[![PyPI](https://img.shields.io/pypi/v/arena-pytest.svg?label=PyPI)](https://pypi.org/project/arena-pytest/)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.stationdevx/arena-junit.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.stationdevx/arena-junit)
+[![NuGet](https://img.shields.io/nuget/v/ArenaDotnet.Xunit.svg?label=NuGet)](https://www.nuget.org/packages/ArenaDotnet.Xunit)
+
+Arena is a cross-platform sandboxing framework. It manages the lifecycle of a set of dependencies (databases, brokers, HTTP services) and components (your applications) as a single sandbox you can open, interact with, and close — giving you repeatable, deterministic, multi-service environments with a fast feedback loop. Arena provides top-level clients for Python, Java, Go, and .NET (the Python client `arena-pytest`, Java client `arena-junit`, and .NET client `arena-xunit` all ship today; a Go client is planned). Component testing is one common use case, but Arena is equally at home as a local development sandbox, a scripted scenario driver, or anywhere else you need a reproducible multi-service environment.
 
 ## Overview
 
 Arena models a sandbox using the concept of matches to manage the lifecycle of a set of dependencies and components (your applications).
 
-The core framework is implemented in Rust. Clients call the core framework library through a C FFI layer which is completly hidden from application developers. The Python client (arena-pytest) is available; Java, Go, and .NET clients are planned.
+The core framework is implemented in Rust. Clients call the core framework library through a C FFI layer which is completly hidden from application developers. The Python client (arena-pytest), Java client (arena-junit), and .NET client (arena-xunit) are available; a Go client is planned.
 
 ## Performance
 
@@ -99,6 +105,8 @@ You can also use `with_source_path` / `with_build_tool` on the builder so Arena 
 
 ### Python (arena-pytest)
 
+Published on PyPI: [arena-pytest](https://pypi.org/project/arena-pytest/)
+
 ```python
 from arena_pytest import (
     ClosedArena,
@@ -152,6 +160,8 @@ await open_arena.close()
 As in Rust, you can point at source plus `with_build_tool(...)` instead of a prebuilt path when you want Arena to compile the component first.
 
 ### Java (arena-junit)
+
+Published on Maven Central: [io.github.stationdevx:arena-junit](https://central.sonatype.com/artifact/io.github.stationdevx/arena-junit)
 
 `arena-junit` is a JUnit 5 extension. You point it at the jar your build already produces, so a test runs against the same artifact you ship rather than a separate in-process test context.
 
@@ -250,6 +260,8 @@ final class ReadingsComponentTest {
 Use this when you want full control over when the sandbox opens and closes, for example sharing one arena across several test classes yourself instead of letting `@Arena` manage it.
 
 ### .NET (arena-xunit)
+
+Published on NuGet: [ArenaDotnet.Xunit](https://www.nuget.org/packages/ArenaDotnet.Xunit)
 
 `arena-xunit` is an xUnit v2 extension targeting `netstandard2.0`, so it works from both .NET Framework and modern .NET test projects. You point it at the executable your build already produces, so a test runs against the same artifact you ship rather than a separate in-process test context.
 
