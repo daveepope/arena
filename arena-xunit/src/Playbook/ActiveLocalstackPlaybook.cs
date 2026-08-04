@@ -1,6 +1,6 @@
 using System;
 
-namespace ArenaXunit.Playbook;
+namespace ArenaDotnet.Xunit.Playbook;
 
 public sealed class ActiveLocalstackPlaybook : ActivePlaybook
 {

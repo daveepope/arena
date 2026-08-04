@@ -2,7 +2,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 
-namespace ArenaXunit.Support;
+namespace ArenaDotnet.Xunit.Support;
 
 internal static class ArenaJson
 {

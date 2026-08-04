@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace ArenaXunit.Component;
+namespace ArenaDotnet.Xunit.Component;
 
 public sealed class BuildTool
 {

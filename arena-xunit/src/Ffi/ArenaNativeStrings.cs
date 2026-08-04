@@ -2,7 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace ArenaXunit.Ffi;
+namespace ArenaDotnet.Xunit.Ffi;
 
 internal static class ArenaNativeStrings
 {

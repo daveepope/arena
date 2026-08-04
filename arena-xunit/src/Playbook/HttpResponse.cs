@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace ArenaXunit.Playbook;
+namespace ArenaDotnet.Xunit.Playbook;
 
 public static class HttpResponse
 {

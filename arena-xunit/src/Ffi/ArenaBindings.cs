@@ -1,6 +1,6 @@
 using System;
 
-namespace ArenaXunit.Ffi;
+namespace ArenaDotnet.Xunit.Ffi;
 
 internal static class ArenaBindings
 {

@@ -5,10 +5,10 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <RootNamespace>ArenaXunit</RootNamespace>
-    <AssemblyName>ArenaXunit</AssemblyName>
+    <RootNamespace>ArenaDotnet.Xunit</RootNamespace>
+    <AssemblyName>ArenaDotnet.Xunit</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <PackageId>Arena.Xunit</PackageId>
+    <PackageId>ArenaDotnet.Xunit</PackageId>
     <Authors>David Pope</Authors>
     <Description>xUnit integration for Arena</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

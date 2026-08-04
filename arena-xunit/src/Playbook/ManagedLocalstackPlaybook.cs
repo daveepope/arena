@@ -1,6 +1,6 @@
 using System;
 
-namespace ArenaXunit.Playbook;
+namespace ArenaDotnet.Xunit.Playbook;
 
 public abstract class ManagedLocalstackPlaybook : ManagedPlaybook
 {

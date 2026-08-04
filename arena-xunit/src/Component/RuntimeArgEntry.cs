@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace ArenaXunit.Component;
+namespace ArenaDotnet.Xunit.Component;
 
 internal sealed class RuntimeArgEntry
 {

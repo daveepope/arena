@@ -7,5 +7,5 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 [assembly: AssemblyConfiguration("Release")]
-[assembly: InternalsVisibleTo("ArenaXunit.UnitTest")]
+[assembly: InternalsVisibleTo("ArenaDotnet.Xunit.UnitTest")]
 [assembly: InternalsVisibleTo("arena_xunit_unit_test_bin")]

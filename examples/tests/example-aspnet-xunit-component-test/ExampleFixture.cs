@@ -5,10 +5,10 @@ using System.Net.Http;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using ArenaExamples.Test.Shared;
-using ArenaXunit;
-using ArenaXunit.Component;
-using ArenaXunit.Dep;
-using ArenaXunit.Ffi;
+using ArenaDotnet.Xunit;
+using ArenaDotnet.Xunit.Component;
+using ArenaDotnet.Xunit.Dep;
+using ArenaDotnet.Xunit.Ffi;
 using Microsoft.Extensions.Logging;
 
 namespace ArenaExamples.ComponentTest;

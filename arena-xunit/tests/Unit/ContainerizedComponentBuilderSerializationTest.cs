@@ -1,8 +1,8 @@
-using ArenaXunit.Component;
+using ArenaDotnet.Xunit.Component;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-namespace ArenaXunit.UnitTest;
+namespace ArenaDotnet.Xunit.UnitTest;
 
 public class ContainerizedComponentBuilderSerializationTest
 {

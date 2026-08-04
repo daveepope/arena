@@ -1,7 +1,7 @@
 using System;
-using ArenaXunit.Ffi;
+using ArenaDotnet.Xunit.Ffi;
 
-namespace ArenaXunit.Playbook;
+namespace ArenaDotnet.Xunit.Playbook;
 
 public class ActivePlaybook : IDisposable
 {

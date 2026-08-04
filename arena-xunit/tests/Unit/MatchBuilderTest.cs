@@ -1,11 +1,11 @@
 using System.Linq;
-using ArenaXunit.Component;
-using ArenaXunit.Dep;
-using ArenaXunit.Playbook;
+using ArenaDotnet.Xunit.Component;
+using ArenaDotnet.Xunit.Dep;
+using ArenaDotnet.Xunit.Playbook;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-namespace ArenaXunit.UnitTest;
+namespace ArenaDotnet.Xunit.UnitTest;
 
 public class MatchBuilderTest
 {

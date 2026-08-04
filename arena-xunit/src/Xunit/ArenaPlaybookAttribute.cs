@@ -1,6 +1,6 @@
 using System;
 
-namespace ArenaXunit;
+namespace ArenaDotnet.Xunit;
 
 [AttributeUsage(AttributeTargets.Field, Inherited = false)]
 public sealed class ArenaPlaybookAttribute : Attribute

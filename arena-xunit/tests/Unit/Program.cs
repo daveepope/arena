@@ -1,7 +1,7 @@
 using System.Reflection;
 using ArenaTools.DotnetXunitRunner;
 
-namespace ArenaXunit.UnitTest;
+namespace ArenaDotnet.Xunit.UnitTest;
 
 public class Program
 {

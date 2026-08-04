@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
-using ArenaXunit.Playbook;
+using ArenaDotnet.Xunit.Playbook;
 
-namespace ArenaXunit.Xunit;
+namespace ArenaDotnet.Xunit.Xunit;
 
 public static class PlaybookScope
 {

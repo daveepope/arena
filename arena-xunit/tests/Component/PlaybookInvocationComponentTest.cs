@@ -3,15 +3,15 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using ArenaXunit;
-using ArenaXunit.Dep;
-using ArenaXunit.Playbook;
-using ArenaXunit.Xunit;
+using ArenaDotnet.Xunit;
+using ArenaDotnet.Xunit.Dep;
+using ArenaDotnet.Xunit.Playbook;
+using ArenaDotnet.Xunit.Xunit;
 using Xunit;
 
 [assembly: PlaybookExecutionAttribute]
 
-namespace ArenaXunit.ComponentTest;
+namespace ArenaDotnet.Xunit.ComponentTest;
 
 public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationComponentTest.Fixture>
 {
@@ -142,7 +142,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
     [Playbook(typeof(VerifyPlaybook))]
     public void VerifyAtLeast_WithoutTraffic_Throws()
     {
-        Assert.Throws<ArenaXunit.Ffi.ArenaBindingError>(
+        Assert.Throws<ArenaDotnet.Xunit.Ffi.ArenaBindingError>(
             () => PlaybookScope.GetActive<ActiveHttpPlaybook>().VerifyAtLeast("POST", "/api/v1/validate", 1));
     }
 
@@ -150,7 +150,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
     [Playbook(typeof(VerifyPlaybook))]
     public void Verify_Failure_DoesNotThrowDuringScopeTeardown()
     {
-        Assert.Throws<ArenaXunit.Ffi.ArenaBindingError>(
+        Assert.Throws<ArenaDotnet.Xunit.Ffi.ArenaBindingError>(
             () => PlaybookScope.GetActive<ActiveHttpPlaybook>().Verify("POST", "/api/v1/validate", 1));
     }
 
@@ -160,7 +160,7 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
         var pb = Arena.GetPlaybook(typeof(UnmetExpectationPlaybook));
         Assert.NotNull(pb);
         var active = pb!.Run(Arena);
-        Assert.Throws<ArenaXunit.Ffi.ArenaBindingError>(() => active.Dispose());
+        Assert.Throws<ArenaDotnet.Xunit.Ffi.ArenaBindingError>(() => active.Dispose());
     }
 
     private static async Task<HttpResponseMessage> PostValidateAsync()

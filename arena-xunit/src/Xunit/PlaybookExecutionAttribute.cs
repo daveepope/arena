@@ -2,7 +2,7 @@ using System;
 using System.Reflection;
 using Xunit.Sdk;
 
-namespace ArenaXunit.Xunit;
+namespace ArenaDotnet.Xunit.Xunit;
 
 [AttributeUsage(AttributeTargets.Assembly)]
 public sealed class PlaybookExecutionAttribute : BeforeAfterTestAttribute

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace ArenaXunit;
+namespace ArenaDotnet.Xunit;
 
 public sealed class MatchBuilder
 {

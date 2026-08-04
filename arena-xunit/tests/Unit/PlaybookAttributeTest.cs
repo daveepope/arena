@@ -1,7 +1,7 @@
 using System;
 using Xunit;
 
-namespace ArenaXunit.UnitTest;
+namespace ArenaDotnet.Xunit.UnitTest;
 
 public class PlaybookAttributeTest
 {

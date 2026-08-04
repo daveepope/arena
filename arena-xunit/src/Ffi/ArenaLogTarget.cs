@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 
-namespace ArenaXunit.Ffi;
+namespace ArenaDotnet.Xunit.Ffi;
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate void ArenaLogCallback(

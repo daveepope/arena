@@ -1,8 +1,8 @@
-using ArenaXunit.Dep;
+using ArenaDotnet.Xunit.Dep;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-namespace ArenaXunit.UnitTest;
+namespace ArenaDotnet.Xunit.UnitTest;
 
 public class TemporalDependencyBuilderSerializationTest
 {

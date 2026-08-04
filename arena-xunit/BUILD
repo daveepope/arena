@@ -10,7 +10,7 @@ load(
 
 _ARENA_XUNIT_SRCS = glob(["src/**/*.cs"])
 
-_ARENA_XUNIT_NUGET_ID = "Arena.Xunit"
+_ARENA_XUNIT_NUGET_ID = "ArenaDotnet.Xunit"
 
 # Sourced from pinned_dependency_versions.bzl, the same constants MODULE.bazel's
 # nuget_archive pins use, so this can't drift from what arena_xunit_lib is
@@ -104,7 +104,7 @@ import_library(
 csharp_library(
     name = "arena_xunit_lib",
     srcs = _ARENA_XUNIT_SRCS,
-    out = "ArenaXunit",
+    out = "ArenaDotnet.Xunit",
     target_frameworks = ["netstandard2.0"],
     visibility = ["//visibility:public"],
     compiler_options = ["/langversion:latest", "/debug:pdbonly"],
@@ -126,6 +126,7 @@ csharp_nuget_package(
     dll = ":arena_xunit_lib",
     target_framework = "netstandard2.0",
     dependencies = _ARENA_XUNIT_NUGET_DEPENDENCIES,
+    readme = "README.md",
     tags = ["manual"],
     visibility = ["//visibility:public"],
 )
@@ -139,6 +140,7 @@ csharp_nuget_package(
     target_framework = "netstandard2.0",
     dependencies = _ARENA_XUNIT_NUGET_DEPENDENCIES,
     allow_prerelease = True,
+    readme = "README.md",
     tags = ["manual"],
     visibility = ["//visibility:public"],
 )
@@ -159,7 +161,7 @@ dotnet_coverage_test(
     name = "arena_xunit_unit_test",
     size = "small",
     target_frameworks = ["net8.0"],
-    instrument_files = ["**/ArenaXunit.dll"],
+    instrument_files = ["**/ArenaDotnet.Xunit.dll"],
     srcs = glob(["tests/Unit/**/*.cs"]),
     data = ["//arena-ffi:arena_ffi_shared", ":xunit_core_netstandard"],
     deps = [

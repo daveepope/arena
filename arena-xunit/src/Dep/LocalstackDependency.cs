@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using ArenaXunit.Support;
+using ArenaDotnet.Xunit.Support;
 using Newtonsoft.Json;
 
-namespace ArenaXunit.Dep;
+namespace ArenaDotnet.Xunit.Dep;
 
 public sealed class QueueSpec
 {

@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using ArenaXunit.Ffi;
-using ArenaXunit.Playbook;
-using ArenaXunit.Support;
+using ArenaDotnet.Xunit.Ffi;
+using ArenaDotnet.Xunit.Playbook;
+using ArenaDotnet.Xunit.Support;
 using Microsoft.Extensions.Logging;
 
-namespace ArenaXunit;
+namespace ArenaDotnet.Xunit;
 
 public sealed class ClosedArena
 {

@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 
-namespace ArenaXunit.Support;
+namespace ArenaDotnet.Xunit.Support;
 
 public static class ArenaIdentifiers
 {

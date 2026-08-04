@@ -1,8 +1,8 @@
 using System;
-using ArenaXunit.Ffi;
+using ArenaDotnet.Xunit.Ffi;
 using Xunit;
 
-namespace ArenaXunit.UnitTest;
+namespace ArenaDotnet.Xunit.UnitTest;
 
 public class ArenaLifecycleTest : IClassFixture<ArenaLifecycleTest.Fixture>
 {

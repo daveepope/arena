@@ -67,6 +67,7 @@ def csharp_nuget_package(
         target_framework,
         dependencies = "",
         allow_prerelease = False,
+        readme = None,
         tags = None,
         visibility = None):
     """Builds `name.nupkg` from `dll` (a `csharp_library`) and `nuspec_template`.
@@ -93,6 +94,10 @@ def csharp_nuget_package(
         allow_prerelease: whether this target may receive the
             `arena_xunit_prerelease` `--define`; set true only for
             snapshot/prerelease targets.
+        readme: optional file to package at the `.nupkg` root; if set, the
+            `nuspec_template` must reference it by the same basename via a
+            `<readme>` element, since NuGet validates that the referenced
+            file actually exists in the package.
         tags: passed through to all generated targets.
         visibility: applied to the `name.nupkg` output target.
     """
@@ -163,13 +168,25 @@ def csharp_nuget_package(
         tags = tags,
     )
 
+    zip_srcs = [
+        ":" + opc_files_name,
+        ":" + nuspec_files_name,
+        ":" + lib_files_name,
+    ]
+
+    if readme:
+        readme_files_name = name + "_readme_files"
+        pkg_files(
+            name = readme_files_name,
+            srcs = [readme],
+            strip_prefix = strip_prefix.files_only(),
+            tags = tags,
+        )
+        zip_srcs.append(":" + readme_files_name)
+
     pkg_zip(
         name = name,
-        srcs = [
-            ":" + opc_files_name,
-            ":" + nuspec_files_name,
-            ":" + lib_files_name,
-        ],
+        srcs = zip_srcs,
         out = name + ".nupkg",
         tags = tags,
         visibility = visibility,
