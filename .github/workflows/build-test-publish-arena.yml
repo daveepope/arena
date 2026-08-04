@@ -629,7 +629,7 @@ jobs:
       - name: Build wheel
         run: |
           rm -f bazel-bin/arena-pytest/arena_pytest-*.whl
-          bazel build //arena-pytest:arena_pytest_wheel --config=ci
+          bazel build //arena-pytest:arena_pytest_wheel --config=ci --config=release
           rm -f bazel-bin/arena-pytest/arena_pytest-*-py3-none-any.whl || true
           ls -la bazel-bin/arena-pytest/*.whl
 
@@ -638,6 +638,20 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: bazel-bin/arena-pytest/*.whl
+          if-no-files-found: error
+
+      - name: Stage arena_ffi_shared for release bundling
+        if: matrix.runner == 'macos-latest'
+        run: |
+          mkdir -p staged-arena-ffi
+          cp bazel-bin/arena-ffi/libarena_ffi.dylib staged-arena-ffi/libarena_ffi_shared.dylib
+
+      - name: Upload arena_ffi_shared artifact
+        if: matrix.runner == 'macos-latest'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: arena-ffi-darwin-aarch64
+          path: staged-arena-ffi/libarena_ffi_shared.dylib
           if-no-files-found: error
 
   publish_testpypi:
@@ -702,11 +716,11 @@ jobs:
     needs:
       - changes
       - publish_gate
-      - build_arena_ffi_shared
+      - wheel
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
-      needs.build_arena_ffi_shared.result == 'success' &&
+      needs.wheel.result == 'success' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
@@ -742,12 +756,6 @@ jobs:
           name: arena-ffi-darwin-aarch64
           path: arena-junit/prebuilt/src/main/resources/darwin-aarch64
 
-      - name: Download arena_ffi_shared (macOS Intel)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: arena-ffi-darwin-x86-64
-          path: arena-junit/prebuilt/src/main/resources/darwin-x86-64
-
       - name: Publish snapshot to Maven Central
         env:
           MAVEN_REPO: https://central.sonatype.com/repository/maven-snapshots/
@@ -755,85 +763,16 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
         run: bazel run //arena-junit:arena_junit_maven_snapshot.publish --config=ci --config=release
 
-  build_arena_ffi_shared:
-    name: Build arena_ffi_shared (${{ matrix.runner }})
-    needs: [changes, publish_gate]
-    if: >-
-      always() && !cancelled() &&
-      needs.publish_gate.result == 'success' &&
-      (
-        (
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository
-        ) ||
-        (
-          github.event_name == 'push' &&
-          github.ref == 'refs/heads/master' &&
-          needs.changes.outputs.version_changed == 'true'
-        )
-      )
-    runs-on: ${{ matrix.runner }}
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-latest
-            artifact: arena-ffi-darwin-aarch64
-            disk-cache: build-test-publish-arena-macos-arm64
-          - runner: macos-15-intel
-            artifact: arena-ffi-darwin-x86-64
-            disk-cache: build-test-publish-arena-macos-intel
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
-          fetch-depth: 0
-
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
-        with:
-          bazelisk-cache: true
-          disk-cache: ${{ matrix.disk-cache }}
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
-
-      - name: Build arena_ffi_shared
-        run: bazel build //arena-ffi:arena_ffi_shared --config=ci --config=release
-
-      - name: Stage arena_ffi_shared for release bundling
-        run: |
-          mkdir -p staged-arena-ffi
-          cp bazel-bin/arena-ffi/libarena_ffi.dylib staged-arena-ffi/libarena_ffi_shared.dylib
-
-      - name: Upload arena_ffi_shared artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: ${{ matrix.artifact }}
-          path: staged-arena-ffi/libarena_ffi_shared.dylib
-          if-no-files-found: error
-
   publish_maven_central:
     name: Publish Maven Central (Ubuntu 24.04)
     needs:
       - changes
       - publish_gate
-      - build_arena_ffi_shared
+      - wheel
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
-      needs.build_arena_ffi_shared.result == 'success' &&
+      needs.wheel.result == 'success' &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/master' &&
       needs.changes.outputs.version_changed == 'true'
@@ -870,12 +809,6 @@ jobs:
           name: arena-ffi-darwin-aarch64
           path: arena-junit/prebuilt/src/main/resources/darwin-aarch64
 
-      - name: Download arena_ffi_shared (macOS Intel)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: arena-ffi-darwin-x86-64
-          path: arena-junit/prebuilt/src/main/resources/darwin-x86-64
-
       - name: Build release artifacts
         run: |
           bazel build //arena-junit:arena_junit_maven //arena-junit:arena_junit_maven-lib \
@@ -902,10 +835,11 @@ jobs:
 
   publish_nuget_snapshot:
     name: Publish NuGet snapshot (Ubuntu 24.04)
-    needs: [changes, publish_gate]
+    needs: [changes, publish_gate, wheel]
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
+      needs.wheel.result == 'success' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
@@ -936,6 +870,12 @@ jobs:
             echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
+      - name: Download arena_ffi_shared (macOS ARM64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-darwin-aarch64
+          path: arena-xunit/prebuilt/darwin-aarch64
+
       - name: NuGet login (OIDC trusted publishing)
         id: nuget_login
         uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841
@@ -949,26 +889,19 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          bazel run --config=ci --define=arena_xunit_prerelease=pr${PR_NUMBER}-${PR_SHA:0:7} \
+          bazel run --config=ci --config=release --define=arena_xunit_prerelease=pr${PR_NUMBER}-${PR_SHA:0:7} \
             //arena-xunit:arena_xunit_nuget_snapshot_push
 
   publish_nuget:
     name: Publish NuGet (Ubuntu 24.04)
-    needs: [changes, publish_gate]
+    needs: [changes, publish_gate, wheel]
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
-      (
-        (
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository
-        ) ||
-        (
-          github.event_name == 'push' &&
-          github.ref == 'refs/heads/master' &&
-          needs.changes.outputs.version_changed == 'true'
-        )
-      )
+      needs.wheel.result == 'success' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/master' &&
+      needs.changes.outputs.version_changed == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -997,6 +930,12 @@ jobs:
             echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
+      - name: Download arena_ffi_shared (macOS ARM64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-darwin-aarch64
+          path: arena-xunit/prebuilt/darwin-aarch64
+
       - name: NuGet login (OIDC trusted publishing)
         id: nuget_login
         uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841
@@ -1007,4 +946,4 @@ jobs:
         env:
           NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
           NUGET_SOURCE: https://api.nuget.org/v3/index.json
-        run: bazel run --config=ci //arena-xunit:arena_xunit_nuget_push
+        run: bazel run --config=ci --config=release //arena-xunit:arena_xunit_nuget_push
