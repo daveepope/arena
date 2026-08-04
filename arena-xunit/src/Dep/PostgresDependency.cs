@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using ArenaXunit.Support;
+using ArenaDotnet.Xunit.Support;
 
-namespace ArenaXunit.Dep;
+namespace ArenaDotnet.Xunit.Dep;
 
 public sealed class PostgresDependency : IArenaMatchPiece
 {

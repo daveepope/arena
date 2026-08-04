@@ -1,7 +1,7 @@
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-namespace ArenaXunit.UnitTest;
+namespace ArenaDotnet.Xunit.UnitTest;
 
 public class HttpPlaybookBuilderPutDeleteTest
 {

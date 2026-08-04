@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
-using ArenaXunit.Support;
+using ArenaDotnet.Xunit.Support;
 using Newtonsoft.Json;
 
-namespace ArenaXunit.Component;
+namespace ArenaDotnet.Xunit.Component;
 
 public sealed class ExecutableComponent : IArenaMatchPiece
 {

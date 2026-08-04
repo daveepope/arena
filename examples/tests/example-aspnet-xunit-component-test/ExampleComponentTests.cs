@@ -1,9 +1,9 @@
 using System.Net;
 using System.Threading.Tasks;
 using ArenaExamples.Test.Shared;
-using ArenaXunit;
-using ArenaXunit.Playbook;
-using ArenaXunit.Xunit;
+using ArenaDotnet.Xunit;
+using ArenaDotnet.Xunit.Playbook;
+using ArenaDotnet.Xunit.Xunit;
 using Xunit;
 
 [assembly: PlaybookExecutionAttribute]

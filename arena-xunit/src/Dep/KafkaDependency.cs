@@ -1,6 +1,6 @@
-using ArenaXunit.Support;
+using ArenaDotnet.Xunit.Support;
 
-namespace ArenaXunit.Dep;
+namespace ArenaDotnet.Xunit.Dep;
 
 public enum KafkaFlavor
 {

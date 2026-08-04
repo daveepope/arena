@@ -1,7 +1,7 @@
 using System;
-using ArenaXunit.Ffi;
+using ArenaDotnet.Xunit.Ffi;
 
-namespace ArenaXunit;
+namespace ArenaDotnet.Xunit;
 
 [AttributeUsage(AttributeTargets.Field, Inherited = false)]
 public sealed class ArenaLoggerAttribute : Attribute

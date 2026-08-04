@@ -1,12 +1,12 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
-using ArenaXunit;
-using ArenaXunit.Dep;
-using ArenaXunit.Xunit;
+using ArenaDotnet.Xunit;
+using ArenaDotnet.Xunit.Dep;
+using ArenaDotnet.Xunit.Xunit;
 using Xunit;
 
-namespace ArenaXunit.ComponentTest;
+namespace ArenaDotnet.Xunit.ComponentTest;
 
 public static class TestRuntime
 {

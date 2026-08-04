@@ -1,6 +1,6 @@
 using Newtonsoft.Json.Linq;
 
-namespace ArenaXunit.Ffi;
+namespace ArenaDotnet.Xunit.Ffi;
 
 public sealed class OauthLoopbackTlsPemPair
 {

@@ -1,9 +1,9 @@
 using System;
-using ArenaXunit.Ffi;
-using ArenaXunit.Playbook;
+using ArenaDotnet.Xunit.Ffi;
+using ArenaDotnet.Xunit.Playbook;
 using Xunit;
 
-namespace ArenaXunit.UnitTest;
+namespace ArenaDotnet.Xunit.UnitTest;
 
 public class ActivePlaybookTest
 {

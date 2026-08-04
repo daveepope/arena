@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace ArenaXunit.Playbook;
+namespace ArenaDotnet.Xunit.Playbook;
 
 public abstract class ManagedHttpPlaybook : ManagedPlaybook
 {

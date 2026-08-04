@@ -1,9 +1,9 @@
 using System;
-using ArenaXunit.Ffi;
-using ArenaXunit.Support;
+using ArenaDotnet.Xunit.Ffi;
+using ArenaDotnet.Xunit.Support;
 using Newtonsoft.Json;
 
-namespace ArenaXunit.Playbook;
+namespace ArenaDotnet.Xunit.Playbook;
 
 public sealed class ActiveHttpPlaybook : ActivePlaybook
 {

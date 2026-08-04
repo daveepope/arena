@@ -1,7 +1,7 @@
-using ArenaXunit.Dep;
+using ArenaDotnet.Xunit.Dep;
 using Xunit;
 
-namespace ArenaXunit.UnitTest;
+namespace ArenaDotnet.Xunit.UnitTest;
 
 public class RegisteredPlaybookTest
 {

@@ -1,7 +1,7 @@
-using ArenaXunit.Playbook;
+using ArenaDotnet.Xunit.Playbook;
 using Xunit;
 
-namespace ArenaXunit.UnitTest;
+namespace ArenaDotnet.Xunit.UnitTest;
 
 public class HttpResponseTest
 {

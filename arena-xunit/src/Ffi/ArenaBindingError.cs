@@ -1,4 +1,4 @@
-namespace ArenaXunit.Ffi;
+namespace ArenaDotnet.Xunit.Ffi;
 
 public sealed class ArenaBindingError : System.Exception
 {

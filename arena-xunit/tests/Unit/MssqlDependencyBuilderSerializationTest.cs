@@ -1,11 +1,11 @@
 using System;
 using System.Linq;
-using ArenaXunit.Dep;
-using ArenaXunit.Support;
+using ArenaDotnet.Xunit.Dep;
+using ArenaDotnet.Xunit.Support;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-namespace ArenaXunit.UnitTest;
+namespace ArenaDotnet.Xunit.UnitTest;
 
 public class MssqlDependencyBuilderSerializationTest
 {

@@ -1,4 +1,4 @@
-namespace ArenaXunit.Playbook;
+namespace ArenaDotnet.Xunit.Playbook;
 
 public interface IPlaybook
 {

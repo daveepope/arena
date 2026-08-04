@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using ArenaXunit.Playbook;
+using ArenaDotnet.Xunit.Playbook;
 
 namespace ArenaExamples.Test.Shared;
 

@@ -10,6 +10,9 @@
     <projectUrl>https://github.com/daveepope/arena</projectUrl>
     <repository type="git" url="https://github.com/daveepope/arena.git" />
     <license type="expression">MIT</license>
+    <licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>
+    <copyright>Copyright © 2026 The Arena Authors: David Pope</copyright>
+    <readme>README.md</readme>
     <tags>arena xunit testing sandboxing</tags>
     <dependencies>
       <group targetFramework="netstandard2.0">

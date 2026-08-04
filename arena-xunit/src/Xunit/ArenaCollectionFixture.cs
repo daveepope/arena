@@ -3,10 +3,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
-using ArenaXunit.Ffi;
+using ArenaDotnet.Xunit.Ffi;
 using Microsoft.Extensions.Logging;
 
-namespace ArenaXunit;
+namespace ArenaDotnet.Xunit;
 
 public abstract class ArenaCollectionFixture : IDisposable
 {

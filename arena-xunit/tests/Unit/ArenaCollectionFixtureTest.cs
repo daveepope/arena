@@ -1,9 +1,9 @@
 using System;
-using ArenaXunit.Dep;
+using ArenaDotnet.Xunit.Dep;
 using Microsoft.Extensions.Logging;
 using Xunit;
 
-namespace ArenaXunit.UnitTest;
+namespace ArenaDotnet.Xunit.UnitTest;
 
 public class ArenaCollectionFixtureTest
 {

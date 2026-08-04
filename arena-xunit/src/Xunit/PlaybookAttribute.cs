@@ -1,6 +1,6 @@
 using System;
 
-namespace ArenaXunit;
+namespace ArenaDotnet.Xunit;
 
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = true, Inherited = true)]
 public class PlaybookAttribute : Attribute

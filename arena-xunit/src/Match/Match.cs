@@ -3,7 +3,7 @@ using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace ArenaXunit;
+namespace ArenaDotnet.Xunit;
 
 public sealed class Match
 {
@@ -34,7 +34,7 @@ public sealed class Match
             Components = Components.Select(c => JToken.Parse(c.ForFfi())).ToList(),
             Playbooks = Playbooks.Select(p => p.ToConfig()).ToList(),
         };
-        return ArenaXunit.Support.ArenaJson.Serialize(obj);
+        return ArenaDotnet.Xunit.Support.ArenaJson.Serialize(obj);
     }
 
     [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]

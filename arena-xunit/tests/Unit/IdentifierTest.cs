@@ -1,9 +1,9 @@
 using System;
 using System.Linq;
-using ArenaXunit.Support;
+using ArenaDotnet.Xunit.Support;
 using Xunit;
 
-namespace ArenaXunit.UnitTest;
+namespace ArenaDotnet.Xunit.UnitTest;
 
 public class IdentifierTest
 {

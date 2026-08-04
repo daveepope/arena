@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using ArenaXunit.Ffi;
-using ArenaXunit.Playbook;
+using ArenaDotnet.Xunit.Ffi;
+using ArenaDotnet.Xunit.Playbook;
 
-namespace ArenaXunit;
+namespace ArenaDotnet.Xunit;
 
 public sealed class OpenArena : IDisposable
 {

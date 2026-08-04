@@ -1,8 +1,8 @@
 using System;
-using ArenaXunit.Xunit;
+using ArenaDotnet.Xunit.Xunit;
 using Xunit;
 
-namespace ArenaXunit.UnitTest;
+namespace ArenaDotnet.Xunit.UnitTest;
 
 public class PlaybookScopeTest : IClassFixture<PlaybookScopeTest.Fixture>
 {

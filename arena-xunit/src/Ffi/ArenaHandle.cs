@@ -1,7 +1,7 @@
 using System;
 using Microsoft.Win32.SafeHandles;
 
-namespace ArenaXunit.Ffi;
+namespace ArenaDotnet.Xunit.Ffi;
 
 internal sealed class ArenaHandle : SafeHandleZeroOrMinusOneIsInvalid
 {
