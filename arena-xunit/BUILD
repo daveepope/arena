@@ -1,7 +1,24 @@
+load("@arena_version//:defs.bzl", "ARENA_VERSION")
 load("@rules_dotnet//dotnet:defs.bzl", "csharp_library", "csharp_test", "import_library")
 load("//tools/dotnet_coverage:defs.bzl", "dotnet_coverage_test")
+load("//tools/dotnet_nuget:defs.bzl", "csharp_nuget_package", "dotnet_nuget_push")
+load(
+    "//tools/dotnet_nuget:pinned_dependency_versions.bzl",
+    "MS_LOGGING_ABSTRACTIONS_VERSION",
+    "NEWTONSOFT_JSON_VERSION",
+)
 
 _ARENA_XUNIT_SRCS = glob(["src/**/*.cs"])
+
+_ARENA_XUNIT_NUGET_ID = "Arena.Xunit"
+
+# Sourced from pinned_dependency_versions.bzl, the same constants MODULE.bazel's
+# nuget_archive pins use, so this can't drift from what arena_xunit_lib is
+# actually built against.
+_ARENA_XUNIT_NUGET_DEPENDENCIES = "\n".join([
+    '<dependency id="Newtonsoft.Json" version="{}" />'.format(NEWTONSOFT_JSON_VERSION),
+    '<dependency id="Microsoft.Extensions.Logging.Abstractions" version="{}" />'.format(MS_LOGGING_ABSTRACTIONS_VERSION),
+])
 
 # Import nuget packages from MODULE.bazel nuget_archive repos
 import_library(
@@ -87,6 +104,7 @@ import_library(
 csharp_library(
     name = "arena_xunit_lib",
     srcs = _ARENA_XUNIT_SRCS,
+    out = "ArenaXunit",
     target_frameworks = ["netstandard2.0"],
     visibility = ["//visibility:public"],
     compiler_options = ["/langversion:latest", "/debug:pdbonly"],
@@ -100,11 +118,48 @@ csharp_library(
     data = ["//arena-ffi:arena_ffi_shared"],
 )
 
+csharp_nuget_package(
+    name = "arena_xunit_nuget",
+    package_id = _ARENA_XUNIT_NUGET_ID,
+    version = ARENA_VERSION,
+    nuspec_template = "nuspec_template.xml",
+    dll = ":arena_xunit_lib",
+    target_framework = "netstandard2.0",
+    dependencies = _ARENA_XUNIT_NUGET_DEPENDENCIES,
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
+csharp_nuget_package(
+    name = "arena_xunit_nuget_snapshot",
+    package_id = _ARENA_XUNIT_NUGET_ID,
+    version = ARENA_VERSION,
+    nuspec_template = "nuspec_template.xml",
+    dll = ":arena_xunit_lib",
+    target_framework = "netstandard2.0",
+    dependencies = _ARENA_XUNIT_NUGET_DEPENDENCIES,
+    allow_prerelease = True,
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
+dotnet_nuget_push(
+    name = "arena_xunit_nuget_push",
+    package = ":arena_xunit_nuget",
+    tags = ["manual"],
+)
+
+dotnet_nuget_push(
+    name = "arena_xunit_nuget_snapshot_push",
+    package = ":arena_xunit_nuget_snapshot",
+    tags = ["manual"],
+)
+
 dotnet_coverage_test(
     name = "arena_xunit_unit_test",
     size = "small",
     target_frameworks = ["net8.0"],
-    instrument_files = ["**/arena_xunit_lib.dll"],
+    instrument_files = ["**/ArenaXunit.dll"],
     srcs = glob(["tests/Unit/**/*.cs"]),
     data = ["//arena-ffi:arena_ffi_shared", ":xunit_core_netstandard"],
     deps = [
