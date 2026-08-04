@@ -699,10 +699,14 @@ jobs:
 
   publish_maven_snapshot:
     name: Publish Maven snapshot (Ubuntu 24.04)
-    needs: [changes, publish_gate]
+    needs:
+      - changes
+      - publish_gate
+      - build_arena_ffi_shared
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
+      needs.build_arena_ffi_shared.result == 'success' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
@@ -732,19 +736,104 @@ jobs:
             echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
+      - name: Download arena_ffi_shared (macOS ARM64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-darwin-aarch64
+          path: arena-junit/prebuilt/src/main/resources/darwin-aarch64
+
+      - name: Download arena_ffi_shared (macOS Intel)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-darwin-x86-64
+          path: arena-junit/prebuilt/src/main/resources/darwin-x86-64
+
       - name: Publish snapshot to Maven Central
         env:
           MAVEN_REPO: https://central.sonatype.com/repository/maven-snapshots/
           MAVEN_USER: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
-        run: bazel run //arena-junit:arena_junit_maven_snapshot.publish --config=ci
+        run: bazel run //arena-junit:arena_junit_maven_snapshot.publish --config=ci --config=release
 
-  publish_maven_central:
-    name: Publish Maven Central (Ubuntu 24.04)
+  build_arena_ffi_shared:
+    name: Build arena_ffi_shared (${{ matrix.runner }})
     needs: [changes, publish_gate]
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
+      (
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        ) ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/master' &&
+          needs.changes.outputs.version_changed == 'true'
+        )
+      )
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            artifact: arena-ffi-darwin-aarch64
+            disk-cache: build-test-publish-arena-macos-arm64
+          - runner: macos-15-intel
+            artifact: arena-ffi-darwin-x86-64
+            disk-cache: build-test-publish-arena-macos-intel
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ matrix.disk-cache }}
+          repository-cache: true
+
+      - name: Configure BuildBuddy remote cache
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
+          fi
+
+      - name: Build arena_ffi_shared
+        run: bazel build //arena-ffi:arena_ffi_shared --config=ci --config=release
+
+      - name: Stage arena_ffi_shared for release bundling
+        run: |
+          mkdir -p staged-arena-ffi
+          cp bazel-bin/arena-ffi/libarena_ffi.dylib staged-arena-ffi/libarena_ffi_shared.dylib
+
+      - name: Upload arena_ffi_shared artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ matrix.artifact }}
+          path: staged-arena-ffi/libarena_ffi_shared.dylib
+          if-no-files-found: error
+
+  publish_maven_central:
+    name: Publish Maven Central (Ubuntu 24.04)
+    needs:
+      - changes
+      - publish_gate
+      - build_arena_ffi_shared
+    if: >-
+      always() && !cancelled() &&
+      needs.publish_gate.result == 'success' &&
+      needs.build_arena_ffi_shared.result == 'success' &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/master' &&
       needs.changes.outputs.version_changed == 'true'
@@ -775,12 +864,24 @@ jobs:
             echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
+      - name: Download arena_ffi_shared (macOS ARM64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-darwin-aarch64
+          path: arena-junit/prebuilt/src/main/resources/darwin-aarch64
+
+      - name: Download arena_ffi_shared (macOS Intel)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-darwin-x86-64
+          path: arena-junit/prebuilt/src/main/resources/darwin-x86-64
+
       - name: Build release artifacts
         run: |
           bazel build //arena-junit:arena_junit_maven //arena-junit:arena_junit_maven-lib \
             //arena-junit:arena_junit_maven-docs //arena-junit:arena_junit_maven-pom \
             //arena-junit:libarena_junit_maven-lib-src.jar \
-            --config=ci
+            --config=ci --config=release
 
       - name: Import GPG key
         run: echo "$GPG_PRIVATE_KEY" | gpg --batch --import
@@ -793,7 +894,7 @@ jobs:
           CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
           CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
         run: |
-          bazel run //scripts:publish_maven_central --config=ci -- \
+          bazel run //scripts:publish_maven_central --config=ci --config=release -- \
             "$PWD/bazel-bin/arena-junit/libarena_junit_maven-lib.jar" \
             "$PWD/bazel-bin/arena-junit/arena_junit_maven-pom.xml" \
             "$PWD/bazel-bin/arena-junit/libarena_junit_maven-lib-src.jar" \
@@ -857,9 +958,17 @@ jobs:
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/master' &&
-      needs.changes.outputs.version_changed == 'true'
+      (
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        ) ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/master' &&
+          needs.changes.outputs.version_changed == 'true'
+        )
+      )
     runs-on: ubuntu-24.04
     permissions:
       contents: read

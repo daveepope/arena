@@ -5,6 +5,11 @@ load("@rules_jvm_external//:defs.bzl", "java_export")
 
 _ARENA_JUNIT_SRCS = glob(["src/main/java/**/*.java"])
 
+_ARENA_JUNIT_PREBUILT_RELEASE_NATIVE_LIBS = glob(
+    ["prebuilt/src/main/resources/**"],
+    allow_empty = True,
+)
+
 config_setting(
     name = "linux_x86_64",
     constraint_values = [
@@ -105,7 +110,7 @@ java_export(
     name = "arena_junit_maven",
     srcs = _ARENA_JUNIT_SRCS,
     javacopts = _ARENA_JUNIT_JAVACOPTS,
-    resources = [":arena_ffi_shared_for_maven"],
+    resources = [":arena_ffi_shared_for_maven"] + _ARENA_JUNIT_PREBUILT_RELEASE_NATIVE_LIBS,
     tags = ["manual"],
     maven_coordinates = _MAVEN_GROUP_ARTIFACT + ":" + ARENA_VERSION,
     pom_template = "pom_template.xml",
@@ -117,7 +122,7 @@ java_export(
     name = "arena_junit_maven_snapshot",
     srcs = _ARENA_JUNIT_SRCS,
     javacopts = _ARENA_JUNIT_JAVACOPTS,
-    resources = [":arena_ffi_shared_for_maven"],
+    resources = [":arena_ffi_shared_for_maven"] + _ARENA_JUNIT_PREBUILT_RELEASE_NATIVE_LIBS,
     tags = ["manual"],
     maven_coordinates = _MAVEN_GROUP_ARTIFACT + ":" + ARENA_VERSION + "-SNAPSHOT",
     pom_template = "pom_template.xml",

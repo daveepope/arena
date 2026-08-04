@@ -33,3 +33,6 @@ coverage --strategy=CoverageReport=local
 
 common:coverage --config=ci
 common:coverage --test_env=RUST_LOG=info
+
+common:release --compilation_mode=opt
+common:release --@rules_rust//rust/settings:extra_rustc_flag=-Cstrip=symbols
