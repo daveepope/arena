@@ -202,7 +202,7 @@
     "//tools:arena_version.bzl%arena_version": {
       "general": {
         "bzlTransitiveDigest": "DKya/O7/G21oGTUpyPEcPOtxkNd6MuOComr8gCuG21I=",
-        "usagesDigest": "Wv4GETQbn3F/Y9momb9rhvctpThtdsJsvc3hLe3J1gw=",
+        "usagesDigest": "B1WFt9vFQMV1a1HPAzFJN3X2pGAF6bNUHwL3NHcXElI=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -349,7 +349,7 @@
     "@@rules_dotnet~//dotnet:extensions.bzl%dotnet": {
       "general": {
         "bzlTransitiveDigest": "455CyqHKbuSpans6TInT87vzKVKvfKsBe2ueLAeTx+A=",
-        "usagesDigest": "qCkWdBznoEBVfQUiDJsyfgijIcd3hyjJxqscfYBBz5w=",
+        "usagesDigest": "7QwsFKnWbKq9qe16Vz2P8m3KlBbJt1hw6X4MECUsqOU=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},

@@ -1,4 +1,5 @@
 load("@arena_version//:defs.bzl", "ARENA_VERSION")
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_dotnet//dotnet:defs.bzl", "csharp_library", "csharp_test", "import_library")
 load("//tools/dotnet_coverage:defs.bzl", "dotnet_coverage_test")
 load("//tools/dotnet_nuget:defs.bzl", "csharp_nuget_package", "dotnet_nuget_push")
@@ -11,6 +12,80 @@ load(
 _ARENA_XUNIT_SRCS = glob(["src/**/*.cs"])
 
 _ARENA_XUNIT_NUGET_ID = "ArenaDotnet.Xunit"
+
+config_setting(
+    name = "linux_x86_64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "linux_aarch64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+config_setting(
+    name = "macos_aarch64",
+    constraint_values = [
+        "@platforms//os:macos",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+config_setting(
+    name = "macos_x86_64",
+    constraint_values = [
+        "@platforms//os:macos",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+copy_file(
+    name = "arena_ffi_shared_for_nuget_linux_x86_64",
+    src = "//arena-ffi:arena_ffi_shared",
+    out = "native/linux-x86-64/libarena_ffi_shared.so",
+)
+
+copy_file(
+    name = "arena_ffi_shared_for_nuget_linux_aarch64",
+    src = "//arena-ffi:arena_ffi_shared",
+    out = "native/linux-aarch64/libarena_ffi_shared.so",
+)
+
+copy_file(
+    name = "arena_ffi_shared_for_nuget_macos_x86_64",
+    src = "//arena-ffi:arena_ffi_shared",
+    out = "native/darwin-x86-64/libarena_ffi_shared.dylib",
+)
+
+copy_file(
+    name = "arena_ffi_shared_for_nuget_macos_aarch64",
+    src = "//arena-ffi:arena_ffi_shared",
+    out = "native/darwin-aarch64/libarena_ffi_shared.dylib",
+)
+
+copy_file(
+    name = "arena_ffi_shared_for_nuget_windows",
+    src = "//arena-ffi:arena_ffi_shared",
+    out = "native/win32-x86-64/arena_ffi_shared.dll",
+)
+
+alias(
+    name = "arena_ffi_shared_for_nuget",
+    actual = select({
+        ":linux_x86_64": ":arena_ffi_shared_for_nuget_linux_x86_64",
+        ":linux_aarch64": ":arena_ffi_shared_for_nuget_linux_aarch64",
+        ":macos_x86_64": ":arena_ffi_shared_for_nuget_macos_x86_64",
+        ":macos_aarch64": ":arena_ffi_shared_for_nuget_macos_aarch64",
+        "@platforms//os:windows": ":arena_ffi_shared_for_nuget_windows",
+        "//conditions:default": ":arena_ffi_shared_for_nuget_linux_x86_64",
+    }),
+)
 
 # Sourced from pinned_dependency_versions.bzl, the same constants MODULE.bazel's
 # nuget_archive pins use, so this can't drift from what arena_xunit_lib is
@@ -126,6 +201,7 @@ csharp_nuget_package(
     dll = ":arena_xunit_lib",
     target_framework = "netstandard2.0",
     dependencies = _ARENA_XUNIT_NUGET_DEPENDENCIES,
+    native_libs = [":arena_ffi_shared_for_nuget"],
     readme = "README.md",
     tags = ["manual"],
     visibility = ["//visibility:public"],
@@ -139,6 +215,7 @@ csharp_nuget_package(
     dll = ":arena_xunit_lib",
     target_framework = "netstandard2.0",
     dependencies = _ARENA_XUNIT_NUGET_DEPENDENCIES,
+    native_libs = [":arena_ffi_shared_for_nuget"],
     allow_prerelease = True,
     readme = "README.md",
     tags = ["manual"],
