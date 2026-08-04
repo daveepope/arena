@@ -846,8 +846,9 @@ jobs:
           NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
           NUGET_SOURCE: https://api.nuget.org/v3/index.json
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          bazel run --config=ci --define=arena_xunit_prerelease=pr${PR_NUMBER} \
+          bazel run --config=ci --define=arena_xunit_prerelease=pr${PR_NUMBER}-${PR_SHA:0:7} \
             //arena-xunit:arena_xunit_nuget_snapshot_push
 
   publish_nuget:
