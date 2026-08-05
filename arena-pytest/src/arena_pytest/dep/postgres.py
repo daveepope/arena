@@ -1,6 +1,13 @@
-from typing import Any, Dict, List
+from __future__ import annotations
 
+from typing import Any, Dict, List, TYPE_CHECKING
+
+from arena_pytest.ffi._ffi import match_playbook_run
+from arena_pytest.playbook import ActivePostgresPlaybook, Playbook
 from arena_pytest.support._identifier import build as _build_identifier
+
+if TYPE_CHECKING:
+    from arena_pytest.arena import OpenArena
 
 
 class PostgresDependencyBuilder:
@@ -59,3 +66,32 @@ class PostgresDependency:
 
     def _for_ffi(self) -> Dict[str, Any]:
         return self._config
+
+
+class ManagedPostgresPlaybook(Playbook):
+    def __init__(
+        self,
+        *,
+        identifier: str,
+        dependency_identifier: str,
+    ):
+        self._identifier = identifier
+        self._dependency_identifier = dependency_identifier
+
+    def identifier(self) -> str:
+        return self._identifier
+
+    @property
+    def dependency_identifier(self) -> str:
+        return self._dependency_identifier
+
+    def _for_ffi(self) -> Dict[str, Any]:
+        return {
+            "identifier": self._identifier,
+            "kind": "postgres",
+            "dependency_identifier": self._dependency_identifier,
+        }
+
+    def run(self, arena: "OpenArena") -> ActivePostgresPlaybook:
+        handle = match_playbook_run(arena._ffi, arena._handle, self._identifier)
+        return ActivePostgresPlaybook(arena._ffi, handle, self._dependency_identifier)

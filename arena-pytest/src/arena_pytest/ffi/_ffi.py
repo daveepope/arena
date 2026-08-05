@@ -500,6 +500,13 @@ def load_ffi() -> Optional[ArenaNativeLib]:
     ]
     lib.arena_mssql_playbook_verify.restype = ctypes.c_int
 
+    lib.arena_postgres_playbook_verify.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    lib.arena_postgres_playbook_verify.restype = ctypes.c_int
+
     return ArenaNativeLib(lib=lib)
 
 
@@ -654,3 +661,22 @@ def mssql_playbook_verify(
     )
     message = _take_err(err, ffi)
     _ffi_expect_ok(raw, message, "mssql_playbook_verify")
+
+
+def postgres_playbook_verify(
+    ffi: ArenaNativeLib,
+    handle: int,
+    verify_spec_json: str,
+) -> None:
+    if not handle:
+        raise ArenaBindingError(
+            "postgres_playbook_verify called without an active playbook handle"
+        )
+    err = ctypes.c_void_p()
+    raw = ffi.lib.arena_postgres_playbook_verify(
+        handle,
+        verify_spec_json.encode("utf-8"),
+        ctypes.byref(err),
+    )
+    message = _take_err(err, ffi)
+    _ffi_expect_ok(raw, message, "postgres_playbook_verify")

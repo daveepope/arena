@@ -1,12 +1,13 @@
 mod healthcheck;
 pub mod postgres_container_impl;
 
+use crate::blocking::run_blocking;
 use crate::builder::PostgresDependencyBuilder;
+use crate::playbook::Playbook;
 use crate::postgres_dependency::healthcheck::DefaultPostgresReadinessCheck;
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
-use futures::channel::oneshot;
 use postgres_container_impl::PostgresImpl;
 use std::time::{Duration, Instant};
 
@@ -26,6 +27,7 @@ pub struct PostgresDependency {
     image_tag: String,
     container_name: Option<String>,
     readiness_check: Box<dyn ReadinessCheck>,
+    managed_tables: Vec<(String, String)>,
 }
 
 impl PostgresDependency {
@@ -58,6 +60,7 @@ impl PostgresDependency {
             needs_teardown: false,
             children_started: false,
             readiness_check: Box::new(DefaultPostgresReadinessCheck),
+            managed_tables: Vec::new(),
         }
     }
 
@@ -65,8 +68,16 @@ impl PostgresDependency {
         self.postgres_impl.connection_string()
     }
 
+    pub fn managed_tables(&self) -> &[(String, String)] {
+        &self.managed_tables
+    }
+
     pub fn builder(identifier: impl Into<String>) -> PostgresDependencyBuilder {
         PostgresDependencyBuilder::new(identifier)
+    }
+
+    pub fn playbook(&self) -> Playbook {
+        Playbook::with(self)
     }
 
     pub(crate) fn set_readiness_check(&mut self, check: Box<dyn ReadinessCheck>) {
@@ -128,42 +139,10 @@ impl PostgresDependency {
             .expect("connection string should be available after postgres starts")
             .to_string();
 
-        let (tx, rx) = oneshot::channel::<Result<(), String>>();
-
-        std::thread::spawn(move || {
-            let res = std::panic::catch_unwind(|| {
-                PostgresDependency::run_startup_sql_scripts(&identifier, &conn_str, &scripts);
-            });
-
-            match res {
-                Ok(()) => {
-                    let _ = tx.send(Ok(()));
-                }
-                Err(panic_payload) => {
-                    let msg = if let Some(s) = panic_payload.downcast_ref::<String>() {
-                        s.clone()
-                    } else if let Some(s) = panic_payload.downcast_ref::<&str>() {
-                        s.to_string()
-                    } else {
-                        format!(
-                            "[PostgresDependency-{}] startup sql scripts panicked.",
-                            identifier
-                        )
-                    };
-
-                    let _ = tx.send(Err(msg));
-                }
-            }
-        });
-
-        match rx.await {
-            Ok(Ok(())) => {}
-            Ok(Err(msg)) => panic!("{msg}"),
-            Err(_canceled) => panic!(
-                "[PostgresDependency-{}] startup-scripts worker thread unexpectedly stopped.",
-                self.identifier
-            ),
-        }
+        run_blocking(move || {
+            PostgresDependency::run_startup_sql_scripts(&identifier, &conn_str, &scripts);
+        })
+        .await;
     }
 }
 

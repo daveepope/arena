@@ -45,6 +45,8 @@ internal static class ArenaNativeLib
     private delegate int arena_http_playbook_verify_fn(IntPtr handle, string specJson, out IntPtr errOut);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_mssql_playbook_verify_fn(IntPtr handle, string specJson, out IntPtr errOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate int arena_postgres_playbook_verify_fn(IntPtr handle, string specJson, out IntPtr errOut);
 
     private static arena_open_fn? _arena_open;
     private static arena_close_fn? _arena_close;
@@ -64,6 +66,7 @@ internal static class ArenaNativeLib
     private static arena_http_playbook_open_fn? _arena_http_playbook_open;
     private static arena_http_playbook_verify_fn? _arena_http_playbook_verify;
     private static arena_mssql_playbook_verify_fn? _arena_mssql_playbook_verify;
+    private static arena_postgres_playbook_verify_fn? _arena_postgres_playbook_verify;
 
     static ArenaNativeLib()
     {
@@ -115,6 +118,7 @@ internal static class ArenaNativeLib
             LoadFunction(out _arena_http_playbook_open, "arena_http_playbook_open");
             LoadFunction(out _arena_http_playbook_verify, "arena_http_playbook_verify");
             LoadFunction(out _arena_mssql_playbook_verify, "arena_mssql_playbook_verify");
+            LoadFunction(out _arena_postgres_playbook_verify, "arena_postgres_playbook_verify");
 
             _initialized = true;
         }
@@ -240,4 +244,7 @@ internal static class ArenaNativeLib
 
     internal static int arena_mssql_playbook_verify(IntPtr handle, string specJson, out IntPtr errOut) =>
         _arena_mssql_playbook_verify!.Invoke(handle, specJson, out errOut);
+
+    internal static int arena_postgres_playbook_verify(IntPtr handle, string specJson, out IntPtr errOut) =>
+        _arena_postgres_playbook_verify!.Invoke(handle, specJson, out errOut);
 }
