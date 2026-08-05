@@ -8,10 +8,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import arena.examples.testruntime.EphemeralTestRuntime;
+import arena.junit.ffi.ArenaLogLevel;
+import arena.junit.ffi.ArenaLogbackFlush;
 import arena.junit.match.ArenaMatchPiece;
 import arena.junit.oauth.OauthDependency;
 import arena.junit.oauth.OauthDependencyBuilder;
 import arena.junit.oauth.OauthLoopbackTls;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.lang.annotation.Annotation;
@@ -19,6 +24,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -119,6 +125,28 @@ final class ArenaExtensionLifecycleComponentTest {
 
     @ArenaAfterOpen
     static void second() {}
+  }
+
+  static final class DependencyLogsEnabledTopology {
+    static final String OAUTH_IDENTIFIER = "arena-extension-dependency-logs-enabled-oauth";
+
+    @ArenaDependency(logs = true)
+    static final OauthDependency oauth =
+        buildOauth(OAUTH_IDENTIFIER, EphemeralTestRuntime.ephemeralTcpPort());
+
+    @ArenaLogger(level = ArenaLogLevel.DEBUG)
+    static final Logger LOG = LoggerFactory.getLogger(DependencyLogsEnabledTopology.class);
+  }
+
+  static final class DependencyLogsDisabledTopology {
+    static final String OAUTH_IDENTIFIER = "arena-extension-dependency-logs-disabled-oauth";
+
+    @ArenaDependency
+    static final OauthDependency oauth =
+        buildOauth(OAUTH_IDENTIFIER, EphemeralTestRuntime.ephemeralTcpPort());
+
+    @ArenaLogger(level = ArenaLogLevel.DEBUG)
+    static final Logger LOG = LoggerFactory.getLogger(DependencyLogsDisabledTopology.class);
   }
 
   private static OauthDependency buildOauth(String identifier, int port) {
@@ -225,8 +253,86 @@ final class ArenaExtensionLifecycleComponentTest {
         () -> extension.supportsParameter(parameterContext, context));
   }
 
+  @Test
+  void beforeAll_dependencyLogsEnabled_forwardsDependencyTaggedDebugLog() {
+    ArenaExtension extension = new ArenaExtension();
+    ListAppender<ILoggingEvent> capture = attachCapture(DependencyLogsEnabledTopology.class);
+    try {
+      extension.beforeAll(contextFor(DependencyLogsEnabledTopology.class));
+      ArenaLogbackFlush.flushIfPresent();
+      assertTrue(
+          capture.list.stream()
+              .anyMatch(
+                  ev ->
+                      safeMessage(ev).contains(DependencyLogsEnabledTopology.OAUTH_IDENTIFIER)
+                          && safeMessage(ev).contains("starting")),
+          capture.list::toString);
+    } finally {
+      extension.afterAll(contextFor(DependencyLogsEnabledTopology.class));
+      detachCapture(DependencyLogsEnabledTopology.class, capture);
+    }
+  }
+
+  @Test
+  void beforeAll_dependencyLogsDisabled_dependencyTaggedDebugLogNotForwarded() {
+    ArenaExtension extension = new ArenaExtension();
+    ListAppender<ILoggingEvent> capture = attachCapture(DependencyLogsDisabledTopology.class);
+    try {
+      extension.beforeAll(contextFor(DependencyLogsDisabledTopology.class));
+      ArenaLogbackFlush.flushIfPresent();
+      assertTrue(
+          capture.list.stream()
+              .noneMatch(
+                  ev ->
+                      safeMessage(ev).contains(DependencyLogsDisabledTopology.OAUTH_IDENTIFIER)
+                          && safeMessage(ev).contains("starting")),
+          capture.list::toString);
+    } finally {
+      extension.afterAll(contextFor(DependencyLogsDisabledTopology.class));
+      detachCapture(DependencyLogsDisabledTopology.class, capture);
+    }
+  }
+
   private static ExtensionContext contextFor(Class<?> testClass) {
     return new MinimalExtensionContext(testClass);
+  }
+
+  private static ListAppender<ILoggingEvent> attachCapture(Class<?> loggerOwner) {
+    ListAppender<ILoggingEvent> capture = new ListAppender<>();
+    capture.setContext(backlogContext());
+    capture.setName("capture-" + loggerOwner.getSimpleName() + "-" + Objects.hash(loggerOwner));
+    capture.start();
+    backlogLogger(loggerOwner).addAppender(capture);
+    return capture;
+  }
+
+  private static void detachCapture(Class<?> loggerOwner, ListAppender<ILoggingEvent> capture) {
+    capture.stop();
+    backlogLogger(loggerOwner).detachAppender(capture);
+  }
+
+  private static ch.qos.logback.classic.Logger backlogLogger(Class<?> loggerOwner) {
+    Logger facade = LoggerFactory.getLogger(loggerOwner);
+    if (!(facade instanceof ch.qos.logback.classic.Logger)) {
+      throw new AssertionError("org.slf4j.Logger must bridge to Logback classic Logger here");
+    }
+    return (ch.qos.logback.classic.Logger) facade;
+  }
+
+  private static LoggerContext backlogContext() {
+    if (!(LoggerFactory.getILoggerFactory() instanceof LoggerContext)) {
+      throw new AssertionError("Logback LoggerContext expected on test classpath");
+    }
+    return (LoggerContext) LoggerFactory.getILoggerFactory();
+  }
+
+  private static String safeMessage(ILoggingEvent ev) {
+    String formatted = ev.getFormattedMessage();
+    if (formatted != null && !formatted.isEmpty()) {
+      return formatted;
+    }
+    String raw = ev.getMessage();
+    return raw != null ? raw : "";
   }
 
   private static ParameterContext parameterContextFor(Class<?> parameterType) {

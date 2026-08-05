@@ -18,6 +18,10 @@ pub(crate) fn init_logging() {
     shared_tracing::ensure_shared_tracing_installed();
 }
 
+pub(crate) fn dispatcher_allowlists_reset() {
+    shared_tracing::dispatcher_allowlists_reset();
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn arena_dispatcher_dependency_allow_json_set(json_utf8: *const c_char) {
     init_logging();
