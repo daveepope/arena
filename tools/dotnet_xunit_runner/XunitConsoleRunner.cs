@@ -102,24 +102,21 @@ internal sealed class ConsoleTestMessageSink : IMessageSink
 
 internal sealed class XunitRunnerOptions : ITestFrameworkExecutionOptions, ITestFrameworkDiscoveryOptions
 {
+    private const string DisableParallelizationKey = "xunit.execution.DisableParallelization";
+    private const string MaxParallelThreadsKey = "xunit.execution.MaxParallelThreads";
+
+    private readonly Dictionary<string, object?> _values = new();
+
     public XunitRunnerOptions(bool parallelizeTests)
     {
-        MaxConcurrency = parallelizeTests ? Environment.ProcessorCount : 1;
-        ParallelizeClassLevel = parallelizeTests;
-        ParallelizeTestLevel = parallelizeTests;
+        SetValue(DisableParallelizationKey, !parallelizeTests);
+        SetValue(MaxParallelThreadsKey, parallelizeTests ? Environment.ProcessorCount : 1);
     }
 
-    public int MaxConcurrency { get; }
-    public TimeSpan ParallelizeAssemblyLevelTimeout { get; } = TimeSpan.FromSeconds(30);
-    public TimeSpan ParallelizeClassLevelTimeout { get; } = TimeSpan.FromSeconds(30);
-    public TimeSpan ParallelizeTestLevelTimeout { get; } = TimeSpan.FromSeconds(30);
     public string? AssemblyFileName => null;
     public string? ConfigFileName => null;
     public bool CollectSourceInformation { get; } = false;
     public bool EnsureTestAssemblyLoadedBeforeDiscovery { get; } = true;
-    public bool ParallelizeAssemblyLevel { get; } = false;
-    public bool ParallelizeClassLevel { get; }
-    public bool ParallelizeTestLevel { get; }
     public bool ShouldFailOnNoTests { get; } = true;
     public bool ShouldRunOnRemoteMachine { get; } = false;
     public bool ShadowCopy { get; } = false;
@@ -128,6 +125,9 @@ internal sealed class XunitRunnerOptions : ITestFrameworkExecutionOptions, ITest
     public bool VerifyTestAssemblyExists { get; } = false;
     public string? DiagnosticOutputFolder => null;
     public string? DiagnosticFileName => null;
-    public TValue GetValue<TValue>(string key) => default!;
-    public void SetValue<TValue>(string key, TValue value) { }
+
+    public TValue GetValue<TValue>(string key) =>
+        _values.TryGetValue(key, out var value) ? (TValue)value! : default!;
+
+    public void SetValue<TValue>(string key, TValue value) => _values[key] = value;
 }

@@ -29,6 +29,7 @@ import arena.junit.dep.PostgresDependencyBuilder;
 import arena.junit.exec.ExecutableComponent;
 import arena.junit.exec.ExecutableComponentBuilder;
 import arena.junit.ffi.ArenaBindingError;
+import arena.junit.ffi.ArenaLogLevel;
 import arena.junit.oauth.OauthDependency;
 import arena.junit.oauth.OauthDependencyBuilder;
 import arena.junit.oauth.OauthLoopbackTls;
@@ -65,7 +66,8 @@ public final class ComponentTest {
   static final ObjectMapper MAPPER = new ObjectMapper();
   static final String CALIBRATION_VALIDATE_PATH = "/api/v1/validate";
 
-  @ArenaLogger static final Logger LOG = LoggerFactory.getLogger(ComponentTest.class);
+  @ArenaLogger(level = ArenaLogLevel.DEBUG)
+  static final Logger LOG = LoggerFactory.getLogger(ComponentTest.class);
 
   private static final EphemeralTestRuntime RT = EphemeralTestRuntime.get();
   private static final int WEB_APP_PORT = RT.execWebAppPort;
@@ -88,7 +90,7 @@ public final class ComponentTest {
 
   private static String accessToken;
 
-  @ArenaDependency
+  @ArenaDependency(logs = true)
   static final OauthDependency OAUTH =
       new OauthDependencyBuilder("example-api-oauth")
           .withPort(OAUTH_PORT)
@@ -97,7 +99,7 @@ public final class ComponentTest {
           .withMetadataBaseUrl(OAUTH_ISSUER)
           .build();
 
-  @ArenaDependency
+  @ArenaDependency(logs = true)
   static final PostgresDependency POSTGRES =
       new PostgresDependencyBuilder("example-api-postgres")
           .withImage("14.20-trixie")
@@ -108,7 +110,7 @@ public final class ComponentTest {
           .withStartupSqlScripts(readSchema("instrument_reading_db_schema.sql"))
           .build();
 
-  @ArenaDependency
+  @ArenaDependency(logs = true)
   static final KafkaDependency KAFKA =
       new KafkaDependencyBuilder("example-api-kafka")
           .withFlavor(KafkaFlavor.APACHE_NATIVE)
@@ -116,7 +118,7 @@ public final class ComponentTest {
           .withTopic(KAFKA_TOPIC)
           .build();
 
-  @ArenaDependency
+  @ArenaDependency(logs = true)
   static final MssqlDependency MSSQL =
       new MssqlDependencyBuilder("example-api-mssql")
           .withPort(MSSQL_PORT)
@@ -126,7 +128,7 @@ public final class ComponentTest {
           .withStartupSqlScripts(readSchema("validation_db_schema.sql"))
           .build();
 
-  @ArenaDependency
+  @ArenaDependency(logs = true)
   static final HttpDependency CALIBRATION =
       new HttpDependencyBuilder("example-api-calibration").withPort(CALIBRATION_HOST_PORT).build();
 
@@ -146,7 +148,8 @@ public final class ComponentTest {
   static final ResetValidationDbPlaybook RESET_VALIDATION_DB =
       new ResetValidationDbPlaybook(MSSQL.identifier());
 
-  @ArenaComponent static final ExecutableComponent WEB_APP = buildWebApp();
+  @ArenaComponent(logs = true)
+  static final ExecutableComponent WEB_APP = buildWebApp();
 
   @Test
   @Playbook(ResetValidationDbPlaybook.class)

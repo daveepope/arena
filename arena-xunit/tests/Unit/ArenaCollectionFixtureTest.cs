@@ -28,6 +28,24 @@ public class ArenaCollectionFixtureTest
         private static readonly HttpDependency? NullDependency = null;
     }
 
+    private sealed class StubMatchPiece : IArenaMatchPiece
+    {
+        public string Identifier { get; }
+        public StubMatchPiece(string identifier) => Identifier = identifier;
+        public string ForFfi() => $"{{\"identifier\":\"{Identifier}\"}}";
+    }
+
+    private class LogsIdentifierFixture : ArenaCollectionFixture
+    {
+        protected override Match Configure() => new MatchBuilder("logs-identifier-match").Build();
+
+        [ArenaDependency(Logs = true)]
+        private static readonly StubMatchPiece LoggedDependency = new StubMatchPiece("stub-dependency-id");
+
+        [ArenaComponent(Logs = true)]
+        private static readonly StubMatchPiece LoggedComponent = new StubMatchPiece("stub-component-id");
+    }
+
     private sealed class RecordingLogger : ILogger
     {
         public bool Logged { get; private set; }
@@ -104,5 +122,14 @@ public class ArenaCollectionFixtureTest
     {
         using var fixture = new ArenaLoggerFixture();
         Assert.NotNull(fixture.Arena);
+    }
+
+    [Fact]
+    public void CollectLogIdentifiers_DependencyAndComponentFieldsLogsTrue_ExtractsIdentifiersFromForFfiJson()
+    {
+        using var fixture = new LogsIdentifierFixture();
+        var (dependencyIds, componentIds) = fixture.CollectLogIdentifiers();
+        Assert.Contains("stub-dependency-id", dependencyIds);
+        Assert.Contains("stub-component-id", componentIds);
     }
 }

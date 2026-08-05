@@ -103,11 +103,41 @@ public abstract class ArenaCollectionFixture : IDisposable
     {
         var match = Configure();
         var (logger, level) = ResolveLogger();
-        var closed = logger != null
-            ? new ClosedArena(GetType().Name, match, level, logger)
-            : new ClosedArena(GetType().Name, match);
+        var (dependencyIds, componentIds) = CollectLogIdentifiers();
+        var closed = new ClosedArena(GetType().Name, match, level, logger, dependencyIds, componentIds);
         var arena = closed.OpenAsync().GetAwaiter().GetResult();
         return new SharedArena(arena);
+    }
+
+    internal (List<string> DependencyIds, List<string> ComponentIds) CollectLogIdentifiers()
+    {
+        var dependencyIds = new List<string>();
+        var componentIds = new List<string>();
+
+        for (var current = GetType(); current != null && current != typeof(object); current = current.BaseType)
+        {
+            foreach (var field in current.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+            {
+                var dependency = field.GetCustomAttribute<ArenaDependencyAttribute>();
+                if (dependency != null && dependency.Logs)
+                {
+                    dependencyIds.Add(IdentifierOf(field));
+                }
+
+                var component = field.GetCustomAttribute<ArenaComponentAttribute>();
+                if (component != null && component.Logs)
+                {
+                    componentIds.Add(IdentifierOf(field));
+                }
+            }
+        }
+
+        return (dependencyIds, componentIds);
+    }
+
+    private static string IdentifierOf(FieldInfo field)
+    {
+        return ((IArenaMatchPiece)RequireFieldValue(field)).Identifier;
     }
 
     private (ILogger? Logger, ArenaLogLevel Level) ResolveLogger()
