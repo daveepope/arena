@@ -19,7 +19,7 @@ members = [
 ]
 
 [workspace.package]
-version = "3.7.0"
+version = "3.7.1"
 [workspace.dependencies]
 arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }
@@ -59,7 +59,7 @@ rstest = "0.22"
 bollard = "0.20"
 ctor = "0.4"
 tar = "0.4"
-tiberius = { version = "0.12", default-features = false, features = ["tds73", "native-tls"] }
+tiberius = { version = "0.12", default-features = false, features = ["tds73", "rustls"] }
 tokio-util = { version = "0.7", features = ["compat"] }
 aws-config = { version = "1", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio"] }
 aws-sdk-sqs = { version = "1", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio"] }
