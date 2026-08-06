@@ -722,7 +722,6 @@ jobs:
           name: ${{ matrix.artifact }}
           path: bazel-bin/arena-pytest/*.whl
           if-no-files-found: error
-          if-no-files-found: error
 
   publish_testpypi:
     name: Publish TestPyPI (Ubuntu 24.04)
