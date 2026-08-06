@@ -71,6 +71,7 @@ copy_file(
     name = "arena_ffi_shared_for_wheel_linux",
     src = "prebuilt/linux-x86-64/libarena_ffi_shared.so",
     out = "src/arena_pytest/libarena_ffi_shared.so",
+    tags = ["manual"],
 )
 
 copy_file(
@@ -80,12 +81,14 @@ copy_file(
         ":macos_x86_64": "prebuilt/darwin-x86-64/libarena_ffi_shared.dylib",
     }),
     out = "src/arena_pytest/libarena_ffi_shared.dylib",
+    tags = ["manual"],
 )
 
 copy_file(
     name = "arena_ffi_shared_for_wheel_windows",
     src = "prebuilt/windows-x86-64/arena_ffi_shared.dll",
     out = "src/arena_pytest/arena_ffi_shared.dll",
+    tags = ["manual"],
 )
 
 alias(
@@ -96,6 +99,7 @@ alias(
         "@platforms//os:windows": ":arena_ffi_shared_for_wheel_windows",
         "//conditions:default": ":arena_ffi_shared_for_wheel_linux",
     }),
+    tags = ["manual"],
 )
 
 py_library(
@@ -177,5 +181,6 @@ py_wheel(
         ":arena_ffi_shared_for_wheel",
         ":arena_pytest_version_synced",
     ],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
