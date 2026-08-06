@@ -23,6 +23,7 @@ aws-sdk-lambda = { workspace = true }
 aws-sdk-eventbridge = { workspace = true }
 aws-credential-types = { workspace = true }
 aws-smithy-types = { workspace = true }
+aws-smithy-http-client = { workspace = true }
 zip = { workspace = true }
 
 [dev-dependencies]

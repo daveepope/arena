@@ -7,6 +7,8 @@ use aws_credential_types::Credentials;
 use aws_sdk_eventbridge as eventbridge;
 use aws_sdk_lambda as lambda;
 use aws_sdk_sqs as sqs;
+use aws_smithy_http_client::tls::rustls_provider::CryptoMode;
+use aws_smithy_http_client::{tls, Builder as HttpClientBuilder};
 use aws_smithy_types::Blob;
 use futures_timer::Delay;
 
@@ -193,10 +195,15 @@ async fn sdk_config(endpoint: &str) -> SdkConfig {
         "arena-localstack",
     );
 
+    let http_client = HttpClientBuilder::new()
+        .tls_provider(tls::Provider::Rustls(CryptoMode::Ring))
+        .build_https();
+
     aws_config::defaults(BehaviorVersion::latest())
         .region(Region::new(LOCALSTACK_REGION))
         .endpoint_url(endpoint)
         .credentials_provider(creds)
+        .http_client(http_client)
         .load()
         .await
 }

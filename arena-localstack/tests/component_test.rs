@@ -5,6 +5,8 @@ use arena_localstack::LocalstackDependency;
 use aws_config::{BehaviorVersion, Region, SdkConfig};
 use aws_credential_types::Credentials;
 use aws_sdk_sqs as sqs;
+use aws_smithy_http_client::tls::rustls_provider::CryptoMode;
+use aws_smithy_http_client::{tls, Builder as HttpClientBuilder};
 use futures::FutureExt;
 
 fn ephemeral_tcp_port() -> u16 {
@@ -30,10 +32,14 @@ fn init_test_logging() {
 
 async fn sdk_config(endpoint: &str) -> SdkConfig {
     let creds = Credentials::new(ACCESS_KEY, SECRET_KEY, None, None, "arena-component-test");
+    let http_client = HttpClientBuilder::new()
+        .tls_provider(tls::Provider::Rustls(CryptoMode::Ring))
+        .build_https();
     aws_config::defaults(BehaviorVersion::latest())
         .region(Region::new(REGION))
         .endpoint_url(endpoint)
         .credentials_provider(creds)
+        .http_client(http_client)
         .load()
         .await
 }

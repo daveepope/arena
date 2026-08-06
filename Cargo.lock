@@ -58,7 +58,7 @@ dependencies = [
 
 [[package]]
 name = "arena"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "arena-container"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "bollard",
  "tokio",
@@ -80,7 +80,7 @@ dependencies = [
 
 [[package]]
 name = "arena-containerized-component"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -96,14 +96,14 @@ dependencies = [
 
 [[package]]
 name = "arena-cryptography"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "rcgen",
 ]
 
 [[package]]
 name = "arena-examples"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "arena",
  "arena-containerized-component",
@@ -132,7 +132,7 @@ dependencies = [
 
 [[package]]
 name = "arena-executable-component"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -146,7 +146,7 @@ dependencies = [
 
 [[package]]
 name = "arena-ffi"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "arc-swap",
  "arena",
@@ -171,7 +171,7 @@ dependencies = [
 
 [[package]]
 name = "arena-http"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -189,7 +189,7 @@ dependencies = [
 
 [[package]]
 name = "arena-kafka"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -205,7 +205,7 @@ dependencies = [
 
 [[package]]
 name = "arena-localstack"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -215,6 +215,7 @@ dependencies = [
  "aws-sdk-eventbridge",
  "aws-sdk-lambda",
  "aws-sdk-sqs",
+ "aws-smithy-http-client",
  "aws-smithy-types",
  "futures",
  "futures-timer",
@@ -229,7 +230,7 @@ dependencies = [
 
 [[package]]
 name = "arena-mssql"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -245,7 +246,7 @@ dependencies = [
 
 [[package]]
 name = "arena-oauth"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -270,7 +271,7 @@ dependencies = [
 
 [[package]]
 name = "arena-postgres"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -285,7 +286,7 @@ dependencies = [
 
 [[package]]
 name = "arena-smtp"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -302,7 +303,7 @@ dependencies = [
 
 [[package]]
 name = "arena-temporal"
-version = "3.7.1"
+version = "4.0.0"
 dependencies = [
  "arena",
  "arena-container",
@@ -466,28 +467,6 @@ dependencies = [
  "aws-smithy-runtime-api",
  "aws-smithy-types",
  "zeroize",
-]
-
-[[package]]
-name = "aws-lc-rs"
-version = "1.16.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ec6fb3fe69024a75fa7e1bfb48aa6cf59706a101658ea01bfd33b2b248a038f"
-dependencies = [
- "aws-lc-sys",
- "zeroize",
-]
-
-[[package]]
-name = "aws-lc-sys"
-version = "0.40.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f50037ee5e1e41e7b8f9d161680a725bd1626cb6f8c7e901f91f942850852fe7"
-dependencies = [
- "cc",
- "cmake",
- "dunce",
- "fs_extra",
 ]
 
 [[package]]
@@ -741,7 +720,6 @@ checksum = "0504b1ab12debb5959e5165ee5fe97dd387e7aa7ea6a477bfd7635dfe769a4f5"
 dependencies = [
  "aws-smithy-async",
  "aws-smithy-http",
- "aws-smithy-http-client",
  "aws-smithy-observability",
  "aws-smithy-runtime-api",
  "aws-smithy-types",
@@ -1098,8 +1076,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43c5703da9466b66a946814e1adf53ea2c90f10063b86290cc9eb67ce3478a20"
 dependencies = [
  "find-msvc-tools",
- "jobserver",
- "libc",
  "shlex",
 ]
 
@@ -1138,15 +1114,6 @@ dependencies = [
  "serde",
  "wasm-bindgen",
  "windows-link",
-]
-
-[[package]]
-name = "cmake"
-version = "0.1.58"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0f78a02292a74a88ac736019ab962ece0bc380e3f977bf72e376c5d78ff0678"
-dependencies = [
- "cc",
 ]
 
 [[package]]
@@ -1469,12 +1436,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7454e41ff9012c00d53cf7f475c5e3afa3b91b7c90568495495e8d9bf47a1055"
 
 [[package]]
-name = "dunce"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
-
-[[package]]
 name = "dyn-clone"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1705,12 +1666,6 @@ dependencies = [
  "autocfg",
  "tokio",
 ]
-
-[[package]]
-name = "fs_extra"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
 
 [[package]]
 name = "futures"
@@ -2330,16 +2285,6 @@ name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
-
-[[package]]
-name = "jobserver"
-version = "0.1.34"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9afb3de4395d6b3e67a780b6de64b51c978ecf11cb9a462c66be7d4ca9039d33"
-dependencies = [
- "getrandom 0.3.4",
- "libc",
-]
 
 [[package]]
 name = "js-sys"
@@ -3521,7 +3466,6 @@ version = "0.23.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69f9466fb2c14ea04357e91413efb882e2a6d4a406e625449bc0a5d360d53a21"
 dependencies = [
- "aws-lc-rs",
  "log",
  "once_cell",
  "ring",
@@ -3590,7 +3534,6 @@ version = "0.103.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
 dependencies = [
- "aws-lc-rs",
  "ring",
  "rustls-pki-types",
  "untrusted",

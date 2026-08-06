@@ -119,7 +119,7 @@ public final class ComponentTest {
   private static String sqsQueueUrl;
   private static long readingsDeviceId;
 
-  @ArenaDependency(logs = true)
+  @ArenaDependency(logs = false)
   static final OauthDependency OAUTH =
       new OauthDependencyBuilder("example-api-oauth")
           .withPort(OAUTH_PORT)
@@ -128,7 +128,7 @@ public final class ComponentTest {
           .withMetadataBaseUrl(OAUTH_ISSUER)
           .build();
 
-  @ArenaDependency(logs = true)
+  @ArenaDependency(logs = false)
   static final PostgresDependency POSTGRES =
       new PostgresDependencyBuilder("example-api-postgres")
           .withImage("14.20-trixie")
@@ -139,7 +139,7 @@ public final class ComponentTest {
           .withStartupSqlScripts(readSchema("instrument_reading_db_schema.sql"))
           .build();
 
-  @ArenaDependency(logs = true)
+  @ArenaDependency(logs = false)
   static final MssqlDependency MSSQL =
       new MssqlDependencyBuilder("example-api-mssql")
           .withPort(MSSQL_PORT)
@@ -149,14 +149,14 @@ public final class ComponentTest {
           .withStartupSqlScripts(readSchema("validation_db_schema.sql"))
           .build();
 
-  @ArenaDependency(logs = true)
+  @ArenaDependency(logs = false)
   static final HttpDependency CALIBRATION =
       new HttpDependencyBuilder("example-api-calibration").withPort(CALIBRATION_HOST_PORT).build();
 
-  @ArenaDependency(logs = true)
+  @ArenaDependency(logs = false)
   static final LocalstackDependency LOCALSTACK = buildLocalstack();
 
-  @ArenaDependency(logs = true)
+  @ArenaDependency(logs = false)
   static final TemporalDependency TEMPORAL =
       new TemporalDependencyBuilder("example-api-temporal")
           .withImage("1.8.0")
@@ -164,7 +164,7 @@ public final class ComponentTest {
           .withUiPort(TEMPORAL_UI_PORT)
           .build();
 
-  @ArenaDependency(logs = true)
+  @ArenaDependency(logs = false)
   static final SmtpDependency SMTP =
       new SmtpDependencyBuilder("example-api-smtp")
           .withPort(SMTP_HOST_PORT)

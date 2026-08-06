@@ -165,6 +165,41 @@ Published on Maven Central: [io.github.stationdevx:arena-junit](https://central.
 
 `arena-junit` is a JUnit 5 extension. You point it at the jar your build already produces, so a test runs against the same artifact you ship rather than a separate in-process test context.
 
+#### Setup
+
+`arena-junit` publishes its native library as a separate Maven classifier per platform (`linux-x86_64`, `osx-aarch_64`, `osx-x86_64`) instead of bundling every platform into one jar. Add the [`os-maven-plugin`](https://github.com/trustin/os-maven-plugin) so the right classifier resolves automatically for your machine:
+
+```xml
+<build>
+  <extensions>
+    <extension>
+      <groupId>kr.motd.maven</groupId>
+      <artifactId>os-maven-plugin</artifactId>
+      <version>1.7.1</version>
+    </extension>
+  </extensions>
+</build>
+
+<dependency>
+  <groupId>io.github.stationdevx</groupId>
+  <artifactId>arena-junit</artifactId>
+  <version>${arena.version}</version>
+  <classifier>${os.detected.classifier}</classifier>
+</dependency>
+```
+
+Gradle (Kotlin DSL), using the [`osdetector`](https://github.com/google/osdetector-gradle-plugin) plugin:
+
+```kotlin
+plugins {
+  id("com.google.osdetector") version "1.7.3"
+}
+
+dependencies {
+  testImplementation("io.github.stationdevx:arena-junit:$arenaVersion:${osdetector.classifier}")
+}
+```
+
 #### Annotation style
 
 Put `@Arena` on the test class, annotate your dependencies and components as static fields, and Arena wires the sandbox for you before any test method runs.

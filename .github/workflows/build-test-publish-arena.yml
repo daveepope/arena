@@ -586,6 +586,11 @@ jobs:
           - runner: macos-latest
             artifact: arena-pytest-wheel-macos-arm64
             disk-cache: build-test-publish-arena-macos-arm64
+            arena-ffi-artifact: arena-ffi-darwin-aarch64
+          - runner: macos-15-intel
+            artifact: arena-pytest-wheel-macos-x86-64
+            disk-cache: build-test-publish-arena-macos-intel
+            arena-ffi-artifact: arena-ffi-darwin-x86-64
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -641,16 +646,16 @@ jobs:
           if-no-files-found: error
 
       - name: Stage arena_ffi_shared for release bundling
-        if: matrix.runner == 'macos-latest'
+        if: matrix.arena-ffi-artifact != ''
         run: |
           mkdir -p staged-arena-ffi
           cp bazel-bin/arena-ffi/libarena_ffi.dylib staged-arena-ffi/libarena_ffi_shared.dylib
 
       - name: Upload arena_ffi_shared artifact
-        if: matrix.runner == 'macos-latest'
+        if: matrix.arena-ffi-artifact != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: arena-ffi-darwin-aarch64
+          name: ${{ matrix.arena-ffi-artifact }}
           path: staged-arena-ffi/libarena_ffi_shared.dylib
           if-no-files-found: error
 
@@ -756,6 +761,17 @@ jobs:
           name: arena-ffi-darwin-aarch64
           path: arena-junit/prebuilt/src/main/resources/darwin-aarch64
 
+      - name: Download arena_ffi_shared (macOS Intel)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-darwin-x86-64
+          path: arena-junit/prebuilt/src/main/resources/darwin-x86-64
+
+      - name: Verify staged native libraries
+        run: |
+          test -s arena-junit/prebuilt/src/main/resources/darwin-aarch64/libarena_ffi_shared.dylib
+          test -s arena-junit/prebuilt/src/main/resources/darwin-x86-64/libarena_ffi_shared.dylib
+
       - name: Publish snapshot to Maven Central
         env:
           MAVEN_REPO: https://central.sonatype.com/repository/maven-snapshots/
@@ -809,11 +825,25 @@ jobs:
           name: arena-ffi-darwin-aarch64
           path: arena-junit/prebuilt/src/main/resources/darwin-aarch64
 
+      - name: Download arena_ffi_shared (macOS Intel)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-darwin-x86-64
+          path: arena-junit/prebuilt/src/main/resources/darwin-x86-64
+
+      - name: Verify staged native libraries
+        run: |
+          test -s arena-junit/prebuilt/src/main/resources/darwin-aarch64/libarena_ffi_shared.dylib
+          test -s arena-junit/prebuilt/src/main/resources/darwin-x86-64/libarena_ffi_shared.dylib
+
       - name: Build release artifacts
         run: |
           bazel build //arena-junit:arena_junit_maven //arena-junit:arena_junit_maven-lib \
             //arena-junit:arena_junit_maven-docs //arena-junit:arena_junit_maven-pom \
             //arena-junit:libarena_junit_maven-lib-src.jar \
+            //arena-junit:arena_junit_native_linux_x86_64 \
+            //arena-junit:arena_junit_native_osx_aarch64 \
+            //arena-junit:arena_junit_native_osx_x86_64 \
             --config=ci --config=release
 
       - name: Import GPG key
@@ -831,7 +861,10 @@ jobs:
             "$PWD/bazel-bin/arena-junit/libarena_junit_maven-lib.jar" \
             "$PWD/bazel-bin/arena-junit/arena_junit_maven-pom.xml" \
             "$PWD/bazel-bin/arena-junit/libarena_junit_maven-lib-src.jar" \
-            "$PWD/bazel-bin/arena-junit/arena_junit_maven-docs.jar"
+            "$PWD/bazel-bin/arena-junit/arena_junit_maven-docs.jar" \
+            --classifier-jar "linux-x86_64=$PWD/bazel-bin/arena-junit/libarena_junit_native_linux_x86_64.jar" \
+            --classifier-jar "osx-aarch_64=$PWD/bazel-bin/arena-junit/libarena_junit_native_osx_aarch64.jar" \
+            --classifier-jar "osx-x86_64=$PWD/bazel-bin/arena-junit/libarena_junit_native_osx_x86_64.jar"
 
   publish_nuget_snapshot:
     name: Publish NuGet snapshot (Ubuntu 24.04)
