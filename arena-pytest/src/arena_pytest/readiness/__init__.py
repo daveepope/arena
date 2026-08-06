@@ -7,4 +7,10 @@ class HttpReadinessCheck:
         return cls()
 
 
+class TcpReadinessCheck:
+    @classmethod
+    def create(cls) -> TcpReadinessCheck:
+        return cls()
+
+
 ReadinessCheck = HttpReadinessCheck

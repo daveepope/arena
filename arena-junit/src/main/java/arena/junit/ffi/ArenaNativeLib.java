@@ -40,6 +40,8 @@ interface ArenaNativeLib extends Library {
   int arena_http_playbook_verify(Pointer handle, String specJson, PointerByReference errOut);
 
   int arena_mssql_playbook_verify(Pointer handle, String specJson, PointerByReference errOut);
+
+  int arena_postgres_playbook_verify(Pointer handle, String specJson, PointerByReference errOut);
 }
 
 final class ArenaNativeHolder {
@@ -47,10 +49,10 @@ final class ArenaNativeHolder {
 
   static {
     String path = ArenaPaths.resolveArenaSharedLibrary();
-    if (path == null || path.isEmpty()) {
-      LIB = null;
-    } else {
+    if (path != null && !path.isEmpty()) {
       LIB = Native.load(path, ArenaNativeLib.class);
+    } else {
+      LIB = ArenaPaths.loadFromClasspath(ArenaNativeLib.class);
     }
   }
 

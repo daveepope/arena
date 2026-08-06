@@ -19,7 +19,11 @@ public final class ArenaBindings {
   public static ArenaNativeLib lib() {
     ArenaNativeLib lib = ArenaNativeHolder.LIB;
     if (lib == null) {
-      throw new ArenaBindingError("arena shared library not found (set ARENA_FFI_LIB or use Bazel runfiles)");
+      throw new ArenaBindingError(
+          "arena shared library not found (set ARENA_FFI_LIB, use Bazel runfiles, or add the"
+              + " os-maven-plugin extension and depend on arena-junit with classifier"
+              + " ${os.detected.classifier} to pull in a platform-native arena_ffi_shared"
+              + " library)");
     }
     return lib;
   }
@@ -249,6 +253,21 @@ public final class ArenaBindings {
     }
     if (st != ArenaStatus.OK) {
       throw new ArenaBindingError(msg != null ? msg : "mssql_playbook_verify failed: " + st, st);
+    }
+  }
+
+  public static void postgresPlaybookVerify(Pointer handle, String specJson) {
+    PointerByReference err = new PointerByReference();
+    int raw = lib().arena_postgres_playbook_verify(handle, specJson, err);
+    String msg = takeErr(err);
+    ArenaStatus st;
+    try {
+      st = ArenaStatus.fromInt(raw);
+    } catch (IllegalArgumentException e) {
+      throw new ArenaBindingError(msg != null ? msg : "postgres_playbook_verify unknown status " + raw);
+    }
+    if (st != ArenaStatus.OK) {
+      throw new ArenaBindingError(msg != null ? msg : "postgres_playbook_verify failed: " + st, st);
     }
   }
 }

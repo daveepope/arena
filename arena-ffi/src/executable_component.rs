@@ -5,7 +5,7 @@ use arena_executable_component::BuildTool;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::healthcheck::{HttpReadinessCheck, ReadinessCheckConfig};
+use crate::healthcheck::{HttpReadinessCheck, ReadinessCheckConfig, TcpReadinessCheck};
 use crate::runtime_args::RuntimeArgConfig;
 
 #[derive(Debug, Deserialize)]
@@ -80,6 +80,13 @@ fn apply_readiness_checks(
             ReadinessCheckConfig::Http { target, timeout_ms } => {
                 builder.with_readiness_check_timeout(
                     HttpReadinessCheck::new(),
+                    target.as_str(),
+                    *timeout_ms,
+                )
+            }
+            ReadinessCheckConfig::Tcp { target, timeout_ms } => {
+                builder.with_readiness_check_timeout(
+                    TcpReadinessCheck::new(),
                     target.as_str(),
                     *timeout_ms,
                 )

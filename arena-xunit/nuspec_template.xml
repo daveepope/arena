@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>{id}</id>
+    <version>{version}</version>
+    <title>arena-xunit</title>
+    <authors>David Pope</authors>
+    <owners>David Pope</owners>
+    <description>xUnit integration for Arena. Arena is a cross-platform sandboxing framework with built-in profiling workflows. It manages the lifecycle of a set of dependencies (databases, brokers, HTTP services) and components (your applications) as a single sandbox you can open, interact with, and close - giving you repeatable, deterministic, multi-service environments with a fast feedback loop. Arena provides top-level clients for Python, Java, Go, and .NET (the Python client arena-pytest, Java client arena-junit, and .NET client arena-xunit all ship today; a Go client is planned). Component testing is one common use case, but Arena is equally at home as a local development sandbox, a scripted scenario driver, or anywhere else you need a reproducible multi-service environment.</description>
+    <projectUrl>https://github.com/daveepope/arena</projectUrl>
+    <repository type="git" url="https://github.com/daveepope/arena.git" />
+    <license type="expression">MIT</license>
+    <licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>
+    <copyright>Copyright © 2026 The Arena Authors: David Pope</copyright>
+    <readme>README.md</readme>
+    <tags>arena xunit testing sandboxing</tags>
+    <dependencies>
+      <group targetFramework="netstandard2.0">
+        {dependencies}
+      </group>
+    </dependencies>
+  </metadata>
+</package>

@@ -1,4 +1,6 @@
 package arena.junit.ffi;
+import com.sun.jna.Library;
+import com.sun.jna.Native;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -6,6 +8,14 @@ import java.util.Locale;
 
 final class ArenaPaths {
   private ArenaPaths() {}
+
+  static <T extends Library> T loadFromClasspath(Class<T> libraryInterface) {
+    try {
+      return Native.load("arena_ffi_shared", libraryInterface);
+    } catch (LinkageError e) {
+      return null;
+    }
+  }
 
   public static String resolveArenaSharedLibrary() {
     String env = System.getenv("ARENA_FFI_LIB");

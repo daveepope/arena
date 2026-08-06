@@ -14,6 +14,13 @@ rust_library(
 )
 
 rust_test(
+    name = "arena_localstack_lib_unit_test",
+    crate = ":arena_localstack",
+    size = "small",
+    edition = "2021",
+)
+
+rust_test(
     name = "unit_test",
     srcs = ["tests/unit_test.rs"],
     size = "small",

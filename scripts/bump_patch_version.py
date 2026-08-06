@@ -10,8 +10,10 @@ from arena_version import (
     bump_patch_version,
     read_version,
     read_version_from_git_ref,
+    release_lockfiles_need_repin,
     release_version_increased,
     release_version_only,
+    repin_release_lockfiles,
     sync_workspace_version,
     write_version,
 )
@@ -42,6 +44,10 @@ def main() -> int:
     print(f"VERSION {head}")
     for name in changed:
         print(f"synced {name}")
+    if changed or release_lockfiles_need_repin(root, head):
+        print("repinning release lockfiles")
+        repin_release_lockfiles(root)
+        print("updated Cargo.Bazel.lock, Cargo.lock, MODULE.bazel.lock")
     return 0
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import base64
 import hashlib
 import json
@@ -75,6 +76,7 @@ def _build_bundle(
     pom_path: Path,
     sources_jar_path: Path,
     javadoc_jar_path: Path,
+    classifier_jars: dict[str, Path],
     passphrase: str,
 ) -> Path:
     layout_dir = staging_dir / group_id.replace(".", "/") / artifact_id / version
@@ -87,6 +89,8 @@ def _build_bundle(
         f"{artifact_prefix}-sources.jar": sources_jar_path,
         f"{artifact_prefix}-javadoc.jar": javadoc_jar_path,
     }
+    for classifier, classifier_jar_path in classifier_jars.items():
+        files_to_upload[f"{artifact_prefix}-{classifier}.jar"] = classifier_jar_path
 
     staged_paths: list[Path] = []
     for target_name, source_path in files_to_upload.items():
@@ -169,20 +173,41 @@ def _await_publish(deployment_id: str, username: str, password: str) -> None:
     )
 
 
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("jar_path")
+    parser.add_argument("pom_path")
+    parser.add_argument("sources_jar_path")
+    parser.add_argument("javadoc_jar_path")
+    parser.add_argument(
+        "--classifier-jar",
+        action="append",
+        default=[],
+        metavar="CLASSIFIER=PATH",
+        help="Additional classifier=jar_path pair to publish alongside the main artifact",
+    )
+    return parser.parse_args(argv)
+
+
+def _parse_classifier_jars(entries: list[str]) -> dict[str, Path]:
+    classifier_jars: dict[str, Path] = {}
+    for entry in entries:
+        classifier, separator, path = entry.partition("=")
+        if not separator or not classifier or not path:
+            raise ValueError(f"invalid --classifier-jar value: {entry!r}, expected CLASSIFIER=PATH")
+        classifier_jars[classifier] = Path(path)
+    return classifier_jars
+
+
 def main() -> None:
-    (
-        _,
-        jar_path,
-        pom_path,
-        sources_jar_path,
-        javadoc_jar_path,
-    ) = sys.argv
+    args = _parse_args(sys.argv[1:])
+    classifier_jars = _parse_classifier_jars(args.classifier_jar)
 
     passphrase = os.environ["GPG_PASSPHRASE"]
     username = os.environ["CENTRAL_TOKEN_USERNAME"]
     password = os.environ["CENTRAL_TOKEN_PASSWORD"]
 
-    group_id, artifact_id, version = _pom_coordinates(Path(pom_path))
+    group_id, artifact_id, version = _pom_coordinates(Path(args.pom_path))
 
     staging_dir = Path(os.environ.get("RUNNER_TEMP", "/tmp")) / f"maven-publish-{uuid.uuid4().hex}"
     staging_dir.mkdir(parents=True, exist_ok=True)
@@ -192,10 +217,11 @@ def main() -> None:
         group_id=group_id,
         artifact_id=artifact_id,
         version=version,
-        jar_path=Path(jar_path),
-        pom_path=Path(pom_path),
-        sources_jar_path=Path(sources_jar_path),
-        javadoc_jar_path=Path(javadoc_jar_path),
+        jar_path=Path(args.jar_path),
+        pom_path=Path(args.pom_path),
+        sources_jar_path=Path(args.sources_jar_path),
+        javadoc_jar_path=Path(args.javadoc_jar_path),
+        classifier_jars=classifier_jars,
         passphrase=passphrase,
     )
     deployment_id = _upload(bundle_path, username, password)

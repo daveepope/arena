@@ -12,7 +12,7 @@ pub(crate) mod strings;
 
 mod containerized_component;
 mod executable_component;
-mod healthcheck;
+pub mod healthcheck;
 mod kafka_dependency;
 mod managed_playbook;
 mod matches;
@@ -36,3 +36,4 @@ pub use open_arena::arena_close;
 pub use strings::arena_free_string;
 pub use dependency::http::{arena_http_playbook_open, arena_http_playbook_verify};
 pub use dependency::mssql::arena_mssql_playbook_verify;
+pub use dependency::postgres::arena_postgres_playbook_verify;

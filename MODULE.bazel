@@ -1,6 +1,6 @@
 module(
     name = "arena",
-    version = "3.5.0",
+    version = "4.0.0",
 )
 
 arena_version_ext = use_extension("//tools:arena_version.bzl", "arena_version")
@@ -12,16 +12,10 @@ bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "rules_java", version = "9.0.0")
 bazel_dep(name = "rules_jvm_external", version = "6.6")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
+bazel_dep(name = "rules_dotnet", version = "0.20.0")
+bazel_dep(name = "rules_pkg", version = "1.0.1")
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
-http_archive(
-    name = "openssl",
-    sha256 = "b28c91532a8b65a1f983b4c28b7488174e4a01008e29ce8e69bd789f28bc2a89",
-    strip_prefix = "openssl-3.5.5",
-    urls = ["https://github.com/openssl/openssl/releases/download/openssl-3.5.5/openssl-3.5.5.tar.gz"],
-    build_file = "//third_party:openssl.BUILD.bazel",
-)
 
 _TRIVY_VERSION = "0.72.0"
 
@@ -50,11 +44,12 @@ java_toolchains = use_extension("@rules_java//java:extensions.bzl", "toolchains"
 use_repo(
     java_toolchains,
     "remote_java_tools",
+    "remote_java_tools_darwin_arm64",
+    "remote_java_tools_darwin_x86_64",
     "remote_java_tools_linux",
     "remote_java_tools_windows",
-    "remote_java_tools_darwin_x86_64",
-    "remote_java_tools_darwin_arm64",
 )
+
 _ARENA_JDK25 = [
     "remotejdk25_linux",
     "remotejdk25_linux_aarch64",
@@ -69,13 +64,12 @@ _ARENA_JDK25 = [
 [register_toolchains("@" + repo + "_toolchain_config_repo//:all") for repo in _ARENA_JDK25]
 
 arena_java_maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
-
 arena_java_maven.artifact(
     name = "arena_java_maven",
-    group = "io.grpc",
     artifact = "grpc-core",
-    version = "1.58.1",
     exclusions = ["io.grpc:grpc-util"],
+    group = "io.grpc",
+    version = "1.58.1",
 )
 arena_java_maven.install(
     name = "arena_java_maven",
@@ -114,9 +108,10 @@ use_repo(arena_java_maven, "arena_java_maven")
 # Python toolchain and pip deps (for arena-pytest).
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
-    python_version = "3.12",
     configure_coverage_tool = True,
+    python_version = "3.12",
 )
+
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
 pip.parse(
     hub_name = "pip",
@@ -133,38 +128,362 @@ use_repo(pip, "pip", "pip_examples")
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2021",
-    versions = ["1.92.0"],
     # bfd is Linux-only; macOS uses the default linker and fails if we pass -fuse-ld=bfd.
     extra_rustc_flags_triples = {
         "x86_64-unknown-linux-gnu": ["-Clink-arg=-fuse-ld=bfd"],
         "aarch64-unknown-linux-gnu": ["-Clink-arg=-fuse-ld=bfd"],
     },
+    versions = ["1.92.0"],
 )
 use_repo(rust, "rust_toolchains")
+
 register_toolchains("@rust_toolchains//:all")
 
 crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
-crate.annotation(
-    crate = "openssl-sys",
-    repositories = ["crates"],
-    build_script_data = ["@openssl//:gen_dir"],
-    build_script_env = {
-        "OPENSSL_NO_VENDOR": "1",
-        "OPENSSL_STATIC": "1",
-        "OPENSSL_DIR": "$(execpath @openssl//:gen_dir)",
-        "OPENSSL_LIB_DIR": "$(execpath @openssl//:gen_dir)/lib64",
-        "OPENSSL_INCLUDE_DIR": "$(execpath @openssl//:gen_dir)/include",
-    },
-)
 crate.from_cargo(
     name = "crates",
     cargo_lockfile = "//:Cargo.lock",
-    manifests = ["//:Cargo.toml"],
     lockfile = "//:Cargo.Bazel.lock",
+    manifests = ["//:Cargo.toml"],
+    supported_platform_triples = [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "x86_64-apple-darwin",
+        "x86_64-pc-windows-msvc",
+        "x86_64-unknown-linux-gnu",
+    ],
 )
-inject_repo(crate, "openssl")
+
 use_repo(crate, "crates")
 
+# .NET toolchain (for arena-xunit).
+dotnet = use_extension("@rules_dotnet//dotnet:extensions.bzl", "dotnet")
+dotnet.toolchain(
+    dotnet_version = "8.0.415",
+)
+use_repo(dotnet, "dotnet_toolchains", "dotnet_x86_64-apple-darwin", "dotnet_x86_64-unknown-linux-gnu")
+
+register_toolchains("@dotnet_toolchains//:all")
+
+nuget_archive = use_repo_rule("@rules_dotnet//dotnet:defs.bzl", "nuget_archive")
+
+# xUnit
+nuget_archive(
+    name = "xunit_extensibility",
+    id = "xunit.extensibility.execution",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "2.9.3",
+)
+
+nuget_archive(
+    name = "xunit_extensibility_core",
+    id = "xunit.extensibility.core",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "2.9.3",
+)
+
+nuget_archive(
+    name = "xunit_assert",
+    id = "xunit.assert",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "2.9.3",
+)
+
+nuget_archive(
+    name = "xunit_abstractions",
+    id = "xunit.abstractions",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "2.0.3",
+)
+
+nuget_archive(
+    name = "xunit_runner",
+    id = "xunit.runner.visualstudio",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "3.1.5",
+)
+
+nuget_archive(
+    name = "xunit_runner_utility",
+    id = "xunit.runner.utility",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "2.9.3",
+)
+
+nuget_archive(
+    name = "xunit_runner_reporters",
+    id = "xunit.runner.reporters",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "2.9.3",
+)
+
+# JSON
+nuget_archive(
+    name = "newtonsoft_json",
+    id = "Newtonsoft.Json",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "13.0.4",
+)
+
+# Logging
+nuget_archive(
+    name = "ms_logging_abstractions",
+    id = "Microsoft.Extensions.Logging.Abstractions",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.2",
+)
+
+nuget_archive(
+    name = "ms_logging",
+    id = "Microsoft.Extensions.Logging",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "ms_logging_console",
+    id = "Microsoft.Extensions.Logging.Console",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "ms_logging_options",
+    id = "Microsoft.Extensions.Options",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.2",
+)
+
+nuget_archive(
+    name = "ms_logging_options_configuration_extensions",
+    id = "Microsoft.Extensions.Options.ConfigurationExtensions",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.0",
+)
+
+nuget_archive(
+    name = "ms_extensions_primitives",
+    id = "Microsoft.Extensions.Primitives",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.0",
+)
+
+nuget_archive(
+    name = "ms_logging_configuration",
+    id = "Microsoft.Extensions.Logging.Configuration",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+# Database
+nuget_archive(
+    name = "npgsql",
+    id = "Npgsql",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.4",
+)
+
+nuget_archive(
+    name = "sqlclient",
+    id = "Microsoft.Data.SqlClient",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "5.2.2",
+)
+
+# AWS
+nuget_archive(
+    name = "aws_core",
+    id = "AWSSDK.Core",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "3.7.400",
+)
+
+nuget_archive(
+    name = "aws_eventbridge",
+    id = "AWSSDK.EventBridge",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "3.7.400",
+)
+
+nuget_archive(
+    name = "aws_sqs",
+    id = "AWSSDK.SQS",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "3.7.502.57",
+)
+
+# JWT
+nuget_archive(
+    name = "jwt",
+    id = "System.IdentityModel.Tokens.Jwt",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "ms_identitymodel_tokens",
+    id = "Microsoft.IdentityModel.Tokens",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "ms_identitymodel_jsonwebtokens",
+    id = "Microsoft.IdentityModel.JsonWebTokens",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "ms_identitymodel_logging",
+    id = "Microsoft.IdentityModel.Logging",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "ms_identitymodel_abstractions",
+    id = "Microsoft.IdentityModel.Abstractions",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "system_configuration_configurationmanager",
+    id = "System.Configuration.ConfigurationManager",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.0",
+)
+
+nuget_archive(
+    name = "ms_identity_client",
+    id = "Microsoft.Identity.Client",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "4.61.3",
+)
+
+nuget_archive(
+    name = "ms_sqlserver_server",
+    id = "Microsoft.SqlServer.Server",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "1.0.0",
+)
+
+# Coverage
+nuget_archive(
+    name = "dotnet_coverage",
+    id = "dotnet-coverage",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "18.9.0",
+)
+
+# Test SDK
+nuget_archive(
+    name = "mstest",
+    id = "Microsoft.NET.Test.Sdk",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "17.11.0",
+)
+
+# ASP.NET Core + Extensions
+nuget_archive(
+    name = "ms_aspnetcore_app_ref",
+    id = "Microsoft.AspNetCore.App.Ref",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.29",
+)
+
+nuget_archive(
+    name = "ms_netcore_app_ref",
+    id = "Microsoft.NETCore.App.Ref",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.29",
+)
+
+nuget_archive(
+    name = "ms_extensions_configuration",
+    id = "Microsoft.Extensions.Configuration",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.0",
+)
+
+nuget_archive(
+    name = "ms_extensions_configuration_abstractions",
+    id = "Microsoft.Extensions.Configuration.Abstractions",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.0",
+)
+
+nuget_archive(
+    name = "ms_extensions_configuration_binder",
+    id = "Microsoft.Extensions.Configuration.Binder",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.2",
+)
+
+nuget_archive(
+    name = "ms_extensions_dependency_injection",
+    id = "Microsoft.Extensions.DependencyInjection",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "ms_extensions_dependency_injection_abstractions",
+    id = "Microsoft.Extensions.DependencyInjection.Abstractions",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.2",
+)
+
+nuget_archive(
+    name = "ms_extensions_hosting",
+    id = "Microsoft.Extensions.Hosting",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "ms_extensions_hosting_abstractions",
+    id = "Microsoft.Extensions.Hosting.Abstractions",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "ms_extensions_http",
+    id = "Microsoft.Extensions.Http",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.1",
+)
+
+nuget_archive(
+    name = "polly",
+    id = "Polly",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.4.2",
+)
+
+# Temporal
+nuget_archive(
+    name = "temporalio",
+    id = "Temporalio",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "1.17.0",
+)
+
+nuget_archive(
+    name = "google_protobuf",
+    id = "Google.Protobuf",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "3.26.1",
+)
+
+nuget_archive(
+    name = "nexus_rpc",
+    id = "NexusRpc",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "0.3.0",
+)
 # py-spy is a binary-only crate (no library target), so it cannot be a normal
 # workspace Cargo.toml dependency of arena-profile; crate.from_specs vendors
 # and builds its binary from source independently of the Cargo.lock graph.

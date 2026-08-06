@@ -1,0 +1,77 @@
+using System.Linq;
+using ArenaDotnet.Xunit.Playbook;
+using Newtonsoft.Json.Linq;
+using Xunit;
+
+namespace ArenaDotnet.Xunit.UnitTest;
+
+public class PlaybookBuilderSerializationTest
+{
+    [Fact]
+    public void HttpPlaybookBuild_PostMapping_SerializesCorrectJson()
+    {
+        var builder = new HttpPlaybookBuilder("dep-id")
+            .Post("/api/validate")
+            .ExpectCalled(1);
+        var mappings = builder.BuildMappings();
+        Assert.Single(mappings);
+        var mapping = mappings[0];
+        var method = mapping.GetType().GetProperty("Method")?.GetValue(mapping);
+        Assert.Equal("POST", method);
+    }
+
+    [Fact]
+    public void HttpPlaybookBuild_GetMapping_SerializesCorrectJson()
+    {
+        var builder = new HttpPlaybookBuilder("dep-id")
+            .Get("/health")
+            .ExpectCalled(1);
+        var mappings = builder.BuildMappings();
+        var method = mappings[0].GetType().GetProperty("Method")?.GetValue(mappings[0]);
+        Assert.Equal("GET", method);
+    }
+
+    [Fact]
+    public void HttpPlaybookBuild_WithResponse_SerializesStatus()
+    {
+        var builder = new HttpPlaybookBuilder("dep-id")
+            .Post("/api/validate")
+            .WillReturn(HttpResponse.OkJson(new { valid = true }))
+            .ExpectCalled(1);
+        var mappings = builder.BuildMappings();
+        var responses = mappings[0].GetType().GetProperty("Responses")?.GetValue(mappings[0]) as System.Collections.IList;
+        Assert.NotNull(responses);
+        Assert.Single(responses);
+        var response = responses[0];
+        var status = response.GetType().GetProperty("Status")?.GetValue(response);
+        Assert.Equal(200, status);
+    }
+
+    [Fact]
+    public void HttpPlaybookBuild_ExpectCalled_SetsKindExactly()
+    {
+        var builder = new HttpPlaybookBuilder("dep-id")
+            .Get("/check")
+            .ExpectCalled(2);
+        var mappings = builder.BuildMappings();
+        var expect = mappings[0].GetType().GetProperty("Expect")?.GetValue(mappings[0]);
+        Assert.NotNull(expect);
+        var kind = expect.GetType().GetProperty("Kind")?.GetValue(expect);
+        Assert.Equal("exactly", kind);
+        var count = expect.GetType().GetProperty("Count")?.GetValue(expect);
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public void HttpPlaybookBuild_ExpectNeverCalled_SetsKindNever()
+    {
+        var builder = new HttpPlaybookBuilder("dep-id")
+            .Get("/never")
+            .ExpectNeverCalled();
+        var mappings = builder.BuildMappings();
+        var expect = mappings[0].GetType().GetProperty("Expect")?.GetValue(mappings[0]);
+        Assert.NotNull(expect);
+        var kind = expect.GetType().GetProperty("Kind")?.GetValue(expect);
+        Assert.Equal("never", kind);
+    }
+}

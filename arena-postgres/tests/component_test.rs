@@ -12,6 +12,14 @@ fn init_test_logging() {
         .try_init();
 }
 
+fn ephemeral_tcp_port() -> u16 {
+    std::net::TcpListener::bind("127.0.0.1:0")
+        .expect("bind ephemeral tcp port")
+        .local_addr()
+        .expect("local_addr")
+        .port()
+}
+
 fn with_client<F, T>(conn_str: &str, f: F) -> Result<T, String>
 where
     F: FnOnce(&mut postgres::Client) -> Result<T, String>,
@@ -35,7 +43,9 @@ impl TestContext {
             phase = "dependency_start_begin",
             "starting dependency",
         );
-        let mut pg = PostgresDependency::builder("").build();
+        let mut pg = PostgresDependency::builder("")
+            .with_port(ephemeral_tcp_port())
+            .build();
         pg.start().await;
 
         let conn_str = pg
@@ -154,6 +164,108 @@ async fn postgres_dependency_lifecycle_component_test() {
             phase = "db_roundtrip_ok",
             "scenario passed",
         ),
+        Ok(Err(e)) => panic!("{e}"),
+        Err(panic_payload) => std::panic::resume_unwind(panic_payload),
+    }
+}
+
+async fn playbook_scenario(pg: &PostgresDependency) -> Result<(), String> {
+    let conn_str = pg
+        .connection_string()
+        .ok_or_else(|| "connection string missing".to_string())?
+        .to_string();
+
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_postgres",
+        scenario = "playbook",
+        phase = "begin",
+        "begin playbook scenario",
+    );
+
+    {
+        let conn_str = conn_str.clone();
+        tokio::task::spawn_blocking(move || {
+            with_client(&conn_str, |c| {
+                c.batch_execute("insert into widgets (name) values ('alpha'), ('beta'), ('gamma');")
+                    .map_err(|e| format!("seed insert failed: {e}"))
+            })
+        })
+        .await
+        .map_err(|e| format!("seed task join failed: {e}"))??;
+    }
+
+    let playbook = pg.playbook().run().await;
+
+    let count = playbook.verify("SELECT COUNT(*) FROM widgets;").await;
+    if count != 0 {
+        return Err(format!(
+            "expected playbook to clear widgets, got count={count}"
+        ));
+    }
+
+    {
+        let conn_str = conn_str.clone();
+        tokio::task::spawn_blocking(move || {
+            with_client(&conn_str, |c| {
+                c.batch_execute("insert into widgets (name) values ('delta'), ('epsilon');")
+                    .map_err(|e| format!("second seed failed: {e}"))
+            })
+        })
+        .await
+        .map_err(|e| format!("second seed task join failed: {e}"))??;
+    }
+
+    let playbook = pg.playbook().run().await;
+    let count = playbook.verify("SELECT COUNT(*) FROM widgets;").await;
+    if count != 0 {
+        return Err(format!(
+            "expected playbook to clear widgets again, got count={count}"
+        ));
+    }
+
+    let literal = playbook.verify("SELECT 1 + 1;").await;
+    if literal != 2 {
+        return Err(format!("expected verify('SELECT 1+1') == 2, got {literal}"));
+    }
+
+    tracing::info!(
+        suite = "crate_component",
+        crate_under_test = "arena_postgres",
+        scenario = "playbook",
+        phase = "ok",
+        "playbook scenario finished",
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn postgres_dependency_playbook_component_test() {
+    init_test_logging();
+
+    let mut pg = PostgresDependency::builder("postgres-playbook-component")
+        .with_port(ephemeral_tcp_port())
+        .with_startup_sql_scripts(vec![r#"
+            create table if not exists widgets(
+                id serial primary key,
+                name text not null
+            )
+            "#
+        .to_string()])
+        .build();
+
+    pg.start().await;
+
+    let outcome = std::panic::AssertUnwindSafe(playbook_scenario(&pg))
+        .catch_unwind()
+        .await;
+
+    tokio::time::timeout(Duration::from_secs(10), pg.stop())
+        .await
+        .unwrap_or_else(|_| panic!("postgres stop timed out"));
+
+    match outcome {
+        Ok(Ok(())) => {}
         Ok(Err(e)) => panic!("{e}"),
         Err(panic_payload) => std::panic::resume_unwind(panic_payload),
     }
