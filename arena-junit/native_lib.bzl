@@ -5,4 +5,4 @@ def arena_junit_classifier_native_lib(name, classifier, resources, classifier_ar
         name = name,
         resources = resources,
     )
-    classifier_artifacts[":" + name] = classifier
+    classifier_artifacts[classifier] = ":" + name
