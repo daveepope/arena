@@ -2,45 +2,9 @@ load("@arena_version//:defs.bzl", "ARENA_VERSION")
 load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@rules_java//java:defs.bzl", "java_library", "java_test")
 load("@rules_jvm_external//:defs.bzl", "java_export")
+load(":native_lib.bzl", "arena_junit_classifier_native_lib")
 
 _ARENA_JUNIT_SRCS = glob(["src/main/java/**/*.java"])
-
-_ARENA_JUNIT_PREBUILT_RELEASE_NATIVE_LIBS = glob(
-    ["prebuilt/src/main/resources/**"],
-    allow_empty = True,
-)
-
-config_setting(
-    name = "linux_x86_64",
-    constraint_values = [
-        "@platforms//os:linux",
-        "@platforms//cpu:x86_64",
-    ],
-)
-
-config_setting(
-    name = "linux_aarch64",
-    constraint_values = [
-        "@platforms//os:linux",
-        "@platforms//cpu:aarch64",
-    ],
-)
-
-config_setting(
-    name = "macos_aarch64",
-    constraint_values = [
-        "@platforms//os:macos",
-        "@platforms//cpu:aarch64",
-    ],
-)
-
-config_setting(
-    name = "macos_x86_64",
-    constraint_values = [
-        "@platforms//os:macos",
-        "@platforms//cpu:x86_64",
-    ],
-)
 
 copy_file(
     name = "arena_ffi_shared_for_maven_linux_x86_64",
@@ -48,40 +12,33 @@ copy_file(
     out = "src/main/resources/linux-x86-64/libarena_ffi_shared.so",
 )
 
-copy_file(
-    name = "arena_ffi_shared_for_maven_linux_aarch64",
-    src = "//arena-ffi:arena_ffi_shared",
-    out = "src/main/resources/linux-aarch64/libarena_ffi_shared.so",
+_ARENA_JUNIT_CLASSIFIER_ARTIFACTS = {}
+
+arena_junit_classifier_native_lib(
+    name = "arena_junit_native_linux_x86_64",
+    classifier = "linux-x86_64",
+    resources = [":arena_ffi_shared_for_maven_linux_x86_64"],
+    classifier_artifacts = _ARENA_JUNIT_CLASSIFIER_ARTIFACTS,
 )
 
-copy_file(
-    name = "arena_ffi_shared_for_maven_macos_x86_64",
-    src = "//arena-ffi:arena_ffi_shared",
-    out = "src/main/resources/darwin-x86-64/libarena_ffi_shared.dylib",
+arena_junit_classifier_native_lib(
+    name = "arena_junit_native_osx_aarch64",
+    classifier = "osx-aarch_64",
+    resources = glob(
+        ["prebuilt/src/main/resources/darwin-aarch64/**"],
+        allow_empty = True,
+    ),
+    classifier_artifacts = _ARENA_JUNIT_CLASSIFIER_ARTIFACTS,
 )
 
-copy_file(
-    name = "arena_ffi_shared_for_maven_macos_aarch64",
-    src = "//arena-ffi:arena_ffi_shared",
-    out = "src/main/resources/darwin-aarch64/libarena_ffi_shared.dylib",
-)
-
-copy_file(
-    name = "arena_ffi_shared_for_maven_windows",
-    src = "//arena-ffi:arena_ffi_shared",
-    out = "src/main/resources/win32-x86-64/arena_ffi_shared.dll",
-)
-
-alias(
-    name = "arena_ffi_shared_for_maven",
-    actual = select({
-        ":linux_x86_64": ":arena_ffi_shared_for_maven_linux_x86_64",
-        ":linux_aarch64": ":arena_ffi_shared_for_maven_linux_aarch64",
-        ":macos_x86_64": ":arena_ffi_shared_for_maven_macos_x86_64",
-        ":macos_aarch64": ":arena_ffi_shared_for_maven_macos_aarch64",
-        "@platforms//os:windows": ":arena_ffi_shared_for_maven_windows",
-        "//conditions:default": ":arena_ffi_shared_for_maven_linux_x86_64",
-    }),
+arena_junit_classifier_native_lib(
+    name = "arena_junit_native_osx_x86_64",
+    classifier = "osx-x86_64",
+    resources = glob(
+        ["prebuilt/src/main/resources/darwin-x86-64/**"],
+        allow_empty = True,
+    ),
+    classifier_artifacts = _ARENA_JUNIT_CLASSIFIER_ARTIFACTS,
 )
 
 _ARENA_JUNIT_JAVACOPTS = [
@@ -110,7 +67,7 @@ java_export(
     name = "arena_junit_maven",
     srcs = _ARENA_JUNIT_SRCS,
     javacopts = _ARENA_JUNIT_JAVACOPTS,
-    resources = [":arena_ffi_shared_for_maven"] + _ARENA_JUNIT_PREBUILT_RELEASE_NATIVE_LIBS,
+    classifier_artifacts = _ARENA_JUNIT_CLASSIFIER_ARTIFACTS,
     tags = ["manual"],
     maven_coordinates = _MAVEN_GROUP_ARTIFACT + ":" + ARENA_VERSION,
     pom_template = "pom_template.xml",
@@ -122,7 +79,7 @@ java_export(
     name = "arena_junit_maven_snapshot",
     srcs = _ARENA_JUNIT_SRCS,
     javacopts = _ARENA_JUNIT_JAVACOPTS,
-    resources = [":arena_ffi_shared_for_maven"] + _ARENA_JUNIT_PREBUILT_RELEASE_NATIVE_LIBS,
+    classifier_artifacts = _ARENA_JUNIT_CLASSIFIER_ARTIFACTS,
     tags = ["manual"],
     maven_coordinates = _MAVEN_GROUP_ARTIFACT + ":" + ARENA_VERSION + "-SNAPSHOT",
     pom_template = "pom_template.xml",

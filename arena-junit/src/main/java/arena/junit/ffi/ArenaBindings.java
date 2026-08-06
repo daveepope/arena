@@ -20,8 +20,10 @@ public final class ArenaBindings {
     ArenaNativeLib lib = ArenaNativeHolder.LIB;
     if (lib == null) {
       throw new ArenaBindingError(
-          "arena shared library not found (set ARENA_FFI_LIB, use Bazel runfiles, or ensure"
-              + " a platform-native arena_ffi_shared library is on the classpath/library path)");
+          "arena shared library not found (set ARENA_FFI_LIB, use Bazel runfiles, or add the"
+              + " os-maven-plugin extension and depend on arena-junit with classifier"
+              + " ${os.detected.classifier} to pull in a platform-native arena_ffi_shared"
+              + " library)");
     }
     return lib;
   }
