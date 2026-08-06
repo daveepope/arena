@@ -69,19 +69,22 @@ config_setting(
 
 copy_file(
     name = "arena_ffi_shared_for_wheel_linux",
-    src = "//arena-ffi:arena_ffi_shared",
+    src = "prebuilt/linux-x86-64/libarena_ffi_shared.so",
     out = "src/arena_pytest/libarena_ffi_shared.so",
 )
 
 copy_file(
     name = "arena_ffi_shared_for_wheel_macos",
-    src = "//arena-ffi:arena_ffi_shared",
+    src = select({
+        ":macos_aarch64": "prebuilt/darwin-aarch64/libarena_ffi_shared.dylib",
+        ":macos_x86_64": "prebuilt/darwin-x86-64/libarena_ffi_shared.dylib",
+    }),
     out = "src/arena_pytest/libarena_ffi_shared.dylib",
 )
 
 copy_file(
     name = "arena_ffi_shared_for_wheel_windows",
-    src = "//arena-ffi:arena_ffi_shared",
+    src = "prebuilt/windows-x86-64/arena_ffi_shared.dll",
     out = "src/arena_pytest/arena_ffi_shared.dll",
 )
 

@@ -1,7 +1,9 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use arena::dependency::RunnableDependency;
-use arena_localstack::LocalstackDependency;
+use arena_localstack::{
+    EventRuleSpec, EventRuleTarget, EventTargetKind, LocalstackDependency, ResourceCreator,
+};
 use aws_config::{BehaviorVersion, Region, SdkConfig};
 use aws_credential_types::Credentials;
 use aws_sdk_sqs as sqs;
@@ -65,11 +67,28 @@ impl TestContext {
             .unwrap_or_default()
             .as_millis();
         let queue_name = format!("arena-component-test-{ts}");
+        let fifo_queue_name = format!("arena-component-test-{ts}.fifo");
+        let event_bus_name = format!("arena-component-test-bus-{ts}");
+        let event_rule_name = format!("arena-component-test-rule-{ts}");
 
         let mut localstack = LocalstackDependency::builder("localstack-component")
             .with_port(ephemeral_tcp_port())
             .with_service("sqs")
+            .with_service("events")
             .with_queue(&queue_name)
+            .with_fifo_queue(&fifo_queue_name)
+            .with_event_bus(&event_bus_name)
+            .with_event_rule(EventRuleSpec {
+                name: event_rule_name,
+                event_bus: Some(event_bus_name.clone()),
+                event_pattern: r#"{"source": ["arena.component-test"]}"#.to_string(),
+                targets: vec![EventRuleTarget {
+                    target_id: "queue-target".to_string(),
+                    kind: EventTargetKind::SqsQueue {
+                        queue_name: queue_name.clone(),
+                    },
+                }],
+            })
             .build();
 
         let start_outcome = std::panic::AssertUnwindSafe(async { localstack.start().await })
@@ -162,6 +181,10 @@ async fn assert_send_receive_roundtrip(ctx: &TestContext) -> Result<(), String> 
     ))
 }
 
+async fn assert_purge_queue_succeeds(ctx: &TestContext) -> Result<(), String> {
+    ResourceCreator::purge_queue(&ctx.endpoint, &ctx.queue_url).await
+}
+
 #[tokio::test]
 async fn localstack_dependency_lifecycle_component_test() {
     init_test_logging();
@@ -177,9 +200,11 @@ async fn localstack_dependency_lifecycle_component_test() {
         queue = %ctx.queue_name,
         "begin send receive",
     );
-    let outcome = std::panic::AssertUnwindSafe(assert_send_receive_roundtrip(&ctx))
-        .catch_unwind()
-        .await;
+    let scenario = async {
+        assert_send_receive_roundtrip(&ctx).await?;
+        assert_purge_queue_succeeds(&ctx).await
+    };
+    let outcome = std::panic::AssertUnwindSafe(scenario).catch_unwind().await;
 
     ctx.stop().await;
 

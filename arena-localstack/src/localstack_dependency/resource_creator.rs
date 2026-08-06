@@ -327,3 +327,114 @@ fn path_to_zip_name(rel: &Path) -> String {
     }
     parts.join("/")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT_DIR_ID: AtomicU64 = AtomicU64::new(0);
+
+    fn setup_scratch_dir() -> PathBuf {
+        let id = NEXT_DIR_ID.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "arena-localstack-resource-creator-test-{}-{id}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).expect("create scratch dir");
+        dir
+    }
+
+    fn teardown_scratch_dir(dir: &Path) {
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn service_err_display_error_returns_display_string() {
+        let err = "boom";
+        assert_eq!(service_err(&err), "boom");
+    }
+
+    #[test]
+    fn path_to_zip_name_nested_path_joins_with_forward_slashes() {
+        let rel = Path::new("a").join("b").join("c.txt");
+        assert_eq!(path_to_zip_name(&rel), "a/b/c.txt");
+    }
+
+    #[test]
+    fn path_to_zip_name_single_component_returns_that_component() {
+        let rel = Path::new("handler.py");
+        assert_eq!(path_to_zip_name(rel), "handler.py");
+    }
+
+    #[test]
+    fn collect_files_non_directory_returns_error() {
+        let dir = setup_scratch_dir();
+        let not_a_dir = dir.join("missing");
+
+        let result = collect_files(&not_a_dir);
+
+        teardown_scratch_dir(&dir);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("is not a directory"));
+    }
+
+    #[test]
+    fn collect_files_nested_dirs_returns_sorted_relative_paths() {
+        let dir = setup_scratch_dir();
+        std::fs::create_dir_all(dir.join("nested")).expect("create nested dir");
+        std::fs::write(dir.join("b.txt"), b"b").expect("write b.txt");
+        std::fs::write(dir.join("a.txt"), b"a").expect("write a.txt");
+        std::fs::write(dir.join("nested/c.txt"), b"c").expect("write nested/c.txt");
+
+        let result = collect_files(&dir);
+
+        teardown_scratch_dir(&dir);
+        let files = result.expect("collect_files succeeds");
+        let names: Vec<String> = files.into_iter().map(|(name, _)| name).collect();
+        assert_eq!(names, vec!["a.txt", "b.txt", "nested/c.txt"]);
+    }
+
+    #[test]
+    fn zip_directory_empty_dir_returns_error() {
+        let dir = setup_scratch_dir();
+
+        let result = zip_directory(&dir);
+
+        teardown_scratch_dir(&dir);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("is empty"));
+    }
+
+    #[test]
+    fn zip_directory_missing_path_returns_error() {
+        let dir = setup_scratch_dir();
+        let missing = dir.join("does-not-exist");
+
+        let result = zip_directory(&missing);
+
+        teardown_scratch_dir(&dir);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("is not a directory"));
+    }
+
+    #[test]
+    fn zip_directory_with_files_returns_archive_containing_them() {
+        let dir = setup_scratch_dir();
+        std::fs::write(dir.join("handler.py"), b"def handler(event, ctx): pass")
+            .expect("write handler.py");
+
+        let result = zip_directory(&dir);
+
+        let bytes = result.expect("zip_directory succeeds");
+        let mut archive =
+            zip::ZipArchive::new(std::io::Cursor::new(bytes)).expect("bytes form a valid zip");
+        let mut names: Vec<String> = (0..archive.len())
+            .map(|i| archive.by_index(i).expect("read zip entry").name().to_string())
+            .collect();
+        names.sort();
+
+        teardown_scratch_dir(&dir);
+        assert_eq!(names, vec!["handler.py"]);
+    }
+}

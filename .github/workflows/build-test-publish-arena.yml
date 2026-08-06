@@ -567,8 +567,8 @@ jobs:
     steps:
       - run: echo "Ready to build release wheels."
 
-  wheel:
-    name: Build wheel (${{ matrix.runner }})
+  build_arena_ffi:
+    name: Build arena_ffi_shared (${{ matrix.runner }})
     needs: [changes, publish_gate]
     if: >-
       always() && !cancelled() &&
@@ -581,16 +581,20 @@ jobs:
       matrix:
         include:
           - runner: ubuntu-24.04
-            artifact: arena-pytest-wheel-ubuntu-24.04
+            artifact: arena-ffi-linux-x86-64
             disk-cache: build-test-publish-arena-ubuntu-24.04
+            built-lib-name: libarena_ffi.so
+            staged-lib-name: libarena_ffi_shared.so
           - runner: macos-latest
-            artifact: arena-pytest-wheel-macos-arm64
+            artifact: arena-ffi-darwin-aarch64
             disk-cache: build-test-publish-arena-macos-arm64
-            arena-ffi-artifact: arena-ffi-darwin-aarch64
+            built-lib-name: libarena_ffi.dylib
+            staged-lib-name: libarena_ffi_shared.dylib
           - runner: macos-15-intel
-            artifact: arena-pytest-wheel-macos-x86-64
+            artifact: arena-ffi-darwin-x86-64
             disk-cache: build-test-publish-arena-macos-intel
-            arena-ffi-artifact: arena-ffi-darwin-x86-64
+            built-lib-name: libarena_ffi.dylib
+            staged-lib-name: libarena_ffi_shared.dylib
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -614,6 +618,80 @@ jobs:
             echo "common:ci --remote_cache=" >> .bazelrc.user
             echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
+
+      - name: Build arena_ffi_shared
+        run: bazel build //arena-ffi:arena_ffi_shared --config=ci --config=release
+
+      - name: Stage arena_ffi_shared for release bundling
+        run: |
+          mkdir -p staged-arena-ffi
+          cp bazel-bin/arena-ffi/${{ matrix.built-lib-name }} staged-arena-ffi/${{ matrix.staged-lib-name }}
+
+      - name: Upload arena_ffi_shared artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ matrix.artifact }}
+          path: staged-arena-ffi/${{ matrix.staged-lib-name }}
+          if-no-files-found: error
+
+  wheel:
+    name: Build wheel (${{ matrix.runner }})
+    needs: [changes, publish_gate, build_arena_ffi]
+    if: >-
+      always() && !cancelled() &&
+      needs.publish_gate.result == 'success' &&
+      needs.build_arena_ffi.result == 'success'
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            artifact: arena-pytest-wheel-ubuntu-24.04
+            disk-cache: build-test-publish-arena-ubuntu-24.04
+            arena-ffi-artifact: arena-ffi-linux-x86-64
+            arena-ffi-prebuilt-dir: linux-x86-64
+          - runner: macos-latest
+            artifact: arena-pytest-wheel-macos-arm64
+            disk-cache: build-test-publish-arena-macos-arm64
+            arena-ffi-artifact: arena-ffi-darwin-aarch64
+            arena-ffi-prebuilt-dir: darwin-aarch64
+          - runner: macos-15-intel
+            artifact: arena-pytest-wheel-macos-x86-64
+            disk-cache: build-test-publish-arena-macos-intel
+            arena-ffi-artifact: arena-ffi-darwin-x86-64
+            arena-ffi-prebuilt-dir: darwin-x86-64
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ matrix.disk-cache }}
+          repository-cache: true
+
+      - name: Configure BuildBuddy remote cache
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
+          fi
+
+      - name: Download arena_ffi_shared
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ matrix.arena-ffi-artifact }}
+          path: arena-pytest/prebuilt/${{ matrix.arena-ffi-prebuilt-dir }}
 
       - name: Unique version for TestPyPI
         if: github.event_name == 'pull_request'
@@ -644,19 +722,6 @@ jobs:
           name: ${{ matrix.artifact }}
           path: bazel-bin/arena-pytest/*.whl
           if-no-files-found: error
-
-      - name: Stage arena_ffi_shared for release bundling
-        if: matrix.arena-ffi-artifact != ''
-        run: |
-          mkdir -p staged-arena-ffi
-          cp bazel-bin/arena-ffi/libarena_ffi.dylib staged-arena-ffi/libarena_ffi_shared.dylib
-
-      - name: Upload arena_ffi_shared artifact
-        if: matrix.arena-ffi-artifact != ''
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: ${{ matrix.arena-ffi-artifact }}
-          path: staged-arena-ffi/libarena_ffi_shared.dylib
           if-no-files-found: error
 
   publish_testpypi:
@@ -721,11 +786,11 @@ jobs:
     needs:
       - changes
       - publish_gate
-      - wheel
+      - build_arena_ffi
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
-      needs.wheel.result == 'success' &&
+      needs.build_arena_ffi.result == 'success' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
@@ -784,11 +849,11 @@ jobs:
     needs:
       - changes
       - publish_gate
-      - wheel
+      - build_arena_ffi
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
-      needs.wheel.result == 'success' &&
+      needs.build_arena_ffi.result == 'success' &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/master' &&
       needs.changes.outputs.version_changed == 'true'
@@ -868,11 +933,11 @@ jobs:
 
   publish_nuget_snapshot:
     name: Publish NuGet snapshot (Ubuntu 24.04)
-    needs: [changes, publish_gate, wheel]
+    needs: [changes, publish_gate, build_arena_ffi]
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
-      needs.wheel.result == 'success' &&
+      needs.build_arena_ffi.result == 'success' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
@@ -903,6 +968,12 @@ jobs:
             echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
+      - name: Download arena_ffi_shared (Linux x86-64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-linux-x86-64
+          path: arena-xunit/prebuilt/linux-x86-64
+
       - name: Download arena_ffi_shared (macOS ARM64)
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
@@ -927,11 +998,11 @@ jobs:
 
   publish_nuget:
     name: Publish NuGet (Ubuntu 24.04)
-    needs: [changes, publish_gate, wheel]
+    needs: [changes, publish_gate, build_arena_ffi]
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
-      needs.wheel.result == 'success' &&
+      needs.build_arena_ffi.result == 'success' &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/master' &&
       needs.changes.outputs.version_changed == 'true'
@@ -962,6 +1033,12 @@ jobs:
             echo "common:ci --remote_cache=" >> .bazelrc.user
             echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
+
+      - name: Download arena_ffi_shared (Linux x86-64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-linux-x86-64
+          path: arena-xunit/prebuilt/linux-x86-64
 
       - name: Download arena_ffi_shared (macOS ARM64)
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
