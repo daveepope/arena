@@ -12,7 +12,7 @@ arena-container = { workspace = true }
 arena-cryptography = { workspace = true }
 async-trait = { workspace = true }
 axum = { workspace = true, features = ["macros", "json"] }
-axum-server = { workspace = true, default-features = false, features = ["tls-rustls"] }
+axum-server = { workspace = true }
 futures = { workspace = true }
 base64 = { workspace = true }
 jsonwebtoken = { workspace = true }

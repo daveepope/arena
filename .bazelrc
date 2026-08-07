@@ -36,3 +36,5 @@ common:coverage --test_env=RUST_LOG=info
 
 common:release --compilation_mode=opt
 common:release --@rules_rust//rust/settings:extra_rustc_flag=-Cstrip=symbols
+common:release --@rules_rust//rust/settings:lto=fat
+common:release --@rules_rust//rust/settings:codegen_units=1

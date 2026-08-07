@@ -1,6 +1,7 @@
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::closed_arena::{OpenArenaHandle, OpenArenaRuntimeState};
+use crate::logging;
 use crate::panic_payload::panic_message;
 
 #[no_mangle]
@@ -23,6 +24,7 @@ pub extern "C" fn arena_close(handle: *mut OpenArenaHandle) {
             }
         });
     }));
+    logging::dispatcher_allowlists_reset();
     if let Err(payload) = outcome {
         tracing::error!(
             panic_message = %panic_message(&payload),

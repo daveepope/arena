@@ -10,6 +10,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -105,31 +106,51 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
     return root;
   }
 
-  private static MatchBuilder buildMatchBuilder(Class<?> root) {
+  private static MatchBuild buildMatchBuilder(Class<?> root) {
     MatchBuilder matchBuilder = new MatchBuilder(root.getSimpleName());
+    List<String> dependencyIds = new ArrayList<>();
+    List<String> componentIds = new ArrayList<>();
     for (Field field : root.getDeclaredFields()) {
       if (field.isAnnotationPresent(ArenaDependency.class)) {
-        matchBuilder.addDependency((ArenaMatchPiece) readStatic(field, root));
+        ArenaMatchPiece piece = (ArenaMatchPiece) readStatic(field, root);
+        matchBuilder.addDependency(piece);
+        if (field.getAnnotation(ArenaDependency.class).logs()) {
+          dependencyIds.add(piece.forFfi().get("identifier").asText());
+        }
       } else if (field.isAnnotationPresent(ArenaComponent.class)) {
-        matchBuilder.addComponent((ArenaMatchPiece) readStatic(field, root));
+        ArenaMatchPiece piece = (ArenaMatchPiece) readStatic(field, root);
+        matchBuilder.addComponent(piece);
+        if (field.getAnnotation(ArenaComponent.class).logs()) {
+          componentIds.add(piece.forFfi().get("identifier").asText());
+        }
       } else if (field.isAnnotationPresent(ArenaPlaybook.class)) {
         ArenaPlaybook annotation = field.getAnnotation(ArenaPlaybook.class);
         matchBuilder.registerPlaybook(
             (Playbook) readStatic(field, root), annotation.execOnDependencyStart());
       }
     }
-    return matchBuilder;
+    return new MatchBuild(matchBuilder, new LogIdentifiers(dependencyIds, componentIds));
   }
 
-  private static ClosedArena closedArenaFor(Class<?> root, Match match) {
+  private static ClosedArena closedArenaFor(Class<?> root, Match match, LogIdentifiers logIdentifiers) {
     Field loggerField = findLoggerField(root);
-    if (loggerField == null) {
-      return new ClosedArena(root.getSimpleName(), List.of(match));
-    }
-    Logger logger = (Logger) readStatic(loggerField, root);
-    ArenaLogLevel level = loggerField.getAnnotation(ArenaLogger.class).level();
-    return new ClosedArena(root.getSimpleName(), List.of(match), level, logger);
+    ArenaLogLevel level =
+        loggerField != null
+            ? loggerField.getAnnotation(ArenaLogger.class).level()
+            : ArenaLogLevel.INFO;
+    Logger logger = loggerField != null ? (Logger) readStatic(loggerField, root) : null;
+    return new ClosedArena(
+        root.getSimpleName(),
+        List.of(match),
+        level,
+        logger,
+        logIdentifiers.dependencyIds(),
+        logIdentifiers.componentIds());
   }
+
+  private record MatchBuild(MatchBuilder matchBuilder, LogIdentifiers logIdentifiers) {}
+
+  private record LogIdentifiers(List<String> dependencyIds, List<String> componentIds) {}
 
   private static Field findLoggerField(Class<?> root) {
     Field found = null;
@@ -210,8 +231,9 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
   }
 
   private static CachedArena buildAndOpen(Class<?> root) {
-    Match match = buildMatchBuilder(root).build();
-    ClosedArena closedArena = closedArenaFor(root, match);
+    MatchBuild matchBuild = buildMatchBuilder(root);
+    Match match = matchBuild.matchBuilder().build();
+    ClosedArena closedArena = closedArenaFor(root, match, matchBuild.logIdentifiers());
     OpenArena openArena;
     try {
       openArena = closedArena.open();

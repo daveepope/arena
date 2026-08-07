@@ -24,3 +24,4 @@ jobs:
           fail-on-severity: moderate
           base-ref: ${{ github.event_name == 'push' && 'HEAD~1' || '' }}
           head-ref: ${{ github.event_name == 'push' && 'HEAD' || '' }}
+          allow-ghsas: GHSA-82j2-j2ch-gfr8

@@ -19,3 +19,4 @@ venv/
 /bazel-*
 /.bazelrc.user
 /arena-junit/prebuilt/
+/arena-pytest/prebuilt/

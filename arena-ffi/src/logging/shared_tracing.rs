@@ -118,6 +118,11 @@ pub(super) fn dispatcher_component_allowlist_store_bytes(bytes: &[u8]) {
     DISPATCHER_COMPONENT_ALLOW.store(Arc::new(dispatcher_allow_json_bytes_store(bytes)));
 }
 
+pub(super) fn dispatcher_allowlists_reset() {
+    DISPATCHER_DEPENDENCY_ALLOW.store(Arc::new(Vec::new()));
+    DISPATCHER_COMPONENT_ALLOW.store(Arc::new(Vec::new()));
+}
+
 pub(super) unsafe fn dispatcher_dependency_allowlist_set_ptr(json_utf8: *const c_char) {
     if json_utf8.is_null() {
         DISPATCHER_DEPENDENCY_ALLOW.store(Arc::new(Vec::new()));

@@ -34,8 +34,8 @@ public final class ClosedArena {
       List<Match> matches,
       ArenaLogLevel logLevel,
       Logger slf4jLogger,
-      List<String> logComponentIds,
-      List<String> logDependencyIds) {
+      List<String> logDependencyIds,
+      List<String> logComponentIds) {
     this.name = name;
     this.matches = List.copyOf(matches);
     this.logLevel = logLevel;
