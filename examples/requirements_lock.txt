@@ -29,7 +29,7 @@ cffi==2.0.0
     # via cryptography
 click==8.3.3
     # via uvicorn
-cryptography==48.0.1
+cryptography==50.0.0
     # via pyjwt
 fastapi==0.136.1
     # via -r examples/requirements.txt
