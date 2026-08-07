@@ -1,4 +1,4 @@
-use crate::executable_component::ExecutableComponent;
+use crate::executable_component::{CpuProfileConfig, ExecutableComponent};
 use arena::healthcheck::ReadinessCheck;
 use arena::Component;
 use std::path::PathBuf;
@@ -25,6 +25,7 @@ pub struct ExecutableComponentBuilder {
     readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
     cpu_profile_output: Option<PathBuf>,
     cpu_profile_auto_open: bool,
+    cpu_profile_hotspots: bool,
 }
 
 const DEFAULT_READINESS_TIMEOUT_MS: u64 = 10_000;
@@ -45,6 +46,7 @@ impl ExecutableComponentBuilder {
             readiness_checks: Vec::new(),
             cpu_profile_output: None,
             cpu_profile_auto_open: false,
+            cpu_profile_hotspots: false,
         }
     }
 
@@ -106,6 +108,11 @@ impl ExecutableComponentBuilder {
 
     pub fn with_cpu_profile_auto_open(mut self) -> Self {
         self.cpu_profile_auto_open = true;
+        self
+    }
+
+    pub fn with_hotspots(mut self) -> Self {
+        self.cpu_profile_hotspots = true;
         self
     }
 
@@ -178,6 +185,7 @@ impl ExecutableComponentBuilder {
         });
 
         let cpu_profile_auto_open = self.cpu_profile_auto_open;
+        let cpu_profile_hotspots = self.cpu_profile_hotspots;
         let cpu_profile = self.cpu_profile_output.map(|output_path| {
             let backend = match &self.build_tool {
                 Some(BuildTool::Cargo) => arena_profile::CpuProfilerBackend::Perf,
@@ -206,7 +214,12 @@ impl ExecutableComponentBuilder {
                     self.identifier
                 ),
             };
-            (backend, output_path, cpu_profile_auto_open)
+            CpuProfileConfig {
+                backend,
+                output_path,
+                auto_open: cpu_profile_auto_open,
+                include_hotspots: cpu_profile_hotspots,
+            }
         });
 
         let mut component = ExecutableComponent::new(self.identifier);
@@ -272,9 +285,10 @@ mod tests {
             .with_cpu_profile("/tmp/does-not-matter.html")
             .build();
 
-        let (backend, _, auto_open) = component.cpu_profile.expect("cpu profile configured");
-        assert_eq!(backend, arena_profile::CpuProfilerBackend::Perf);
-        assert!(!auto_open);
+        let cfg = component.cpu_profile.expect("cpu profile configured");
+        assert_eq!(cfg.backend, arena_profile::CpuProfilerBackend::Perf);
+        assert!(!cfg.auto_open);
+        assert!(!cfg.include_hotspots);
     }
 
     #[test]
@@ -286,8 +300,8 @@ mod tests {
                 .with_cpu_profile("/tmp/does-not-matter.html")
                 .build();
 
-            let (backend, _, _) = component.cpu_profile.expect("cpu profile configured");
-            assert_eq!(backend, arena_profile::CpuProfilerBackend::AsyncProfiler);
+            let cfg = component.cpu_profile.expect("cpu profile configured");
+            assert_eq!(cfg.backend, arena_profile::CpuProfilerBackend::AsyncProfiler);
         }
     }
 
@@ -300,9 +314,22 @@ mod tests {
             .with_cpu_profile_auto_open()
             .build();
 
-        let (backend, _, auto_open) = component.cpu_profile.expect("cpu profile configured");
-        assert_eq!(backend, arena_profile::CpuProfilerBackend::PySpy);
-        assert!(auto_open);
+        let cfg = component.cpu_profile.expect("cpu profile configured");
+        assert_eq!(cfg.backend, arena_profile::CpuProfilerBackend::PySpy);
+        assert!(cfg.auto_open);
+    }
+
+    #[test]
+    fn build_with_hotspots_enables_include_hotspots() {
+        let component = ExecutableComponentBuilder::new("builder-test")
+            .with_build_tool(BuildTool::Cargo)
+            .with_executable_path("/bin/true")
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .with_hotspots()
+            .build();
+
+        let cfg = component.cpu_profile.expect("cpu profile configured");
+        assert!(cfg.include_hotspots);
     }
 
     #[test]

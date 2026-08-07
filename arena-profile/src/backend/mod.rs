@@ -21,6 +21,7 @@ pub(crate) fn resolve_binary(
     binary: &'static str,
     install_hint: &'static str,
 ) -> Result<String, CpuProfileError> {
+    clear_stale_runfiles_manifest_env();
     match runfiles::Runfiles::create() {
         Ok(r) => {
             for rlocation in rlocations {
@@ -39,6 +40,14 @@ pub(crate) fn resolve_binary(
         Ok(path_fallback.to_string())
     } else {
         Err(CpuProfileError::MissingBinary { binary, install_hint })
+    }
+}
+
+fn clear_stale_runfiles_manifest_env() {
+    if let Some(manifest) = std::env::var_os("RUNFILES_MANIFEST_FILE") {
+        if !manifest.is_empty() && !std::path::Path::new(&manifest).exists() {
+            std::env::remove_var("RUNFILES_MANIFEST_FILE");
+        }
     }
 }
 
@@ -134,6 +143,34 @@ mod tests {
             result,
             Err(CpuProfileError::MissingBinary { binary: "fake-tool", .. })
         ));
+    }
+
+    #[test]
+    fn clear_stale_runfiles_manifest_env_nonexistent_path_removes_var() {
+        std::env::set_var("RUNFILES_MANIFEST_FILE", "/nonexistent/arena-profile-fake-manifest");
+
+        clear_stale_runfiles_manifest_env();
+
+        assert!(std::env::var_os("RUNFILES_MANIFEST_FILE").is_none());
+    }
+
+    #[test]
+    fn clear_stale_runfiles_manifest_env_existing_path_leaves_var_set() {
+        let real_file = std::env::temp_dir().join(format!(
+            "arena-profile-runfiles-manifest-test-{}.txt",
+            std::process::id()
+        ));
+        std::fs::write(&real_file, "").expect("write manifest fixture");
+        std::env::set_var("RUNFILES_MANIFEST_FILE", &real_file);
+
+        clear_stale_runfiles_manifest_env();
+
+        assert_eq!(
+            std::env::var_os("RUNFILES_MANIFEST_FILE").as_deref(),
+            Some(real_file.as_os_str())
+        );
+        std::env::remove_var("RUNFILES_MANIFEST_FILE");
+        let _ = std::fs::remove_file(&real_file);
     }
 
     #[test]

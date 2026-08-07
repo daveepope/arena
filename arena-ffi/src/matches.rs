@@ -127,6 +127,29 @@ mod tests {
         .expect("valid match config")
     }
 
+    fn exec_component_with_cpu_profile_config(build_tool: Option<&str>) -> MatchConfig {
+        let build_tool_field = match build_tool {
+            Some(tool) => format!(r#""build_tool": "{tool}","#),
+            None => String::new(),
+        };
+        serde_json::from_str(&format!(
+            r#"{{
+                "components": [
+                    {{
+                        "type": "exec",
+                        "identifier": "exec",
+                        "executable_path": "/bin/true",
+                        {build_tool_field}
+                        "cpu_profile_output": "/tmp/does-not-matter.html",
+                        "cpu_profile_auto_open": false,
+                        "cpu_profile_hotspots": true
+                    }}
+                ]
+            }}"#
+        ))
+        .expect("valid match config")
+    }
+
     fn full_match_config_with_playbook() -> MatchConfig {
         serde_json::from_str(
             r#"{
@@ -160,6 +183,33 @@ mod tests {
             .block_on(build_components_async(&config))
             .expect("exec variant builds");
         assert_eq!(components.len(), 1);
+    }
+
+    #[test]
+    fn build_components_async_exec_with_cpu_profile_and_supported_build_tool_succeeds() {
+        let config = exec_component_with_cpu_profile_config(Some("python"));
+        let result = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(build_components_async(&config));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn build_components_async_exec_with_cpu_profile_and_no_build_tool_returns_err() {
+        let config = exec_component_with_cpu_profile_config(None);
+        let result = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(build_components_async(&config));
+        assert!(matches!(result, Err(e) if e.contains("cpu_profile_output requires build_tool")));
+    }
+
+    #[test]
+    fn build_components_async_exec_with_cpu_profile_and_unsupported_build_tool_returns_err() {
+        let config = exec_component_with_cpu_profile_config(Some("dotnet"));
+        let result = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(build_components_async(&config));
+        assert!(matches!(result, Err(e) if e.contains("cpu_profile_output requires build_tool")));
     }
 
     #[test]

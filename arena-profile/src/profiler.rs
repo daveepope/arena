@@ -62,14 +62,20 @@ pub struct WrappedProfileSession {
     sampler: Box<dyn WrappingSampler>,
     state: WrapState,
     output_path: PathBuf,
+    include_hotspots: bool,
 }
 
 impl WrappedProfileSession {
+    pub fn with_hotspots(mut self) -> Self {
+        self.include_hotspots = true;
+        self
+    }
+
     pub fn finish(self, wrapping_child: &mut Child) -> Result<(), CpuProfileError> {
         let folded_path = self
             .sampler
             .collect(self.state, wrapping_child, FINISH_TIMEOUT)?;
-        render_collected(&folded_path, &self.output_path)
+        render_collected(&folded_path, &self.output_path, self.include_hotspots)
     }
 }
 
@@ -77,14 +83,20 @@ pub struct AugmentedProfileSession {
     sampler: Box<dyn ArgAugmentingSampler>,
     state: AugmentState,
     output_path: PathBuf,
+    include_hotspots: bool,
 }
 
 impl AugmentedProfileSession {
+    pub fn with_hotspots(mut self) -> Self {
+        self.include_hotspots = true;
+        self
+    }
+
     pub fn finish(self, augmented_process: &mut Child) -> Result<(), CpuProfileError> {
         crate::backend::wait_bounded(augmented_process, FINISH_TIMEOUT)
             .map_err(|e| CpuProfileError::Finish(format!("profiled process did not exit cleanly: {e}")))?;
         let folded_path = self.sampler.collect(self.state, FINISH_TIMEOUT)?;
-        render_collected(&folded_path, &self.output_path)
+        render_collected(&folded_path, &self.output_path, self.include_hotspots)
     }
 }
 
@@ -99,6 +111,23 @@ pub enum PreparedLaunch {
         shutdown_signal: ShutdownSignal,
         session: AugmentedProfileSession,
     },
+}
+
+impl PreparedLaunch {
+    pub fn with_hotspots(self) -> Self {
+        match self {
+            PreparedLaunch::Wrapped { program, args, session } => PreparedLaunch::Wrapped {
+                program,
+                args,
+                session: session.with_hotspots(),
+            },
+            PreparedLaunch::ArgsAugmented { args, shutdown_signal, session } => PreparedLaunch::ArgsAugmented {
+                args,
+                shutdown_signal,
+                session: session.with_hotspots(),
+            },
+        }
+    }
 }
 
 pub fn prepare_cpu_profile(
@@ -134,6 +163,7 @@ fn prepare_wrapped(
             sampler,
             state,
             output_path,
+            include_hotspots: false,
         },
     })
 }
@@ -151,18 +181,23 @@ fn prepare_augmented(
             sampler,
             state,
             output_path,
+            include_hotspots: false,
         },
     })
 }
 
-fn render_collected(folded_path: &std::path::Path, output_path: &std::path::Path) -> Result<(), CpuProfileError> {
+fn render_collected(
+    folded_path: &std::path::Path,
+    output_path: &std::path::Path,
+    include_hotspots: bool,
+) -> Result<(), CpuProfileError> {
     let folded_file = std::fs::File::open(folded_path).map_err(|e| {
         CpuProfileError::Finish(format!(
             "failed to read folded stacks at {}: {e}",
             folded_path.display()
         ))
     })?;
-    let render_result = render_folded_to_html(folded_file, output_path);
+    let render_result = render_folded_to_html(folded_file, output_path, include_hotspots);
     let _ = std::fs::remove_file(folded_path);
     render_result?;
     Ok(())
@@ -264,8 +299,10 @@ mod tests {
     }
 
     fn write_sample_folded_stacks(name: &str) -> PathBuf {
+        static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let unique_id = NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!(
-            "arena-profile-test-folded-{name}-{}.folded",
+            "arena-profile-test-folded-{name}-{}-{unique_id}.folded",
             std::process::id()
         ));
         std::fs::write(&path, "main;handler;compute 42\n").expect("write sample folded stacks");
@@ -435,7 +472,7 @@ mod tests {
             std::process::id()
         ));
 
-        let result = render_collected(&missing, &temp_html_path("render-collected-missing"));
+        let result = render_collected(&missing, &temp_html_path("render-collected-missing"), false);
 
         assert!(matches!(result, Err(CpuProfileError::Finish(_))));
     }
@@ -445,10 +482,36 @@ mod tests {
         let folded_path = write_sample_folded_stacks("render-collected-cleanup");
         let output_path = temp_html_path("render-collected-cleanup");
 
-        let result = render_collected(&folded_path, &output_path);
+        let result = render_collected(&folded_path, &output_path, false);
 
         assert!(result.is_ok());
         assert!(!folded_path.exists());
+        let _ = std::fs::remove_file(&output_path);
+    }
+
+    #[test]
+    fn wrapped_finish_with_hotspots_enabled_renders_hotspots_table() {
+        let output_path = temp_html_path("wrapped-finish-hotspots");
+        let sampler = FakeWrappingSampler {
+            outcome: WrapOutcome::CollectSucceeds,
+            wrapped_program: "/usr/bin/perf",
+        };
+        let PreparedLaunch::Wrapped { session, .. } =
+            prepare_wrapped(Box::new(sampler), &sample_request(), output_path.clone()).unwrap()
+        else {
+            panic!("expected Wrapped variant");
+        };
+        let mut placeholder_child = std::process::Command::new("true")
+            .spawn()
+            .expect("spawn placeholder child");
+
+        let result = session.with_hotspots().finish(&mut placeholder_child);
+        let _ = placeholder_child.wait();
+
+        assert!(result.is_ok());
+        let report = std::fs::read_to_string(&output_path).expect("read rendered report");
+        assert!(report.contains("arena-profile-hotspots"));
+        assert!(report.contains("compute"));
         let _ = std::fs::remove_file(&output_path);
     }
 }

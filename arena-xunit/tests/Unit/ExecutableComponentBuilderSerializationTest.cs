@@ -114,4 +114,25 @@ public class ExecutableComponentBuilderSerializationTest
             .Build();
         Assert.StartsWith("arena-exec-", comp.Identifier);
     }
+
+    [Fact]
+    public void WithCpuProfile_Called_ThrowsNotSupported()
+    {
+        var builder = new ExecutableComponentBuilder("test");
+        Assert.Throws<System.NotSupportedException>(() => builder.WithCpuProfile("/tmp/profile.html"));
+    }
+
+    [Fact]
+    public void WithCpuProfileAutoOpen_Called_ThrowsNotSupported()
+    {
+        var builder = new ExecutableComponentBuilder("test");
+        Assert.Throws<System.NotSupportedException>(() => builder.WithCpuProfileAutoOpen());
+    }
+
+    [Fact]
+    public void WithHotspots_Called_ThrowsNotSupported()
+    {
+        var builder = new ExecutableComponentBuilder("test");
+        Assert.Throws<System.NotSupportedException>(() => builder.WithHotspots());
+    }
 }

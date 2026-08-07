@@ -56,6 +56,21 @@ public final class ExecutableComponentBuilder {
     return this;
   }
 
+  public ExecutableComponentBuilder withCpuProfile(String outputPath) {
+    config.put("cpu_profile_output", outputPath);
+    return this;
+  }
+
+  public ExecutableComponentBuilder withCpuProfileAutoOpen() {
+    config.put("cpu_profile_auto_open", true);
+    return this;
+  }
+
+  public ExecutableComponentBuilder withHotspots() {
+    config.put("cpu_profile_hotspots", true);
+    return this;
+  }
+
   public ExecutableComponentBuilder withReadinessCheck(ReadinessCheck check, String target) {
     return withReadinessCheck(check, target, 10_000L);
   }

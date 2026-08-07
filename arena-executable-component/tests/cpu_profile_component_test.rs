@@ -30,6 +30,33 @@ async fn stop_pyspy_wrapped_profile_configured_renders_html_report() {
 }
 
 #[tokio::test]
+async fn stop_pyspy_wrapped_profile_with_hotspots_renders_hotspots_table() {
+    let output_path = std::env::temp_dir().join(format!(
+        "arena-executable-component-pyspy-hotspots-test-{}.html",
+        std::process::id()
+    ));
+
+    let mut component = ExecutableComponent::builder("cpu-profile-pyspy-hotspots-test")
+        .with_build_tool(BuildTool::Python)
+        .with_executable_path("/usr/bin/python3")
+        .with_runtime_arg("flag", "-c")
+        .with_runtime_arg("script", "while True:\n    pass\n")
+        .with_cpu_profile(&output_path)
+        .with_hotspots()
+        .build();
+
+    component.start().await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    component.stop().await;
+
+    let report = std::fs::read_to_string(&output_path).expect("read html report");
+    assert!(report.contains("<svg"));
+    assert!(report.contains("arena-profile-hotspots"));
+    assert!(report.contains("severity-badge"));
+    let _ = std::fs::remove_file(&output_path);
+}
+
+#[tokio::test]
 async fn stop_async_profiler_arg_augmented_profile_configured_renders_html_report() {
     let fixture_path = std::env::temp_dir().join(format!(
         "arena-executable-component-asprof-fixture-{}.java",

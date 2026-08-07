@@ -10,6 +10,7 @@ license = "todo"
 path = "src/lib.rs"
 
 [dependencies]
+base64 = { workspace = true }
 inferno = { workspace = true }
 runfiles = { workspace = true }
 tracing = { workspace = true }

@@ -21,6 +21,7 @@ rust_library(
     name = "arena_profile",
     srcs = glob(["src/**/*.rs"]),
     edition = "2021",
+    compile_data = ["//:arena-logo.png"],
     data = select({
         ":linux_x86_64": ["@async_profiler_linux_x64//:lib/libasyncProfiler.so"],
         ":linux_aarch64": ["@async_profiler_linux_arm64//:lib/libasyncProfiler.so"],

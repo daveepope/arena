@@ -13,6 +13,7 @@ class BuildTool(Enum):
     DOTNET = "dotnet"
     MAKE = "make"
     CMAKE = "cmake"
+    PYTHON = "python"
 
     @staticmethod
     def custom(command: str, args: List[str]) -> Dict[str, Any]:
@@ -51,6 +52,18 @@ class ExecutableComponentBuilder:
 
     def with_runtime_arg(self, name: str, value: str) -> "ExecutableComponentBuilder":
         self._config["runtime_args"].append({"name": name, "value": value})
+        return self
+
+    def with_cpu_profile(self, output_path: str) -> "ExecutableComponentBuilder":
+        self._config["cpu_profile_output"] = output_path
+        return self
+
+    def with_cpu_profile_auto_open(self) -> "ExecutableComponentBuilder":
+        self._config["cpu_profile_auto_open"] = True
+        return self
+
+    def with_hotspots(self) -> "ExecutableComponentBuilder":
+        self._config["cpu_profile_hotspots"] = True
         return self
 
     def with_readiness_check(

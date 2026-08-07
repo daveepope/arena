@@ -14,6 +14,13 @@ enum ActiveCpuProfile {
     ArgAugmented(AugmentedProfileSession, ShutdownSignal),
 }
 
+pub(crate) struct CpuProfileConfig {
+    pub(crate) backend: arena_profile::CpuProfilerBackend,
+    pub(crate) output_path: PathBuf,
+    pub(crate) auto_open: bool,
+    pub(crate) include_hotspots: bool,
+}
+
 pub struct ExecutableComponent {
     pub(crate) identifier: String,
     pub(crate) children: Option<Vec<Box<dyn RunnableComponent>>>,
@@ -23,7 +30,7 @@ pub struct ExecutableComponent {
     pub(crate) process_handle: Option<Child>,
     pub(crate) stopped: bool,
     pub(crate) readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
-    pub(crate) cpu_profile: Option<(arena_profile::CpuProfilerBackend, PathBuf, bool)>,
+    pub(crate) cpu_profile: Option<CpuProfileConfig>,
     active_cpu_profile: Option<ActiveCpuProfile>,
 }
 
@@ -127,13 +134,15 @@ impl ExecutableComponent {
                     phase = "cpu_profile_finish_done",
                     "cpu profile rendered",
                 );
-                if let Some((_, output_path, true)) = self.cpu_profile.as_ref() {
-                    if let Err(e) = arena_profile::open_report(output_path) {
-                        tracing::warn!(
-                            component = %self.identifier,
-                            error = %e,
-                            "failed to open cpu profile report",
-                        );
+                if let Some(cfg) = self.cpu_profile.as_ref() {
+                    if cfg.auto_open {
+                        if let Err(e) = arena_profile::open_report(&cfg.output_path) {
+                            tracing::warn!(
+                                component = %self.identifier,
+                                error = %e,
+                                "failed to open cpu profile report",
+                            );
+                        }
                     }
                 }
             }
@@ -174,15 +183,16 @@ impl ExecutableComponent {
 
         let base_args: Vec<String> = self.runtime_args.iter().map(|(_, v)| v.clone()).collect();
 
-        let (spawn_program, spawn_args, active_profile) = if let Some((backend, output_path, _)) =
-            self.cpu_profile.as_ref()
-        {
+        let (spawn_program, spawn_args, active_profile) = if let Some(cfg) = self.cpu_profile.as_ref() {
             let request = arena_profile::LaunchRequest {
                 program: executable_path.clone(),
                 args: base_args,
             };
-            let prepared = arena_profile::prepare_cpu_profile(*backend, request, output_path.clone())
+            let mut prepared = arena_profile::prepare_cpu_profile(cfg.backend, request, cfg.output_path.clone())
                 .map_err(|e| format!("cpu profiler preparation failed: {}", e))?;
+            if cfg.include_hotspots {
+                prepared = prepared.with_hotspots();
+            }
             match prepared {
                 PreparedLaunch::Wrapped { program, args, session } => {
                     (program, args, Some(ActiveCpuProfile::Wrapped(session)))
@@ -436,11 +446,12 @@ mod tests {
     #[test]
     fn on_cpu_profile_finished_ok_without_auto_open_does_not_attempt_open() {
         let mut component = new_component("cpu-profile-test");
-        component.cpu_profile = Some((
-            arena_profile::CpuProfilerBackend::Perf,
-            PathBuf::from("/tmp/does-not-matter.html"),
-            false,
-        ));
+        component.cpu_profile = Some(CpuProfileConfig {
+            backend: arena_profile::CpuProfilerBackend::Perf,
+            output_path: PathBuf::from("/tmp/does-not-matter.html"),
+            auto_open: false,
+            include_hotspots: false,
+        });
 
         component.on_cpu_profile_finished(Ok(()));
     }
