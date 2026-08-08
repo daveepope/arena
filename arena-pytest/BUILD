@@ -24,7 +24,7 @@ ARENA_PYTEST_CLASSIFIERS = [
 ]
 
 exports_files(
-    ["README.md", "LICENSE", "requirements.txt", "requirements_lock.txt"],
+    ["LICENSE", "requirements.txt", "requirements_lock.txt"],
     visibility = ["//visibility:public"],
 )
 
@@ -174,7 +174,7 @@ py_wheel(
     strip_path_prefixes = ["arena-pytest/src"],
     author = "David Pope",
     classifiers = ARENA_PYTEST_CLASSIFIERS,
-    description_file = "DESCRIPTION.md",
+    description_file = "//:README.md",
     description_content_type = "text/markdown",
     homepage = "https://github.com/daveepope/arena",
     license = "MIT",

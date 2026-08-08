@@ -1,6 +1,6 @@
 module(
     name = "arena",
-    version = "4.1.0",
+    version = "5.0.0",
 )
 
 arena_version_ext = use_extension("//tools:arena_version.bzl", "arena_version")
@@ -81,6 +81,8 @@ arena_java_maven.install(
         "org.junit.jupiter:junit-jupiter-params:5.11.4",
         "org.junit.jupiter:junit-jupiter-engine:5.11.4",
         "org.junit.platform:junit-platform-console:1.11.4",
+        "org.junit.platform:junit-platform-suite-api:1.11.4",
+        "org.junit.platform:junit-platform-suite-engine:1.11.4",
         "org.apache.kafka:kafka-clients:3.9.0",
         "org.springframework.boot:spring-boot-starter-web:3.5.3",
         "org.springframework.boot:spring-boot-starter-jdbc:3.5.3",

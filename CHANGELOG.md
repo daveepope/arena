@@ -5,17 +5,239 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.1.0]
+## [5.0.0]
+
+### Breaking
+
+- Scoped `Managed*Playbook` activation now runs after the test body by default instead of before (Python, Java, .NET); custom Python `Playbook` subclasses must now extend `ManagedPlaybook` or `UnmanagedPlaybook`
 
 ### Added
 
 - Unmanaged playbook support in arena-pytest, arena-junit, arena-xunit
+- arena-junit: share one arena across multiple test classes via `@Suite`/`@SelectClasses` and `@Arena(value = ...)`
 - `--bump major/minor/patch` flag for the version bump script
 
 ### Changed
 
 - arena-xunit `ManagedPlaybook.Run()` is now overridable
+- arena-pytest and arena-xunit published packages use the root `README.md` instead of per-package copies
 
 ### Fixed
 
 - arena-junit `ActivePlaybook` no longer rejects a zero/null handle
+
+### Removed
+
+- arena-pytest and arena-xunit per-package `README.md`/`DESCRIPTION.md` files
+
+## [4.0.1]
+
+### Fixed
+
+- Bump `cryptography` 48.0.1 → 50.0.0 in examples (CVE fix)
+
+## [4.0.0]
+
+Not published to PyPI, Maven Central, or NuGet due to a GitHub Actions outage; superseded immediately by 4.0.1.
+
+### Changed
+
+- Reduced release build size; split the release build matrix per platform for arena-junit
+- Release builds now run on every merge to master
+
+### Fixed
+
+- Rust builds on Intel Mac (missing `x86_64-apple-darwin` in `crate.from_cargo` `supported_platform_triples`)
+- Maven Central publish pipeline
+
+## [3.7.0]
+
+### Added
+
+- Scoped `@ArenaLogger`-style logging annotation for arena-junit and arena-xunit's `ArenaCollectionFixture`
+- FFI test coverage for postgres and Temporal dependency wiring
+
+### Fixed
+
+- Dependency log forwarding gaps
+
+## [3.6.0]
+
+### Added
+
+- `ManagedPostgresPlaybook` across arena-pytest, arena-junit, and arena-xunit, with FFI bindings and a Postgres playbook manifest
+
+## [3.5.9]
+
+### Fixed
+
+- Release publish pipeline (CI workflow, `.bazelrc`, lockfile sync)
+
+## [3.5.7]
+
+### Fixed
+
+- Native library resolution/packaging for arena-junit and arena-xunit (`ArenaBindings`, `ArenaNativeLib`, `ArenaPaths`)
+
+## [3.5.6]
+
+### Changed
+
+- arena-junit, arena-pytest, and arena-xunit package description metadata (POM, `DESCRIPTION.md`, nuspec)
+
+## [3.5.5]
+
+### Fixed
+
+- Renamed the arena-xunit NuGet assembly/package for publishing
+
+## [3.5.4]
+
+### Changed
+
+- Dependency lockfile repin; CI workflow tweak
+
+## [3.5.3]
+
+### Added
+
+- Publish arena-xunit to NuGet, including the `csharp_nuget_package` Bazel packaging toolchain (nuspec template, push script, pinned-version checks)
+
+## [3.5.2]
+
+### Changed
+
+- Default container image CVE scan is now a label-gated GitHub Actions option instead of always running
+
+## [3.5.1]
+
+### Added
+
+- TCP readiness check alongside the existing HTTP readiness check
+
+## [3.5.0]
+
+### Added
+
+- STARTTLS support for arena-smtp (`with_starttls()` / `.withStarttls()`), backed by an ephemeral self-signed certificate shared via arena-container
+
+## [3.4.0]
+
+### Added
+
+- arena-smtp mail-capture dependency crate, wired into arena-pytest (`SmtpDependencyBuilder`) and arena-junit (`SmtpDependency`)
+
+## [3.3.0]
+
+### Added
+
+- Temporal dependency support in arena-pytest and arena-junit, with FFI bindings
+
+## [3.2.1]
+
+### Fixed
+
+- Bump jackson-databind, postgresql, and mssql-jdbc to patched versions (CVE fixes)
+
+## [3.2.0]
+
+### Added
+
+- `arena-temporal` dependency crate with a gRPC-based readiness check and pinned image tag
+
+## [3.1.1]
+
+### Changed
+
+- Enabled BuildBuddy remote build caching for CI
+
+## [3.1.0]
+
+### Added
+
+- Best-effort container image CVE search (`scripts/check_container_cves.py`) and bumped default image versions
+
+## [3.0.1]
+
+### Fixed
+
+- Bump `serde_with` 3.18.0 → 3.21.0
+
+## [3.0.0]
+
+### Breaking
+
+- arena-junit now targets Java 25
+
+### Removed
+
+- The unrelated `arbiter` crate and its tests
+
+## [2.0.0]
+
+### Breaking
+
+- arena-junit examples move from a separate `ArenaFixture` class to declaring `@ArenaDependency`/`@ArenaComponent` directly on the test class (the `@Arena` annotation pattern)
+
+## [1.2.4]
+
+### Fixed
+
+- Maven Central publish CI workflow
+
+## [1.2.3]
+
+### Fixed
+
+- Maven Central publish script
+
+## [1.2.2]
+
+### Added
+
+- Publish arena-junit to Maven Central, including the publish script and POM template
+
+## [1.2.1]
+
+### Added
+
+- Dependency review workflow
+
+### Changed
+
+- Pinned default container image tags/versions with a security scan check
+
+## [1.2.0]
+
+### Added
+
+- Container image default/version management scripts (`container_defaults.py`, image matrix, default-images codegen)
+
+## [1.1.1]
+
+### Fixed
+
+- Bump `cmov` 0.5.3 → 0.5.4
+
+## [1.1.0]
+
+### Changed
+
+- Simplified CI/CD: publish now triggers on version update instead of PR labels; removed the PR-label version-bump feature
+
+## [1.0.0]
+
+### Added
+
+- First stable release
+- `tools/version_sync.bzl` and related scripts to keep the workspace version in sync
+
+### Changed
+
+- CI now enforces a 3-day dependency release-age gate and locks down `MODULE.bazel.lock`
+
+## [0.4.0-b1] (pre-release)
+
+### Added
+
+- Initial PyPI pre-release

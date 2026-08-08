@@ -37,6 +37,10 @@
 - **Do not add comments** in source (no `//`, `///`, `//!`, or block comments) when making changes. **Do not add doc comments** or expand existing commentary. Commenting and documentation are **the developer’s responsibility**.
 - If the developer **asks you to add comments**, **refuse** and explain that they should **read and understand the code**, then **document the public API** (e.g. `rustdoc` on `pub` items) themselves. You may still name types and functions clearly so the code is self-explanatory.
 
+## Changelog
+
+- When adding an entry to **`CHANGELOG.md`**, keep it **short and concise**: one line per change, no prose explanations, no restating the diff.
+
 ## Construction patterns
 
 - Build **`RunnableDependency`** and **`RunnableComponent`** types through **builders**. Use **`pub(crate) fn new`** (or equivalent) when only the owning crate’s builder should construct the type.

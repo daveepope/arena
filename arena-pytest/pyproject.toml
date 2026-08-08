@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "arena-pytest"
 dynamic = ["version"]
 description = "pytest integration for Arena"
-readme = "DESCRIPTION.md"
+readme = "../README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.9"

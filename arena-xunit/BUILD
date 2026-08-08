@@ -132,7 +132,7 @@ csharp_nuget_package(
     target_framework = "netstandard2.0",
     dependencies = _ARENA_XUNIT_NUGET_DEPENDENCIES,
     native_libs = _ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS,
-    readme = "README.md",
+    readme = "//:README.md",
     tags = ["manual"],
     visibility = ["//visibility:public"],
 )
@@ -147,7 +147,7 @@ csharp_nuget_package(
     dependencies = _ARENA_XUNIT_NUGET_DEPENDENCIES,
     native_libs = _ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS,
     allow_prerelease = True,
-    readme = "README.md",
+    readme = "//:README.md",
     tags = ["manual"],
     visibility = ["//visibility:public"],
 )

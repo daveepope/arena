@@ -586,9 +586,10 @@ final class PlaybookInvocationExtensionUnitTest {
 
   private static void seedOpenArena(Class<?> hostClass, OpenArena openArena) throws Exception {
     Class<?> cachedArenaClass = Class.forName("arena.junit.ArenaExtension$CachedArena");
-    Constructor<?> cachedArenaConstructor = cachedArenaClass.getDeclaredConstructor(OpenArena.class);
+    Constructor<?> cachedArenaConstructor =
+        cachedArenaClass.getDeclaredConstructor(OpenArena.class, Integer.class);
     cachedArenaConstructor.setAccessible(true);
-    Object cachedArena = cachedArenaConstructor.newInstance(openArena);
+    Object cachedArena = cachedArenaConstructor.newInstance(openArena, null);
     Field refsField = cachedArenaClass.getDeclaredField("refs");
     refsField.setAccessible(true);
     refsField.setInt(cachedArena, 1);

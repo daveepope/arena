@@ -29,6 +29,8 @@ import org.junit.jupiter.api.extension.ExecutableInvoker;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.TestInstances;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.platform.suite.api.SelectClasses;
+import org.junit.platform.suite.api.Suite;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +60,39 @@ final class ArenaExtensionLifecycleComponentTest {
   abstract static class MiddleLayer extends SharedTopology {}
 
   static final class SecondConsumer extends MiddleLayer {}
+
+  static final class SuiteDefs {
+    @ArenaDependency
+    static final OauthDependency oauth =
+        buildOauth("arena-extension-suite-defs-oauth", EphemeralTestRuntime.ephemeralTcpPort());
+  }
+
+  @Arena(SuiteDefs.class)
+  static final class SuiteMemberA {}
+
+  @Arena(SuiteDefs.class)
+  static final class SuiteMemberB {}
+
+  static final class EmptySuiteDefs {}
+
+  @Arena(EmptySuiteDefs.class)
+  static final class SuiteMemberMissingFields {}
+
+  static final class UnrelatedSelectedClass {}
+
+  @Suite
+  @SelectClasses(UnrelatedSelectedClass.class)
+  static final class MismatchedSuiteDefs {
+    @ArenaDependency
+    static final OauthDependency oauth =
+        buildOauth("arena-extension-mismatched-suite-oauth", EphemeralTestRuntime.ephemeralTcpPort());
+  }
+
+  @Arena(MismatchedSuiteDefs.class)
+  static final class MismatchedMemberA {}
+
+  @Arena(MismatchedSuiteDefs.class)
+  static final class MismatchedMemberB {}
 
   static final class NonStaticAfterOpenTopology {
     @ArenaDependency
@@ -144,6 +179,56 @@ final class ArenaExtensionLifecycleComponentTest {
 
     extension.afterAll(contextFor(SecondConsumer.class));
     assertNull(first.handle());
+  }
+
+  @Test
+  void beforeAll_unrelatedClassesReferencingSameArenaViaExplicitValue_opensOnceAndReuses() {
+    ArenaExtension extension = new ArenaExtension();
+
+    extension.beforeAll(contextFor(SuiteMemberA.class));
+    OpenArena first = ArenaExtension.openArenaFor(SuiteMemberA.class);
+    assertNotNull(first);
+    assertTrue(first.handle() != null);
+
+    extension.beforeAll(contextFor(SuiteMemberB.class));
+    OpenArena second = ArenaExtension.openArenaFor(SuiteMemberB.class);
+    assertSame(first, second);
+
+    extension.afterAll(contextFor(SuiteMemberA.class));
+    assertNotNull(first.handle());
+
+    extension.afterAll(contextFor(SuiteMemberB.class));
+    assertNull(first.handle());
+  }
+
+  @Test
+  void beforeAll_suiteRootSelectClassesDoesNotNameExplicitMembers_fallsBackToRefCountingInsteadOfClosingEarly() {
+    ArenaExtension extension = new ArenaExtension();
+
+    extension.beforeAll(contextFor(MismatchedMemberA.class));
+    extension.beforeAll(contextFor(MismatchedMemberB.class));
+    OpenArena opened = ArenaExtension.openArenaFor(MismatchedMemberA.class);
+    assertNotNull(opened.handle());
+
+    extension.afterAll(contextFor(MismatchedMemberA.class));
+    assertNotNull(
+        opened.handle(),
+        "arena must stay open for MismatchedMemberB even though @SelectClasses on "
+            + "MismatchedSuiteDefs does not name either explicit member");
+
+    extension.afterAll(contextFor(MismatchedMemberB.class));
+    assertNull(opened.handle());
+  }
+
+  @Test
+  void beforeAll_explicitValueReferencesClassWithNoArenaFields_throwsIllegalStateException() {
+    ArenaExtension extension = new ArenaExtension();
+    IllegalStateException error =
+        assertThrows(
+            IllegalStateException.class,
+            () -> extension.beforeAll(contextFor(SuiteMemberMissingFields.class)));
+    assertTrue(error.getMessage().contains(EmptySuiteDefs.class.getName()));
+    assertTrue(error.getMessage().contains(SuiteMemberMissingFields.class.getName()));
   }
 
   @Test
