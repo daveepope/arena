@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
 from arena_pytest.ffi._ffi import match_playbook_run
-from arena_pytest.playbook import ActiveMssqlPlaybook, Playbook
+from arena_pytest.playbook import ActiveMssqlPlaybook, ManagedPlaybook
 from arena_pytest.support._identifier import build as _build_identifier
 
 if TYPE_CHECKING:
@@ -81,7 +81,7 @@ class MssqlDependency:
         return self._config
 
 
-class ManagedMssqlPlaybook(Playbook):
+class ManagedMssqlPlaybook(ManagedPlaybook):
     def __init__(
         self,
         *,

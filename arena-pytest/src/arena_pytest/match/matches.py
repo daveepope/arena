@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple, Type
 
-from arena_pytest.playbook import Playbook
+from arena_pytest.playbook import ManagedPlaybook, Playbook, UnmanagedPlaybook
 
 
 class Match:
@@ -82,17 +82,17 @@ class MatchBuilder:
         playbook: Playbook,
         exec_on_dependency_start: bool = False,
     ) -> "MatchBuilder":
-        if not isinstance(playbook, Playbook):
+        if not isinstance(playbook, (ManagedPlaybook, UnmanagedPlaybook)):
             raise TypeError(
-                "register_playbook requires a Playbook instance "
-                f"(got {type(playbook).__name__})"
+                "register_playbook requires a ManagedPlaybook or UnmanagedPlaybook "
+                f"instance (got {type(playbook).__name__})"
             )
-        if not hasattr(playbook, "_for_ffi"):
+        if exec_on_dependency_start and not hasattr(playbook, "_for_ffi"):
             raise TypeError(
-                "register_playbook only accepts playbooks that serialize their "
-                "manifest (ManagedHttpPlaybook, ManagedMssqlPlaybook, "
-                "ManagedLocalstackPlaybook, or subclasses); "
-                f"{type(playbook).__name__} does not"
+                "register_playbook(..., exec_on_dependency_start=True) requires a "
+                "playbook that serializes its manifest (ManagedHttpPlaybook, "
+                "ManagedMssqlPlaybook, ManagedLocalstackPlaybook, ManagedPostgresPlaybook, "
+                f"or a subclass); {type(playbook).__name__} does not"
             )
         key = type(playbook)
         if key in self._playbooks:

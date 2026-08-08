@@ -6,7 +6,7 @@ import sys
 import types
 
 from arena_pytest.arena import pytest_runtest_setup, pytest_runtest_teardown
-from arena_pytest.playbook import ActivePlaybook, Playbook, playbook
+from arena_pytest.playbook import ActivePlaybook, ManagedPlaybook, UnmanagedPlaybook, playbook
 
 
 def _arena_plugin():
@@ -22,7 +22,18 @@ def _arena_plugin():
     )
 
 
-class _HookPlaybook(Playbook):
+class _HookUnmanagedPlaybook(UnmanagedPlaybook):
+    def __init__(self, label: str):
+        self._label = label
+
+    def identifier(self):
+        return self._label
+
+    def run(self, arena):
+        return ActivePlaybook(arena._ffi, id(self))
+
+
+class _HookManagedPlaybook(ManagedPlaybook):
     def __init__(self, label: str):
         self._label = label
 
@@ -59,7 +70,7 @@ def test_pytest_runtest_teardown_without_actives_is_noop():
     pytest_runtest_teardown(item, None)
 
 
-def test_pytest_runtest_setup_teardown_activates_stacked_playbook_markers(monkeypatch):
+def test_pytest_runtest_setup_teardown_activates_stacked_unmanaged_markers(monkeypatch):
     opened = []
     dropped = []
 
@@ -73,11 +84,11 @@ def test_pytest_runtest_setup_teardown_activates_stacked_playbook_markers(monkey
     monkeypatch.setattr(_arena_plugin(), "_activate_classes", fake_activate)
     monkeypatch.setattr(_arena_plugin(), "_drop_actives", fake_drop)
 
-    class Alpha(_HookPlaybook):
+    class Alpha(_HookUnmanagedPlaybook):
         def __init__(self):
             super().__init__("alpha")
 
-    class Beta(_HookPlaybook):
+    class Beta(_HookUnmanagedPlaybook):
         def __init__(self):
             super().__init__("beta")
 
@@ -97,3 +108,33 @@ def test_pytest_runtest_setup_teardown_activates_stacked_playbook_markers(monkey
 
     pytest_runtest_teardown(item, None)
     assert dropped == [2]
+
+
+def test_pytest_runtest_setup_teardown_defers_managed_marker_to_teardown(monkeypatch):
+    run_managed = []
+
+    def fake_run_managed(_arena, _matches, classes):
+        run_managed.extend(k.__name__ for k in classes)
+
+    monkeypatch.setattr(_arena_plugin(), "_run_managed_classes", fake_run_managed)
+
+    class Cleanup(_HookManagedPlaybook):
+        def __init__(self):
+            super().__init__("cleanup")
+
+    def fn():
+        pass
+
+    fn.pytestmark = [playbook(Cleanup).mark]
+    item = _Item(list(fn.pytestmark))
+    request = MagicMock()
+    request.getfixturevalue = lambda name: (
+        _FakeOpenArena() if name == "arena" else _RecordingClosedArena([])
+    )
+    item._request = request
+
+    pytest_runtest_setup(item)
+    assert run_managed == []
+
+    pytest_runtest_teardown(item, None)
+    assert run_managed == ["Cleanup"]

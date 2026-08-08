@@ -445,6 +445,7 @@ py_library(
         ":arena_config_py",
         "//arena-pytest:arena_pytest_lib",
         "@pip//requests",
+        "@pip_examples//fastmssql",
     ],
     visibility = ["//visibility:public"],
 )
@@ -598,6 +599,7 @@ py_test(
         "@pip//pytest_asyncio",
         "@pip//requests",
         "@pip_examples//boto3",
+        "@pip_examples//fastmssql",
     ],
     tags = [
         "component_test",

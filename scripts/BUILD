@@ -57,9 +57,9 @@ py_binary(
 )
 
 py_binary(
-    name = "bump_patch_version",
-    srcs = ["bump_patch_version.py"],
-    main = "bump_patch_version.py",
+    name = "bump_version",
+    srcs = ["bump_version.py"],
+    main = "bump_version.py",
     deps = [":arena_version_lib"],
     imports = ["."],
     visibility = ["//visibility:public"],
@@ -98,13 +98,13 @@ py_test(
 )
 
 py_test(
-    name = "bump_patch_version_test",
+    name = "bump_version_test",
     size = "small",
     srcs = [
-        "bump_patch_version.py",
-        "bump_patch_version_test.py",
+        "bump_version.py",
+        "bump_version_test.py",
     ],
-    main = "bump_patch_version_test.py",
+    main = "bump_version_test.py",
     deps = [":arena_version_lib"],
     imports = ["."],
     visibility = ["//visibility:public"],

@@ -59,6 +59,7 @@ from arena_config import (
     EXEC_WEB_APP_PORT,
     LOCALSTACK_HOST_PORT,
     MATCH_NAME,
+    MSSQL_CONNECTION_STRING_LOCAL,
     MSSQL_DB_NAME,
     MSSQL_DB_PASS,
     MSSQL_DB_USER,
@@ -84,6 +85,7 @@ from playbooks import (
     CalibrationApiFlakyPlaybook,
     EventsPurgePlaybook,
     ResetValidationDbPlaybook,
+    SeedValidationReadingPlaybook,
 )
 WEB_APP_PORT = EXEC_WEB_APP_PORT
 EVENT_BUS_NAME = "example-api-events"
@@ -295,10 +297,7 @@ def closed_arena() -> ClosedArena:
             "example-readings-fastapi-web-app not found (build //examples:example-readings-fastapi-web-app)"
         )
 
-    mssql_cs = (
-        f"Server=tcp:localhost,{MSSQL_PORT};Database={MSSQL_DB_NAME};"
-        f"User Id={MSSQL_DB_USER};Password={MSSQL_DB_PASS};TrustServerCertificate=True;"
-    )
+    mssql_cs = MSSQL_CONNECTION_STRING_LOCAL
     pg_cs = (
         f"host=localhost port={POSTGRES_PORT} user={POSTGRES_DB_USER} "
         f"password={POSTGRES_DB_PASS} dbname={POSTGRES_DB_NAME}"
@@ -351,6 +350,7 @@ def closed_arena() -> ClosedArena:
             exec_on_dependency_start=True,
         )
         .register_playbook(ResetValidationDbPlaybook(mssql.identifier))
+        .register_playbook(SeedValidationReadingPlaybook(mssql_cs))
         .build()
     )
 
@@ -375,6 +375,11 @@ def closed_arena() -> ClosedArena:
 @pytest.fixture(scope="session")
 def base_url() -> str:
     return f"http://127.0.0.1:{WEB_APP_PORT}"
+
+
+@pytest.fixture(scope="session")
+def mssql_connection_string() -> str:
+    return MSSQL_CONNECTION_STRING_LOCAL
 
 
 @pytest.fixture(scope="session")

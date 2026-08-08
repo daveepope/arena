@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 from pathlib import Path
 
 from arena_version import (
-    bump_patch_version,
+    bump_version,
     read_version,
     read_version_from_git_ref,
     release_lockfiles_need_repin,
@@ -26,21 +27,38 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def bump_patch_release_from_base(root: Path, base_ref: str) -> tuple[str, list[str]]:
-    base = release_version_only(read_version_from_git_ref(root, base_ref))
-    target = bump_patch_version(base)
+def bump_release_from_base(
+    root: Path, base_ref: str, kind: str = "patch"
+) -> tuple[str, list[str]]:
     head = release_version_only(read_version(root))
-    if not release_version_increased(base, head):
-        write_version(root, target)
-        head = target
+    if kind == "patch":
+        base = release_version_only(read_version_from_git_ref(root, base_ref))
+        if not release_version_increased(base, head):
+            head = bump_version(base, kind)
+            write_version(root, head)
+    else:
+        head = bump_version(head, kind)
+        write_version(root, head)
     changed = sync_workspace_version(root)
     return head, changed
 
 
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Bump the Arena release version.")
+    parser.add_argument(
+        "--bump",
+        choices=["major", "minor", "patch"],
+        default="patch",
+        help="which part of MAJOR.MINOR.PATCH to bump (default: patch)",
+    )
+    return parser.parse_args(argv)
+
+
 def main() -> int:
+    args = _parse_args(sys.argv[1:])
     root = _repo_root()
     base_ref = os.environ.get("ARENA_VERSION_BASE_REF", "origin/master").strip()
-    head, changed = bump_patch_release_from_base(root, base_ref)
+    head, changed = bump_release_from_base(root, base_ref, args.bump)
     print(f"VERSION {head}")
     for name in changed:
         print(f"synced {name}")

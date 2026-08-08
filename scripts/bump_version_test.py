@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from bump_patch_version import bump_patch_release_from_base
+from bump_version import bump_release_from_base
 from arena_version import is_synced, read_version, write_version
 
 
@@ -43,7 +43,7 @@ class BumpPatchReleaseFromBaseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self._setup_git_repo(root, "1.1.0", "1.1.0")
-            head, changed = bump_patch_release_from_base(root, "base")
+            head, changed = bump_release_from_base(root, "base")
             self.assertEqual(head, "1.1.1")
             self.assertEqual(read_version(root), "1.1.1")
             self.assertTrue(is_synced(root))
@@ -59,7 +59,7 @@ class BumpPatchReleaseFromBaseTest(unittest.TestCase):
                 '[workspace.package]\nversion = "1.1.0"\n',
                 encoding="utf-8",
             )
-            head, changed = bump_patch_release_from_base(root, "base")
+            head, changed = bump_release_from_base(root, "base")
             self.assertEqual(head, "1.1.1")
             self.assertIn("Cargo.toml", changed)
             self.assertTrue(is_synced(root))
@@ -68,7 +68,7 @@ class BumpPatchReleaseFromBaseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self._setup_git_repo(root, "1.1.0", "1.1.2")
-            head, changed = bump_patch_release_from_base(root, "base")
+            head, changed = bump_release_from_base(root, "base")
             self.assertEqual(head, "1.1.2")
             self.assertEqual(read_version(root), "1.1.2")
             self.assertEqual(changed, [])
@@ -78,9 +78,52 @@ class BumpPatchReleaseFromBaseTest(unittest.TestCase):
             root = Path(tmp)
             self._setup_git_repo(root, "1.1.0", "1.1.1")
             subprocess.run(["git", "branch", "merged", "HEAD"], cwd=root, check=True)
-            head, _changed = bump_patch_release_from_base(root, "merged")
+            head, _changed = bump_release_from_base(root, "merged")
             self.assertEqual(head, "1.1.2")
             self.assertEqual(read_version(root), "1.1.2")
+
+    def test_bump_release_from_base_kind_minor_bumps_minor_and_resets_patch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._setup_git_repo(root, "1.1.5", "1.1.5")
+            head, _changed = bump_release_from_base(root, "base", "minor")
+            self.assertEqual(head, "1.2.0")
+            self.assertEqual(read_version(root), "1.2.0")
+
+    def test_bump_release_from_base_kind_major_bumps_major_and_resets_minor_patch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._setup_git_repo(root, "1.5.3", "1.5.3")
+            head, _changed = bump_release_from_base(root, "base", "major")
+            self.assertEqual(head, "2.0.0")
+            self.assertEqual(read_version(root), "2.0.0")
+
+    def test_bump_release_from_base_kind_minor_head_already_ahead_of_base_still_bumps(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._setup_git_repo(root, "4.0.0", "4.0.1")
+            head, _changed = bump_release_from_base(root, "base", "minor")
+            self.assertEqual(head, "4.1.0")
+            self.assertEqual(read_version(root), "4.1.0")
+
+    def test_bump_release_from_base_kind_major_head_already_ahead_of_base_still_bumps(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._setup_git_repo(root, "4.0.0", "4.0.1")
+            head, _changed = bump_release_from_base(root, "base", "major")
+            self.assertEqual(head, "5.0.0")
+            self.assertEqual(read_version(root), "5.0.0")
+
+    def test_bump_release_from_base_unknown_kind_raises_value_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._setup_git_repo(root, "1.1.0", "1.1.0")
+            with self.assertRaises(ValueError):
+                bump_release_from_base(root, "base", "typo")
 
 
 if __name__ == "__main__":

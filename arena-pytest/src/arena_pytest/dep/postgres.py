@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, TYPE_CHECKING
 
 from arena_pytest.ffi._ffi import match_playbook_run
-from arena_pytest.playbook import ActivePostgresPlaybook, Playbook
+from arena_pytest.playbook import ActivePostgresPlaybook, ManagedPlaybook
 from arena_pytest.support._identifier import build as _build_identifier
 
 if TYPE_CHECKING:
@@ -68,7 +68,7 @@ class PostgresDependency:
         return self._config
 
 
-class ManagedPostgresPlaybook(Playbook):
+class ManagedPostgresPlaybook(ManagedPlaybook):
     def __init__(
         self,
         *,

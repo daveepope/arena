@@ -8,7 +8,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from arena_version import (
+    bump_major_version,
+    bump_minor_version,
     bump_patch_version,
+    bump_version,
     is_synced,
     read_version,
     read_version_from_git_ref,
@@ -49,6 +52,31 @@ class ReadVersionTest(unittest.TestCase):
 class BumpPatchVersionTest(unittest.TestCase):
     def test_bump_patch_version_increments_patch(self) -> None:
         self.assertEqual(bump_patch_version("1.1.0"), "1.1.1")
+
+
+class BumpMinorVersionTest(unittest.TestCase):
+    def test_bump_minor_version_increments_minor_resets_patch(self) -> None:
+        self.assertEqual(bump_minor_version("1.1.5"), "1.2.0")
+
+
+class BumpMajorVersionTest(unittest.TestCase):
+    def test_bump_major_version_increments_major_resets_minor_patch(self) -> None:
+        self.assertEqual(bump_major_version("1.5.3"), "2.0.0")
+
+
+class BumpVersionTest(unittest.TestCase):
+    def test_bump_version_kind_patch_delegates_to_bump_patch_version(self) -> None:
+        self.assertEqual(bump_version("1.1.0", "patch"), "1.1.1")
+
+    def test_bump_version_kind_minor_delegates_to_bump_minor_version(self) -> None:
+        self.assertEqual(bump_version("1.1.0", "minor"), "1.2.0")
+
+    def test_bump_version_kind_major_delegates_to_bump_major_version(self) -> None:
+        self.assertEqual(bump_version("1.1.0", "major"), "2.0.0")
+
+    def test_bump_version_unknown_kind_raises_value_error(self) -> None:
+        with self.assertRaises(ValueError):
+            bump_version("1.1.0", "typo")
 
 
 class ReleaseVersionIncreasedTest(unittest.TestCase):
