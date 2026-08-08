@@ -1,8 +1,14 @@
+import asyncio
+
+from fastmssql import Connection, PoolConfig, SslConfig
+
 from arena_pytest import (
+    ActivePlaybook,
     HttpPlaybookBuilder,
     ManagedHttpPlaybook,
     ManagedLocalstackPlaybook,
     ManagedMssqlPlaybook,
+    UnmanagedPlaybook,
     ok_json,
     server_error,
     status,
@@ -73,3 +79,40 @@ class EventsPurgePlaybook(ManagedLocalstackPlaybook):
             identifier=PLAYBOOK_EVENTS_PURGE,
             dependency_identifier=dependency_identifier,
         )
+
+
+SEED_VALIDATION_READING_USER = "Seeded By Unmanaged Playbook"
+SEED_VALIDATION_READING_VALUE = 42
+
+
+async def connect_validation_db(connection_string: str) -> Connection:
+    conn = Connection(
+        connection_string=connection_string,
+        ssl_config=SslConfig.development(),
+        pool_config=PoolConfig.one(),
+    )
+    await conn.connect()
+    return conn
+
+
+class SeedValidationReadingPlaybook(UnmanagedPlaybook):
+    def __init__(self, connection_string: str):
+        self._connection_string = connection_string
+
+    def identifier(self) -> str:
+        return "seed-validation-reading"
+
+    def run(self, arena) -> ActivePlaybook:
+        asyncio.run(self._seed())
+        return ActivePlaybook(None, 0)
+
+    async def _seed(self) -> None:
+        conn = await connect_validation_db(self._connection_string)
+        try:
+            await conn.execute(
+                "INSERT INTO dbo.validation_results (user_name, value, valid) "
+                "VALUES (@P1, @P2, @P3)",
+                [SEED_VALIDATION_READING_USER, SEED_VALIDATION_READING_VALUE, 1],
+            )
+        finally:
+            await conn.disconnect()

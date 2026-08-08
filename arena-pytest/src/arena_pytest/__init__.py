@@ -27,7 +27,9 @@ from arena_pytest.playbook import (
     ActiveLocalstackPlaybook,
     ActiveMssqlPlaybook,
     ActivePlaybook,
+    ManagedPlaybook,
     Playbook,
+    UnmanagedPlaybook,
     playbook,
 )
 from arena_pytest.dep.http import (
@@ -124,7 +126,9 @@ __all__ = [
     "ActivePlaybook",
     "ManagedHttpPlaybook",
     "ManagedMssqlPlaybook",
+    "ManagedPlaybook",
     "Playbook",
+    "UnmanagedPlaybook",
     "KAFKA_INTERNAL_DOCKER_PORT",
     "KafkaDependency",
     "KafkaDependencyBuilder",

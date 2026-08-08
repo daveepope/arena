@@ -1,0 +1,23 @@
+[advisories]
+ignore = [
+    # rsa 0.9.10 Marvin Attack timing side-channel (arena-oauth, jsonwebtoken).
+    # No fixed release exists upstream. Usage is local RSA keypair generation and
+    # JWT signing/verification against ephemeral test credentials, not decryption
+    # of attacker-supplied ciphertext over an untrusted network.
+    "RUSTSEC-2023-0071",
+
+    # rustls-webpki 0.101.7 name-constraint / CRL-parsing bugs, pulled in via
+    # tiberius 0.12.3 (arena-mssql). tiberius has no released or unreleased fix
+    # (checked prisma/tiberius main branch); the only available workaround is
+    # switching tiberius's TLS backend from rustls to native-tls, which trades
+    # this for a hard runtime dependency on system OpenSSL. Arena's MSSQL
+    # connections are to ephemeral, self-hosted containers on a local/Docker
+    # network, not exposed to an untrusted network path, so exploitability here
+    # is low. Revisit if tiberius publishes a fix.
+    "RUSTSEC-2026-0098",
+    "RUSTSEC-2026-0099",
+    "RUSTSEC-2026-0104",
+
+    # rustls-pemfile 1.0.4 unmaintained warning, same tiberius 0.12.3 chain as above.
+    "RUSTSEC-2025-0134",
+]

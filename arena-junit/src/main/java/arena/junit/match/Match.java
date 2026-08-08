@@ -61,11 +61,14 @@ public final class Match {
     if (network != null && !network.isEmpty()) {
       out.put("network", network);
     }
-    if (!playbooks.isEmpty()) {
-      ArrayNode pbs = ArenaJson.array();
-      for (RegisteredPlaybook p : playbooks.values()) {
-        pbs.add(p.forFfi());
+    ArrayNode pbs = ArenaJson.array();
+    for (RegisteredPlaybook p : playbooks.values()) {
+      ObjectNode serialized = p.forFfi();
+      if (serialized != null) {
+        pbs.add(serialized);
       }
+    }
+    if (!pbs.isEmpty()) {
       out.set("playbooks", pbs);
     }
     return out;

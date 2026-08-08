@@ -10,9 +10,6 @@ public abstract class ActivePlaybook implements AutoCloseable {
   private boolean bodyFailed;
 
   protected ActivePlaybook(Pointer handle) {
-    if (handle == null || Pointer.nativeValue(handle) == 0) {
-      throw new IllegalArgumentException("ActivePlaybook requires a non-null native handle");
-    }
     this.handle = handle;
   }
 

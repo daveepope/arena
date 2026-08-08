@@ -17,6 +17,10 @@ from playbooks import (
     CalibrationApiErrorPathPlaybook,
     CalibrationApiFlakyPlaybook,
     ResetValidationDbPlaybook,
+    SeedValidationReadingPlaybook,
+    SEED_VALIDATION_READING_USER,
+    SEED_VALIDATION_READING_VALUE,
+    connect_validation_db,
 )
 from arena_config import CALIBRATION_VALIDATE_PATH, SMTP_UI_PORT
 from api_http import ApiClient
@@ -131,6 +135,29 @@ def test_post_reading_succeeds_after_calibration_flaky_sequence(
         "Flaky 3", 3, "recovered", readings_device_id
     )
     assert any(r["id"] == created_id for r in api_client.get_readings())
+
+
+@playbook(ResetValidationDbPlaybook)
+@playbook(SeedValidationReadingPlaybook)
+def test_seed_validation_reading_playbook_row_visible_before_test_body(
+    mssql_connection_string: str,
+):
+    import asyncio
+
+    async def _fetch():
+        conn = await connect_validation_db(mssql_connection_string)
+        try:
+            stream = await conn.query(
+                "SELECT value FROM dbo.validation_results WHERE user_name = @P1",
+                [SEED_VALIDATION_READING_USER],
+            )
+            return stream.all()
+        finally:
+            await conn.disconnect()
+
+    rows = asyncio.run(_fetch())
+    assert len(rows) == 1
+    assert rows[0]["value"] == SEED_VALIDATION_READING_VALUE
 
 
 @playbook(CalibrationApiErrorPathPlaybook)

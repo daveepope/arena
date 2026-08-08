@@ -398,6 +398,7 @@ java_library(
     deps = [
         "//arena-junit:arena_junit_lib",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:net_java_dev_jna_jna",
     ],
 )
 
@@ -445,6 +446,7 @@ py_library(
         ":arena_config_py",
         "//arena-pytest:arena_pytest_lib",
         "@pip//requests",
+        "@pip_examples//fastmssql",
     ],
     visibility = ["//visibility:public"],
 )
@@ -598,6 +600,7 @@ py_test(
         "@pip//pytest_asyncio",
         "@pip//requests",
         "@pip_examples//boto3",
+        "@pip_examples//fastmssql",
     ],
     tags = [
         "component_test",
@@ -722,14 +725,13 @@ java_test(
     use_testrunner = False,
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
-        "--include-engine=junit-jupiter",
-        "--select-package=arena.examples.component",
+        "--include-engine=junit-platform-suite",
+        "--select-class=arena.examples.component.ComponentTestSuite",
     ],
     data = [
         ":example-readings-spring-boot-web-app",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
-        ":arena_config",
         ":validation_db_schema",
     ],
     jvm_flags = ["-Djna.nosys=true"],
@@ -738,13 +740,16 @@ java_test(
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
         "@arena_java_maven//:org_junit_platform_junit_platform_console",
         "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+        "@arena_java_maven//:org_junit_platform_junit_platform_suite_engine",
     ],
     deps = [
         ":ephemeral_test_runtime_java",
         ":junit_shared",
         "//arena-junit:arena_junit_lib",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:com_microsoft_sqlserver_mssql_jdbc",
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:org_junit_platform_junit_platform_suite_api",
         "@arena_java_maven//:org_slf4j_slf4j_api",
         "@arena_java_maven//:org_springframework_boot_spring_boot_starter_logging",
         "@arena_java_maven//:software_amazon_awssdk_auth",
@@ -769,14 +774,13 @@ java_test(
     use_testrunner = False,
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
-        "--include-engine=junit-jupiter",
-        "--select-package=arena.examples.component",
+        "--include-engine=junit-platform-suite",
+        "--select-class=arena.examples.component.ComponentTestSuite",
     ],
     data = [
         ":example-readings-axum-web-app",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
-        ":arena_config",
         ":validation_db_schema",
     ],
     jvm_flags = ["-Djna.nosys=true"],
@@ -784,14 +788,17 @@ java_test(
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
         "@arena_java_maven//:org_junit_platform_junit_platform_console",
         "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+        "@arena_java_maven//:org_junit_platform_junit_platform_suite_engine",
     ],
     deps = [
         ":ephemeral_test_runtime_java",
         ":junit_shared",
         "//arena-junit:arena_junit_lib",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:com_microsoft_sqlserver_mssql_jdbc",
         "@arena_java_maven//:org_apache_kafka_kafka_clients",
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:org_junit_platform_junit_platform_suite_api",
         "@arena_java_maven//:org_slf4j_slf4j_api",
     ],
 )

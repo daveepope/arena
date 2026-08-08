@@ -18,10 +18,12 @@ public abstract class ManagedPlaybook : IPlaybook
         DependencyIdentifier = dependencyIdentifier;
     }
 
-    public ActivePlaybook Run(OpenArena arena)
+    public virtual ActivePlaybook Run(OpenArena arena)
     {
         return WrapHandle(ArenaBindings.MatchPlaybookRun(arena.Handle, Identifier));
     }
+
+    internal virtual bool ActivatesBeforeTest => false;
 
     internal abstract string Kind { get; }
 

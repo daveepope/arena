@@ -110,8 +110,39 @@ def bump_patch_version(version: str) -> str:
     return f"{major}.{minor}.{patch + 1}"
 
 
+def bump_minor_version(version: str) -> str:
+    major, minor, _patch = parse_release_version(version)
+    return f"{major}.{minor + 1}.0"
+
+
+def bump_major_version(version: str) -> str:
+    major, _minor, _patch = parse_release_version(version)
+    return f"{major + 1}.0.0"
+
+
+_BUMP_KIND_FNS = {
+    "major": bump_major_version,
+    "minor": bump_minor_version,
+    "patch": bump_patch_version,
+}
+
+
+def bump_version(version: str, kind: str) -> str:
+    try:
+        fn = _BUMP_KIND_FNS[kind]
+    except KeyError:
+        raise ValueError(
+            f"unknown bump kind {kind!r}; expected one of {sorted(_BUMP_KIND_FNS)}"
+        ) from None
+    return fn(version)
+
+
 def release_version_increased(base: str, head: str) -> bool:
     return parse_release_version(head) > parse_release_version(base)
+
+
+def higher_release_version(a: str, b: str) -> str:
+    return a if parse_release_version(a) >= parse_release_version(b) else b
 
 
 def _git_show_at_ref(root: Path, ref: str, path: str) -> str | None:

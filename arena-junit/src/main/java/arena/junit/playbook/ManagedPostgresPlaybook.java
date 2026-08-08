@@ -7,7 +7,7 @@ import arena.junit.support.ArenaJson;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.jna.Pointer;
 
-public class ManagedPostgresPlaybook implements Playbook, PlaybookRegistration {
+public class ManagedPostgresPlaybook implements ManagedPlaybook, PlaybookRegistration {
   private final String identifier;
   private final String dependencyIdentifier;
 

@@ -1,7 +1,9 @@
 package arena.junit.match;
 
-import arena.junit.playbook.PlaybookRegistration;
+import arena.junit.playbook.ManagedPlaybook;
 import arena.junit.playbook.Playbook;
+import arena.junit.playbook.PlaybookRegistration;
+import arena.junit.playbook.UnmanagedPlaybook;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -43,11 +45,18 @@ public final class MatchBuilder {
     if (playbook == null) {
       throw new IllegalArgumentException("playbook must not be null");
     }
-    if (!(playbook instanceof PlaybookRegistration)) {
+    if (!(playbook instanceof ManagedPlaybook) && !(playbook instanceof UnmanagedPlaybook)) {
       throw new IllegalArgumentException(
           "playbook "
               + playbook.getClass().getName()
-              + " must implement PlaybookRegistration to be registered on a match");
+              + " must implement ManagedPlaybook or UnmanagedPlaybook to be registered on a match");
+    }
+    if (execOnDependencyStart && !(playbook instanceof PlaybookRegistration)) {
+      throw new IllegalArgumentException(
+          "playbook "
+              + playbook.getClass().getName()
+              + " must implement PlaybookRegistration to be registered with"
+              + " execOnDependencyStart=true");
     }
     Class<? extends Playbook> klass = playbook.getClass();
     if (playbooks.containsKey(klass)) {

@@ -4,14 +4,10 @@ import arena.junit.playbook.ManagedHttpPlaybook;
 import java.util.List;
 
 public final class CalibrationApiErrorPathPlaybook extends ManagedHttpPlaybook {
+  private static final String IDENTIFIER = "example-api-calibration-api-error-path";
+  private static final String VALIDATE_PATH = "/api/v1/validate";
+
   public CalibrationApiErrorPathPlaybook(String dependencyIdentifier) {
-    super(
-        PlaybookConfig.CALIBRATION_API_ERROR_PATH,
-        dependencyIdentifier,
-        List.of(
-            mapping(
-                "POST",
-                PlaybookConfig.CALIBRATION_VALIDATE_PATH,
-                500)));
+    super(IDENTIFIER, dependencyIdentifier, List.of(mapping("POST", VALIDATE_PATH, 500)));
   }
 }

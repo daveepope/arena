@@ -10,11 +10,12 @@ public final class RegisteredPlaybook {
   private final boolean execOnDependencyStart;
 
   public RegisteredPlaybook(Playbook playbook, boolean execOnDependencyStart) {
-    if (!(playbook instanceof PlaybookRegistration)) {
+    if (execOnDependencyStart && !(playbook instanceof PlaybookRegistration)) {
       throw new IllegalArgumentException(
           "playbook "
               + playbook.getClass().getName()
-              + " must implement PlaybookRegistration to be registered on a match");
+              + " must implement PlaybookRegistration to be registered with"
+              + " execOnDependencyStart=true");
     }
     this.playbook = playbook;
     this.execOnDependencyStart = execOnDependencyStart;
@@ -29,7 +30,10 @@ public final class RegisteredPlaybook {
   }
 
   public ObjectNode forFfi() {
-    ObjectNode n = ((PlaybookRegistration) playbook).forRegisteredFfi().deepCopy();
+    if (!(playbook instanceof PlaybookRegistration registration)) {
+      return null;
+    }
+    ObjectNode n = registration.forRegisteredFfi().deepCopy();
     n.put("exec_on_dependency_start", execOnDependencyStart);
     return n;
   }

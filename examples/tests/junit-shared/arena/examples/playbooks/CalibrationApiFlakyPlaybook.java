@@ -6,12 +6,15 @@ import arena.junit.playbook.ManagedHttpPlaybook;
 import java.util.Map;
 
 public final class CalibrationApiFlakyPlaybook extends ManagedHttpPlaybook {
+  private static final String IDENTIFIER = "example-api-calibration-api-flaky-path";
+  private static final String VALIDATE_PATH = "/api/v1/validate";
+
   public CalibrationApiFlakyPlaybook(String dependencyIdentifier) {
     super(
-        PlaybookConfig.CALIBRATION_API_FLAKY_PATH,
+        IDENTIFIER,
         dependencyIdentifier,
         new HttpPlaybookBuilder(dependencyIdentifier)
-            .post(PlaybookConfig.CALIBRATION_VALIDATE_PATH)
+            .post(VALIDATE_PATH)
             .willReturn(HttpResponse.serverError())
             .thenReturn(HttpResponse.status(503))
             .thenReturn(HttpResponse.okJson(Map.of("valid", true))));

@@ -5,7 +5,7 @@ import warnings
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Union
 
 from arena_pytest.ffi._ffi import http_playbook_open, match_playbook_run
-from arena_pytest.playbook import ActiveHttpPlaybook, Playbook
+from arena_pytest.playbook import ActiveHttpPlaybook, ManagedPlaybook
 from arena_pytest.support._identifier import build as _build_identifier
 
 if TYPE_CHECKING:
@@ -363,7 +363,9 @@ class HttpSequenceBuilder:
         return self.open(arena)
 
 
-class ManagedHttpPlaybook(Playbook):
+class ManagedHttpPlaybook(ManagedPlaybook):
+    _activates_before_test = True
+
     def __init__(
         self,
         *,

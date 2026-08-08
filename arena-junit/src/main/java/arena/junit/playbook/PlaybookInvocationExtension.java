@@ -74,7 +74,7 @@ public final class PlaybookInvocationExtension
   public void afterEach(ExtensionContext context) {
     PlaybookScope methodScope = context.getStore(NS).remove(METHOD_SCOPE_KEY, PlaybookScope.class);
     if (methodScope != null) {
-      methodScope.close();
+      methodScope.finish();
     }
   }
 
@@ -83,7 +83,7 @@ public final class PlaybookInvocationExtension
     ExtensionContext.Store store = context.getStore(NS);
     PlaybookScope scope = store.remove(CLASS_SCOPE_KEY, PlaybookScope.class);
     if (scope != null) {
-      scope.close();
+      scope.finish();
     }
   }
 
@@ -147,31 +147,72 @@ public final class PlaybookInvocationExtension
     return out;
   }
 
+  private static boolean activatesBeforeTest(Playbook playbook) {
+    return !(playbook instanceof ManagedPlaybook managed) || managed.activatesBeforeTest();
+  }
+
+  private static List<Playbook>[] partitionClasses(
+      OpenArena arena, Class<? extends Playbook>[] classes) {
+    List<Playbook> before = new ArrayList<>();
+    List<Playbook> after = new ArrayList<>();
+    for (Class<? extends Playbook> klass : classes) {
+      Playbook pb = resolveRegistered(arena, klass);
+      if (activatesBeforeTest(pb)) {
+        before.add(pb);
+      } else {
+        after.add(pb);
+      }
+    }
+    @SuppressWarnings("unchecked")
+    List<Playbook>[] result = new List[] {before, after};
+    return result;
+  }
+
   private static PlaybookScope openScope(OpenArena arena, Class<? extends Playbook>[] classes) {
+    List<Playbook>[] partitioned = partitionClasses(arena, classes);
+    List<Playbook> beforePlaybooks = partitioned[0];
+    List<Playbook> afterPlaybooks = partitioned[1];
     List<ActivePlaybook> opened = new ArrayList<>();
     try {
-      for (Class<? extends Playbook> klass : classes) {
-        Playbook pb = arena.playbook(klass);
-        if (pb == null) {
-          throw new IllegalStateException(
-              "@Playbook: no playbook of class "
-                  + klass.getName()
-                  + " is registered on any match");
-        }
-        Boolean execOnDependencyStart = arena.playbookExecOnDependencyStart(klass);
-        if (Boolean.TRUE.equals(execOnDependencyStart)) {
-          throw new IllegalStateException(
-              "@Playbook: playbook "
-                  + klass.getName()
-                  + " was registered with execOnDependencyStart=true and cannot be scoped per-test");
-        }
+      for (Playbook pb : beforePlaybooks) {
         opened.add(pb.run(arena));
       }
     } catch (RuntimeException e) {
       closeAll(opened);
       throw e;
     }
-    return new PlaybookScope(opened);
+    return new PlaybookScope(arena, opened, afterPlaybooks);
+  }
+
+  private static Playbook resolveRegistered(OpenArena arena, Class<? extends Playbook> klass) {
+    Playbook pb = arena.playbook(klass);
+    if (pb == null) {
+      throw new IllegalStateException(
+          "@Playbook: no playbook of class " + klass.getName() + " is registered on any match");
+    }
+    Boolean execOnDependencyStart = arena.playbookExecOnDependencyStart(klass);
+    if (Boolean.TRUE.equals(execOnDependencyStart)) {
+      throw new IllegalStateException(
+          "@Playbook: playbook "
+              + klass.getName()
+              + " was registered with execOnDependencyStart=true and cannot be scoped per-test");
+    }
+    return pb;
+  }
+
+  private static void runManagedPlaybooks(OpenArena arena, List<Playbook> managedPlaybooks) {
+    RuntimeException firstError = null;
+    for (Playbook pb : managedPlaybooks) {
+      try (ActivePlaybook active = pb.run(arena)) {
+      } catch (RuntimeException e) {
+        if (firstError == null) {
+          firstError = e;
+        }
+      }
+    }
+    if (firstError != null) {
+      throw firstError;
+    }
   }
 
   private static void closeAll(List<ActivePlaybook> opened) {
@@ -188,14 +229,19 @@ public final class PlaybookInvocationExtension
   }
 
   static final class PlaybookScope {
+    private final OpenArena arena;
     private final List<ActivePlaybook> opened;
+    private final List<Playbook> managedPlaybooks;
 
-    PlaybookScope(List<ActivePlaybook> opened) {
+    PlaybookScope(OpenArena arena, List<ActivePlaybook> opened, List<Playbook> managedPlaybooks) {
+      this.arena = arena;
       this.opened = opened;
+      this.managedPlaybooks = managedPlaybooks;
     }
 
-    void close() {
+    void finish() {
       closeAll(opened);
+      runManagedPlaybooks(arena, managedPlaybooks);
     }
 
     List<ActivePlaybook> actives() {

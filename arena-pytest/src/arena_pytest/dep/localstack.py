@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
 from arena_pytest.ffi._ffi import match_playbook_run
-from arena_pytest.playbook import ActiveLocalstackPlaybook, Playbook
+from arena_pytest.playbook import ActiveLocalstackPlaybook, ManagedPlaybook
 from arena_pytest.support._identifier import build as _build_identifier
 
 if TYPE_CHECKING:
@@ -210,7 +210,7 @@ class LocalstackDependency:
         return self._config
 
 
-class ManagedLocalstackPlaybook(Playbook):
+class ManagedLocalstackPlaybook(ManagedPlaybook):
     def __init__(
         self,
         *,

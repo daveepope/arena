@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Type
 
 import pytest
 import pytest_asyncio
@@ -17,12 +17,16 @@ from arena_pytest.ffi._ffi import (
 from arena_pytest.playbook import (
     PLAYBOOK_MARKER,
     ActivePlaybook,
+    Playbook,
     _activate_classes,
     _class_marker_classes,
     _drop_actives,
+    _finish_playbook_scope,
     _matches_from_closed_arena,
     _module_marker_classes,
     _own_marker_classes,
+    _partition_classes,
+    _run_managed_classes,
 )
 
 
@@ -103,6 +107,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 _FUNCTION_ACTIVES_ATTR = "_arena_pytest_function_actives"
+_FUNCTION_MANAGED_ATTR = "_arena_pytest_function_managed_classes"
 
 
 def active_playbooks_for_item(item: pytest.Item) -> List[ActivePlaybook]:
@@ -125,20 +130,33 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     classes = _own_marker_classes(item)
     if not classes:
         return
+    unmanaged_classes, managed_classes = _partition_classes(classes)
+    setattr(item, _FUNCTION_MANAGED_ATTR, managed_classes)
+    if not unmanaged_classes:
+        return
     request = _item_request(item)
     arena_obj = request.getfixturevalue("arena")
     matches = _matches_from_closed_arena(request.getfixturevalue("closed_arena"))
-    actives = _activate_classes(arena_obj, matches, classes)
+    actives = _activate_classes(arena_obj, matches, unmanaged_classes)
     setattr(item, _FUNCTION_ACTIVES_ATTR, actives)
 
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_runtest_teardown(item: pytest.Item, nextitem: Optional[pytest.Item]) -> None:
     actives: Optional[List[ActivePlaybook]] = getattr(item, _FUNCTION_ACTIVES_ATTR, None)
-    if not actives:
-        return
-    setattr(item, _FUNCTION_ACTIVES_ATTR, None)
-    _drop_actives(actives)
+    if actives:
+        setattr(item, _FUNCTION_ACTIVES_ATTR, None)
+        _drop_actives(actives)
+
+    managed_classes: Optional[List[Type[Playbook]]] = getattr(
+        item, _FUNCTION_MANAGED_ATTR, None
+    )
+    if managed_classes:
+        setattr(item, _FUNCTION_MANAGED_ATTR, None)
+        request = _item_request(item)
+        arena_obj = request.getfixturevalue("arena")
+        matches = _matches_from_closed_arena(request.getfixturevalue("closed_arena"))
+        _run_managed_classes(arena_obj, matches, managed_classes)
 
 
 @pytest.fixture(scope="class", autouse=True)
@@ -148,14 +166,15 @@ def _playbook_class_scope(request: pytest.FixtureRequest):
     if not classes:
         yield
         return
+    unmanaged_classes, managed_classes = _partition_classes(classes)
     arena_obj = request.getfixturevalue("arena")
     closed = request.getfixturevalue("closed_arena")
     matches = _matches_from_closed_arena(closed)
-    actives = _activate_classes(arena_obj, matches, classes)
+    actives = _activate_classes(arena_obj, matches, unmanaged_classes)
     try:
         yield
     finally:
-        _drop_actives(actives)
+        _finish_playbook_scope(arena_obj, matches, actives, managed_classes)
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -165,11 +184,12 @@ def _playbook_module_scope(request: pytest.FixtureRequest):
     if not classes:
         yield
         return
+    unmanaged_classes, managed_classes = _partition_classes(classes)
     arena_obj = request.getfixturevalue("arena")
     closed = request.getfixturevalue("closed_arena")
     matches = _matches_from_closed_arena(closed)
-    actives = _activate_classes(arena_obj, matches, classes)
+    actives = _activate_classes(arena_obj, matches, unmanaged_classes)
     try:
         yield
     finally:
-        _drop_actives(actives)
+        _finish_playbook_scope(arena_obj, matches, actives, managed_classes)

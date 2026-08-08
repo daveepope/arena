@@ -14,14 +14,21 @@ import arena.junit.oauth.OauthDependency;
 import arena.junit.oauth.OauthDependencyBuilder;
 import arena.junit.oauth.OauthLoopbackTls;
 import arena.junit.playbook.ActiveHttpPlaybook;
+import arena.junit.playbook.ActivePlaybook;
 import arena.junit.playbook.HttpPlaybookBuilder;
 import arena.junit.playbook.ManagedHttpPlaybook;
+import arena.junit.playbook.ManagedPlaybook;
 import arena.junit.playbook.Playbook;
+import arena.junit.playbook.UnmanagedPlaybook;
+import com.sun.jna.Pointer;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.ArrayDeque;
+import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import org.junit.jupiter.api.Test;
 
 @Arena
@@ -48,6 +55,14 @@ final class PlaybookInvocationExtensionComponentTest {
 
   @ArenaPlaybook(execOnDependencyStart = false)
   static final VerifyPlaybook VERIFY = new VerifyPlaybook(CALIBRATION.identifier());
+
+  @ArenaPlaybook(execOnDependencyStart = false)
+  static final UnmanagedProbePlaybook UNMANAGED_PROBE = new UnmanagedProbePlaybook();
+
+  @ArenaPlaybook(execOnDependencyStart = false)
+  static final ManagedProbePlaybook MANAGED_PROBE = new ManagedProbePlaybook();
+
+  private static final Queue<String> PROBE_CALL_ORDER = new ArrayDeque<>();
 
   private static OauthDependency buildOauth() {
     OauthLoopbackTls.PemPair pem = OauthLoopbackTls.oauthLoopbackTlsPemPair();
@@ -102,6 +117,45 @@ final class PlaybookInvocationExtensionComponentTest {
               .post(CALIBRATION_VALIDATE_PATH)
               .willReturn(arena.junit.playbook.HttpResponse.okJson(Map.of("valid", true))));
     }
+  }
+
+  static final class ProbeActivePlaybook extends ActivePlaybook {
+    ProbeActivePlaybook() {
+      super(Pointer.NULL);
+    }
+  }
+
+  static final class UnmanagedProbePlaybook implements Playbook, UnmanagedPlaybook {
+    @Override
+    public String identifier() {
+      return "unmanaged-probe";
+    }
+
+    @Override
+    public ActivePlaybook run(OpenArena arena) {
+      PROBE_CALL_ORDER.add("unmanaged");
+      return new ProbeActivePlaybook();
+    }
+  }
+
+  static final class ManagedProbePlaybook implements Playbook, ManagedPlaybook {
+    @Override
+    public String identifier() {
+      return "managed-probe";
+    }
+
+    @Override
+    public ActivePlaybook run(OpenArena arena) {
+      PROBE_CALL_ORDER.add("managed");
+      return new ProbeActivePlaybook();
+    }
+  }
+
+  @Test
+  @arena.junit.Playbook(UnmanagedProbePlaybook.class)
+  @arena.junit.Playbook(ManagedProbePlaybook.class)
+  void scopedPlaybook_managedAndUnmanagedStacked_unmanagedRunsBeforeManagedNotYetRun() {
+    assertEquals(List.of("unmanaged"), List.copyOf(PROBE_CALL_ORDER));
   }
 
   @Test

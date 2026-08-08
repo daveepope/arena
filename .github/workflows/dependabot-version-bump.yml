@@ -51,7 +51,7 @@ jobs:
           ARENA_VERSION_BASE_REF: origin/${{ github.base_ref }}
           ARENA_BAZEL_CONFIG: ci
         run: |
-          bazel run //scripts:bump_patch_version --config=ci
+          bazel run //scripts:bump_version --config=ci
           bazel run //scripts:sync_version --config=ci
 
       - name: Commit and push
