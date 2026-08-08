@@ -41,8 +41,17 @@ public class RegisteredPlaybookTest
         var playbook = new TestManagedHttpPlaybook("id", "dep-id");
         var rp = new RegisteredPlaybook(playbook, true);
         var config = rp.ToConfig();
-        var val = config.GetType().GetProperty("exec_on_dependency_start")?.GetValue(config);
+        var val = config!.GetType().GetProperty("exec_on_dependency_start")?.GetValue(config);
         Assert.Equal(true, val);
+    }
+
+    [Fact]
+    public void ToConfig_UnmanagedPlaybook_ReturnsNull()
+    {
+        var playbook = new UnmanagedPlaybookTest.TestUnmanagedPlaybook("seed-id");
+        var rp = new RegisteredPlaybook(playbook, false);
+        var config = rp.ToConfig();
+        Assert.Null(config);
     }
 
     private class TestManagedHttpPlaybook : Playbook.ManagedHttpPlaybook

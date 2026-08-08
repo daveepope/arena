@@ -32,7 +32,7 @@ public sealed class Match
             Network = Network,
             Dependencies = Dependencies.Select(d => JToken.Parse(d.ForFfi())).ToList(),
             Components = Components.Select(c => JToken.Parse(c.ForFfi())).ToList(),
-            Playbooks = Playbooks.Select(p => p.ToConfig()).ToList(),
+            Playbooks = Playbooks.Select(p => p.ToConfig()).Where(c => c != null).ToList()!,
         };
         return ArenaDotnet.Xunit.Support.ArenaJson.Serialize(obj);
     }

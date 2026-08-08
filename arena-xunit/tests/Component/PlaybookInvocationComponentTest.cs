@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -68,6 +69,36 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
         }
     }
 
+    private static readonly Queue<string> ProbeCallOrder = new();
+
+    private class ManagedProbePlaybook : ManagedLocalstackPlaybook
+    {
+        public ManagedProbePlaybook(string depId)
+            : base("playbook-invocation-managed-probe", depId)
+        {
+        }
+
+        public override ActivePlaybook Run(OpenArena arena)
+        {
+            var active = base.Run(arena);
+            ProbeCallOrder.Enqueue("managed");
+            return active;
+        }
+    }
+
+    private class UnmanagedProbePlaybook : UnmanagedPlaybook
+    {
+        public override string Identifier => "playbook-invocation-unmanaged-probe";
+
+        public override ActivePlaybook Run(OpenArena arena)
+        {
+            ProbeCallOrder.Enqueue("unmanaged");
+            return new ActiveHttpPlaybook(IntPtr.Zero);
+        }
+    }
+
+    private static readonly int _localstackPort = TestRuntime.AllocatePort();
+
     public class Fixture : ArenaCollectionFixture
     {
         protected override Match Configure()
@@ -76,12 +107,21 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
                 .WithPort(_httpPort)
                 .Build();
 
+            var localstackDep = new LocalstackDependencyBuilder("playbook-invocation-localstack")
+                .WithPort(_localstackPort)
+                .WithServices("sqs")
+                .WithQueue("playbook-invocation-managed-probe-queue")
+                .Build();
+
             return new MatchBuilder("playbook-invocation-match")
                 .AddDependency(httpDep)
+                .AddDependency(localstackDep)
                 .RegisterPlaybook(new CalibrationHappyPathPlaybook(httpDep.Identifier), true)
                 .RegisterPlaybook(new ScopedOutagePlaybook(httpDep.Identifier), false)
                 .RegisterPlaybook(new VerifyPlaybook(httpDep.Identifier), false)
                 .RegisterPlaybook(new UnmetExpectationPlaybook(httpDep.Identifier), false)
+                .RegisterPlaybook(new ManagedProbePlaybook(localstackDep.Identifier), false)
+                .RegisterPlaybook(new UnmanagedProbePlaybook(), false)
                 .Build();
         }
     }
@@ -152,6 +192,14 @@ public class PlaybookInvocationComponentTest : IClassFixture<PlaybookInvocationC
     {
         Assert.Throws<ArenaDotnet.Xunit.Ffi.ArenaBindingError>(
             () => PlaybookScope.GetActive<ActiveHttpPlaybook>().Verify("POST", "/api/v1/validate", 1));
+    }
+
+    [Fact]
+    [Playbook(typeof(UnmanagedProbePlaybook))]
+    [Playbook(typeof(ManagedProbePlaybook))]
+    public void ScopedPlaybook_ManagedAndUnmanagedStacked_UnmanagedRunsBeforeManagedNotYetRun()
+    {
+        Assert.Equal(new[] { "unmanaged" }, ProbeCallOrder);
     }
 
     [Fact]

@@ -36,6 +36,23 @@ public sealed class MatchBuilder
 
     public MatchBuilder RegisterPlaybook(Playbook.IPlaybook playbook, bool execOnDependencyStart)
     {
+        if (playbook == null)
+            throw new ArgumentNullException(nameof(playbook));
+        if (playbook is not Playbook.ManagedPlaybook and not Playbook.UnmanagedPlaybook)
+        {
+            throw new ArgumentException(
+                $"RegisterPlaybook requires a ManagedPlaybook or UnmanagedPlaybook instance " +
+                $"(got {playbook.GetType().Name})",
+                nameof(playbook));
+        }
+        if (execOnDependencyStart && playbook is not Playbook.ManagedPlaybook)
+        {
+            throw new ArgumentException(
+                $"RegisterPlaybook(..., execOnDependencyStart: true) requires a playbook that " +
+                $"serializes its manifest (a ManagedPlaybook subclass); {playbook.GetType().Name} does not",
+                nameof(execOnDependencyStart));
+        }
+
         _playbooks.Add(new RegisteredPlaybook(playbook, execOnDependencyStart));
         return this;
     }
@@ -57,16 +74,11 @@ public sealed class RegisteredPlaybook
     public Playbook.IPlaybook Playbook { get; }
     public bool ExecOnDependencyStart { get; }
 
-    public object ToConfig()
+    public object? ToConfig()
     {
         if (Playbook is Playbook.ManagedPlaybook managed)
             return managed.BuildRegistrationConfig(ExecOnDependencyStart);
 
-        return new
-        {
-            identifier = Playbook.Identifier,
-            kind = "unknown",
-            exec_on_dependency_start = ExecOnDependencyStart,
-        };
+        return null;
     }
 }

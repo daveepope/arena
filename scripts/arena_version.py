@@ -141,6 +141,10 @@ def release_version_increased(base: str, head: str) -> bool:
     return parse_release_version(head) > parse_release_version(base)
 
 
+def higher_release_version(a: str, b: str) -> str:
+    return a if parse_release_version(a) >= parse_release_version(b) else b
+
+
 def _git_show_at_ref(root: Path, ref: str, path: str) -> str | None:
     result = subprocess.run(
         ["git", "show", f"{ref}:{path}"],

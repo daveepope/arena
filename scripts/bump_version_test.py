@@ -118,6 +118,26 @@ class BumpPatchReleaseFromBaseTest(unittest.TestCase):
             self.assertEqual(head, "5.0.0")
             self.assertEqual(read_version(root), "5.0.0")
 
+    def test_bump_release_from_base_kind_minor_head_stale_behind_base_bumps_from_base(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._setup_git_repo(root, "4.1.0", "4.0.1")
+            head, _changed = bump_release_from_base(root, "base", "minor")
+            self.assertEqual(head, "4.2.0")
+            self.assertEqual(read_version(root), "4.2.0")
+
+    def test_bump_release_from_base_kind_major_head_stale_behind_base_bumps_from_base(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._setup_git_repo(root, "4.1.0", "4.0.1")
+            head, _changed = bump_release_from_base(root, "base", "major")
+            self.assertEqual(head, "5.0.0")
+            self.assertEqual(read_version(root), "5.0.0")
+
     def test_bump_release_from_base_unknown_kind_raises_value_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

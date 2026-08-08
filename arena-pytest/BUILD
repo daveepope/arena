@@ -129,6 +129,23 @@ py_test(
     visibility = ["//visibility:public"],
 )
 
+py_test(
+    name = "playbook_timing_component_test",
+    size = "medium",
+    srcs = glob(["tests/component/playbooks/*.py"]),
+    main = "tests/component/playbooks/playbook_timing_component_test.py",
+    imports = ["tests/component/playbooks"],
+    data = ["//arena-ffi:arena_ffi_shared"],
+    deps = [
+        ":arena_pytest_lib",
+        "@pip//pytest",
+        "@pip//pytest_asyncio",
+    ],
+    tags = ["component_test"],
+    python_version = "PY3",
+    visibility = ["//visibility:public"],
+)
+
 sync_arena_version(
     name = "sync_version_before_wheel",
     stamp = "version_sync.stamp",
@@ -164,7 +181,7 @@ py_wheel(
     project_urls = {
         "Repository": "https://github.com/daveepope/arena",
         "Issues": "https://github.com/daveepope/arena/issues",
-        "Changelog": "https://github.com/daveepope/arena/releases",
+        "Changelog": "https://github.com/daveepope/arena/blob/master/CHANGELOG.md",
     },
     summary = "pytest API and fixtures for Arena (via the C FFI)",
     requires = [

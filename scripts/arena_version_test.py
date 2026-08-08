@@ -12,6 +12,7 @@ from arena_version import (
     bump_minor_version,
     bump_patch_version,
     bump_version,
+    higher_release_version,
     is_synced,
     read_version,
     read_version_from_git_ref,
@@ -77,6 +78,17 @@ class BumpVersionTest(unittest.TestCase):
     def test_bump_version_unknown_kind_raises_value_error(self) -> None:
         with self.assertRaises(ValueError):
             bump_version("1.1.0", "typo")
+
+
+class HigherReleaseVersionTest(unittest.TestCase):
+    def test_higher_release_version_a_greater_returns_a(self) -> None:
+        self.assertEqual(higher_release_version("1.2.0", "1.1.0"), "1.2.0")
+
+    def test_higher_release_version_b_greater_returns_b(self) -> None:
+        self.assertEqual(higher_release_version("1.1.0", "1.2.0"), "1.2.0")
+
+    def test_higher_release_version_equal_returns_a(self) -> None:
+        self.assertEqual(higher_release_version("1.1.0", "1.1.0"), "1.1.0")
 
 
 class ReleaseVersionIncreasedTest(unittest.TestCase):

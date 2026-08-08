@@ -9,6 +9,7 @@ from pathlib import Path
 
 from arena_version import (
     bump_version,
+    higher_release_version,
     read_version,
     read_version_from_git_ref,
     release_lockfiles_need_repin,
@@ -31,13 +32,13 @@ def bump_release_from_base(
     root: Path, base_ref: str, kind: str = "patch"
 ) -> tuple[str, list[str]]:
     head = release_version_only(read_version(root))
+    base = release_version_only(read_version_from_git_ref(root, base_ref))
     if kind == "patch":
-        base = release_version_only(read_version_from_git_ref(root, base_ref))
         if not release_version_increased(base, head):
             head = bump_version(base, kind)
             write_version(root, head)
     else:
-        head = bump_version(head, kind)
+        head = bump_version(higher_release_version(head, base), kind)
         write_version(root, head)
     changed = sync_workspace_version(root)
     return head, changed
