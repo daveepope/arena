@@ -27,6 +27,11 @@ final class HttpPlaybookRegistrationTest {
   }
 
   @Test
+  void activatesBeforeTest_always_returnsTrue() {
+    assertTrue(new ValidationPlaybook().activatesBeforeTest());
+  }
+
+  @Test
   void forRegisteredFfi_singleMapping_serializesHttpPlaybookShape() {
     ValidationPlaybook pb = new ValidationPlaybook();
     ObjectNode n = pb.forRegisteredFfi();

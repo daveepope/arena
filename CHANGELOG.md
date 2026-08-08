@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - arena-junit `ActivePlaybook` no longer rejects a zero/null handle
+- Bump Spring Boot 3.5.3 → 3.5.16, `jackson-databind` → 2.18.9, `logback-classic` → 1.5.38 (CVE fixes)
 
 ### Removed
 
