@@ -54,12 +54,12 @@ public abstract class ArenaCollectionFixture : IDisposable
             {
                 if (field.GetCustomAttribute<ArenaDependencyAttribute>() != null)
                 {
-                    builder.AddDependency((IArenaMatchPiece)RequireFieldValue(field));
+                    builder.AddDependency((IArenaDependency)RequireFieldValue(field));
                     foundAny = true;
                 }
                 else if (field.GetCustomAttribute<ArenaComponentAttribute>() != null)
                 {
-                    builder.AddComponent((IArenaMatchPiece)RequireFieldValue(field));
+                    builder.AddComponent((IArenaComponent)RequireFieldValue(field));
                     foundAny = true;
                 }
                 else if (field.GetCustomAttribute<ArenaPlaybookAttribute>() is { } playbookAttribute)
@@ -121,23 +121,18 @@ public abstract class ArenaCollectionFixture : IDisposable
                 var dependency = field.GetCustomAttribute<ArenaDependencyAttribute>();
                 if (dependency != null && dependency.Logs)
                 {
-                    dependencyIds.Add(IdentifierOf(field));
+                    dependencyIds.Add(((IArenaDependency)RequireFieldValue(field)).Identifier);
                 }
 
                 var component = field.GetCustomAttribute<ArenaComponentAttribute>();
                 if (component != null && component.Logs)
                 {
-                    componentIds.Add(IdentifierOf(field));
+                    componentIds.Add(((IArenaComponent)RequireFieldValue(field)).Identifier);
                 }
             }
         }
 
         return (dependencyIds, componentIds);
-    }
-
-    private static string IdentifierOf(FieldInfo field)
-    {
-        return ((IArenaMatchPiece)RequireFieldValue(field)).Identifier;
     }
 
     private (ILogger? Logger, ArenaLogLevel Level) ResolveLogger()

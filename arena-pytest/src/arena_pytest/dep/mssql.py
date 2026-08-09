@@ -4,6 +4,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
 from arena_pytest.ffi._ffi import match_playbook_run
+from arena_pytest.ffi._ffi_children import children_for_ffi
 from arena_pytest.playbook import ActiveMssqlPlaybook, ManagedPlaybook
 from arena_pytest.support._identifier import build as _build_identifier
 
@@ -22,6 +23,7 @@ class MssqlDependencyBuilder:
             "type": "mssql",
             "identifier": _build_identifier("arena-mssql", name),
         }
+        self._children: List[Any] = []
 
     def with_image_name(self, image_name: str) -> "MssqlDependencyBuilder":
         self._config["image_name"] = image_name
@@ -62,23 +64,36 @@ class MssqlDependencyBuilder:
         self._config["encryption"] = value
         return self
 
+    def with_child_dependencies(self, children: List[Any]) -> "MssqlDependencyBuilder":
+        self._children.extend(children)
+        return self
+
     def build(self) -> "MssqlDependency":
-        return MssqlDependency(dict(self._config))
+        return MssqlDependency(dict(self._config), children=list(self._children))
 
     def _for_ffi(self) -> Dict[str, Any]:
-        return dict(self._config)
+        d = dict(self._config)
+        children = children_for_ffi(self._children)
+        if children:
+            d["children"] = children
+        return d
 
 
 class MssqlDependency:
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], children: Optional[List[Any]] = None):
         self._config = config
+        self._children = children or []
 
     @property
     def identifier(self) -> str:
         return self._config["identifier"]
 
     def _for_ffi(self) -> Dict[str, Any]:
-        return self._config
+        d = dict(self._config)
+        children = children_for_ffi(self._children)
+        if children:
+            d["children"] = children
+        return d
 
 
 class ManagedMssqlPlaybook(ManagedPlaybook):

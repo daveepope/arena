@@ -1,4 +1,4 @@
-use arena::dependency::RunnableDependency;
+use arena::dependency::{Dependency, RunnableDependency};
 use arena_oauth::OauthDependency;
 use futures::FutureExt;
 
@@ -50,6 +50,12 @@ impl RunnableDependency for PanickingOauthChild {
     async fn stop(&mut self) {}
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
+    fn children(&self) -> &[Dependency] {
+        &[]
+    }
+    fn children_mut(&mut self) -> &mut [Dependency] {
+        &mut []
+    }
 
     async fn soft_reset(&self) {}
 

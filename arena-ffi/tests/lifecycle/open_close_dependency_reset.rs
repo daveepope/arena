@@ -33,6 +33,19 @@ fn arena_open_null_name_pointer_writes_error_returns_null_handle() {
 }
 
 #[test]
+fn arena_open_malformed_config_json_writes_parse_error_returns_null_handle() {
+    let name = CString::new("test").unwrap();
+    let config = CString::new("{not valid json").unwrap();
+    let mut err: *mut c_char = std::ptr::null_mut();
+    let h = arena_open(name.as_ptr(), config.as_ptr(), &mut err as *mut _);
+    assert!(h.is_null());
+    assert!(!err.is_null());
+    let msg = unsafe { CStr::from_ptr(err).to_string_lossy().into_owned() };
+    assert!(msg.contains("config failed to parse"), "got: {msg}");
+    arena_free_string(err);
+}
+
+#[test]
 fn arena_soft_reset_missing_dependency_writes_not_found_keeps_live_handle() {
     let name = CString::new("test").unwrap();
     let mut err: *mut c_char = std::ptr::null_mut();

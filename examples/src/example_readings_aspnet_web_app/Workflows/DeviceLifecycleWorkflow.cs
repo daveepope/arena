@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Temporalio.Workflows;
 using Temporalio.Exceptions;
@@ -14,7 +15,7 @@ public class DeviceLifecycleWorkflow
     {
         while (true)
         {
-            await Task.Delay(1000);
+            await Workflow.DelayAsync(TimeSpan.FromMilliseconds(100));
         }
     }
 
@@ -28,13 +29,20 @@ public class DeviceLifecycleWorkflow
         });
     }
 
+    private static readonly ActivityOptions TransitionActivityOptions = new()
+    {
+        StartToCloseTimeout = TimeSpan.FromMilliseconds(100),
+    };
+
     [WorkflowSignal]
     public async Task RequestTransition(string target)
     {
         if (_currentState == target)
             return;
 
-        await DeviceActivities.Transition(_currentState, target);
+        await Workflow.ExecuteActivityAsync(
+            () => DeviceActivities.Transition(_currentState, target),
+            TransitionActivityOptions);
         _currentState = target;
         _transitionCount++;
     }
@@ -42,7 +50,9 @@ public class DeviceLifecycleWorkflow
     [WorkflowSignal]
     public async Task Stop()
     {
-        await DeviceActivities.Stop(_currentState);
+        await Workflow.ExecuteActivityAsync(
+            () => DeviceActivities.Stop(_currentState),
+            TransitionActivityOptions);
         throw new ApplicationFailureException("Device stopped");
     }
 }

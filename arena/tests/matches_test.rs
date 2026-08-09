@@ -15,6 +15,16 @@ struct StubDependency {
     identifier: String,
     started: Arc<Mutex<bool>>,
     stop_log: Arc<Mutex<Vec<String>>>,
+    children: Vec<Dependency>,
+}
+
+fn stub_dependency(identifier: &str) -> StubDependency {
+    StubDependency {
+        identifier: identifier.to_string(),
+        started: Arc::new(Mutex::new(false)),
+        stop_log: Arc::new(Mutex::new(Vec::new())),
+        children: Vec::new(),
+    }
 }
 
 #[async_trait]
@@ -38,7 +48,15 @@ impl RunnableDependency for StubDependency {
             .unwrap()
             .push(self.identifier.clone());
     }
-    fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
+    fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
+        self.children.push(dep);
+    }
+    fn children(&self) -> &[Dependency] {
+        &self.children
+    }
+    fn children_mut(&mut self) -> &mut [Dependency] {
+        &mut self.children
+    }
     async fn soft_reset(&self) {}
     async fn hard_reset(&mut self) {}
 }
@@ -63,6 +81,12 @@ impl RunnableDependency for PanicOnStartDependency {
     }
     async fn stop(&mut self) {}
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
+    fn children(&self) -> &[Dependency] {
+        &[]
+    }
+    fn children_mut(&mut self) -> &mut [Dependency] {
+        &mut []
+    }
     async fn soft_reset(&self) {}
     async fn hard_reset(&mut self) {}
 }
@@ -155,6 +179,7 @@ async fn register_playbook_exec_on_start_runs_after_deps_in_parallel() {
         identifier: "dep-1".to_string(),
         started: dep_started.clone(),
         stop_log: Arc::new(Mutex::new(Vec::new())),
+        children: Vec::new(),
     };
 
     let run_log = Arc::new(Mutex::new(Vec::<String>::new()));
@@ -212,6 +237,7 @@ async fn register_playbook_exec_on_start_false_skips_run() {
         identifier: "dep-1".to_string(),
         started: Arc::new(Mutex::new(false)),
         stop_log: Arc::new(Mutex::new(Vec::new())),
+        children: Vec::new(),
     };
 
     let pb = PanicOnRunPlaybook {
@@ -234,6 +260,7 @@ async fn run_playbook_known_id_returns_active() {
         identifier: "dep-1".to_string(),
         started: dep_started.clone(),
         stop_log: Arc::new(Mutex::new(Vec::new())),
+        children: Vec::new(),
     };
 
     let run_log = Arc::new(Mutex::new(Vec::<String>::new()));
@@ -273,6 +300,7 @@ async fn run_playbook_unknown_id_returns_none() {
         identifier: "dep-1".to_string(),
         started: Arc::new(Mutex::new(false)),
         stop_log: Arc::new(Mutex::new(Vec::new())),
+        children: Vec::new(),
     };
 
     let mut a_match = Match::new("test-match", vec![Box::new(dep)], vec![]);
@@ -293,6 +321,7 @@ async fn start_later_dep_panic_stops_earlier_started_deps() {
         identifier: "dep-ok".to_string(),
         started: Arc::new(Mutex::new(false)),
         stop_log: stop_log.clone(),
+        children: Vec::new(),
     };
     let dep_fail = PanicOnStartDependency {
         identifier: "dep-fail".to_string(),
@@ -307,4 +336,46 @@ async fn start_later_dep_panic_stops_earlier_started_deps() {
     let outcome = AssertUnwindSafe(a_match.start()).catch_unwind().await;
     assert!(outcome.is_err());
     assert_eq!(stop_log.lock().unwrap().clone(), vec!["dep-ok".to_string()]);
+}
+
+#[tokio::test]
+async fn dependency_nested_two_levels_returns_grandchild() {
+    let grandchild = stub_dependency("grandchild");
+    let mut child = stub_dependency("child");
+    child.add_child(Box::new(grandchild));
+    let mut parent = stub_dependency("parent");
+    parent.add_child(Box::new(child));
+
+    let a_match = Match::new("nested-match", vec![Box::new(parent)], vec![]);
+
+    let found = a_match.dependency("grandchild");
+    assert!(found.is_some());
+    assert_eq!(found.unwrap().identifier(), "grandchild");
+}
+
+#[tokio::test]
+async fn dependency_mut_nested_two_levels_returns_grandchild() {
+    let grandchild = stub_dependency("grandchild");
+    let mut child = stub_dependency("child");
+    child.add_child(Box::new(grandchild));
+    let mut parent = stub_dependency("parent");
+    parent.add_child(Box::new(child));
+
+    let mut a_match = Match::new("nested-match-mut", vec![Box::new(parent)], vec![]);
+
+    let found = a_match.dependency_mut("grandchild");
+    assert!(found.is_some());
+    assert_eq!(found.unwrap().identifier(), "grandchild");
+}
+
+#[tokio::test]
+async fn dependency_unknown_identifier_in_nested_tree_returns_none() {
+    let mut child = stub_dependency("child");
+    child.add_child(Box::new(stub_dependency("grandchild")));
+    let mut parent = stub_dependency("parent");
+    parent.add_child(Box::new(child));
+
+    let a_match = Match::new("nested-match-miss", vec![Box::new(parent)], vec![]);
+
+    assert!(a_match.dependency("does-not-exist").is_none());
 }

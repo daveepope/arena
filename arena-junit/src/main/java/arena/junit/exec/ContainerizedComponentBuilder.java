@@ -1,8 +1,10 @@
 package arena.junit.exec;
+import arena.junit.match.ArenaRunnableComponent;
 import arena.junit.readiness.ReadinessCheck;
 import arena.junit.readiness.ReadinessChecksFfi;
 import arena.junit.support.ArenaIdentifiers;
 import arena.junit.support.ArenaJson;
+import arena.junit.support.ChildrenFfi;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -12,6 +14,7 @@ import java.util.List;
 public final class ContainerizedComponentBuilder {
   private final ObjectNode config;
   private final List<ReadinessChecksFfi.ReadinessEntry> readiness = new ArrayList<>();
+  private final List<ArenaRunnableComponent> children = new ArrayList<>();
 
   public ContainerizedComponentBuilder(String name, String containerfile) {
     config =
@@ -78,7 +81,12 @@ public final class ContainerizedComponentBuilder {
     return this;
   }
 
+  public ContainerizedComponentBuilder addChildComponent(ArenaRunnableComponent child) {
+    this.children.add(child);
+    return this;
+  }
+
   public ContainerizedComponent build() {
-    return new ContainerizedComponent(config.deepCopy(), readiness);
+    return new ContainerizedComponent(config.deepCopy(), readiness, children);
   }
 }

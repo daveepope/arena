@@ -6,8 +6,8 @@ namespace ArenaDotnet.Xunit;
 public sealed class MatchBuilder
 {
     private readonly string _name;
-    private readonly List<IArenaMatchPiece> _dependencies = new();
-    private readonly List<IArenaMatchPiece> _components = new();
+    private readonly List<IArenaDependency> _dependencies = new();
+    private readonly List<IArenaComponent> _components = new();
     private string? _network;
     private readonly List<RegisteredPlaybook> _playbooks = new();
 
@@ -22,13 +22,13 @@ public sealed class MatchBuilder
         return this;
     }
 
-    public MatchBuilder AddDependency(IArenaMatchPiece dependency)
+    public MatchBuilder AddDependency(IArenaDependency dependency)
     {
         _dependencies.Add(dependency);
         return this;
     }
 
-    public MatchBuilder AddComponent(IArenaMatchPiece component)
+    public MatchBuilder AddComponent(IArenaComponent component)
     {
         _components.Add(component);
         return this;

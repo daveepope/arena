@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using ArenaDotnet.Xunit.Support;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Dep;
 
@@ -86,7 +87,7 @@ internal sealed class LocalstackEventBusConfig
     [JsonProperty("name")] public string Name { get; set; } = default!;
 }
 
-public sealed class LocalstackDependency : IArenaMatchPiece
+public sealed class LocalstackDependency : IArenaDependency
 {
     public string Type => "localstack";
     public string Identifier { get; }
@@ -99,6 +100,7 @@ public sealed class LocalstackDependency : IArenaMatchPiece
     private readonly List<LocalstackRuleConfig> _eventRules;
     private readonly string? _image;
     private readonly string? _containerName;
+    private readonly List<IArenaDependency> _children;
 
     internal LocalstackDependency(
         string identifier,
@@ -108,7 +110,8 @@ public sealed class LocalstackDependency : IArenaMatchPiece
         List<LocalstackEventBusConfig> eventBuses,
         List<LocalstackRuleConfig> eventRules,
         string? image,
-        string? containerName)
+        string? containerName,
+        List<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -119,6 +122,7 @@ public sealed class LocalstackDependency : IArenaMatchPiece
         _eventRules = eventRules;
         _image = image;
         _containerName = containerName;
+        _children = children;
     }
 
     public string ForFfi()
@@ -136,6 +140,7 @@ public sealed class LocalstackDependency : IArenaMatchPiece
         if (_eventRules.Count > 0) config.EventRules = _eventRules;
         if (!string.IsNullOrEmpty(_image)) config.Image = _image;
         if (!string.IsNullOrEmpty(_containerName)) config.ContainerName = _containerName;
+        config.Children = ChildrenWireFormat.Build(_children);
 
         return ArenaJson.Serialize(config);
     }
@@ -152,6 +157,7 @@ public sealed class LocalstackDependency : IArenaMatchPiece
         [JsonProperty("event_rules")] public List<LocalstackRuleConfig>? EventRules { get; set; }
         [JsonProperty("image")] public string? Image { get; set; }
         [JsonProperty("container_name")] public string? ContainerName { get; set; }
+        [JsonProperty("children")] public List<JToken>? Children { get; set; }
     }
 }
 
@@ -165,6 +171,7 @@ public sealed class LocalstackDependencyBuilder
     private readonly List<EventRuleSpec> _eventRules = new();
     private string? _image;
     private string? _containerName;
+    private readonly List<IArenaDependency> _children = new();
 
     public LocalstackDependencyBuilder(string name)
     {
@@ -229,6 +236,12 @@ public sealed class LocalstackDependencyBuilder
         return this;
     }
 
+    public LocalstackDependencyBuilder AddChildDependency(IArenaDependency child)
+    {
+        _children.Add(child);
+        return this;
+    }
+
     public LocalstackDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-localstack", _name);
@@ -275,6 +288,7 @@ public sealed class LocalstackDependencyBuilder
             eventBuses,
             rules,
             _image,
-            _containerName);
+            _containerName,
+            _children);
     }
 }

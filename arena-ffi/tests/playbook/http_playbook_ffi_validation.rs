@@ -35,6 +35,26 @@ fn http_playbook_verify_null_handle_returns_invalid_argument() {
 }
 
 #[test]
+fn http_playbook_open_malformed_spec_json_returns_null_and_parse_error() {
+    let spec = CString::new("{not valid json").unwrap();
+    let mut err: *mut c_char = std::ptr::null_mut();
+    let arena_handle = 0x1 as *mut arena_ffi::OpenArenaHandle;
+    let pb = arena_http_playbook_open(arena_handle, spec.as_ptr(), &mut err as *mut _);
+    assert!(pb.is_null());
+    assert!(err_text(err).contains("spec parse failed"));
+}
+
+#[test]
+fn http_playbook_verify_malformed_spec_json_returns_invalid_argument() {
+    let spec = CString::new("{not valid json").unwrap();
+    let mut err: *mut c_char = std::ptr::null_mut();
+    let handle = 0x1 as *mut arena_ffi::ArenaActivePlaybookHandle;
+    let status = arena_http_playbook_verify(handle, spec.as_ptr(), &mut err as *mut _);
+    assert_eq!(status, ArenaStatus::InvalidArgument);
+    assert!(err_text(err).contains("parse failed"));
+}
+
+#[test]
 fn http_playbook_verify_both_count_fields_returns_invalid_argument() {
     let spec = CString::new(
         r#"{"method":"GET","url_path":"/x","expected_count":1,"minimum_count":1}"#,

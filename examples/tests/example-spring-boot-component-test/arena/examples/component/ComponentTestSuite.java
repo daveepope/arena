@@ -90,6 +90,7 @@ public final class ComponentTestSuite {
 
   private static final EphemeralTestRuntime RT = EphemeralTestRuntime.get();
   private static final int WEB_APP_PORT = RT.execWebAppPort;
+  private static final int WEB_APP_2_PORT = EphemeralTestRuntime.ephemeralTcpPort();
   private static final int POSTGRES_PORT = RT.postgresPort;
   private static final int MSSQL_PORT = RT.mssqlPort;
   private static final int CALIBRATION_HOST_PORT = RT.calibrationHostPort;
@@ -208,7 +209,10 @@ public final class ComponentTestSuite {
       new ResetReadingsDbPlaybook(POSTGRES.identifier());
 
   @ArenaComponent(logs = true)
-  static final ExecutableComponent WEB_APP = buildWebApp();
+  static final ExecutableComponent WEB_APP = buildWebApp("example-api-web-app", WEB_APP_PORT);
+
+  @ArenaComponent(logs = true)
+  static final ExecutableComponent WEB_APP_2 = buildWebApp("example-api-web-app-2", WEB_APP_2_PORT);
 
   @ArenaAfterOpen
   static void afterOpen() throws Exception {
@@ -271,7 +275,7 @@ public final class ComponentTestSuite {
     }
   }
 
-  private static ExecutableComponent buildWebApp() {
+  private static ExecutableComponent buildWebApp(String name, int port) {
     String appLauncher;
     try {
       appLauncher = Runfiles.findWebAppLauncher();
@@ -279,9 +283,9 @@ public final class ComponentTestSuite {
       throw new IllegalStateException("failed to locate web app launcher runfile", e);
     }
     assertTrue(!appLauncher.isEmpty(), "web app launcher must be present under Bazel runfiles");
-    return new ExecutableComponentBuilder("example-api-web-app")
+    return new ExecutableComponentBuilder(name)
         .withExecutablePath(appLauncher)
-        .withEnvVar("WEB_APP_PORT", String.valueOf(WEB_APP_PORT))
+        .withEnvVar("WEB_APP_PORT", String.valueOf(port))
         .withEnvVar(
             "POSTGRES_CONNECTION_STRING",
             "host=localhost port="
@@ -317,9 +321,7 @@ public final class ComponentTestSuite {
         .withEnvVar("EVENT_BUS_NAME", EVENT_BUS_NAME)
         .withEnvVar("EVENT_SOURCE", EVENT_SOURCE)
         .withReadinessCheck(
-            HttpReadinessCheck.create(),
-            "http://127.0.0.1:" + WEB_APP_PORT + "/health",
-            30_000L)
+            HttpReadinessCheck.create(), "http://127.0.0.1:" + port + "/health", 30_000L)
         .build();
   }
 
@@ -392,6 +394,10 @@ public final class ComponentTestSuite {
 
   static ApiClient apiClient() {
     return new ApiClient("http://127.0.0.1:" + WEB_APP_PORT, accessToken, MAPPER);
+  }
+
+  static ApiClient apiClient2() {
+    return new ApiClient("http://127.0.0.1:" + WEB_APP_2_PORT, accessToken, MAPPER);
   }
 
   static void waitDeviceProvisionedEmail(String needle) throws Exception {

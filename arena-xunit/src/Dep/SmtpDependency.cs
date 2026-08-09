@@ -1,8 +1,10 @@
+using System.Collections.Generic;
 using ArenaDotnet.Xunit.Support;
+using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Dep;
 
-public sealed class SmtpDependency : IArenaMatchPiece
+public sealed class SmtpDependency : IArenaDependency
 {
     public string Type => "smtp";
     public string Identifier { get; }
@@ -11,8 +13,11 @@ public sealed class SmtpDependency : IArenaMatchPiece
     public string? TlsMode { get; }
     public string? Image { get; }
     public string? ContainerName { get; }
+    public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
-    internal SmtpDependency(string identifier, int port, int uiPort, string? tlsMode, string? image, string? containerName)
+    private readonly IReadOnlyList<IArenaDependency> _children;
+
+    internal SmtpDependency(string identifier, int port, int uiPort, string? tlsMode, string? image, string? containerName, IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -20,6 +25,7 @@ public sealed class SmtpDependency : IArenaMatchPiece
         TlsMode = string.IsNullOrEmpty(tlsMode) ? null : tlsMode;
         Image = string.IsNullOrEmpty(image) ? null : image;
         ContainerName = string.IsNullOrEmpty(containerName) ? null : containerName;
+        _children = children;
     }
 
     public string ForFfi()
@@ -36,6 +42,7 @@ public sealed class SmtpDependencyBuilder
     private string? _tlsMode;
     private string? _image;
     private string? _containerName;
+    private readonly List<IArenaDependency> _children = new();
 
     public SmtpDependencyBuilder(string name)
     {
@@ -78,9 +85,15 @@ public sealed class SmtpDependencyBuilder
         return this;
     }
 
+    public SmtpDependencyBuilder AddChildDependency(IArenaDependency child)
+    {
+        _children.Add(child);
+        return this;
+    }
+
     public SmtpDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-smtp", _name);
-        return new SmtpDependency(identifier, _port, _uiPort, _tlsMode, _image, _containerName);
+        return new SmtpDependency(identifier, _port, _uiPort, _tlsMode, _image, _containerName, _children);
     }
 }

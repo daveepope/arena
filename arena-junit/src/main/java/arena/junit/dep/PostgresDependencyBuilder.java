@@ -1,9 +1,12 @@
 package arena.junit.dep;
+import arena.junit.match.ArenaRunnableDependency;
 import arena.junit.support.ArenaIdentifiers;
 import arena.junit.support.ArenaJson;
+import arena.junit.support.ChildrenFfi;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class PostgresDependencyBuilder {
@@ -11,6 +14,7 @@ public final class PostgresDependencyBuilder {
       ArenaJson.object()
           .put("type", "postgres")
           .put("identifier", ArenaIdentifiers.build("arena-postgres", ""));
+  private final List<ArenaRunnableDependency> children = new ArrayList<>();
 
   public PostgresDependencyBuilder(String name) {
     config.put("identifier", ArenaIdentifiers.build("arena-postgres", name));
@@ -60,7 +64,16 @@ public final class PostgresDependencyBuilder {
     return this;
   }
 
+  public PostgresDependencyBuilder addChildDependency(ArenaRunnableDependency child) {
+    this.children.add(child);
+    return this;
+  }
+
   public PostgresDependency build() {
-    return new PostgresDependency(config.deepCopy());
+    ObjectNode cfg = config.deepCopy();
+    if (!children.isEmpty()) {
+      cfg.set("children", ChildrenFfi.buildDependencies(children));
+    }
+    return new PostgresDependency(cfg);
   }
 }

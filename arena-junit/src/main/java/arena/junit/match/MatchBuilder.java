@@ -13,8 +13,8 @@ import java.util.Map;
 public final class MatchBuilder {
   private final String name;
   private String network;
-  private final List<ArenaMatchPiece> dependencies = new ArrayList<>();
-  private final List<ArenaMatchPiece> components = new ArrayList<>();
+  private final List<ArenaRunnableDependency> dependencies = new ArrayList<>();
+  private final List<ArenaRunnableComponent> components = new ArrayList<>();
   private final Map<Class<? extends Playbook>, RegisteredPlaybook> playbooks =
       new LinkedHashMap<>();
 
@@ -27,12 +27,12 @@ public final class MatchBuilder {
     return this;
   }
 
-  public MatchBuilder addDependency(ArenaMatchPiece dependency) {
+  public MatchBuilder addDependency(ArenaRunnableDependency dependency) {
     dependencies.add(dependency);
     return this;
   }
 
-  public MatchBuilder addComponent(ArenaMatchPiece component) {
+  public MatchBuilder addComponent(ArenaRunnableComponent component) {
     components.add(component);
     return this;
   }

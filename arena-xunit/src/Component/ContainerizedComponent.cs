@@ -2,10 +2,11 @@ using System.Collections.Generic;
 using System.Linq;
 using ArenaDotnet.Xunit.Support;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Component;
 
-public sealed class ContainerizedComponent : IArenaMatchPiece
+public sealed class ContainerizedComponent : IArenaComponent
 {
     public string Type => "container";
     public string Identifier { get; }
@@ -19,11 +20,13 @@ public sealed class ContainerizedComponent : IArenaMatchPiece
     private readonly List<RuntimeArgEntry> _runtimeArgs;
     private readonly List<PortMappingEntry> _portMappings;
     private readonly List<ReadinessCheckEntry> _readinessChecks;
+    private readonly List<IArenaComponent> _children;
 
     internal ContainerizedComponent(string identifier, string containerfile, string? buildContext,
         string? imageTag, string? network, Dictionary<string, string> envVars,
         List<RuntimeArgEntry> runtimeArgs, List<PortMappingEntry> portMappings,
-        List<string> hostMappings, List<ReadinessCheckEntry> readinessChecks)
+        List<string> hostMappings, List<ReadinessCheckEntry> readinessChecks,
+        List<IArenaComponent> children)
     {
         Identifier = identifier;
         Containerfile = containerfile;
@@ -35,6 +38,7 @@ public sealed class ContainerizedComponent : IArenaMatchPiece
         _portMappings = portMappings;
         HostMappings = hostMappings;
         _readinessChecks = readinessChecks;
+        _children = children;
     }
 
     public string ForFfi()
@@ -52,6 +56,7 @@ public sealed class ContainerizedComponent : IArenaMatchPiece
             PortMappings = PortMappingEntry.Build(_portMappings),
             HostMappings = new List<string>(HostMappings),
             ReadinessChecks = ReadinessCheckWireFormat.Build(_readinessChecks),
+            Children = ChildrenWireFormat.Build(_children),
         });
     }
 
@@ -69,6 +74,7 @@ public sealed class ContainerizedComponent : IArenaMatchPiece
         [JsonProperty("port_mappings")] public List<object> PortMappings { get; set; } = default!;
         [JsonProperty("host_mappings")] public List<string> HostMappings { get; set; } = default!;
         [JsonProperty("readiness_checks")] public List<object>? ReadinessChecks { get; set; }
+        [JsonProperty("children")] public List<JToken>? Children { get; set; }
     }
 }
 
@@ -104,6 +110,7 @@ public sealed class ContainerizedComponentBuilder
     private readonly List<PortMappingEntry> _portMappings = new();
     private readonly List<string> _hostMappings = new();
     private readonly List<ReadinessCheckEntry> _readinessChecks = new();
+    private readonly List<IArenaComponent> _children = new();
 
     public ContainerizedComponentBuilder(string name)
     {
@@ -169,6 +176,12 @@ public sealed class ContainerizedComponentBuilder
         return this;
     }
 
+    public ContainerizedComponentBuilder AddChildComponent(IArenaComponent child)
+    {
+        _children.Add(child);
+        return this;
+    }
+
     public ContainerizedComponent Build()
     {
         if (string.IsNullOrEmpty(_containerfile))
@@ -177,6 +190,6 @@ public sealed class ContainerizedComponentBuilder
         return new ContainerizedComponent(identifier, _containerfile, _buildContext, _imageTag, _network,
             new Dictionary<string, string>(_envVars), new List<RuntimeArgEntry>(_runtimeArgs),
             new List<PortMappingEntry>(_portMappings), new List<string>(_hostMappings),
-            new List<ReadinessCheckEntry>(_readinessChecks));
+            new List<ReadinessCheckEntry>(_readinessChecks), new List<IArenaComponent>(_children));
     }
 }

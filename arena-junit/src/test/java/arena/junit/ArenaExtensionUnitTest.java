@@ -9,7 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import arena.junit.ffi.ArenaLogLevel;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableComponent;
+import arena.junit.match.ArenaRunnableDependency;
 import arena.junit.match.Match;
 import arena.junit.match.MatchBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,14 +43,14 @@ final class ArenaExtensionUnitTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  static final class StubMatchPiece implements ArenaMatchPiece {
+  static final class StubMatchPiece implements ArenaRunnableDependency, ArenaRunnableComponent {
     @Override
     public ObjectNode forFfi() {
       return MAPPER.createObjectNode();
     }
   }
 
-  static final class IdentifiedMatchPiece implements ArenaMatchPiece {
+  static final class IdentifiedMatchPiece implements ArenaRunnableDependency, ArenaRunnableComponent {
     private final String identifier;
 
     IdentifiedMatchPiece(String identifier) {

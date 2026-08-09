@@ -1,8 +1,9 @@
-use arena::dependency::RunnableDependency;
+use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_kafka::{KafkaDependency, KafkaImpl};
 use async_trait::async_trait;
 use futures::FutureExt;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,6 +101,12 @@ impl RunnableDependency for FakeDep {
     }
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
+    fn children(&self) -> &[Dependency] {
+        &[]
+    }
+    fn children_mut(&mut self) -> &mut [Dependency] {
+        &mut []
+    }
 
     async fn soft_reset(&self) {}
 
@@ -193,4 +200,82 @@ async fn start_readiness_err_panics_after_impl_start() {
 
     assert!(outcome.is_err());
     assert_eq!(events.lock().unwrap().as_slice(), &[Event::KafkaStart]);
+}
+
+#[test]
+fn identifier_as_any_and_children_reflect_dependency_state() {
+    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
+    let mut dep = KafkaDependency::builder("kafka-accessors")
+        .with_impl(FakeKafkaImpl {
+            bootstrap: None,
+            events: events.clone(),
+        })
+        .with_port(0)
+        .with_image_tag("x")
+        .build();
+
+    assert!(dep.identifier().contains("kafka-accessors"));
+    assert!(dep.as_any().downcast_ref::<KafkaDependency>().is_some());
+    assert!(dep.as_any_mut().downcast_mut::<KafkaDependency>().is_some());
+    assert!(dep.children().is_empty());
+
+    dep.add_child(Box::new(FakeDep {
+        name: "kafka-child",
+        events: events.clone(),
+        stopped: false,
+    }));
+
+    assert_eq!(dep.children().len(), 1);
+    assert_eq!(dep.children_mut().len(), 1);
+}
+
+struct FlakyKafkaImpl {
+    calls: AtomicUsize,
+    ready_after: usize,
+    bootstrap: String,
+}
+
+#[async_trait]
+impl KafkaImpl for FlakyKafkaImpl {
+    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) {}
+
+    async fn stop(&mut self) {}
+
+    fn bootstrap_servers(&self) -> Option<&str> {
+        let seen = self.calls.fetch_add(1, Ordering::SeqCst);
+        if seen < self.ready_after {
+            None
+        } else {
+            Some(&self.bootstrap)
+        }
+    }
+}
+
+struct ImmediateReadinessCheck;
+
+#[async_trait]
+impl ReadinessCheck for ImmediateReadinessCheck {
+    async fn is_ready(&self, _identifier: &str, _bootstrap_servers: &str, _timeout_ms: u64) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn wait_until_ready_retries_until_impl_reports_bootstrap() {
+    let mut dep = KafkaDependency::builder("kafka-flaky")
+        .with_impl(FlakyKafkaImpl {
+            calls: AtomicUsize::new(0),
+            ready_after: 2,
+            bootstrap: "127.0.0.1:9092".to_string(),
+        })
+        .with_port(0)
+        .with_image_tag("x")
+        .with_readiness_check(ImmediateReadinessCheck)
+        .build();
+
+    dep.start().await;
+
+    assert_eq!(dep.bootstrap_servers(), Some("127.0.0.1:9092"));
+
+    dep.stop().await;
 }

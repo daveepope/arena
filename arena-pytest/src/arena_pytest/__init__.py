@@ -86,7 +86,11 @@ from arena_pytest.oauth import (
     oauth_issuer_host_is_non_loopback,
     oauth_loopback_tls_pem_pair,
 )
-from arena_pytest.dep.postgres import PostgresDependency, PostgresDependencyBuilder
+from arena_pytest.dep.postgres import (
+    ManagedPostgresPlaybook,
+    PostgresDependency,
+    PostgresDependencyBuilder,
+)
 from arena_pytest.dep.smtp import SmtpDependency, SmtpDependencyBuilder
 from arena_pytest.dep.temporal import TemporalDependency, TemporalDependencyBuilder
 from arena_pytest.readiness import HttpReadinessCheck, ReadinessCheck, TcpReadinessCheck
@@ -156,6 +160,7 @@ __all__ = [
     "OauthDependencyBuilder",
     "oauth_issuer_host_is_non_loopback",
     "oauth_loopback_tls_pem_pair",
+    "ManagedPostgresPlaybook",
     "PostgresDependency",
     "PostgresDependencyBuilder",
     "TemporalDependency",

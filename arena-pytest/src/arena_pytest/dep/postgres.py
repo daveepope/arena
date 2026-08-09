@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from arena_pytest.ffi._ffi import match_playbook_run
+from arena_pytest.ffi._ffi_children import children_for_ffi
 from arena_pytest.playbook import ActivePostgresPlaybook, ManagedPlaybook
 from arena_pytest.support._identifier import build as _build_identifier
 
@@ -16,6 +17,7 @@ class PostgresDependencyBuilder:
             "type": "postgres",
             "identifier": _build_identifier("arena-postgres", name),
         }
+        self._children: List[Any] = []
 
     def with_image_name(self, image_name: str) -> "PostgresDependencyBuilder":
         self._config["image_name"] = image_name
@@ -49,23 +51,36 @@ class PostgresDependencyBuilder:
         self._config["startup_sql_scripts"] = scripts
         return self
 
+    def with_child_dependencies(self, children: List[Any]) -> "PostgresDependencyBuilder":
+        self._children.extend(children)
+        return self
+
     def build(self) -> "PostgresDependency":
-        return PostgresDependency(dict(self._config))
+        return PostgresDependency(dict(self._config), children=list(self._children))
 
     def _for_ffi(self) -> Dict[str, Any]:
-        return dict(self._config)
+        d = dict(self._config)
+        children = children_for_ffi(self._children)
+        if children:
+            d["children"] = children
+        return d
 
 
 class PostgresDependency:
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], children: Optional[List[Any]] = None):
         self._config = config
+        self._children = children or []
 
     @property
     def identifier(self) -> str:
         return self._config["identifier"]
 
     def _for_ffi(self) -> Dict[str, Any]:
-        return self._config
+        d = dict(self._config)
+        children = children_for_ffi(self._children)
+        if children:
+            d["children"] = children
+        return d
 
 
 class ManagedPostgresPlaybook(ManagedPlaybook):

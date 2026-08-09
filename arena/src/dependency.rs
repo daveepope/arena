@@ -9,8 +9,25 @@ pub trait RunnableDependency: Send + Sync {
     async fn start(&mut self);
     async fn stop(&mut self);
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>);
+    fn children(&self) -> &[Dependency];
+    fn children_mut(&mut self) -> &mut [Dependency];
     async fn soft_reset(&self);
     async fn hard_reset(&mut self);
 }
 
 pub type Dependency = Box<dyn RunnableDependency>;
+
+pub fn find_dependency<'a>(
+    deps: &'a [Dependency],
+    identifier: &str,
+) -> Option<&'a dyn RunnableDependency> {
+    for dep in deps {
+        if dep.identifier() == identifier {
+            return Some(dep.as_ref());
+        }
+        if let Some(found) = find_dependency(dep.children(), identifier) {
+            return Some(found);
+        }
+    }
+    None
+}

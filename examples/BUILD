@@ -186,6 +186,14 @@ import_library(
 )
 
 import_library(
+    name = "polly_core_lib",
+    library_name = "Polly.Core",
+    libs = ["@polly_core//:libs"],
+    refs = ["@polly_core//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
     name = "jwt_lib",
     library_name = "System.IdentityModel.Tokens.Jwt",
     libs = ["@jwt//:libs"],
@@ -610,6 +618,38 @@ py_test(
     visibility = ["//visibility:public"],
 )
 
+py_test(
+    name = "pytest_fastapi_chained_component_test",
+    size = "medium",
+    srcs = glob(["tests/example-fastapi-pytest-chained-component-test/**/*.py"]),
+    main = "tests/example-fastapi-pytest-chained-component-test/fastapi_chained_component_test.py",
+    imports = [
+        "tests/example-fastapi-pytest-chained-component-test",
+        "tests/pytest-shared",
+    ],
+    data = [
+        "//arena-ffi:arena_ffi_shared",
+        "//examples:example-readings-fastapi-web-app",
+        "//examples:instrument_reading_db_schema",
+        "//examples:arena_config",
+        "//examples:validation_db_schema",
+    ],
+    deps = [
+        ":pytest_shared",
+        "//arena-pytest:arena_pytest_lib",
+        "@pip//pytest",
+        "@pip//pytest_asyncio",
+        "@pip//requests",
+        "@pip_examples//fastmssql",
+    ],
+    tags = [
+        "component_test",
+        "example_component",
+    ],
+    python_version = "PY3",
+    visibility = ["//visibility:public"],
+)
+
 rust_test(
     name = "example-axum-component-test",
     srcs = glob(["tests/example-axum-component-test/**/*.rs"]),
@@ -760,6 +800,50 @@ java_test(
 )
 
 java_test(
+    name = "example-spring-boot-chained-component-test",
+    size = "medium",
+    srcs = glob(["tests/example-spring-boot-chained-component-test/**/*.java"]),
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    tags = [
+        "component_test",
+        "example_component",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-platform-suite",
+        "--select-class=arena.examples.component.ChainedComponentTestSuite",
+    ],
+    data = [
+        ":example-readings-spring-boot-web-app",
+        "//arena-ffi:arena_ffi_shared",
+        ":instrument_reading_db_schema",
+        ":validation_db_schema",
+    ],
+    jvm_flags = ["-Djna.nosys=true"],
+    runtime_deps = [
+        ":example_spring_boot_component_test_logging_resources",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+        "@arena_java_maven//:org_junit_platform_junit_platform_suite_engine",
+        "@arena_java_maven//:org_springframework_boot_spring_boot_starter_logging",
+    ],
+    deps = [
+        ":ephemeral_test_runtime_java",
+        ":junit_shared",
+        "//arena-junit:arena_junit_lib",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:org_junit_platform_junit_platform_suite_api",
+        "@arena_java_maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+java_test(
     name = "example-axum-junit-component-test",
     size = "medium",
     srcs = glob(["tests/example-axum-junit-component-test/**/*.java"]),
@@ -815,6 +899,7 @@ csharp_library(
         ":aws_sqs_lib",
         ":aws_core_lib",
         ":polly_lib",
+        ":polly_core_lib",
     ],
     visibility = ["//visibility:public"],
 )
@@ -829,6 +914,7 @@ csharp_library(
 csharp_library(
     name = "example_readings_aspnet_web_app_lib",
     target_frameworks = ["net8.0"],
+    nullable = "enable",
     srcs = glob(
         ["src/example_readings_aspnet_web_app/**/*.cs"],
         exclude = ["src/example_readings_aspnet_web_app/Program.cs"],
@@ -864,6 +950,8 @@ csharp_library(
         ":temporalio_lib",
         ":google_protobuf_lib",
         ":nexus_rpc_lib",
+        ":polly_lib",
+        ":polly_core_lib",
     ],
     visibility = ["//visibility:public"],
 )
@@ -872,6 +960,7 @@ csharp_binary(
     name = "example-readings-aspnet-web-app",
     target_frameworks = ["net8.0"],
     project_sdk = "web",
+    nullable = "enable",
     srcs = ["src/example_readings_aspnet_web_app/Program.cs"],
     appsetting_files = ["src/example_readings_aspnet_web_app/appsettings.json"],
     data = ["@temporalio//:runtimes/linux-x64/native/libtemporalio_sdk_core_c_bridge.so"],
@@ -930,16 +1019,65 @@ csharp_test(
     visibility = ["//visibility:public"],
 )
 
+csharp_test(
+    name = "example-aspnet-xunit-chained-component-test",
+    size = "medium",
+    tags = [
+        "component_test",
+        "example_component",
+    ],
+    target_frameworks = ["net8.0"],
+    srcs = glob(["tests/example-aspnet-xunit-chained-component-test/**/*.cs"]),
+    data = [
+        ":example-readings-aspnet-web-app",
+        "//arena-ffi:arena_ffi_shared",
+        ":instrument_reading_db_schema",
+        ":arena_config",
+        ":validation_db_schema",
+        "//arena-xunit:xunit_core_netstandard",
+    ],
+    deps = [
+        ":xunit_shared",
+        ":xunit_assert_lib",
+        ":xunit_abstractions_lib",
+        ":xunit_extensibility_lib",
+        ":xunit_extensibility_core_lib",
+        ":xunit_runner_utility_lib",
+        ":xunit_runner_reporters_lib",
+        ":example_readings_aspnet_web_app_lib",
+        "//arena-xunit:arena_xunit_lib",
+        ":aws_sqs_lib",
+        ":aws_core_lib",
+        ":polly_lib",
+        ":ms_logging_abstractions_lib",
+        ":ms_logging_lib",
+        ":ms_logging_console_lib",
+        ":ms_logging_options_lib",
+        ":ms_logging_options_configuration_extensions_lib",
+        ":ms_logging_configuration_lib",
+        ":ms_extensions_configuration_lib",
+        ":ms_extensions_configuration_abstractions_lib",
+        ":ms_extensions_configuration_binder_lib",
+        ":ms_extensions_dependency_injection_abstractions_lib",
+        ":ms_extensions_primitives_lib",
+        "//tools/dotnet_xunit_runner:xunit_console_runner",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 test_suite(
     name = "example_component_tests",
     tags = ["component_test"],
     tests = [
         ":pytest_axum_component_test",
         ":pytest_fastapi_component_test",
+        ":pytest_fastapi_chained_component_test",
         ":example-axum-component-test",
         ":example-axum-junit-component-test",
         ":example-spring-boot-component-test",
+        ":example-spring-boot-chained-component-test",
         ":example-aspnet-xunit-component-test",
+        ":example-aspnet-xunit-chained-component-test",
     ],
     visibility = ["//visibility:public"],
 )

@@ -1,9 +1,9 @@
 package arena.junit.dep.temporal;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableDependency;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public final class TemporalDependency implements ArenaMatchPiece {
+public final class TemporalDependency implements ArenaRunnableDependency {
   private final ObjectNode config;
 
   TemporalDependency(ObjectNode config) {

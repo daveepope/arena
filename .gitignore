@@ -20,3 +20,5 @@ venv/
 /.bazelrc.user
 /arena-junit/prebuilt/
 /arena-pytest/prebuilt/
+
+/fuzz/target/

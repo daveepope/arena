@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import arena.junit.ArenaExtension;
 import arena.junit.OpenArena;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableDependency;
 import arena.junit.match.Match;
 import arena.junit.match.MatchBuilder;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -517,7 +517,7 @@ final class PlaybookInvocationExtensionUnitTest {
     return constructor.newInstance(new Pointer(1), 0L, List.of(match));
   }
 
-  static final class TopologyMarker implements ArenaMatchPiece {
+  static final class TopologyMarker implements ArenaRunnableDependency {
     @Override
     public ObjectNode forFfi() {
       return JsonNodeFactory.instance.objectNode();

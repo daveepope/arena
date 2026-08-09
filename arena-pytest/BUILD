@@ -146,6 +146,22 @@ py_test(
     visibility = ["//visibility:public"],
 )
 
+py_test(
+    name = "children_lifecycle_component_test",
+    size = "small",
+    srcs = glob(["tests/component/children/*.py"]),
+    main = "tests/component/children/children_lifecycle_component_test.py",
+    imports = ["tests/component/children"],
+    data = ["//arena-ffi:arena_ffi_shared"],
+    deps = [
+        ":arena_pytest_lib",
+        "@pip//pytest",
+    ],
+    tags = ["component_test"],
+    python_version = "PY3",
+    visibility = ["//visibility:public"],
+)
+
 sync_arena_version(
     name = "sync_version_before_wheel",
     stamp = "version_sync.stamp",

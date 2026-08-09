@@ -59,7 +59,8 @@ builder.Services.AddSingleton<IDevicesService>(sp => new DevicesService(
     builder.Configuration["POSTGRES_CONNECTION_STRING"]!,
     sp.GetRequiredService<IDeviceWorkflowService>(),
     sp.GetRequiredService<ISmtpClientService>()));
-builder.Services.AddHostedService<DeviceLifecycleWorkerHostedService>();
+builder.Services.AddSingleton<DeviceLifecycleWorkerHostedService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DeviceLifecycleWorkerHostedService>());
 
 builder.Services.AddHttpClient();
 

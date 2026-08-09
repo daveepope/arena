@@ -1,11 +1,11 @@
 package arena.junit.dep;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableDependency;
 import arena.junit.playbook.LocalstackModels;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public final class LocalstackDependency implements ArenaMatchPiece {
+public final class LocalstackDependency implements ArenaRunnableDependency {
   private final ObjectNode config;
 
   LocalstackDependency(ObjectNode config) {

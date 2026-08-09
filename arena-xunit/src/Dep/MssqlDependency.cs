@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using ArenaDotnet.Xunit.Support;
+using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Dep;
 
@@ -9,7 +10,7 @@ public enum MssqlEncryption
     On
 }
 
-public sealed class MssqlDependency : IArenaMatchPiece
+public sealed class MssqlDependency : IArenaDependency
 {
     public string Type => "mssql";
     public string Identifier { get; }
@@ -19,6 +20,9 @@ public sealed class MssqlDependency : IArenaMatchPiece
     public string? DatabaseUsername { get; }
     public string? DatabasePassword { get; }
     public IReadOnlyList<string> StartupSqlScripts { get; }
+    public List<JToken>? Children => ChildrenWireFormat.Build(_children);
+
+    private readonly IReadOnlyList<IArenaDependency> _children;
 
     internal MssqlDependency(
         string identifier,
@@ -27,7 +31,8 @@ public sealed class MssqlDependency : IArenaMatchPiece
         string? databaseName,
         string? databaseUsername,
         string? databasePassword,
-        IReadOnlyList<string> startupSqlScripts)
+        IReadOnlyList<string> startupSqlScripts,
+        IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -36,6 +41,7 @@ public sealed class MssqlDependency : IArenaMatchPiece
         DatabaseUsername = databaseUsername;
         DatabasePassword = databasePassword;
         StartupSqlScripts = startupSqlScripts;
+        _children = children;
     }
 
     public string ForFfi()
@@ -53,6 +59,7 @@ public sealed class MssqlDependencyBuilder
     private string? _databaseUsername;
     private string? _databasePassword;
     private readonly List<string> _startupSqlScripts = new();
+    private readonly List<IArenaDependency> _children = new();
 
     public MssqlDependencyBuilder(string name)
     {
@@ -95,9 +102,15 @@ public sealed class MssqlDependencyBuilder
         return this;
     }
 
+    public MssqlDependencyBuilder AddChildDependency(IArenaDependency child)
+    {
+        _children.Add(child);
+        return this;
+    }
+
     public MssqlDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-mssql", _name);
-        return new MssqlDependency(identifier, _port, _encryption, _databaseName, _databaseUsername, _databasePassword, _startupSqlScripts);
+        return new MssqlDependency(identifier, _port, _encryption, _databaseName, _databaseUsername, _databasePassword, _startupSqlScripts, _children);
     }
 }

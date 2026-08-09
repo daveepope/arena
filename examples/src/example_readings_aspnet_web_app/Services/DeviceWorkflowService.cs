@@ -2,6 +2,8 @@ using System;
 using System.Threading.Tasks;
 using ArenaExamples.Readings.Aspnet.Models;
 using ArenaExamples.Readings.Aspnet.Workflows;
+using Polly;
+using Polly.Retry;
 using Temporalio.Client;
 
 namespace ArenaExamples.Readings.Aspnet.Services;
@@ -16,6 +18,16 @@ public interface IDeviceWorkflowService
 
 public class DeviceWorkflowService : IDeviceWorkflowService
 {
+    private static readonly ResiliencePipeline QueryPipeline = new ResiliencePipelineBuilder()
+        .AddRetry(new RetryStrategyOptions
+        {
+            MaxRetryAttempts = 3,
+            BackoffType = DelayBackoffType.Constant,
+            Delay = TimeSpan.Zero,
+        })
+        .AddTimeout(TimeSpan.FromSeconds(1))
+        .Build();
+
     private readonly ITemporalClient _client;
     private readonly string _taskQueue;
 
@@ -56,17 +68,20 @@ public class DeviceWorkflowService : IDeviceWorkflowService
         var workflowId = $"device-{deviceId}";
         try
         {
-            var handle = _client.GetWorkflowHandle<DeviceLifecycleWorkflow>(workflowId);
-            var result = await handle.QueryAsync((DeviceLifecycleWorkflow wf) => wf.QuerySnapshot());
-            var state = System.Text.Json.JsonSerializer.Deserialize<DeviceState>(result);
-            if (state == null)
-                return null;
-            return new DeviceStateResponse
+            return await QueryPipeline.ExecuteAsync(async _ =>
             {
-                DeviceId = deviceId,
-                State = state.CurrentState,
-                TransitionCount = state.TransitionCount
-            };
+                var handle = _client.GetWorkflowHandle<DeviceLifecycleWorkflow>(workflowId);
+                var result = await handle.QueryAsync((DeviceLifecycleWorkflow wf) => wf.QuerySnapshot());
+                var state = System.Text.Json.JsonSerializer.Deserialize<DeviceState>(result);
+                if (state == null)
+                    return null;
+                return new DeviceStateResponse
+                {
+                    DeviceId = deviceId,
+                    State = state.CurrentState,
+                    TransitionCount = state.TransitionCount
+                };
+            });
         }
         catch
         {

@@ -12,6 +12,10 @@ name = "ffi_test"
 path = "tests/lifecycle/open_close_dependency_reset.rs"
 
 [[test]]
+name = "ffi_children_test"
+path = "tests/lifecycle/open_close_with_children.rs"
+
+[[test]]
 name = "ffi_logging_test"
 path = "tests/logging/logging_ffi_callbacks.rs"
 
@@ -37,6 +41,7 @@ arena-mssql = { workspace = true }
 arena-oauth = { workspace = true }
 arena-temporal = { workspace = true }
 arena-smtp = { workspace = true }
+futures = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 reqwest = { workspace = true }
