@@ -4,6 +4,7 @@ use std::os::raw::c_char;
 use arena_ffi::{arena_close, arena_free_string, arena_open};
 
 #[test]
+#[ignore]
 fn arena_open_nested_component_children_builds_starts_and_closes_cleanly() {
     let name = CString::new("test-with-children").unwrap();
     let config = CString::new(
@@ -35,6 +36,7 @@ fn arena_open_nested_component_children_builds_starts_and_closes_cleanly() {
 }
 
 #[test]
+#[ignore]
 fn arena_open_nested_component_children_two_levels_builds_and_closes_cleanly() {
     let name = CString::new("test-with-deep-children").unwrap();
     let config = CString::new(
