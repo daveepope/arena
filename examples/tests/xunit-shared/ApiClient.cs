@@ -5,11 +5,29 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Polly;
+using Polly.Retry;
 
 namespace ArenaExamples.Test.Shared;
 
 public class ApiClient
 {
+    private static readonly JsonSerializerOptions SerializerOptions = new() { PropertyNameCaseInsensitive = true };
+
+    private static readonly ResiliencePipeline<HttpResponseMessage> GetPipeline =
+        new ResiliencePipelineBuilder<HttpResponseMessage>()
+            .AddTimeout(TimeSpan.FromSeconds(3))
+            .AddRetry(new RetryStrategyOptions<HttpResponseMessage>
+            {
+                ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
+                    .HandleResult(response => !response.IsSuccessStatusCode)
+                    .Handle<HttpRequestException>(),
+                MaxRetryAttempts = int.MaxValue,
+                BackoffType = DelayBackoffType.Constant,
+                Delay = TimeSpan.FromMilliseconds(100),
+            })
+            .Build();
+
     private readonly HttpClient _client;
 
     public ApiClient(string baseUrl, string accessToken)
@@ -24,7 +42,7 @@ public class ApiClient
 
     public async Task<string> GetAsync(string path)
     {
-        var response = await _client.GetAsync(path);
+        var response = await GetRawAsync(path);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
@@ -32,7 +50,7 @@ public class ApiClient
     public async Task<TResponse> GetJsonAsync<TResponse>(string path)
     {
         var json = await GetAsync(path);
-        return JsonSerializer.Deserialize<TResponse>(json)!;
+        return JsonSerializer.Deserialize<TResponse>(json, SerializerOptions)!;
     }
 
     public async Task<TResponse> PostJsonAsync<TRequest, TResponse>(string path, TRequest request)
@@ -40,7 +58,7 @@ public class ApiClient
         var response = await _client.PostAsJsonAsync(path, request);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync();
-        return JsonSerializer.Deserialize<TResponse>(json)!;
+        return JsonSerializer.Deserialize<TResponse>(json, SerializerOptions)!;
     }
 
     public async Task<HttpResponseMessage> PostJsonRawAsync<TRequest>(string path, TRequest request)
@@ -55,7 +73,7 @@ public class ApiClient
 
     public async Task<HttpResponseMessage> GetRawAsync(string path)
     {
-        return await _client.GetAsync(path);
+        return await GetPipeline.ExecuteAsync(async _ => await _client.GetAsync(path));
     }
 
     public async Task<bool> StopDeviceAsync(int deviceId)

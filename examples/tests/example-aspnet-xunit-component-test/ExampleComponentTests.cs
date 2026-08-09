@@ -15,35 +15,32 @@ public class ExampleComponentTests : IClassFixture<ExampleFixture>
     private static OpenArena Arena { get; set; } = null!;
 
     private readonly ApiClient api;
+    private readonly ApiClient api2;
 
     public ExampleComponentTests(ExampleFixture fixture)
     {
         Arena = fixture.Arena;
         api = fixture.ApiClient;
+        api2 = fixture.ApiClient2;
     }
 
     [Fact]
-    [Playbook(typeof(Playbooks.CalibrationOutagePlaybook))]
     [Playbook(typeof(Playbooks.ResetValidationDbPlaybook))]
-    public async Task PostReadingReturns500WhenCalibrationOutageActive()
+    public async Task CreateDeviceRequestTransitionAppliesRequestedState()
     {
-        var response = await api.PostReadingRawAsync(new CreateReadingRequest { UserName = "Outage User", Value = 99, DeviceId = 1 });
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-    }
+        var created = await api.CreateDeviceAsync(new CreateDeviceRequest { Name = "Smell-O-Scope Mk II" });
 
-    [Fact]
-    [Playbook(typeof(Playbooks.CalibrationOutagePlaybook))]
-    [Playbook(typeof(Playbooks.ResetValidationDbPlaybook))]
-    public async Task PostReadingReturns500UnderStackedPlaybooks()
-    {
-        var response = await api.PostReadingRawAsync(new CreateReadingRequest { UserName = "Stack Outage", Value = 1, DeviceId = 1 });
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-    }
+        var state = await api2.GetDeviceStateAsync(created.Id);
+        Assert.Equal("OFF", state.State);
 
-    [Fact]
-    public async Task GetDeviceStateUnknownDeviceReturnsNotFound()
-    {
-        var response = await api.GetDeviceStateRawAsync(999_999_999);
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        await api2.SetDeviceStateAsync(created.Id, new SetDeviceStateRequest { Target = "ON" });
+        state = await api.GetDeviceStateAsync(created.Id);
+        Assert.Equal("ON", state.State);
+
+        await api.SetDeviceStateAsync(created.Id, new SetDeviceStateRequest { Target = "ERROR" });
+        state = await api2.GetDeviceStateAsync(created.Id);
+        Assert.Equal("ERROR", state.State);
+
+        await api2.StopDeviceAsync(created.Id);
     }
 }

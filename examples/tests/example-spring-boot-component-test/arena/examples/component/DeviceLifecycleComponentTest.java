@@ -16,17 +16,19 @@ final class DeviceLifecycleComponentTest {
   @Test
   @Playbook(ResetReadingsDbPlaybook.class)
   void createDeviceRequestTransitionAppliesRequestedState() throws Exception {
-    ApiClient client = ComponentTestSuite.apiClient();
-    long deviceId = client.createDevice("Smell-O-Scope Mk II");
-    assertEquals("OFF", client.getDeviceState(deviceId));
+    ApiClient client1 = ComponentTestSuite.apiClient();
+    ApiClient client2 = ComponentTestSuite.apiClient2();
 
-    client.setDeviceState(deviceId, "ON");
-    assertEquals("ON", client.getDeviceState(deviceId));
+    long deviceId = client1.createDevice("Smell-O-Scope Mk II");
+    assertEquals("OFF", client2.getDeviceState(deviceId));
 
-    client.setDeviceState(deviceId, "ERROR");
-    assertEquals("ERROR", client.getDeviceState(deviceId));
+    client2.setDeviceState(deviceId, "ON");
+    assertEquals("ON", client1.getDeviceState(deviceId));
 
-    client.stopDevice(deviceId);
+    client1.setDeviceState(deviceId, "ERROR");
+    assertEquals("ERROR", client2.getDeviceState(deviceId));
+
+    client2.stopDevice(deviceId);
   }
 
   @Test

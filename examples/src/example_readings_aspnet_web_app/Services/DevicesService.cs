@@ -65,7 +65,7 @@ public class DevicesService : IDevicesService
                     VALUES (@name)
                     RETURNING id";
                 cmd.Parameters.AddWithValue("@name", request.Name);
-                deviceId = (int)(await cmd.ExecuteScalarAsync()!)!;
+                deviceId = (int)(long)(await cmd.ExecuteScalarAsync()!)!;
             }
 
             await _workflowService.StartDeviceAsync(deviceId);

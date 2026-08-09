@@ -186,6 +186,14 @@ import_library(
 )
 
 import_library(
+    name = "polly_core_lib",
+    library_name = "Polly.Core",
+    libs = ["@polly_core//:libs"],
+    refs = ["@polly_core//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
     name = "jwt_lib",
     library_name = "System.IdentityModel.Tokens.Jwt",
     libs = ["@jwt//:libs"],
@@ -815,6 +823,7 @@ csharp_library(
         ":aws_sqs_lib",
         ":aws_core_lib",
         ":polly_lib",
+        ":polly_core_lib",
     ],
     visibility = ["//visibility:public"],
 )
@@ -829,6 +838,7 @@ csharp_library(
 csharp_library(
     name = "example_readings_aspnet_web_app_lib",
     target_frameworks = ["net8.0"],
+    nullable = "enable",
     srcs = glob(
         ["src/example_readings_aspnet_web_app/**/*.cs"],
         exclude = ["src/example_readings_aspnet_web_app/Program.cs"],
@@ -864,6 +874,8 @@ csharp_library(
         ":temporalio_lib",
         ":google_protobuf_lib",
         ":nexus_rpc_lib",
+        ":polly_lib",
+        ":polly_core_lib",
     ],
     visibility = ["//visibility:public"],
 )
@@ -872,6 +884,7 @@ csharp_binary(
     name = "example-readings-aspnet-web-app",
     target_frameworks = ["net8.0"],
     project_sdk = "web",
+    nullable = "enable",
     srcs = ["src/example_readings_aspnet_web_app/Program.cs"],
     appsetting_files = ["src/example_readings_aspnet_web_app/appsettings.json"],
     data = ["@temporalio//:runtimes/linux-x64/native/libtemporalio_sdk_core_c_bridge.so"],

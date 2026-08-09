@@ -25,6 +25,7 @@ public sealed class ExampleFixture : ArenaCollectionFixture
     private const string MssqlHost = "127.0.0.1";
 
     public static int WebAppPort { get; } = EphemeralTestRuntime.AllocatePort();
+    public static int WebApp2Port { get; } = EphemeralTestRuntime.AllocatePort();
     public static int PostgresPort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int MssqlPort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int CalibrationPort { get; } = EphemeralTestRuntime.AllocatePort();
@@ -37,7 +38,8 @@ public sealed class ExampleFixture : ArenaCollectionFixture
 
     [ArenaLogger(Level = ArenaLogLevel.Debug)]
     private static readonly ILogger Log =
-        LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger(nameof(ExampleFixture));
+        LoggerFactory.Create(builder => builder.SetMinimumLevel(LogLevel.Debug).AddConsole())
+            .CreateLogger(nameof(ExampleFixture));
 
     private static readonly OauthLoopbackTlsPemPair OauthPem = OauthLoopbackTls.OauthLoopbackTlsPemPair();
 
@@ -126,11 +128,16 @@ public sealed class ExampleFixture : ArenaCollectionFixture
     private static readonly Playbooks.EventsPurgePlaybook EventsPurge =
         new(Localstack.Identifier);
 
-    [ArenaComponent]
-    private static readonly ExecutableComponent WebApp =
-        new ExecutableComponentBuilder("example-api-web-app")
+    [ArenaComponent(Logs = false)]
+    private static readonly ExecutableComponent WebApp = BuildWebApp("example-api-web-app", WebAppPort);
+
+    [ArenaComponent(Logs = false)]
+    private static readonly ExecutableComponent WebApp2 = BuildWebApp("example-api-web-app-2", WebApp2Port);
+
+    private static ExecutableComponent BuildWebApp(string name, int port) =>
+        new ExecutableComponentBuilder(name)
             .WithExecutablePath(ResolveWebAppExecutablePath())
-            .WithEnvVar("WEB_APP_PORT", WebAppPort.ToString())
+            .WithEnvVar("WEB_APP_PORT", port.ToString())
             .WithEnvVar("CALIBRATION_URL", $"http://127.0.0.1:{CalibrationPort}")
             .WithEnvVar("POSTGRES_HOST", PostgresHost)
             .WithEnvVar("POSTGRES_PORT", PostgresPort.ToString())
@@ -138,7 +145,7 @@ public sealed class ExampleFixture : ArenaCollectionFixture
             .WithEnvVar("POSTGRES_USER", PostgresDbUser)
             .WithEnvVar("POSTGRES_PASSWORD", PostgresDbPassword)
             .WithEnvVar("POSTGRES_CONNECTION_STRING",
-                $"host={PostgresHost} port={PostgresPort} user={PostgresDbUser} password={PostgresDbPassword} dbname={PostgresDbName}")
+                $"Host={PostgresHost};Port={PostgresPort};Username={PostgresDbUser};Password={PostgresDbPassword};Database={PostgresDbName}")
             .WithEnvVar("MSSQL_HOST", MssqlHost)
             .WithEnvVar("MSSQL_PORT", MssqlPort.ToString())
             .WithEnvVar("MSSQL_DB_NAME", MssqlDbName)
@@ -168,15 +175,17 @@ public sealed class ExampleFixture : ArenaCollectionFixture
             .WithEnvVar("OAUTH_CLIENT_ID", "test-client")
             .WithEnvVar("OAUTH_CLIENT_SECRET", "test-secret")
             .WithEnvVar("LD_LIBRARY_PATH", ResolveTemporalNativeLibDir())
-            .WithReadinessCheck(HttpReadinessCheck.Create(), $"http://127.0.0.1:{WebAppPort}/health")
+            .WithReadinessCheck(HttpReadinessCheck.Create(), $"http://127.0.0.1:{port}/health")
             .Build();
 
     public ApiClient ApiClient { get; }
+    public ApiClient ApiClient2 { get; }
 
     public ExampleFixture() : base()
     {
         var authToken = GetAuthToken();
         ApiClient = new ApiClient($"http://127.0.0.1:{WebAppPort}", authToken);
+        ApiClient2 = new ApiClient($"http://127.0.0.1:{WebApp2Port}", authToken);
     }
 
     private static string GetAuthToken()

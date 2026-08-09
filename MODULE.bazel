@@ -465,6 +465,13 @@ nuget_archive(
     version = "8.4.2",
 )
 
+nuget_archive(
+    name = "polly_core",
+    id = "Polly.Core",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.4.2",
+)
+
 # Temporal
 nuget_archive(
     name = "temporalio",
