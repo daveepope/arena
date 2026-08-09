@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Dep;
 
-public sealed class OauthDependency : IArenaMatchPiece
+public sealed class OauthDependency : IArenaDependency
 {
     public string Type => "oauth";
     public string Identifier { get; }
@@ -16,10 +16,10 @@ public sealed class OauthDependency : IArenaMatchPiece
     [JsonProperty("server_tls_private_key_pem")] public string? ServerTlsKey { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
-    private readonly IReadOnlyList<IArenaMatchPiece> _children;
+    private readonly IReadOnlyList<IArenaDependency> _children;
 
     internal OauthDependency(string identifier, int port, string? listenIp, string? metadataBaseUrl,
-        string? serverTlsCert, string? serverTlsKey, IReadOnlyList<IArenaMatchPiece> children)
+        string? serverTlsCert, string? serverTlsKey, IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -44,7 +44,7 @@ public sealed class OauthDependencyBuilder
     private string? _metadataBaseUrl;
     private string? _serverTlsCert;
     private string? _serverTlsKey;
-    private readonly List<IArenaMatchPiece> _children = new();
+    private readonly List<IArenaDependency> _children = new();
 
     public OauthDependencyBuilder(string name)
     {
@@ -76,9 +76,9 @@ public sealed class OauthDependencyBuilder
         return this;
     }
 
-    public OauthDependencyBuilder WithChildDependencies(IEnumerable<IArenaMatchPiece> children)
+    public OauthDependencyBuilder AddChildDependency(IArenaDependency child)
     {
-        _children.AddRange(children);
+        _children.Add(child);
         return this;
     }
 

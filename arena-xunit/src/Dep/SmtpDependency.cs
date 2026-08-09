@@ -4,7 +4,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Dep;
 
-public sealed class SmtpDependency : IArenaMatchPiece
+public sealed class SmtpDependency : IArenaDependency
 {
     public string Type => "smtp";
     public string Identifier { get; }
@@ -15,9 +15,9 @@ public sealed class SmtpDependency : IArenaMatchPiece
     public string? ContainerName { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
-    private readonly IReadOnlyList<IArenaMatchPiece> _children;
+    private readonly IReadOnlyList<IArenaDependency> _children;
 
-    internal SmtpDependency(string identifier, int port, int uiPort, string? tlsMode, string? image, string? containerName, IReadOnlyList<IArenaMatchPiece> children)
+    internal SmtpDependency(string identifier, int port, int uiPort, string? tlsMode, string? image, string? containerName, IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -42,7 +42,7 @@ public sealed class SmtpDependencyBuilder
     private string? _tlsMode;
     private string? _image;
     private string? _containerName;
-    private readonly List<IArenaMatchPiece> _children = new();
+    private readonly List<IArenaDependency> _children = new();
 
     public SmtpDependencyBuilder(string name)
     {
@@ -85,9 +85,9 @@ public sealed class SmtpDependencyBuilder
         return this;
     }
 
-    public SmtpDependencyBuilder WithChildDependencies(IEnumerable<IArenaMatchPiece> children)
+    public SmtpDependencyBuilder AddChildDependency(IArenaDependency child)
     {
-        _children.AddRange(children);
+        _children.Add(child);
         return this;
     }
 

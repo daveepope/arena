@@ -1,9 +1,9 @@
 package arena.junit.dep;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableDependency;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public final class MssqlDependency implements ArenaMatchPiece {
+public final class MssqlDependency implements ArenaRunnableDependency {
   private final ObjectNode config;
 
   MssqlDependency(ObjectNode config) {

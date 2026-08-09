@@ -4,7 +4,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Dep;
 
-public sealed class HttpDependency : IArenaMatchPiece
+public sealed class HttpDependency : IArenaDependency
 {
     public string Type => "http";
     public string Identifier { get; }
@@ -15,9 +15,9 @@ public sealed class HttpDependency : IArenaMatchPiece
     public string? ImageTag { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
-    private readonly IReadOnlyList<IArenaMatchPiece> _children;
+    private readonly IReadOnlyList<IArenaDependency> _children;
 
-    internal HttpDependency(string identifier, int port, string? listenIp, string? containerName, string? imageName, string? imageTag, IReadOnlyList<IArenaMatchPiece> children)
+    internal HttpDependency(string identifier, int port, string? listenIp, string? containerName, string? imageName, string? imageTag, IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -42,7 +42,7 @@ public sealed class HttpDependencyBuilder
     private string? _containerName;
     private string? _imageName;
     private string? _imageTag;
-    private readonly List<IArenaMatchPiece> _children = new();
+    private readonly List<IArenaDependency> _children = new();
 
     public HttpDependencyBuilder(string name)
     {
@@ -79,9 +79,9 @@ public sealed class HttpDependencyBuilder
         return this;
     }
 
-    public HttpDependencyBuilder WithChildDependencies(IEnumerable<IArenaMatchPiece> children)
+    public HttpDependencyBuilder AddChildDependency(IArenaDependency child)
     {
-        _children.AddRange(children);
+        _children.Add(child);
         return this;
     }
 

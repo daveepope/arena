@@ -1,5 +1,5 @@
 package arena.junit.oauth;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableDependency;
 import arena.junit.support.ArenaIdentifiers;
 import arena.junit.support.ArenaJson;
 import arena.junit.support.ChildrenFfi;
@@ -29,7 +29,7 @@ public final class OauthDependencyBuilder {
           .put("type", "oauth")
           .put("identifier", ArenaIdentifiers.build("arena-oauth", ""))
           .put("port", DEFAULT_OAUTH_PORT);
-  private final List<ArenaMatchPiece> children = new ArrayList<>();
+  private final List<ArenaRunnableDependency> children = new ArrayList<>();
 
   public OauthDependencyBuilder(String name) {
     config.put("identifier", ArenaIdentifiers.build("arena-oauth", name));
@@ -62,8 +62,8 @@ public final class OauthDependencyBuilder {
     return this;
   }
 
-  public OauthDependencyBuilder withChildDependencies(List<ArenaMatchPiece> children) {
-    this.children.addAll(children);
+  public OauthDependencyBuilder addChildDependency(ArenaRunnableDependency child) {
+    this.children.add(child);
     return this;
   }
 
@@ -73,7 +73,7 @@ public final class OauthDependencyBuilder {
       cfg.put("metadata_base_url", OAUTH_ISSUER);
     }
     if (!children.isEmpty()) {
-      cfg.set("children", ChildrenFfi.build(children));
+      cfg.set("children", ChildrenFfi.buildDependencies(children));
     }
     return new OauthDependency(cfg);
   }

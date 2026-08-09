@@ -1,5 +1,5 @@
 package arena.junit.exec;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableComponent;
 import arena.junit.readiness.ReadinessChecksFfi;
 import arena.junit.support.ChildrenFfi;
 
@@ -7,15 +7,15 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
 
-public final class ExecutableComponent implements ArenaMatchPiece {
+public final class ExecutableComponent implements ArenaRunnableComponent {
   private final ObjectNode config;
   private final List<ReadinessChecksFfi.ReadinessEntry> readiness;
-  private final List<ArenaMatchPiece> children;
+  private final List<ArenaRunnableComponent> children;
 
   ExecutableComponent(
       ObjectNode config,
       List<ReadinessChecksFfi.ReadinessEntry> readiness,
-      List<ArenaMatchPiece> children) {
+      List<ArenaRunnableComponent> children) {
     this.config = config;
     this.readiness = List.copyOf(readiness);
     this.children = List.copyOf(children);
@@ -33,7 +33,7 @@ public final class ExecutableComponent implements ArenaMatchPiece {
       d.set("readiness_checks", rc);
     }
     if (!children.isEmpty()) {
-      d.set("children", ChildrenFfi.build(children));
+      d.set("children", ChildrenFfi.buildComponents(children));
     }
     return d;
   }

@@ -6,7 +6,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Component;
 
-public sealed class ContainerizedComponent : IArenaMatchPiece
+public sealed class ContainerizedComponent : IArenaComponent
 {
     public string Type => "container";
     public string Identifier { get; }
@@ -20,13 +20,13 @@ public sealed class ContainerizedComponent : IArenaMatchPiece
     private readonly List<RuntimeArgEntry> _runtimeArgs;
     private readonly List<PortMappingEntry> _portMappings;
     private readonly List<ReadinessCheckEntry> _readinessChecks;
-    private readonly List<IArenaMatchPiece> _children;
+    private readonly List<IArenaComponent> _children;
 
     internal ContainerizedComponent(string identifier, string containerfile, string? buildContext,
         string? imageTag, string? network, Dictionary<string, string> envVars,
         List<RuntimeArgEntry> runtimeArgs, List<PortMappingEntry> portMappings,
         List<string> hostMappings, List<ReadinessCheckEntry> readinessChecks,
-        List<IArenaMatchPiece> children)
+        List<IArenaComponent> children)
     {
         Identifier = identifier;
         Containerfile = containerfile;
@@ -110,7 +110,7 @@ public sealed class ContainerizedComponentBuilder
     private readonly List<PortMappingEntry> _portMappings = new();
     private readonly List<string> _hostMappings = new();
     private readonly List<ReadinessCheckEntry> _readinessChecks = new();
-    private readonly List<IArenaMatchPiece> _children = new();
+    private readonly List<IArenaComponent> _children = new();
 
     public ContainerizedComponentBuilder(string name)
     {
@@ -176,9 +176,9 @@ public sealed class ContainerizedComponentBuilder
         return this;
     }
 
-    public ContainerizedComponentBuilder WithChildComponents(IEnumerable<IArenaMatchPiece> children)
+    public ContainerizedComponentBuilder AddChildComponent(IArenaComponent child)
     {
-        _children.AddRange(children);
+        _children.Add(child);
         return this;
     }
 
@@ -190,6 +190,6 @@ public sealed class ContainerizedComponentBuilder
         return new ContainerizedComponent(identifier, _containerfile, _buildContext, _imageTag, _network,
             new Dictionary<string, string>(_envVars), new List<RuntimeArgEntry>(_runtimeArgs),
             new List<PortMappingEntry>(_portMappings), new List<string>(_hostMappings),
-            new List<ReadinessCheckEntry>(_readinessChecks), new List<IArenaMatchPiece>(_children));
+            new List<ReadinessCheckEntry>(_readinessChecks), new List<IArenaComponent>(_children));
     }
 }

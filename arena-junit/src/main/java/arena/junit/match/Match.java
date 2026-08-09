@@ -13,16 +13,16 @@ import java.util.Map;
 
 public final class Match {
   private final String name;
-  private final List<ArenaMatchPiece> dependencies = new ArrayList<>();
-  private final List<ArenaMatchPiece> components = new ArrayList<>();
+  private final List<ArenaRunnableDependency> dependencies = new ArrayList<>();
+  private final List<ArenaRunnableComponent> components = new ArrayList<>();
   private final Map<Class<? extends Playbook>, RegisteredPlaybook> playbooks =
       new LinkedHashMap<>();
   private String network;
 
   Match(
       String name,
-      List<ArenaMatchPiece> dependencies,
-      List<ArenaMatchPiece> components,
+      List<ArenaRunnableDependency> dependencies,
+      List<ArenaRunnableComponent> components,
       String network,
       Map<Class<? extends Playbook>, RegisteredPlaybook> playbooks) {
     this.name = name;
@@ -49,8 +49,8 @@ public final class Match {
   public ObjectNode forFfi() {
     ObjectNode out = ArenaJson.object();
     out.put("match_name", name);
-    out.set("dependencies", ChildrenFfi.build(dependencies));
-    out.set("components", ChildrenFfi.build(components));
+    out.set("dependencies", ChildrenFfi.buildDependencies(dependencies));
+    out.set("components", ChildrenFfi.buildComponents(components));
     if (network != null && !network.isEmpty()) {
       out.put("network", network);
     }

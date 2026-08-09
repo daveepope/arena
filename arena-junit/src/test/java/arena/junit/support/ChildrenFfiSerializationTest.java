@@ -12,13 +12,12 @@ import arena.junit.dep.smtp.SmtpDependencyBuilder;
 import arena.junit.dep.temporal.TemporalDependencyBuilder;
 import arena.junit.exec.ContainerizedComponentBuilder;
 import arena.junit.exec.ExecutableComponentBuilder;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableDependency;
 import arena.junit.oauth.OauthDependencyBuilder;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.util.List;
-import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -35,11 +34,11 @@ final class ChildrenFfiSerializationTest {
   }
 
   @Test
-  void httpDependency_withChildDependencies_nestsChildConfig() {
+  void httpDependency_withChildDependency_nestsChildConfig() {
     var child = new HttpDependencyBuilder("child").withPort(9090).build();
     ObjectNode config =
         new HttpDependencyBuilder("parent")
-            .withChildDependencies(java.util.List.of(child))
+            .addChildDependency(child)
             .build()
             .forFfi();
     assertEquals(1, config.path("children").size());
@@ -59,53 +58,104 @@ final class ChildrenFfiSerializationTest {
   }
 
   @Test
-  void executableComponent_withChildComponents_nestsChildConfig() {
+  void executableComponent_withChildComponent_nestsChildConfig() {
     var child =
         new ExecutableComponentBuilder("child").withExecutablePath("/bin/true").build();
     ObjectNode config =
         new ExecutableComponentBuilder("parent")
             .withExecutablePath("/bin/true")
-            .withChildComponents(java.util.List.of(child))
+            .addChildComponent(child)
             .build()
             .forFfi();
     assertEquals(1, config.path("children").size());
     assertEquals("exec", config.path("children").get(0).path("type").asText());
   }
 
-  private static Stream<Arguments> remainingTypeFactories() {
+  @Test
+  void containerizedComponent_noChildren_omitsChildrenKey() {
+    ObjectNode config = new ContainerizedComponentBuilder("parent", "Dockerfile").build().forFfi();
+    assertFalse(config.has("children"));
+  }
+
+  @Test
+  void containerizedComponent_withChildComponent_nestsChildConfig() {
+    var child = new ContainerizedComponentBuilder("child", "Dockerfile").build();
+    ObjectNode config =
+        new ContainerizedComponentBuilder("parent", "Dockerfile")
+            .addChildComponent(child)
+            .build()
+            .forFfi();
+    assertEquals(1, config.path("children").size());
+    assertEquals("container", config.path("children").get(0).path("type").asText());
+  }
+
+  private static Stream<Arguments> remainingDependencyTypeFactories() {
     return Stream.of(
-        Arguments.of("kafka", (BiFunction<String, List<ArenaMatchPiece>, ArenaMatchPiece>)
-            (name, children) -> new KafkaDependencyBuilder(name).withChildDependencies(children).build()),
-        Arguments.of("localstack", (BiFunction<String, List<ArenaMatchPiece>, ArenaMatchPiece>)
-            (name, children) -> new LocalstackDependencyBuilder(name).withChildDependencies(children).build()),
-        Arguments.of("mssql", (BiFunction<String, List<ArenaMatchPiece>, ArenaMatchPiece>)
-            (name, children) -> new MssqlDependencyBuilder(name).withChildDependencies(children).build()),
-        Arguments.of("oauth", (BiFunction<String, List<ArenaMatchPiece>, ArenaMatchPiece>)
-            (name, children) -> new OauthDependencyBuilder(name).withChildDependencies(children).build()),
-        Arguments.of("postgres", (BiFunction<String, List<ArenaMatchPiece>, ArenaMatchPiece>)
-            (name, children) -> new PostgresDependencyBuilder(name).withChildDependencies(children).build()),
-        Arguments.of("smtp", (BiFunction<String, List<ArenaMatchPiece>, ArenaMatchPiece>)
-            (name, children) -> new SmtpDependencyBuilder(name).withChildDependencies(children).build()),
-        Arguments.of("temporal", (BiFunction<String, List<ArenaMatchPiece>, ArenaMatchPiece>)
-            (name, children) -> new TemporalDependencyBuilder(name).withChildDependencies(children).build()),
-        Arguments.of("container", (BiFunction<String, List<ArenaMatchPiece>, ArenaMatchPiece>)
-            (name, children) -> new ContainerizedComponentBuilder(name, "Dockerfile").withChildComponents(children).build()));
+        Arguments.of("kafka", (Function<ArenaRunnableDependency, ArenaRunnableDependency>) child -> {
+          var b = new KafkaDependencyBuilder("dep");
+          if (child != null) {
+            b.addChildDependency(child);
+          }
+          return b.build();
+        }),
+        Arguments.of("localstack", (Function<ArenaRunnableDependency, ArenaRunnableDependency>) child -> {
+          var b = new LocalstackDependencyBuilder("dep");
+          if (child != null) {
+            b.addChildDependency(child);
+          }
+          return b.build();
+        }),
+        Arguments.of("mssql", (Function<ArenaRunnableDependency, ArenaRunnableDependency>) child -> {
+          var b = new MssqlDependencyBuilder("dep");
+          if (child != null) {
+            b.addChildDependency(child);
+          }
+          return b.build();
+        }),
+        Arguments.of("oauth", (Function<ArenaRunnableDependency, ArenaRunnableDependency>) child -> {
+          var b = new OauthDependencyBuilder("dep");
+          if (child != null) {
+            b.addChildDependency(child);
+          }
+          return b.build();
+        }),
+        Arguments.of("postgres", (Function<ArenaRunnableDependency, ArenaRunnableDependency>) child -> {
+          var b = new PostgresDependencyBuilder("dep");
+          if (child != null) {
+            b.addChildDependency(child);
+          }
+          return b.build();
+        }),
+        Arguments.of("smtp", (Function<ArenaRunnableDependency, ArenaRunnableDependency>) child -> {
+          var b = new SmtpDependencyBuilder("dep");
+          if (child != null) {
+            b.addChildDependency(child);
+          }
+          return b.build();
+        }),
+        Arguments.of("temporal", (Function<ArenaRunnableDependency, ArenaRunnableDependency>) child -> {
+          var b = new TemporalDependencyBuilder("dep");
+          if (child != null) {
+            b.addChildDependency(child);
+          }
+          return b.build();
+        }));
   }
 
   @ParameterizedTest
-  @MethodSource("remainingTypeFactories")
-  void dependencyOrComponent_noChildren_omitsChildrenKey(
-      String expectedType, BiFunction<String, List<ArenaMatchPiece>, ArenaMatchPiece> factory) {
-    ObjectNode config = factory.apply("parent", List.of()).forFfi();
+  @MethodSource("remainingDependencyTypeFactories")
+  void dependency_noChildren_omitsChildrenKey(
+      String expectedType, Function<ArenaRunnableDependency, ArenaRunnableDependency> factory) {
+    ObjectNode config = factory.apply(null).forFfi();
     assertFalse(config.has("children"));
   }
 
   @ParameterizedTest
-  @MethodSource("remainingTypeFactories")
-  void dependencyOrComponent_withChildren_nestsChildConfig(
-      String expectedType, BiFunction<String, List<ArenaMatchPiece>, ArenaMatchPiece> factory) {
-    ArenaMatchPiece child = factory.apply("child", List.of());
-    ObjectNode config = factory.apply("parent", List.of(child)).forFfi();
+  @MethodSource("remainingDependencyTypeFactories")
+  void dependency_withChild_nestsChildConfig(
+      String expectedType, Function<ArenaRunnableDependency, ArenaRunnableDependency> factory) {
+    ArenaRunnableDependency child = factory.apply(null);
+    ObjectNode config = factory.apply(child).forFfi();
     assertEquals(1, config.path("children").size());
     assertEquals(expectedType, config.path("children").get(0).path("type").asText());
   }

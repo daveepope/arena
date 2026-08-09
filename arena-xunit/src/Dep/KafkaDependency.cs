@@ -10,7 +10,7 @@ public enum KafkaFlavor
     Confluent
 }
 
-public sealed class KafkaDependency : IArenaMatchPiece
+public sealed class KafkaDependency : IArenaDependency
 {
     public string Type => "kafka";
     public string Identifier { get; }
@@ -18,9 +18,9 @@ public sealed class KafkaDependency : IArenaMatchPiece
     public KafkaFlavor Flavor { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
-    private readonly IReadOnlyList<IArenaMatchPiece> _children;
+    private readonly IReadOnlyList<IArenaDependency> _children;
 
-    internal KafkaDependency(string identifier, int port, KafkaFlavor flavor, IReadOnlyList<IArenaMatchPiece> children)
+    internal KafkaDependency(string identifier, int port, KafkaFlavor flavor, IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -39,7 +39,7 @@ public sealed class KafkaDependencyBuilder
     private readonly string _name;
     private int _port = 9092;
     private KafkaFlavor _flavor = KafkaFlavor.ApacheNative;
-    private readonly List<IArenaMatchPiece> _children = new();
+    private readonly List<IArenaDependency> _children = new();
 
     public KafkaDependencyBuilder(string name)
     {
@@ -58,9 +58,9 @@ public sealed class KafkaDependencyBuilder
         return this;
     }
 
-    public KafkaDependencyBuilder WithChildDependencies(IEnumerable<IArenaMatchPiece> children)
+    public KafkaDependencyBuilder AddChildDependency(IArenaDependency child)
     {
-        _children.AddRange(children);
+        _children.Add(child);
         return this;
     }
 

@@ -1,9 +1,9 @@
 package arena.junit.dep;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableDependency;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public final class KafkaDependency implements ArenaMatchPiece {
+public final class KafkaDependency implements ArenaRunnableDependency {
   public static final int KAFKA_INTERNAL_DOCKER_PORT = 29092;
 
   private final ObjectNode config;

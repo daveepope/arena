@@ -10,7 +10,7 @@ public enum MssqlEncryption
     On
 }
 
-public sealed class MssqlDependency : IArenaMatchPiece
+public sealed class MssqlDependency : IArenaDependency
 {
     public string Type => "mssql";
     public string Identifier { get; }
@@ -22,7 +22,7 @@ public sealed class MssqlDependency : IArenaMatchPiece
     public IReadOnlyList<string> StartupSqlScripts { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
-    private readonly IReadOnlyList<IArenaMatchPiece> _children;
+    private readonly IReadOnlyList<IArenaDependency> _children;
 
     internal MssqlDependency(
         string identifier,
@@ -32,7 +32,7 @@ public sealed class MssqlDependency : IArenaMatchPiece
         string? databaseUsername,
         string? databasePassword,
         IReadOnlyList<string> startupSqlScripts,
-        IReadOnlyList<IArenaMatchPiece> children)
+        IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -59,7 +59,7 @@ public sealed class MssqlDependencyBuilder
     private string? _databaseUsername;
     private string? _databasePassword;
     private readonly List<string> _startupSqlScripts = new();
-    private readonly List<IArenaMatchPiece> _children = new();
+    private readonly List<IArenaDependency> _children = new();
 
     public MssqlDependencyBuilder(string name)
     {
@@ -102,9 +102,9 @@ public sealed class MssqlDependencyBuilder
         return this;
     }
 
-    public MssqlDependencyBuilder WithChildDependencies(IEnumerable<IArenaMatchPiece> children)
+    public MssqlDependencyBuilder AddChildDependency(IArenaDependency child)
     {
-        _children.AddRange(children);
+        _children.Add(child);
         return this;
     }
 

@@ -1,5 +1,5 @@
 package arena.junit.dep.smtp;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableDependency;
 import arena.junit.support.ArenaIdentifiers;
 import arena.junit.support.ArenaJson;
 import arena.junit.support.ChildrenFfi;
@@ -13,7 +13,7 @@ public final class SmtpDependencyBuilder {
       ArenaJson.object()
           .put("type", "smtp")
           .put("identifier", ArenaIdentifiers.build("arena-smtp", ""));
-  private final List<ArenaMatchPiece> children = new ArrayList<>();
+  private final List<ArenaRunnableDependency> children = new ArrayList<>();
 
   public SmtpDependencyBuilder(String name) {
     config.put("identifier", ArenaIdentifiers.build("arena-smtp", name));
@@ -54,15 +54,15 @@ public final class SmtpDependencyBuilder {
     return this;
   }
 
-  public SmtpDependencyBuilder withChildDependencies(List<ArenaMatchPiece> children) {
-    this.children.addAll(children);
+  public SmtpDependencyBuilder addChildDependency(ArenaRunnableDependency child) {
+    this.children.add(child);
     return this;
   }
 
   public SmtpDependency build() {
     ObjectNode cfg = config.deepCopy();
     if (!children.isEmpty()) {
-      cfg.set("children", ChildrenFfi.build(children));
+      cfg.set("children", ChildrenFfi.buildDependencies(children));
     }
     return new SmtpDependency(cfg);
   }

@@ -4,7 +4,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Dep;
 
-public sealed class TemporalDependency : IArenaMatchPiece
+public sealed class TemporalDependency : IArenaDependency
 {
     public string Type => "temporal";
     public string Identifier { get; }
@@ -15,9 +15,9 @@ public sealed class TemporalDependency : IArenaMatchPiece
     public string? ContainerName { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
-    private readonly IReadOnlyList<IArenaMatchPiece> _children;
+    private readonly IReadOnlyList<IArenaDependency> _children;
 
-    internal TemporalDependency(string identifier, int port, int uiPort, string? image, string? imageName, string? containerName, IReadOnlyList<IArenaMatchPiece> children)
+    internal TemporalDependency(string identifier, int port, int uiPort, string? image, string? imageName, string? containerName, IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -42,7 +42,7 @@ public sealed class TemporalDependencyBuilder
     private string? _image;
     private string? _imageName;
     private string? _containerName;
-    private readonly List<IArenaMatchPiece> _children = new();
+    private readonly List<IArenaDependency> _children = new();
 
     public TemporalDependencyBuilder(string name)
     {
@@ -79,9 +79,9 @@ public sealed class TemporalDependencyBuilder
         return this;
     }
 
-    public TemporalDependencyBuilder WithChildDependencies(IEnumerable<IArenaMatchPiece> children)
+    public TemporalDependencyBuilder AddChildDependency(IArenaDependency child)
     {
-        _children.AddRange(children);
+        _children.Add(child);
         return this;
     }
 

@@ -6,7 +6,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Component;
 
-public sealed class ExecutableComponent : IArenaMatchPiece
+public sealed class ExecutableComponent : IArenaComponent
 {
     public string Type => "exec";
     public string Identifier { get; }
@@ -17,11 +17,11 @@ public sealed class ExecutableComponent : IArenaMatchPiece
 
     private readonly List<RuntimeArgEntry> _runtimeArgs;
     private readonly List<ReadinessCheckEntry> _readinessChecks;
-    private readonly List<IArenaMatchPiece> _children;
+    private readonly List<IArenaComponent> _children;
 
     internal ExecutableComponent(string identifier, string executablePath, string? sourcePath,
         BuildTool? buildTool, Dictionary<string, string> envVars, List<RuntimeArgEntry> runtimeArgs,
-        List<ReadinessCheckEntry> readinessChecks, List<IArenaMatchPiece> children)
+        List<ReadinessCheckEntry> readinessChecks, List<IArenaComponent> children)
     {
         Identifier = identifier;
         ExecutablePath = executablePath;
@@ -73,7 +73,7 @@ public sealed class ExecutableComponentBuilder
     private readonly Dictionary<string, string> _envVars = new();
     private readonly List<RuntimeArgEntry> _runtimeArgs = new();
     private readonly List<ReadinessCheckEntry> _readinessChecks = new();
-    private readonly List<IArenaMatchPiece> _children = new();
+    private readonly List<IArenaComponent> _children = new();
 
     public ExecutableComponentBuilder(string name)
     {
@@ -121,9 +121,9 @@ public sealed class ExecutableComponentBuilder
         return this;
     }
 
-    public ExecutableComponentBuilder WithChildComponents(IEnumerable<IArenaMatchPiece> children)
+    public ExecutableComponentBuilder AddChildComponent(IArenaComponent child)
     {
-        _children.AddRange(children);
+        _children.Add(child);
         return this;
     }
 
@@ -134,6 +134,6 @@ public sealed class ExecutableComponentBuilder
         var identifier = ArenaIdentifiers.Build("arena-exec", _name);
         return new ExecutableComponent(identifier, _executablePath, _sourcePath, _buildTool,
             new Dictionary<string, string>(_envVars), new List<RuntimeArgEntry>(_runtimeArgs),
-            new List<ReadinessCheckEntry>(_readinessChecks), new List<IArenaMatchPiece>(_children));
+            new List<ReadinessCheckEntry>(_readinessChecks), new List<IArenaComponent>(_children));
     }
 }

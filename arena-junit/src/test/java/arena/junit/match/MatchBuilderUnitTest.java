@@ -19,7 +19,7 @@ final class MatchBuilderUnitTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  static final class StubMatchPiece implements ArenaMatchPiece {
+  static final class StubMatchPiece implements ArenaRunnableDependency, ArenaRunnableComponent {
     @Override
     public ObjectNode forFfi() {
       return MAPPER.createObjectNode();

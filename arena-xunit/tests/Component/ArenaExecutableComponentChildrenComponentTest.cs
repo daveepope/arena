@@ -34,7 +34,7 @@ public class ArenaExecutableComponentChildrenComponentTest
                 .WithExecutablePath("/bin/sh")
                 .WithRuntimeArg("flag", "-c")
                 .WithRuntimeArg("script", $"echo parent >> {_markerFile}")
-                .WithChildComponents(new[] { child })
+                .AddChildComponent(child)
                 .Build();
 
             return new MatchBuilder("children-lifecycle-match")

@@ -9,13 +9,13 @@ namespace ArenaDotnet.Xunit;
 public sealed class Match
 {
     public string Name { get; }
-    public IReadOnlyList<IArenaMatchPiece> Dependencies { get; }
-    public IReadOnlyList<IArenaMatchPiece> Components { get; }
+    public IReadOnlyList<IArenaDependency> Dependencies { get; }
+    public IReadOnlyList<IArenaComponent> Components { get; }
     public string? Network { get; }
     public IReadOnlyList<RegisteredPlaybook> Playbooks { get; }
 
-    internal Match(string name, IReadOnlyList<IArenaMatchPiece> dependencies,
-        IReadOnlyList<IArenaMatchPiece> components, string? network,
+    internal Match(string name, IReadOnlyList<IArenaDependency> dependencies,
+        IReadOnlyList<IArenaComponent> components, string? network,
         IReadOnlyList<RegisteredPlaybook> playbooks)
     {
         Name = name;

@@ -29,7 +29,7 @@ import arena.junit.dep.temporal.TemporalDependencyBuilder;
 import arena.junit.exec.ExecutableComponent;
 import arena.junit.exec.ExecutableComponentBuilder;
 import arena.junit.ffi.ArenaLogLevel;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableComponent;
 import arena.junit.oauth.OauthDependency;
 import arena.junit.oauth.OauthDependencyBuilder;
 import arena.junit.oauth.OauthLoopbackTls;
@@ -151,7 +151,7 @@ public final class ChainedComponentTestSuite {
           .withImage("1.8.0")
           .withPort(TEMPORAL_GRPC_PORT)
           .withUiPort(TEMPORAL_UI_PORT)
-          .withChildDependencies(List.of(POSTGRES))
+          .addChildDependency(POSTGRES)
           .build();
 
   @ArenaDependency(logs = false)
@@ -217,7 +217,7 @@ public final class ChainedComponentTestSuite {
   }
 
   private static ExecutableComponent buildWebApp(
-      String name, int port, List<ArenaMatchPiece> children) {
+      String name, int port, List<ArenaRunnableComponent> children) {
     String appLauncher;
     try {
       appLauncher = Runfiles.findWebAppLauncher();
@@ -225,47 +225,50 @@ public final class ChainedComponentTestSuite {
       throw new IllegalStateException("failed to locate web app launcher runfile", e);
     }
     assertTrue(!appLauncher.isEmpty(), "web app launcher must be present under Bazel runfiles");
-    return new ExecutableComponentBuilder(name)
-        .withExecutablePath(appLauncher)
-        .withEnvVar("WEB_APP_PORT", String.valueOf(port))
-        .withEnvVar(
-            "POSTGRES_CONNECTION_STRING",
-            "host=localhost port="
-                + POSTGRES_PORT
-                + " user="
-                + POSTGRES_DB_USER
-                + " password="
-                + POSTGRES_DB_PASS
-                + " dbname="
-                + POSTGRES_DB_NAME)
-        .withEnvVar("CALIBRATION_API_BASE_URL", "http://127.0.0.1:" + CALIBRATION_HOST_PORT)
-        .withEnvVar(
-            "MSSQL_CONNECTION_STRING",
-            "Server=tcp:localhost,"
-                + MSSQL_PORT
-                + ";Database="
-                + MSSQL_DB_NAME
-                + ";User Id="
-                + MSSQL_DB_USER
-                + ";Password="
-                + MSSQL_DB_PASS
-                + ";TrustServerCertificate=True;")
-        .withEnvVar("TEMPORAL_TARGET", TEMPORAL_TARGET)
-        .withEnvVar("SMTP_HOST", "127.0.0.1")
-        .withEnvVar("SMTP_PORT", String.valueOf(SMTP_HOST_PORT))
-        .withEnvVar("OAUTH_ISSUER_URL", OAUTH_ISSUER)
-        .withEnvVar("OAUTH_TLS_CA_FILE", OAUTH_CA_PATH)
-        .withEnvVar("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
-        .withEnvVar("AWS_ENDPOINT_URL", LOCALSTACK_ENDPOINT)
-        .withEnvVar("AWS_DEFAULT_REGION", REGION)
-        .withEnvVar("AWS_ACCESS_KEY_ID", AWS_DUMMY.get("aws_access_key_id"))
-        .withEnvVar("AWS_SECRET_ACCESS_KEY", AWS_DUMMY.get("aws_secret_access_key"))
-        .withEnvVar("EVENT_BUS_NAME", EVENT_BUS_NAME)
-        .withEnvVar("EVENT_SOURCE", EVENT_SOURCE)
-        .withReadinessCheck(
-            HttpReadinessCheck.create(), "http://127.0.0.1:" + port + "/health", 30_000L)
-        .withChildComponents(children)
-        .build();
+    ExecutableComponentBuilder builder =
+        new ExecutableComponentBuilder(name)
+            .withExecutablePath(appLauncher)
+            .withEnvVar("WEB_APP_PORT", String.valueOf(port))
+            .withEnvVar(
+                "POSTGRES_CONNECTION_STRING",
+                "host=localhost port="
+                    + POSTGRES_PORT
+                    + " user="
+                    + POSTGRES_DB_USER
+                    + " password="
+                    + POSTGRES_DB_PASS
+                    + " dbname="
+                    + POSTGRES_DB_NAME)
+            .withEnvVar("CALIBRATION_API_BASE_URL", "http://127.0.0.1:" + CALIBRATION_HOST_PORT)
+            .withEnvVar(
+                "MSSQL_CONNECTION_STRING",
+                "Server=tcp:localhost,"
+                    + MSSQL_PORT
+                    + ";Database="
+                    + MSSQL_DB_NAME
+                    + ";User Id="
+                    + MSSQL_DB_USER
+                    + ";Password="
+                    + MSSQL_DB_PASS
+                    + ";TrustServerCertificate=True;")
+            .withEnvVar("TEMPORAL_TARGET", TEMPORAL_TARGET)
+            .withEnvVar("SMTP_HOST", "127.0.0.1")
+            .withEnvVar("SMTP_PORT", String.valueOf(SMTP_HOST_PORT))
+            .withEnvVar("OAUTH_ISSUER_URL", OAUTH_ISSUER)
+            .withEnvVar("OAUTH_TLS_CA_FILE", OAUTH_CA_PATH)
+            .withEnvVar("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
+            .withEnvVar("AWS_ENDPOINT_URL", LOCALSTACK_ENDPOINT)
+            .withEnvVar("AWS_DEFAULT_REGION", REGION)
+            .withEnvVar("AWS_ACCESS_KEY_ID", AWS_DUMMY.get("aws_access_key_id"))
+            .withEnvVar("AWS_SECRET_ACCESS_KEY", AWS_DUMMY.get("aws_secret_access_key"))
+            .withEnvVar("EVENT_BUS_NAME", EVENT_BUS_NAME)
+            .withEnvVar("EVENT_SOURCE", EVENT_SOURCE)
+            .withReadinessCheck(
+                HttpReadinessCheck.create(), "http://127.0.0.1:" + port + "/health", 30_000L);
+    for (ArenaRunnableComponent child : children) {
+      builder.addChildComponent(child);
+    }
+    return builder.build();
   }
 
   private static List<String> readSchema(String filename) {

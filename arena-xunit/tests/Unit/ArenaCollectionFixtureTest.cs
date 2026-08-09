@@ -28,7 +28,7 @@ public class ArenaCollectionFixtureTest
         private static readonly HttpDependency? NullDependency = null;
     }
 
-    private sealed class StubMatchPiece : IArenaMatchPiece
+    private sealed class StubMatchPiece : IArenaDependency, IArenaComponent
     {
         public string Identifier { get; }
         public StubMatchPiece(string identifier) => Identifier = identifier;

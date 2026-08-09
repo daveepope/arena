@@ -1,7 +1,8 @@
 package arena.junit;
 
 import arena.junit.ffi.ArenaLogLevel;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableComponent;
+import arena.junit.match.ArenaRunnableDependency;
 import arena.junit.match.Match;
 import arena.junit.match.MatchBuilder;
 import arena.junit.playbook.Playbook;
@@ -169,13 +170,13 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
     List<String> componentIds = new ArrayList<>();
     for (Field field : root.getDeclaredFields()) {
       if (field.isAnnotationPresent(ArenaDependency.class)) {
-        ArenaMatchPiece piece = (ArenaMatchPiece) readStatic(field, root);
+        ArenaRunnableDependency piece = (ArenaRunnableDependency) readStatic(field, root);
         matchBuilder.addDependency(piece);
         if (field.getAnnotation(ArenaDependency.class).logs()) {
           dependencyIds.add(piece.forFfi().get("identifier").asText());
         }
       } else if (field.isAnnotationPresent(ArenaComponent.class)) {
-        ArenaMatchPiece piece = (ArenaMatchPiece) readStatic(field, root);
+        ArenaRunnableComponent piece = (ArenaRunnableComponent) readStatic(field, root);
         matchBuilder.addComponent(piece);
         if (field.getAnnotation(ArenaComponent.class).logs()) {
           componentIds.add(piece.forFfi().get("identifier").asText());

@@ -352,9 +352,14 @@ async fn add_child_appends_and_lifecycle_includes_it() {
         .with_readiness_check(AlwaysOkReadinessCheck)
         .build();
 
+    assert!(dep.children().is_empty());
+
     dep.add_child(Box::new(RecordingChild {
         events: child_events.clone(),
     }));
+
+    assert_eq!(dep.children().len(), 1);
+    assert_eq!(dep.children_mut().len(), 1);
 
     dep.start().await;
     dep.stop().await;

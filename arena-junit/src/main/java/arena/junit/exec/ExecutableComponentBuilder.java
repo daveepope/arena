@@ -1,5 +1,5 @@
 package arena.junit.exec;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableComponent;
 import arena.junit.readiness.ReadinessCheck;
 import arena.junit.readiness.ReadinessChecksFfi;
 import arena.junit.support.ArenaIdentifiers;
@@ -14,7 +14,7 @@ import java.util.List;
 public final class ExecutableComponentBuilder {
   private final ObjectNode config;
   private final List<ReadinessChecksFfi.ReadinessEntry> readiness = new ArrayList<>();
-  private final List<ArenaMatchPiece> children = new ArrayList<>();
+  private final List<ArenaRunnableComponent> children = new ArrayList<>();
 
   public ExecutableComponentBuilder(String name) {
     ObjectNode c = ArenaJson.object();
@@ -69,8 +69,8 @@ public final class ExecutableComponentBuilder {
     return this;
   }
 
-  public ExecutableComponentBuilder withChildComponents(List<ArenaMatchPiece> children) {
-    this.children.addAll(children);
+  public ExecutableComponentBuilder addChildComponent(ArenaRunnableComponent child) {
+    this.children.add(child);
     return this;
   }
 

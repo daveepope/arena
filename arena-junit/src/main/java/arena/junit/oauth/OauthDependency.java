@@ -1,9 +1,9 @@
 package arena.junit.oauth;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableDependency;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public final class OauthDependency implements ArenaMatchPiece {
+public final class OauthDependency implements ArenaRunnableDependency {
   private final ObjectNode config;
 
   OauthDependency(ObjectNode config) {

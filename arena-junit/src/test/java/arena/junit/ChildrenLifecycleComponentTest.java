@@ -36,7 +36,7 @@ final class ChildrenLifecycleComponentTest {
               .withExecutablePath("/bin/sh")
               .withRuntimeArg("flag", "-c")
               .withRuntimeArg("script", "echo parent >> " + markerFile)
-              .withChildComponents(List.of(child))
+              .addChildComponent(child)
               .build();
 
       Match match = new MatchBuilder(MATCH_NAME).addComponent(parent).build();

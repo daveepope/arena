@@ -4,7 +4,7 @@ using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Dep;
 
-public sealed class PostgresDependency : IArenaMatchPiece
+public sealed class PostgresDependency : IArenaDependency
 {
     public string Type => "postgres";
     public string Identifier { get; }
@@ -15,7 +15,7 @@ public sealed class PostgresDependency : IArenaMatchPiece
     public IReadOnlyList<string> StartupSqlScripts { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
-    private readonly IReadOnlyList<IArenaMatchPiece> _children;
+    private readonly IReadOnlyList<IArenaDependency> _children;
 
     internal PostgresDependency(
         string identifier,
@@ -24,7 +24,7 @@ public sealed class PostgresDependency : IArenaMatchPiece
         string? databaseUsername,
         string? databasePassword,
         IReadOnlyList<string> startupSqlScripts,
-        IReadOnlyList<IArenaMatchPiece> children)
+        IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -49,7 +49,7 @@ public sealed class PostgresDependencyBuilder
     private string? _databaseUsername;
     private string? _databasePassword;
     private readonly List<string> _startupSqlScripts = new();
-    private readonly List<IArenaMatchPiece> _children = new();
+    private readonly List<IArenaDependency> _children = new();
 
     public PostgresDependencyBuilder(string name)
     {
@@ -86,9 +86,9 @@ public sealed class PostgresDependencyBuilder
         return this;
     }
 
-    public PostgresDependencyBuilder WithChildDependencies(IEnumerable<IArenaMatchPiece> children)
+    public PostgresDependencyBuilder AddChildDependency(IArenaDependency child)
     {
-        _children.AddRange(children);
+        _children.Add(child);
         return this;
     }
 

@@ -93,7 +93,7 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
         new TemporalDependencyBuilder("test-chained-temporal")
             .WithPort(TemporalPort)
             .WithUiPort(TemporalUiPort)
-            .WithChildDependencies(new IArenaMatchPiece[] { Postgres })
+            .AddChildDependency(Postgres)
             .Build();
 
     [ArenaDependency]
@@ -124,14 +124,15 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
         new(Postgres.Identifier);
 
     private static readonly ExecutableComponent WebAppChild =
-        BuildWebApp("example-api-chained-web-app-child", WebAppChildPort, Array.Empty<IArenaMatchPiece>());
+        BuildWebApp("example-api-chained-web-app-child", WebAppChildPort, Array.Empty<IArenaComponent>());
 
     [ArenaComponent(Logs = false)]
     private static readonly ExecutableComponent WebApp =
-        BuildWebApp("example-api-chained-web-app", WebAppPort, new IArenaMatchPiece[] { WebAppChild });
+        BuildWebApp("example-api-chained-web-app", WebAppPort, new IArenaComponent[] { WebAppChild });
 
-    private static ExecutableComponent BuildWebApp(string name, int port, IEnumerable<IArenaMatchPiece> children) =>
-        new ExecutableComponentBuilder(name)
+    private static ExecutableComponent BuildWebApp(string name, int port, IEnumerable<IArenaComponent> children)
+    {
+        var builder = new ExecutableComponentBuilder(name)
             .WithExecutablePath(ResolveWebAppExecutablePath())
             .WithEnvVar("WEB_APP_PORT", port.ToString())
             .WithEnvVar("CALIBRATION_URL", $"http://127.0.0.1:{CalibrationPort}")
@@ -171,9 +172,13 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
             .WithEnvVar("OAUTH_CLIENT_ID", "test-client")
             .WithEnvVar("OAUTH_CLIENT_SECRET", "test-secret")
             .WithEnvVar("LD_LIBRARY_PATH", ResolveTemporalNativeLibDir())
-            .WithReadinessCheck(HttpReadinessCheck.Create(), $"http://127.0.0.1:{port}/health")
-            .WithChildComponents(children)
-            .Build();
+            .WithReadinessCheck(HttpReadinessCheck.Create(), $"http://127.0.0.1:{port}/health");
+        foreach (var child in children)
+        {
+            builder.AddChildComponent(child);
+        }
+        return builder.Build();
+    }
 
     public ApiClient ApiClient { get; }
     public ApiClient ApiClient2 { get; }

@@ -1,6 +1,6 @@
 package arena.junit.match;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public interface ArenaMatchPiece {
+public interface ArenaRunnableDependency {
   ObjectNode forFfi();
 }

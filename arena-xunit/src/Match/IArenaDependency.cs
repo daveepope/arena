@@ -1,8 +1,6 @@
-using Newtonsoft.Json;
-
 namespace ArenaDotnet.Xunit;
 
-public interface IArenaMatchPiece
+public interface IArenaDependency
 {
     string Identifier { get; }
     string ForFfi();

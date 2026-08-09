@@ -87,7 +87,7 @@ internal sealed class LocalstackEventBusConfig
     [JsonProperty("name")] public string Name { get; set; } = default!;
 }
 
-public sealed class LocalstackDependency : IArenaMatchPiece
+public sealed class LocalstackDependency : IArenaDependency
 {
     public string Type => "localstack";
     public string Identifier { get; }
@@ -100,7 +100,7 @@ public sealed class LocalstackDependency : IArenaMatchPiece
     private readonly List<LocalstackRuleConfig> _eventRules;
     private readonly string? _image;
     private readonly string? _containerName;
-    private readonly List<IArenaMatchPiece> _children;
+    private readonly List<IArenaDependency> _children;
 
     internal LocalstackDependency(
         string identifier,
@@ -111,7 +111,7 @@ public sealed class LocalstackDependency : IArenaMatchPiece
         List<LocalstackRuleConfig> eventRules,
         string? image,
         string? containerName,
-        List<IArenaMatchPiece> children)
+        List<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -171,7 +171,7 @@ public sealed class LocalstackDependencyBuilder
     private readonly List<EventRuleSpec> _eventRules = new();
     private string? _image;
     private string? _containerName;
-    private readonly List<IArenaMatchPiece> _children = new();
+    private readonly List<IArenaDependency> _children = new();
 
     public LocalstackDependencyBuilder(string name)
     {
@@ -236,9 +236,9 @@ public sealed class LocalstackDependencyBuilder
         return this;
     }
 
-    public LocalstackDependencyBuilder WithChildDependencies(IEnumerable<IArenaMatchPiece> children)
+    public LocalstackDependencyBuilder AddChildDependency(IArenaDependency child)
     {
-        _children.AddRange(children);
+        _children.Add(child);
         return this;
     }
 
