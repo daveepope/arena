@@ -768,6 +768,50 @@ java_test(
 )
 
 java_test(
+    name = "example-spring-boot-chained-component-test",
+    size = "medium",
+    srcs = glob(["tests/example-spring-boot-chained-component-test/**/*.java"]),
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    tags = [
+        "component_test",
+        "example_component",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-platform-suite",
+        "--select-class=arena.examples.component.ChainedComponentTestSuite",
+    ],
+    data = [
+        ":example-readings-spring-boot-web-app",
+        "//arena-ffi:arena_ffi_shared",
+        ":instrument_reading_db_schema",
+        ":validation_db_schema",
+    ],
+    jvm_flags = ["-Djna.nosys=true"],
+    runtime_deps = [
+        ":example_spring_boot_component_test_logging_resources",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+        "@arena_java_maven//:org_junit_platform_junit_platform_suite_engine",
+        "@arena_java_maven//:org_springframework_boot_spring_boot_starter_logging",
+    ],
+    deps = [
+        ":ephemeral_test_runtime_java",
+        ":junit_shared",
+        "//arena-junit:arena_junit_lib",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:org_junit_platform_junit_platform_suite_api",
+        "@arena_java_maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+java_test(
     name = "example-axum-junit-component-test",
     size = "medium",
     srcs = glob(["tests/example-axum-junit-component-test/**/*.java"]),
@@ -952,6 +996,7 @@ test_suite(
         ":example-axum-component-test",
         ":example-axum-junit-component-test",
         ":example-spring-boot-component-test",
+        ":example-spring-boot-chained-component-test",
         ":example-aspnet-xunit-component-test",
     ],
     visibility = ["//visibility:public"],

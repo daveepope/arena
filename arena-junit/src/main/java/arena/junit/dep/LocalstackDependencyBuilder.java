@@ -1,7 +1,9 @@
 package arena.junit.dep;
+import arena.junit.match.ArenaMatchPiece;
 import arena.junit.playbook.LocalstackModels;
 import arena.junit.support.ArenaIdentifiers;
 import arena.junit.support.ArenaJson;
+import arena.junit.support.ChildrenFfi;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -10,6 +12,7 @@ import java.util.List;
 
 public final class LocalstackDependencyBuilder {
   private final ObjectNode config;
+  private final List<ArenaMatchPiece> children = new ArrayList<>();
 
   public LocalstackDependencyBuilder(String name) {
     ObjectNode c = ArenaJson.object();
@@ -130,7 +133,16 @@ public final class LocalstackDependencyBuilder {
     return n;
   }
 
+  public LocalstackDependencyBuilder withChildDependencies(List<ArenaMatchPiece> children) {
+    this.children.addAll(children);
+    return this;
+  }
+
   public LocalstackDependency build() {
-    return new LocalstackDependency(config.deepCopy());
+    ObjectNode cfg = config.deepCopy();
+    if (!children.isEmpty()) {
+      cfg.set("children", ChildrenFfi.build(children));
+    }
+    return new LocalstackDependency(cfg);
   }
 }

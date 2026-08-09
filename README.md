@@ -23,26 +23,58 @@ Arena is a cross-platform sandboxing framework. It manages the lifecycle of a se
 
 Arena models a sandbox using the concept of matches to manage the lifecycle of a set of dependencies and components (your applications).
 
-The core framework is implemented in Rust. Clients call the core framework library through a C FFI layer which is completly hidden from application developers. The Python client (arena-pytest), Java client (arena-junit), and .NET client (arena-xunit) are available; a Go client is planned.
+The core framework is implemented in Rust. Clients call the core framework library through a C FFI layer which is completely hidden from application developers. The Python client (arena-pytest), Java client (arena-junit), and .NET client (arena-xunit) are available; a Go client is planned.
 
-![Arena architecture](./arena.drawio.png)
+![Arena architecture](./arena.png)
 
-## Performance
+### Component and Dependency Trees
 
-Arena is built for speed and efficiency. Within a match, all dependencies start concurrently using the simple concept of dependency trees where dependencies can declare children; the tree is respected so children start before parents and stop after them. This keeps setup and teardown time low even with many services. The same concept applies to component trees where one component starts before another where a dependency relationship exists.
+![Arena dependency and component trees](./arena-trees.png)
 
-Bazel build is used to build and runs tests in parallel and streams logs during execution. All runtimes are built and tested together, e.g. rust, python ett. For Cargo, use `cargo testv` or `cargo test -- --nocapture` to stream output. For pytest, use `-s` to disable capture.
+Any dependency or component can declare other dependencies/components as children, using the core trait's `add_child`, or the friendlier per-type builder methods `with_child_dependencies(...)` / `with_child_components(...)`. Each node just owns a list of its own children, forming an n-ary tree where nesting is unlimited: a child can have children of its own, and so on.
+
+Use a dependency tree when one dependency needs another dependency already up and ready before it starts, e.g. a service that needs a broker or database dependency ready first, so the broker/database is declared as its child. Use a component tree the same way for your own applications, e.g. a component that needs a sidecar, proxy, or upstream service already running before it starts, so that upstream service is declared as its child.
+
+```rust
+let dependency_d = HttpDependency::builder("dependency-d").build();
+let dependency_b = HttpDependency::builder("dependency-b")
+    .with_child_dependencies(vec![Box::new(dependency_d)])
+    .build();
+let dependency_c = HttpDependency::builder("dependency-c").build();
+let dependency_a = HttpDependency::builder("dependency-a")
+    .with_child_dependencies(vec![Box::new(dependency_b), Box::new(dependency_c)])
+    .build();
+
+let component_d = ExecutableComponent::builder("component-d")
+    .with_executable_path("/bin/true")
+    .build();
+let component_b = ExecutableComponent::builder("component-b")
+    .with_executable_path("/bin/true")
+    .with_child_components(vec![Box::new(component_d)])
+    .build();
+let component_c = ExecutableComponent::builder("component-c")
+    .with_executable_path("/bin/true")
+    .build();
+let component_a = ExecutableComponent::builder("component-a")
+    .with_executable_path("/bin/true")
+    .with_child_components(vec![Box::new(component_b), Box::new(component_c)])
+    .build();
+```
+
+For this tree, start order is depth-first, children before their parent, siblings in declared order:
+
+`dependency_d → dependency_b → dependency_c → dependency_a`
+
+Stop order is the exact reverse: a node stops itself before its children, and children stop in reverse declared order:
+
+`dependency_a → dependency_c → dependency_b → dependency_d`
+
+The same pattern applies to the component tree. This LIFO ordering is for nesting *within* one tree. Independent root-level dependencies/components registered on the same match run concurrently, all dependencies fully start before any component starts, and on stop all components stop before any dependency stops.
 
 ## Prerequisites
 
 - Bazel (via [Bazelisk](https://github.com/bazelbuild/bazelisk) is recommended)
 - Docker
-
-## Agent instructions (AI / editors)
-
-- **`AGENTS.md` is the source of truth** for project agent rules (coding assistants, CI context, etc.).
-- **`CLAUDE.md`** and **`.cursor/rules/arena-agent.mdc`** are **generated** from it: do not edit them by hand.
-- After you change **`AGENTS.md`**, run **`bazel run //scripts:sync_agent_rules`**, then commit **`AGENTS.md`**, **`CLAUDE.md`**, and **`.cursor/rules/arena-agent.mdc`** together.
 
 ## Installation
 
@@ -57,10 +89,6 @@ Run the full test suite:
 ```bash
 bazel test //...
 ```
-
-## Host development (Cargo and Python)
-
-You can use Cargo and Python on your host machine instead of Bazel. You will need to install the prerequisites yourself: Rust 1.92+, Python 3.9+, and the dependencies in `arena-pytest/requirements.txt`. Build the FFI library with `cargo build -p arena-ffi --release`, then install the Python client with `pip install -e arena-pytest`.
 
 ## Usage
 
@@ -163,7 +191,7 @@ await open_arena.close()
 
 As in Rust, you can point at source plus `with_build_tool(...)` instead of a prebuilt path when you want Arena to compile the component first.
 
-#### Playbooks
+#### Python playbooks
 
 Register a `Managed*Playbook` (or your own class extending `Playbook`/`UnmanagedPlaybook`) on the `MatchBuilder` alongside your dependencies, then stack `@playbook(YourPlaybook)` decorators on a test to activate it just for that test:
 
@@ -192,7 +220,7 @@ Published on Maven Central: [io.github.stationdevx:arena-junit](https://central.
 
 `arena-junit` is a JUnit 5 extension. You point it at the jar your build already produces, so a test runs against the same artifact you ship rather than a separate in-process test context.
 
-#### Setup
+#### Java setup
 
 `arena-junit` publishes its native library as a separate Maven classifier per platform (`linux-x86_64`, `osx-aarch_64`, `osx-x86_64`) instead of bundling every platform into one jar. Add the [`os-maven-plugin`](https://github.com/trustin/os-maven-plugin) so the right classifier resolves automatically for your machine:
 
@@ -227,7 +255,7 @@ dependencies {
 }
 ```
 
-#### Annotation style
+#### Java annotation style declaration
 
 Put `@Arena` on the test class, annotate your dependencies and components as static fields, and Arena wires the sandbox for you before any test method runs.
 
@@ -275,7 +303,7 @@ static final ExecutableComponent WEB_APP_2 =
 
 Both instances run in the same sandbox against the same Postgres, so you can test how your service behaves with two copies of itself running, or bring in another team's service and test the two together.
 
-#### Building the arena yourself
+#### Java building the arena yourself
 
 If you would rather not use field scanning, build the same sandbox by hand with `MatchBuilder` and open it in a plain JUnit lifecycle method:
 
@@ -321,7 +349,7 @@ final class ReadingsComponentTest {
 
 Use this when you want full control over when the sandbox opens and closes, for example sharing one arena across several test classes yourself instead of letting `@Arena` manage it.
 
-#### Playbooks
+#### Java playbooks
 
 Declare a `Managed*Playbook` (or your own class implementing `Playbook`/`UnmanagedPlaybook`) as an `@ArenaPlaybook` static field alongside your dependencies, then stack `@Playbook(YourPlaybook.class)` on a `@Test` method to activate it just for that test:
 
@@ -345,7 +373,7 @@ Published on NuGet: [ArenaDotnet.Xunit](https://www.nuget.org/packages/ArenaDotn
 
 `arena-xunit` is an xUnit v2 extension targeting `netstandard2.0`, so it works from both .NET Framework and modern .NET test projects. You point it at the executable your build already produces, so a test runs against the same artifact you ship rather than a separate in-process test context.
 
-#### Xunit annotations
+#### C# xunit annotation style declaration
 
 Put your dependencies and components as `[ArenaDependency]` / `[ArenaComponent]` static fields on a class that extends `ArenaCollectionFixture`, then have your test class implement xUnit's `IClassFixture<T>` to receive the shared, already-open arena before any test method runs.
 
@@ -403,7 +431,7 @@ private static readonly ExecutableComponent WebApp2 =
 
 Both instances run in the same sandbox against the same Postgres, so you can test how your service behaves with two copies of itself running, or bring in another team's service and test the two together.
 
-#### Building the arena yourself
+#### C# building the arena yourself
 
 If you would rather not use field scanning, build the same sandbox by hand with `MatchBuilder` and open it yourself in an xUnit fixture:
 
@@ -458,7 +486,7 @@ public class ReadingsComponentTests : IClassFixture<ReadingsFixture>
 
 Use this when you want full control over when the sandbox opens and closes, for example sharing one arena across several test classes yourself instead of letting `ArenaCollectionFixture` manage it via attributes.
 
-#### Playbooks
+#### C# playbooks
 
 Declare a `Managed*Playbook` (or your own class extending `UnmanagedPlaybook`) as an `[ArenaPlaybook]` static field alongside your dependencies, then stack `[Playbook(typeof(YourPlaybook))]` on a test method to activate it just for that test:
 
@@ -477,47 +505,132 @@ public async Task CreateReadingWithValidationDbScopedPlaybook()
 
 See [Playbooks](#playbooks) below for the full picture, including how to write your own unmanaged playbook.
 
+## Readiness Guarantee
+
+Arena performs and orchestrates readiness checks for you, so you don't write polling loops, retries, or sleeps into your own code. Every dependency and component runs its readiness check as the last step of starting, using a built-in check for dependencies with an obvious signal (e.g. Postgres waits for a real database connection), or a check you register yourself (e.g. `HttpReadinessCheck` against a component's health endpoint). If a readiness check fails, starting fails loudly instead of returning something half-ready.
+
+Reporting as started is not the same as the process being launched, the container running, or a port being open. Arena waits for the thing to actually be able to serve a request. `HttpReadinessCheck` polls with a real HTTP call and only succeeds on a real response; the Postgres dependency waits for a real database connection, not just its container reaching a running state. Many off-the-shelf test container images only signal "the container is up," not "the service inside it is ready for traffic," which is why you'll often see hand-rolled wait strategies, retry loops, or sleeps wrapped around them. Arena pushes that work into the readiness check itself so you don't have to write it per project.
+
+That means once `open()` / `OpenAsync()` returns, everything in the sandbox has already reported ready, so you can call straight into it.
+
+**Python (arena-pytest)**
+
+```python
+component = (
+    ExecutableComponentBuilder("my service")
+    .with_executable_path("/path/to/your/binary")
+    .with_readiness_check(HttpReadinessCheck(), "http://127.0.0.1:8080/health")
+    .build()
+)
+
+open_arena = await closed.open()
+
+# No polling, retries, or sleeps needed here. Arena already ran the
+# readiness check during open(). The service is reachable right now.
+response = await http_client.get("http://127.0.0.1:8080/orders")
+assert response.status_code == 200
+```
+
+**Java (arena-junit)**
+
+```java
+@ArenaComponent
+static final ExecutableComponent WEB_APP =
+    new ExecutableComponentBuilder("my-service")
+        .withExecutablePath("/path/to/your/binary")
+        .withReadinessCheck(HttpReadinessCheck.create(), "http://127.0.0.1:8080/health")
+        .build();
+
+@Test
+void createOrderIsListed() throws Exception {
+  // No polling, retries, or sleeps needed here. Arena already ran the
+  // readiness check before this test method ran. The service is reachable right now.
+  HttpResponse<String> response = httpClient.send(ordersRequest, BodyHandlers.ofString());
+  assertEquals(200, response.statusCode());
+}
+```
+
+**.NET (arena-xunit)**
+
+```csharp
+[ArenaComponent]
+private static readonly ExecutableComponent WebApp =
+    new ExecutableComponentBuilder("my-service")
+        .WithExecutablePath("/path/to/your/binary")
+        .WithReadinessCheck(HttpReadinessCheck.Create(), "http://127.0.0.1:8080/health")
+        .Build();
+
+[Fact]
+public async Task CreateOrderIsListed()
+{
+    // No polling, retries, or sleeps needed here. Arena already ran the
+    // readiness check before this test ran. The service is reachable right now.
+    var response = await _httpClient.GetAsync("http://127.0.0.1:8080/orders");
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+}
+```
+
 ## Playbooks
 
-A **playbook** is a named, scoped behavior attached to a dependency in your sandbox. It describes how that dependency should act for the lifetime of the playbook, for example baseline HTTP responses for a downstream service, resetting MSSQL tables when a scenario begins and ends, purging localstack resources between scenarios, or seeding a row before a scenario runs. Playbooks are part of Arena’s lifecycle model: you open them when a scenario needs them and close them when that scenario is done, so the sandbox returns to a known baseline.
+A **playbook** composes setup and teardown logic for a dependency and scopes it to a stage in your application's lifecycle, for example a single test function or a whole test class. There are two kinds:
 
-When a playbook is **active**, Arena runs its setup on open and its teardown on close (explicit close, scope exit, or arena shutdown). Some dependency types can also verify that expected interaction occurred during the playbook’s lifetime when the playbook declares those rules.
+- **Managed**: describe the behavior as a manifest (mappings, table resets, purge rules) by extending a `Managed*Playbook` type for the dependency (`ManagedHttpPlaybook`, `ManagedMssqlPlaybook`, and similar). Arena applies it on open and cleans up after itself on close, no hand-rolled teardown. See the managed examples under [Usage](#usage) above for each client.
+- **Unmanaged**: write the behavior yourself in code by implementing `Playbook`/`UnmanagedPlaybook` (in Rust, any `Playbook` implementation is unmanaged by definition). Arena calls your code on open and disposes the handle you return on close; any cleanup your scenario needs is on you.
 
-There are two kinds of playbook, and every dependency-backed playbook is one or the other:
+Here is an unmanaged playbook that seeds a validation row before a scenario runs, registered and activated per test, in each client:
 
-- **[Managed playbooks](#managed-playbooks)**: you describe the behavior as a manifest (mappings, table resets, purge rules); Arena applies it on open and cleans up after itself on close. No hand-rolled teardown.
-- **[Unmanaged playbooks](#unmanaged-playbooks)**: you write the behavior yourself as arbitrary code (seed a row, call another service, anything a manifest can't express). Arena just calls your code and disposes the handle you return; any teardown your scenario needs is on you.
+**Rust**
 
-Both kinds register on a match the same way and activate through the same scoped-activation mechanism (see [Scoped activation](#scoped-activation)); the difference is only who owns the setup/teardown logic, and, by default, whether the playbook runs before or after the test body.
+```rust
+use arena::dependency::Dependency;
+use arena::playbook::{ActivePlaybook, Playbook};
+use async_trait::async_trait;
+use std::any::Any;
 
-### Managed playbooks
+struct SeedValidationReadingPlaybook {
+    connection_string: String,
+}
 
-A **managed playbook** is a playbook whose behavior is declared up front as a manifest (mappings, table resets, purge rules, and similar). You **register** managed playbooks on a **match** when you build the sandbox. Arena applies the manifest when the playbook opens and **cleans up after itself when it closes** (mappings removed, tables reset, queues purged, and so on), so you do not hand-roll teardown. That automatic setup and teardown is what **managed** means. By default a managed playbook activates **after** the test body (teardown for whatever ran), so the next scenario starts clean.
+struct NoopActivePlaybook;
 
-Define sandbox-specific playbooks by **extending** the managed base for the dependency type (`ManagedHttpPlaybook`, `ManagedMssqlPlaybook`, `ManagedLocalstackPlaybook`, `ManagedPostgresPlaybook`, and similar in Python, Java, and .NET). In Rust, build the same manifests with the `Managed*Playbook` types from the dependency crates. Register the instance on the match; Arena executes it through the core runtime.
+impl ActivePlaybook for NoopActivePlaybook {
+    fn identifier(&self) -> &str {
+        "seed-validation-reading"
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
 
-Register with **`exec_on_dependency_start`** (Python/Java), the `ExecOnDependencyStart` property on `[ArenaPlaybook]` (.NET), or the second argument to **`register_playbook`** (Rust):
+#[async_trait]
+impl Playbook for SeedValidationReadingPlaybook {
+    fn identifier(&self) -> &str {
+        "seed-validation-reading"
+    }
 
-- **`true`**: run when the dependency starts and stay active for the sandbox session (typical for default dependency behavior, such as a baseline HTTP stub for the whole run).
-- **`false`**: register only; open when you need a shorter-lived scenario.
+    async fn run(&self, _dependencies: &[Dependency]) -> Box<dyn ActivePlaybook> {
+        seed_validation_reading(&self.connection_string)
+            .await
+            .expect("seed validation_results row");
+        Box::new(NoopActivePlaybook)
+    }
+}
 
-**Rust**: pass `Box<dyn Playbook>` from `ManagedHttpPlaybook`, `ManagedMssqlPlaybook`, or sibling types to `Match::register_playbook`.
+let a_match = Match::new("my-test", vec![mssql], vec![]).register_playbook(
+    Box::new(SeedValidationReadingPlaybook {
+        connection_string: connection_string.clone(),
+    }),
+    false,
+);
 
-**Python**: subclass a `Managed*Playbook` type and pass an instance to `MatchBuilder.register_playbook`.
+// later, when the scenario needs it:
+let _active = open_arena
+    .run_playbook("seed-validation-reading")
+    .await
+    .expect("seed-validation-reading playbook registered");
+```
 
-**Java**: subclass a `Managed*Playbook` type and pass an instance to `MatchBuilder.registerPlaybook`.
-
-**.NET**: subclass a `Managed*Playbook` type and pass an instance to `MatchBuilder.RegisterPlaybook`, or declare it as an `[ArenaPlaybook]` static field alongside your dependencies.
-
-### Unmanaged playbooks
-
-An **unmanaged playbook** is a playbook whose behavior is entirely your own code; there is no manifest, Arena does not know or manage what your `run` actually does. Use it for anything a manifest can't express: seeding a row before a test, calling another service, arbitrary setup. Implement `identifier()` and `run(arena)` yourself and return an active handle; Arena disposes that handle when the playbook closes, but whatever your code did (e.g. rows it inserted) is your own responsibility to clean up if the next scenario needs a clean slate. Pair it with a managed playbook's automatic teardown (see the stacked examples below) if you need that.
-
-By default an unmanaged playbook activates **before** the test body, so the state it sets up is already there when the test starts, the opposite default from managed playbooks.
-
-**Rust**: there is no separate `Unmanaged` marker; implement the `Playbook` trait directly (any hand-written implementation is, by definition, unmanaged) and pass `Box<dyn Playbook>` to `Match::register_playbook`.
-
-**Python**: subclass `UnmanagedPlaybook`:
+**Python (arena-pytest)**
 
 ```python
 class SeedValidationReadingPlaybook(UnmanagedPlaybook):
@@ -528,15 +641,47 @@ class SeedValidationReadingPlaybook(UnmanagedPlaybook):
         return "seed-validation-reading"
 
     def run(self, arena) -> ActivePlaybook:
-        # arbitrary setup code, e.g. seed a row via SQL
-        ...
+        asyncio.run(self._seed())
         return ActivePlaybook(None, 0)
+
+    async def _seed(self) -> None:
+        conn = await connect_validation_db(self._connection_string)
+        try:
+            await conn.execute(
+                "INSERT INTO dbo.validation_results (user_name, value, valid) "
+                "VALUES (@P1, @P2, @P3)",
+                ["Seeded By Unmanaged Playbook", 42, 1],
+            )
+        finally:
+            await conn.disconnect()
+
+
+a_match = (
+    MatchBuilder("my-test")
+    .add_dependency(mssql)
+    .register_playbook(
+        SeedValidationReadingPlaybook(connection_string),
+        exec_on_dependency_start=False,
+    )
+    .build()
+)
+
+@playbook(SeedValidationReadingPlaybook)
+def test_create_reading_with_seeded_row(api_client):
+    # the row is already seeded when the test starts
+    ...
 ```
 
-**Java**: implement `Playbook` and `UnmanagedPlaybook`:
+**Java (arena-junit)**
 
 ```java
 public final class SeedValidationReadingPlaybook implements Playbook, UnmanagedPlaybook {
+  private final String jdbcUrl;
+
+  public SeedValidationReadingPlaybook(String jdbcUrl) {
+    this.jdbcUrl = jdbcUrl;
+  }
+
   @Override
   public String identifier() {
     return "seed-validation-reading";
@@ -544,39 +689,85 @@ public final class SeedValidationReadingPlaybook implements Playbook, UnmanagedP
 
   @Override
   public ActivePlaybook run(OpenArena arena) {
-    // arbitrary setup code, e.g. seed a row via JDBC
+    try (Connection connection = DriverManager.getConnection(jdbcUrl);
+        PreparedStatement statement = connection.prepareStatement(
+            "INSERT INTO dbo.validation_results (user_name, value, valid) VALUES (?, ?, ?)")) {
+      statement.setString(1, "Seeded By Unmanaged Playbook");
+      statement.setInt(2, 42);
+      statement.setBoolean(3, true);
+      statement.executeUpdate();
+    } catch (Exception e) {
+      throw new IllegalStateException("failed to seed dbo.validation_results row", e);
+    }
     return new NoopActivePlaybook();
   }
+
+  private static final class NoopActivePlaybook extends ActivePlaybook {
+    NoopActivePlaybook() {
+      super(Pointer.NULL);
+    }
+  }
+}
+
+@ArenaPlaybook(execOnDependencyStart = false)
+static final SeedValidationReadingPlaybook SEED_VALIDATION_READING =
+    new SeedValidationReadingPlaybook(jdbcUrl);
+
+@Test
+@Playbook(SeedValidationReadingPlaybook.class)
+void createReadingWithSeededRow() throws Exception {
+  // the row is already seeded when the test starts
 }
 ```
 
-**.NET**: extend `UnmanagedPlaybook`:
+**.NET (arena-xunit)**
 
 ```csharp
-private class SeedValidationReadingPlaybook : UnmanagedPlaybook
+public sealed class SeedValidationReadingPlaybook : UnmanagedPlaybook
 {
+    private readonly string _connectionString;
+
+    public SeedValidationReadingPlaybook(string connectionString)
+    {
+        _connectionString = connectionString;
+    }
+
     public override string Identifier => "seed-validation-reading";
 
     public override ActivePlaybook Run(OpenArena arena)
     {
-        // arbitrary setup code, e.g. seed a row via SQL
-        return new ActiveHttpPlaybook(IntPtr.Zero);
+        using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            "INSERT INTO dbo.validation_results (user_name, value, valid) VALUES (@user, @value, @valid)";
+        command.Parameters.AddWithValue("@user", "Seeded By Unmanaged Playbook");
+        command.Parameters.AddWithValue("@value", 42);
+        command.Parameters.AddWithValue("@valid", true);
+        command.ExecuteNonQuery();
+        return new ActiveMssqlPlaybook(IntPtr.Zero);
     }
+}
+
+[ArenaPlaybook(ExecOnDependencyStart = false)]
+private static readonly SeedValidationReadingPlaybook SeedValidationReading =
+    new SeedValidationReadingPlaybook(connectionString);
+
+[Fact]
+[Playbook(typeof(SeedValidationReadingPlaybook))]
+public async Task CreateReadingWithSeededRow()
+{
+    // the row is already seeded when the test starts
 }
 ```
 
-Register and activate it exactly like a managed playbook: see [Scoped activation](#scoped-activation).
+You can stack managed and unmanaged playbooks on the same test: unmanaged ones run before the test body (seeding state), managed ones run after (tearing down), regardless of the order you list them in.
 
-### Scoped activation
+## Agent instructions (AI / editors)
 
-For playbooks registered with **`exec_on_dependency_start=false`**, open them only for the period that scenario should apply:
-
-- **Rust**: obtain the dependency from the open arena, call `.playbook().run().await`, and hold the active playbook until scope ends.
-- **Python**: stack `@playbook(YourPlaybook)` decorators on the callable that should run under that behavior (one playbook class per line).
-- **Java**: stack `@Playbook(YourPlaybook.class)` annotations the same way (one class per line).
-- **.NET**: stack `[Playbook(typeof(YourPlaybook))]` attributes on the test method or class the same way, with `[assembly: PlaybookExecutionAttribute]` declared once per test assembly.
-
-Managed and unmanaged playbooks can be stacked together on the same test: Arena runs the unmanaged ones first (before the test body) and the managed ones last (after), regardless of the order you list them in. Session-default and scoped playbooks can coexist on one match. Scoped playbooks tear down when they close so the next scenario starts from a clean sandbox state.
+- **`AGENTS.md` is the source of truth** for project agent rules (coding assistants, CI context, etc.).
+- **`CLAUDE.md`** and **`.cursor/rules/arena-agent.mdc`** are **generated** from it: do not edit them by hand.
+- After you change **`AGENTS.md`**, run **`bazel run //scripts:sync_agent_rules`**, then commit **`AGENTS.md`**, **`CLAUDE.md`**, and **`.cursor/rules/arena-agent.mdc`** together.
 
 ## License
 

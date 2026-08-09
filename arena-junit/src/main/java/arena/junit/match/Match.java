@@ -2,6 +2,7 @@ package arena.junit.match;
 
 import arena.junit.playbook.Playbook;
 import arena.junit.support.ArenaJson;
+import arena.junit.support.ChildrenFfi;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -48,16 +49,8 @@ public final class Match {
   public ObjectNode forFfi() {
     ObjectNode out = ArenaJson.object();
     out.put("match_name", name);
-    ArrayNode deps = ArenaJson.array();
-    for (ArenaMatchPiece d : dependencies) {
-      deps.add(d.forFfi());
-    }
-    out.set("dependencies", deps);
-    ArrayNode comps = ArenaJson.array();
-    for (ArenaMatchPiece c : components) {
-      comps.add(c.forFfi());
-    }
-    out.set("components", comps);
+    out.set("dependencies", ChildrenFfi.build(dependencies));
+    out.set("components", ChildrenFfi.build(components));
     if (network != null && !network.isEmpty()) {
       out.put("network", network);
     }

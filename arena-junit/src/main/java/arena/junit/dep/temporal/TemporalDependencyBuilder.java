@@ -1,14 +1,19 @@
 package arena.junit.dep.temporal;
+import arena.junit.match.ArenaMatchPiece;
 import arena.junit.support.ArenaIdentifiers;
 import arena.junit.support.ArenaJson;
+import arena.junit.support.ChildrenFfi;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class TemporalDependencyBuilder {
   private final ObjectNode config =
       ArenaJson.object()
           .put("type", "temporal")
           .put("identifier", ArenaIdentifiers.build("arena-temporal", ""));
+  private final List<ArenaMatchPiece> children = new ArrayList<>();
 
   public TemporalDependencyBuilder(String name) {
     config.put("identifier", ArenaIdentifiers.build("arena-temporal", name));
@@ -39,7 +44,16 @@ public final class TemporalDependencyBuilder {
     return this;
   }
 
+  public TemporalDependencyBuilder withChildDependencies(List<ArenaMatchPiece> children) {
+    this.children.addAll(children);
+    return this;
+  }
+
   public TemporalDependency build() {
-    return new TemporalDependency(config.deepCopy());
+    ObjectNode cfg = config.deepCopy();
+    if (!children.isEmpty()) {
+      cfg.set("children", ChildrenFfi.build(children));
+    }
+    return new TemporalDependency(cfg);
   }
 }

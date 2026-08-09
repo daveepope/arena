@@ -1,9 +1,10 @@
 import ctypes
 import json
 import os
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
+from arena_pytest.ffi._ffi_children import children_for_ffi
 from arena_pytest.support._identifier import build as _build_identifier
 
 DEFAULT_OAUTH_PORT = 9444
@@ -24,6 +25,7 @@ class OauthDependencyBuilder:
             "identifier": _build_identifier("arena-oauth", name),
             "port": DEFAULT_OAUTH_PORT,
         }
+        self._children: List[Any] = []
 
     def with_port(self, port: int) -> "OauthDependencyBuilder":
         self._config["port"] = port
@@ -47,23 +49,32 @@ class OauthDependencyBuilder:
         self._config["metadata_base_url"] = url.rstrip("/")
         return self
 
+    def with_child_dependencies(self, children: List[Any]) -> "OauthDependencyBuilder":
+        self._children.extend(children)
+        return self
+
     def build(self) -> "OauthDependency":
         cfg = dict(self._config)
         if not str(cfg.get("metadata_base_url") or "").strip():
             cfg["metadata_base_url"] = OAUTH_ISSUER
-        return OauthDependency(cfg)
+        return OauthDependency(cfg, children=list(self._children))
 
 
 class OauthDependency:
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], children: Optional[List[Any]] = None):
         self._config = config
+        self._children = children or []
 
     @property
     def identifier(self) -> str:
         return str(self._config["identifier"])
 
     def _for_ffi(self) -> Dict[str, Any]:
-        return dict(self._config)
+        d = dict(self._config)
+        children = children_for_ffi(self._children)
+        if children:
+            d["children"] = children
+        return d
 
 
 def oauth_loopback_tls_pem_pair() -> tuple[str, str]:

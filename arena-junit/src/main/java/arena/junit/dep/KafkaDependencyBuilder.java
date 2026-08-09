@@ -1,9 +1,13 @@
 package arena.junit.dep;
+import arena.junit.match.ArenaMatchPiece;
 import arena.junit.support.ArenaIdentifiers;
 import arena.junit.support.ArenaJson;
+import arena.junit.support.ChildrenFfi;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class KafkaDependencyBuilder {
   private final ObjectNode config =
@@ -11,6 +15,7 @@ public final class KafkaDependencyBuilder {
           .put("type", "kafka")
           .put("identifier", ArenaIdentifiers.build("arena-kafka", ""))
           .set("topics", ArenaJson.array());
+  private final List<ArenaMatchPiece> children = new ArrayList<>();
 
   public KafkaDependencyBuilder(String name) {
     config.put("identifier", ArenaIdentifiers.build("arena-kafka", name));
@@ -41,7 +46,16 @@ public final class KafkaDependencyBuilder {
     return this;
   }
 
+  public KafkaDependencyBuilder withChildDependencies(List<ArenaMatchPiece> children) {
+    this.children.addAll(children);
+    return this;
+  }
+
   public KafkaDependency build() {
-    return new KafkaDependency(config.deepCopy());
+    ObjectNode cfg = config.deepCopy();
+    if (!children.isEmpty()) {
+      cfg.set("children", ChildrenFfi.build(children));
+    }
+    return new KafkaDependency(cfg);
   }
 }

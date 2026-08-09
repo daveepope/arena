@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using ArenaDotnet.Xunit.Support;
+using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Dep;
 
@@ -14,12 +16,16 @@ public sealed class KafkaDependency : IArenaMatchPiece
     public string Identifier { get; }
     public int Port { get; }
     public KafkaFlavor Flavor { get; }
+    public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
-    internal KafkaDependency(string identifier, int port, KafkaFlavor flavor)
+    private readonly IReadOnlyList<IArenaMatchPiece> _children;
+
+    internal KafkaDependency(string identifier, int port, KafkaFlavor flavor, IReadOnlyList<IArenaMatchPiece> children)
     {
         Identifier = identifier;
         Port = port;
         Flavor = flavor;
+        _children = children;
     }
 
     public string ForFfi()
@@ -33,6 +39,7 @@ public sealed class KafkaDependencyBuilder
     private readonly string _name;
     private int _port = 9092;
     private KafkaFlavor _flavor = KafkaFlavor.ApacheNative;
+    private readonly List<IArenaMatchPiece> _children = new();
 
     public KafkaDependencyBuilder(string name)
     {
@@ -51,9 +58,15 @@ public sealed class KafkaDependencyBuilder
         return this;
     }
 
+    public KafkaDependencyBuilder WithChildDependencies(IEnumerable<IArenaMatchPiece> children)
+    {
+        _children.AddRange(children);
+        return this;
+    }
+
     public KafkaDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-kafka", _name);
-        return new KafkaDependency(identifier, _port, _flavor);
+        return new KafkaDependency(identifier, _port, _flavor, _children);
     }
 }

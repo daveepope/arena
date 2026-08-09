@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from arena_pytest.ffi._ffi_children import children_for_ffi
 from arena_pytest.ffi._ffi_readiness import ReadinessCheckEntry, readiness_checks_for_ffi
 from arena_pytest.support._identifier import build as _build_identifier
 from arena_pytest.readiness import HttpReadinessCheck, TcpReadinessCheck
@@ -17,6 +18,7 @@ class ContainerizedComponentBuilder:
             "host_mappings": [],
         }
         self._readiness_checks: List[ReadinessCheckEntry] = []
+        self._children: List[Any] = []
 
     def with_build_context(self, path: str) -> "ContainerizedComponentBuilder":
         self._config["build_context"] = path
@@ -57,11 +59,23 @@ class ContainerizedComponentBuilder:
         self._readiness_checks.append((check, target, timeout_ms))
         return self
 
+    def with_child_components(self, children: List[Any]) -> "ContainerizedComponentBuilder":
+        self._children.extend(children)
+        return self
+
     def build(self) -> "ContainerizedComponent":
-        return ContainerizedComponent(dict(self._config), readiness_checks=list(self._readiness_checks))
+        return ContainerizedComponent(
+            dict(self._config),
+            readiness_checks=list(self._readiness_checks),
+            children=list(self._children),
+        )
 
     def _for_ffi(self) -> Dict[str, Any]:
-        return dict(self._config)
+        d = dict(self._config)
+        children = children_for_ffi(self._children)
+        if children:
+            d["children"] = children
+        return d
 
 
 class ContainerizedComponent:
@@ -69,13 +83,18 @@ class ContainerizedComponent:
         self,
         config: Dict[str, Any],
         readiness_checks: Optional[List[ReadinessCheckEntry]] = None,
+        children: Optional[List[Any]] = None,
     ):
         self._config = config
         self._readiness_checks = readiness_checks or []
+        self._children = children or []
 
     def _for_ffi(self) -> Dict[str, Any]:
         d = dict(self._config)
         rc = readiness_checks_for_ffi(self._readiness_checks)
         if rc:
             d["readiness_checks"] = rc
+        children = children_for_ffi(self._children)
+        if children:
+            d["children"] = children
         return d

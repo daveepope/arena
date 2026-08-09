@@ -15,7 +15,7 @@ public class DeviceLifecycleWorkflow
     {
         while (true)
         {
-            await Workflow.DelayAsync(TimeSpan.FromSeconds(1));
+            await Workflow.DelayAsync(TimeSpan.FromMilliseconds(100));
         }
     }
 
@@ -31,7 +31,7 @@ public class DeviceLifecycleWorkflow
 
     private static readonly ActivityOptions TransitionActivityOptions = new()
     {
-        StartToCloseTimeout = TimeSpan.FromSeconds(10),
+        StartToCloseTimeout = TimeSpan.FromMilliseconds(100),
     };
 
     [WorkflowSignal]

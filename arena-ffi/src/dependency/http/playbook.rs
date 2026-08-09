@@ -95,14 +95,22 @@ pub extern "C" fn arena_http_playbook_open(
         }
     };
 
-    let parsed: PlaybookSpec = match serde_json::from_str(&spec_str) {
-        Ok(v) => v,
-        Err(e) => {
+    let parsed: PlaybookSpec = match catch_unwind(AssertUnwindSafe(|| serde_json::from_str(&spec_str)))
+    {
+        Ok(Ok(v)) => v,
+        Ok(Err(e)) => {
             unsafe {
                 write_error(
                     err_out,
                     format!("arena_http_playbook_open: spec parse failed: {e}"),
                 )
+            };
+            return std::ptr::null_mut();
+        }
+        Err(payload) => {
+            let msg = panic_message(&payload);
+            unsafe {
+                write_error(err_out, format!("panic in arena_http_playbook_open: {msg}"))
             };
             return std::ptr::null_mut();
         }
@@ -226,9 +234,10 @@ pub extern "C" fn arena_http_playbook_verify(
         }
     };
 
-    let parsed: VerifySpec = match serde_json::from_str(&spec_str) {
-        Ok(v) => v,
-        Err(e) => {
+    let parsed: VerifySpec = match catch_unwind(AssertUnwindSafe(|| serde_json::from_str(&spec_str)))
+    {
+        Ok(Ok(v)) => v,
+        Ok(Err(e)) => {
             unsafe {
                 write_error(
                     err_out,
@@ -236,6 +245,16 @@ pub extern "C" fn arena_http_playbook_verify(
                 )
             };
             return ArenaStatus::InvalidArgument;
+        }
+        Err(payload) => {
+            let msg = panic_message(&payload);
+            unsafe {
+                write_error(
+                    err_out,
+                    format!("panic in arena_http_playbook_verify: {msg}"),
+                )
+            };
+            return ArenaStatus::Failed;
         }
     };
     let _ = parsed.dependency_identifier;

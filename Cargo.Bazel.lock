@@ -1,5 +1,5 @@
 {
-  "checksum": "84b1aea6cce92d9b4d0a17ae271809b9a6030c2b51ae4b9a944dfe08a915d634",
+  "checksum": "499a20ef7b17cf9b4ee677dd6962b7403eda5be490dffc647e84640f88f88cac",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -832,6 +832,10 @@
             {
               "id": "arc-swap 1.9.1",
               "target": "arc_swap"
+            },
+            {
+              "id": "futures 0.3.32",
+              "target": "futures"
             },
             {
               "id": "reqwest 0.12.28",

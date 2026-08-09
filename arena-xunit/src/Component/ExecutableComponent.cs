@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ArenaDotnet.Xunit.Support;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Component;
 
@@ -16,10 +17,11 @@ public sealed class ExecutableComponent : IArenaMatchPiece
 
     private readonly List<RuntimeArgEntry> _runtimeArgs;
     private readonly List<ReadinessCheckEntry> _readinessChecks;
+    private readonly List<IArenaMatchPiece> _children;
 
     internal ExecutableComponent(string identifier, string executablePath, string? sourcePath,
         BuildTool? buildTool, Dictionary<string, string> envVars, List<RuntimeArgEntry> runtimeArgs,
-        List<ReadinessCheckEntry> readinessChecks)
+        List<ReadinessCheckEntry> readinessChecks, List<IArenaMatchPiece> children)
     {
         Identifier = identifier;
         ExecutablePath = executablePath;
@@ -28,6 +30,7 @@ public sealed class ExecutableComponent : IArenaMatchPiece
         EnvVars = envVars;
         _runtimeArgs = runtimeArgs;
         _readinessChecks = readinessChecks;
+        _children = children;
     }
 
     public string ForFfi()
@@ -42,6 +45,7 @@ public sealed class ExecutableComponent : IArenaMatchPiece
             EnvVars = EnvVars.ToDictionary(kv => kv.Key, kv => kv.Value),
             RuntimeArgs = RuntimeArgEntry.Build(_runtimeArgs),
             ReadinessChecks = ReadinessCheckWireFormat.Build(_readinessChecks),
+            Children = ChildrenWireFormat.Build(_children),
         });
     }
 
@@ -56,6 +60,7 @@ public sealed class ExecutableComponent : IArenaMatchPiece
         [JsonProperty("env_vars")] public Dictionary<string, string> EnvVars { get; set; } = default!;
         [JsonProperty("runtime_args")] public List<object> RuntimeArgs { get; set; } = default!;
         [JsonProperty("readiness_checks")] public List<object>? ReadinessChecks { get; set; }
+        [JsonProperty("children")] public List<JToken>? Children { get; set; }
     }
 }
 
@@ -68,6 +73,7 @@ public sealed class ExecutableComponentBuilder
     private readonly Dictionary<string, string> _envVars = new();
     private readonly List<RuntimeArgEntry> _runtimeArgs = new();
     private readonly List<ReadinessCheckEntry> _readinessChecks = new();
+    private readonly List<IArenaMatchPiece> _children = new();
 
     public ExecutableComponentBuilder(string name)
     {
@@ -115,6 +121,12 @@ public sealed class ExecutableComponentBuilder
         return this;
     }
 
+    public ExecutableComponentBuilder WithChildComponents(IEnumerable<IArenaMatchPiece> children)
+    {
+        _children.AddRange(children);
+        return this;
+    }
+
     public ExecutableComponent Build()
     {
         if (string.IsNullOrEmpty(_executablePath))
@@ -122,6 +134,6 @@ public sealed class ExecutableComponentBuilder
         var identifier = ArenaIdentifiers.Build("arena-exec", _name);
         return new ExecutableComponent(identifier, _executablePath, _sourcePath, _buildTool,
             new Dictionary<string, string>(_envVars), new List<RuntimeArgEntry>(_runtimeArgs),
-            new List<ReadinessCheckEntry>(_readinessChecks));
+            new List<ReadinessCheckEntry>(_readinessChecks), new List<IArenaMatchPiece>(_children));
     }
 }

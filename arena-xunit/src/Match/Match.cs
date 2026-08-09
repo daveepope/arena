@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using ArenaDotnet.Xunit.Support;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -30,8 +31,8 @@ public sealed class Match
         {
             MatchName = Name,
             Network = Network,
-            Dependencies = Dependencies.Select(d => JToken.Parse(d.ForFfi())).ToList(),
-            Components = Components.Select(c => JToken.Parse(c.ForFfi())).ToList(),
+            Dependencies = ChildrenWireFormat.Build(Dependencies) ?? new List<JToken>(),
+            Components = ChildrenWireFormat.Build(Components) ?? new List<JToken>(),
             Playbooks = Playbooks.Select(p => p.ToConfig()).Where(c => c != null).ToList()!,
         };
         return ArenaDotnet.Xunit.Support.ArenaJson.Serialize(obj);

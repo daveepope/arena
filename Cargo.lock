@@ -161,6 +161,7 @@ dependencies = [
  "arena-smtp",
  "arena-temporal",
  "async-trait",
+ "futures",
  "reqwest",
  "serde",
  "serde_json",
