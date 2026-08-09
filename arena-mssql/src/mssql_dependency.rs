@@ -4,7 +4,7 @@ pub mod mssql_container_impl;
 use crate::builder::MssqlDependencyBuilder;
 use crate::mssql_dependency::healthcheck::DefaultMssqlReadinessCheck;
 use crate::mssql_dependency::mssql_container_impl::DEFAULT_CONNECT_TIMEOUT;
-use arena::dependency::RunnableDependency;
+use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
 use futures::channel::oneshot;
@@ -434,6 +434,14 @@ impl RunnableDependency for MssqlDependency {
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
         self.dependencies.get_or_insert_with(Vec::new).push(dep);
+    }
+
+    fn children(&self) -> &[Dependency] {
+        self.dependencies.as_deref().unwrap_or(&[])
+    }
+
+    fn children_mut(&mut self) -> &mut [Dependency] {
+        self.dependencies.as_deref_mut().unwrap_or(&mut [])
     }
 
     async fn soft_reset(&self) {

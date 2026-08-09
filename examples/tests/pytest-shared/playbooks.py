@@ -8,6 +8,7 @@ from arena_pytest import (
     ManagedHttpPlaybook,
     ManagedLocalstackPlaybook,
     ManagedMssqlPlaybook,
+    ManagedPostgresPlaybook,
     UnmanagedPlaybook,
     ok_json,
     server_error,
@@ -69,6 +70,14 @@ class ResetValidationDbPlaybook(ManagedMssqlPlaybook):
     def __init__(self, dependency_identifier: str):
         super().__init__(
             identifier=PLAYBOOK_VALIDATION_DB_SCOPED,
+            dependency_identifier=dependency_identifier,
+        )
+
+
+class ResetReadingsDbPlaybook(ManagedPostgresPlaybook):
+    def __init__(self, dependency_identifier: str):
+        super().__init__(
+            identifier="test-readings-db-scoped",
             dependency_identifier=dependency_identifier,
         )
 

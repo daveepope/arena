@@ -1,4 +1,4 @@
-use arena::dependency::RunnableDependency;
+use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_localstack::{LocalstackDependency, LocalstackImpl};
 use async_trait::async_trait;
@@ -92,6 +92,12 @@ impl RunnableDependency for FakeDep {
     }
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
+    fn children(&self) -> &[Dependency] {
+        &[]
+    }
+    fn children_mut(&mut self) -> &mut [Dependency] {
+        &mut []
+    }
 
     async fn soft_reset(&self) {}
 

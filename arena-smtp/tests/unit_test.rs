@@ -1,4 +1,4 @@
-use arena::dependency::RunnableDependency;
+use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_smtp::{SmtpDependency, SmtpImpl, SmtpTlsConfig};
 use async_trait::async_trait;
@@ -332,6 +332,12 @@ impl RunnableDependency for RecordingChild {
     async fn hard_reset(&mut self) {}
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
+    fn children(&self) -> &[Dependency] {
+        &[]
+    }
+    fn children_mut(&mut self) -> &mut [Dependency] {
+        &mut []
+    }
 }
 
 #[tokio::test]

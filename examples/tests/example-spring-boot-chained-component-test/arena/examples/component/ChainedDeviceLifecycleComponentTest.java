@@ -3,13 +3,16 @@ package arena.examples.component;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import arena.examples.http.ApiClient;
+import arena.examples.playbooks.ResetReadingsDbPlaybook;
 import arena.junit.Arena;
+import arena.junit.Playbook;
 import org.junit.jupiter.api.Test;
 
 @Arena(ChainedComponentTestSuite.class)
 final class ChainedDeviceLifecycleComponentTest {
 
   @Test
+  @Playbook(ResetReadingsDbPlaybook.class)
   void createDeviceRequestTransitionAppliesRequestedState() throws Exception {
     ApiClient client1 = ChainedComponentTestSuite.apiClient();
     ApiClient client2 = ChainedComponentTestSuite.apiClient2();

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import arena.examples.http.ApiClient;
 import arena.examples.playbooks.CalibrationApiHappyPathPlaybook;
 import arena.examples.playbooks.EventsPurgePlaybook;
+import arena.examples.playbooks.ResetReadingsDbPlaybook;
 import arena.examples.testruntime.EphemeralTestRuntime;
 import arena.junit.Arena;
 import arena.junit.ArenaAfterOpen;
@@ -166,6 +167,10 @@ public final class ChainedComponentTestSuite {
       new CalibrationApiHappyPathPlaybook(CALIBRATION.identifier());
 
   @ArenaPlaybook static final EventsPurgePlaybook EVENTS_PURGE = new EventsPurgePlaybook(LOCALSTACK.identifier());
+
+  @ArenaPlaybook(execOnDependencyStart = false)
+  static final ResetReadingsDbPlaybook RESET_READINGS_DB =
+      new ResetReadingsDbPlaybook(POSTGRES.identifier());
 
   private static final ExecutableComponent WEB_APP_CHILD =
       buildWebApp("example-api-chained-web-app-child", WEB_APP_CHILD_PORT, List.of());

@@ -618,6 +618,38 @@ py_test(
     visibility = ["//visibility:public"],
 )
 
+py_test(
+    name = "pytest_fastapi_chained_component_test",
+    size = "medium",
+    srcs = glob(["tests/example-fastapi-pytest-chained-component-test/**/*.py"]),
+    main = "tests/example-fastapi-pytest-chained-component-test/fastapi_chained_component_test.py",
+    imports = [
+        "tests/example-fastapi-pytest-chained-component-test",
+        "tests/pytest-shared",
+    ],
+    data = [
+        "//arena-ffi:arena_ffi_shared",
+        "//examples:example-readings-fastapi-web-app",
+        "//examples:instrument_reading_db_schema",
+        "//examples:arena_config",
+        "//examples:validation_db_schema",
+    ],
+    deps = [
+        ":pytest_shared",
+        "//arena-pytest:arena_pytest_lib",
+        "@pip//pytest",
+        "@pip//pytest_asyncio",
+        "@pip//requests",
+        "@pip_examples//fastmssql",
+    ],
+    tags = [
+        "component_test",
+        "example_component",
+    ],
+    python_version = "PY3",
+    visibility = ["//visibility:public"],
+)
+
 rust_test(
     name = "example-axum-component-test",
     srcs = glob(["tests/example-axum-component-test/**/*.rs"]),
@@ -987,17 +1019,65 @@ csharp_test(
     visibility = ["//visibility:public"],
 )
 
+csharp_test(
+    name = "example-aspnet-xunit-chained-component-test",
+    size = "medium",
+    tags = [
+        "component_test",
+        "example_component",
+    ],
+    target_frameworks = ["net8.0"],
+    srcs = glob(["tests/example-aspnet-xunit-chained-component-test/**/*.cs"]),
+    data = [
+        ":example-readings-aspnet-web-app",
+        "//arena-ffi:arena_ffi_shared",
+        ":instrument_reading_db_schema",
+        ":arena_config",
+        ":validation_db_schema",
+        "//arena-xunit:xunit_core_netstandard",
+    ],
+    deps = [
+        ":xunit_shared",
+        ":xunit_assert_lib",
+        ":xunit_abstractions_lib",
+        ":xunit_extensibility_lib",
+        ":xunit_extensibility_core_lib",
+        ":xunit_runner_utility_lib",
+        ":xunit_runner_reporters_lib",
+        ":example_readings_aspnet_web_app_lib",
+        "//arena-xunit:arena_xunit_lib",
+        ":aws_sqs_lib",
+        ":aws_core_lib",
+        ":polly_lib",
+        ":ms_logging_abstractions_lib",
+        ":ms_logging_lib",
+        ":ms_logging_console_lib",
+        ":ms_logging_options_lib",
+        ":ms_logging_options_configuration_extensions_lib",
+        ":ms_logging_configuration_lib",
+        ":ms_extensions_configuration_lib",
+        ":ms_extensions_configuration_abstractions_lib",
+        ":ms_extensions_configuration_binder_lib",
+        ":ms_extensions_dependency_injection_abstractions_lib",
+        ":ms_extensions_primitives_lib",
+        "//tools/dotnet_xunit_runner:xunit_console_runner",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 test_suite(
     name = "example_component_tests",
     tags = ["component_test"],
     tests = [
         ":pytest_axum_component_test",
         ":pytest_fastapi_component_test",
+        ":pytest_fastapi_chained_component_test",
         ":example-axum-component-test",
         ":example-axum-junit-component-test",
         ":example-spring-boot-component-test",
         ":example-spring-boot-chained-component-test",
         ":example-aspnet-xunit-component-test",
+        ":example-aspnet-xunit-chained-component-test",
     ],
     visibility = ["//visibility:public"],
 )

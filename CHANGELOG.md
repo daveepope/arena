@@ -5,6 +5,21 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.0]
+
+### Added
+
+- Dependency and component trees: `with_child_dependencies`/`with_child_components` (Rust: `add_child`) across Rust, Java, Python, and .NET clients
+- ClusterFuzzLite continuous fuzzing (`fuzz/`, `.clusterfuzzlite/`)
+
+### Fixed
+
+- xunit ASP.NET example app: health check now waits for the Temporal worker to be actively polling before reporting ready, fixing flaky startup/logging in the xunit example tests
+- Managed playbooks and `arena_soft_reset`/`arena_hard_reset` now resolve dependencies nested as children, not just top-level dependencies
+- arena-ffi entry points no longer crash the host process on malformed JSON input; panics are now returned as errors
+- arena-pytest: `ManagedPostgresPlaybook` is now exported from the package root
+- Documented accepted `cargo audit` advisories for `rsa`/`rustls-webpki` transitive deps (no upstream fix available; low exploitability for Arena's ephemeral local connections)
+
 ## [5.0.0]
 
 ### Breaking
