@@ -2,6 +2,8 @@
 
 ![Arena logo](./arena-logo.png)
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14020/badge)](https://www.bestpractices.dev/projects/14020)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14020/baseline)](https://www.bestpractices.dev/projects/14020)
 [![CI](https://github.com/daveepope/arena/actions/workflows/build-test-publish-arena.yml/badge.svg?branch=master)](https://github.com/daveepope/arena/actions/workflows/build-test-publish-arena.yml)
 [![codecov](https://codecov.io/gh/daveepope/arena/graph/badge.svg?branch=master)](https://codecov.io/gh/daveepope/arena)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
