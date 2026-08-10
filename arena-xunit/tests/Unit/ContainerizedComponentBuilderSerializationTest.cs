@@ -88,6 +88,33 @@ public class ContainerizedComponentBuilderSerializationTest
     }
 
     [Fact]
+    public void Build_WithBindMount_SerializesCorrectJson()
+    {
+        var comp = new ContainerizedComponentBuilder("test")
+            .WithContainerfile("./Dockerfile")
+            .WithBindMount("/host/data", "/mnt/data", true)
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Single(obj["bind_mounts"]);
+        Assert.Equal("/host/data", obj["bind_mounts"][0]["host_path"]);
+        Assert.Equal("/mnt/data", obj["bind_mounts"][0]["container_path"]);
+        Assert.Equal(true, obj["bind_mounts"][0]["read_only"]);
+    }
+
+    [Fact]
+    public void Build_WithBindMount_DefaultsReadOnlyToFalse()
+    {
+        var comp = new ContainerizedComponentBuilder("test")
+            .WithContainerfile("./Dockerfile")
+            .WithBindMount("/host/data", "/mnt/data")
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal(false, obj["bind_mounts"][0]["read_only"]);
+    }
+
+    [Fact]
     public void Build_WithReadinessCheck_SerializesHttpKind()
     {
         var comp = new ContainerizedComponentBuilder("test")
