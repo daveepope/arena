@@ -19,6 +19,13 @@ pub struct ContainerizedComponentBuilder {
     port_mappings: Vec<(u16, u16)>,
     readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
     host_mappings: Vec<String>,
+    bind_mounts: Vec<BindMount>,
+}
+
+pub(crate) struct BindMount {
+    pub(crate) host_path: String,
+    pub(crate) container_path: String,
+    pub(crate) read_only: bool,
 }
 
 const DEFAULT_READINESS_TIMEOUT_MS: u64 = 10_000;
@@ -41,6 +48,7 @@ impl ContainerizedComponentBuilder {
             port_mappings: Vec::new(),
             readiness_checks: Vec::new(),
             host_mappings: Vec::new(),
+            bind_mounts: Vec::new(),
         }
     }
 
@@ -86,6 +94,20 @@ impl ContainerizedComponentBuilder {
 
     pub fn with_host_mapping(mut self, host_mapping: impl Into<String>) -> Self {
         self.host_mappings.push(host_mapping.into());
+        self
+    }
+
+    pub fn with_bind_mount(
+        mut self,
+        host_path: impl Into<String>,
+        container_path: impl Into<String>,
+        read_only: bool,
+    ) -> Self {
+        self.bind_mounts.push(BindMount {
+            host_path: host_path.into(),
+            container_path: container_path.into(),
+            read_only,
+        });
         self
     }
 
@@ -333,6 +355,7 @@ impl ContainerizedComponentBuilder {
             port_mappings: self.port_mappings,
             readiness_checks: self.readiness_checks,
             host_mappings: self.host_mappings,
+            bind_mounts: self.bind_mounts,
             runtime_client,
             container_id: None,
             stopped: false,

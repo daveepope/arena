@@ -13,6 +13,14 @@ pub(crate) struct PortMappingConfig {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct BindMountConfig {
+    pub host_path: String,
+    pub container_path: String,
+    #[serde(default)]
+    pub read_only: bool,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct ContainerizedComponentConfig {
     pub identifier: String,
     #[serde(alias = "dockerfile")]
@@ -33,6 +41,8 @@ pub(crate) struct ContainerizedComponentConfig {
     pub readiness_checks: Option<Vec<ReadinessCheckConfig>>,
     #[serde(default)]
     pub host_mappings: Option<Vec<String>>,
+    #[serde(default)]
+    pub bind_mounts: Option<Vec<BindMountConfig>>,
 }
 
 pub(crate) async fn build(config: &ContainerizedComponentConfig) -> Result<Component, String> {
@@ -64,6 +74,11 @@ pub(crate) async fn build(config: &ContainerizedComponentConfig) -> Result<Compo
     if let Some(hosts) = &config.host_mappings {
         for h in hosts {
             builder = builder.with_host_mapping(h);
+        }
+    }
+    if let Some(mounts) = &config.bind_mounts {
+        for m in mounts {
+            builder = builder.with_bind_mount(&m.host_path, &m.container_path, m.read_only);
         }
     }
     if let Some(checks) = &config.readiness_checks {

@@ -1,10 +1,11 @@
-use crate::builder::ContainerizedComponentBuilder;
+use crate::builder::{BindMount, ContainerizedComponentBuilder};
 use arena::component::RunnableComponent;
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
 use bollard::container::LogOutput;
 use bollard::models::{
-    ContainerCreateBody, EndpointSettings, HostConfig, NetworkingConfig, PortBinding,
+    ContainerCreateBody, EndpointSettings, HostConfig, Mount, MountTypeEnum, NetworkingConfig,
+    PortBinding,
 };
 use bollard::query_parameters::{
     CreateContainerOptionsBuilder, LogsOptionsBuilder, RemoveContainerOptionsBuilder,
@@ -25,6 +26,7 @@ pub struct ContainerizedComponent {
     pub(crate) port_mappings: Vec<(u16, u16)>,
     pub(crate) readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
     pub(crate) host_mappings: Vec<String>,
+    pub(crate) bind_mounts: Vec<BindMount>,
     pub(crate) runtime_client: Docker,
     pub(crate) container_id: Option<String>,
     pub(crate) stopped: bool,
@@ -85,6 +87,21 @@ impl ContainerizedComponent {
 
         if !self.host_mappings.is_empty() {
             host_config.extra_hosts = Some(self.host_mappings.clone());
+        }
+
+        if !self.bind_mounts.is_empty() {
+            host_config.mounts = Some(
+                self.bind_mounts
+                    .iter()
+                    .map(|bind_mount| Mount {
+                        target: Some(bind_mount.container_path.clone()),
+                        source: Some(bind_mount.host_path.clone()),
+                        typ: Some(MountTypeEnum::BIND),
+                        read_only: Some(bind_mount.read_only),
+                        ..Default::default()
+                    })
+                    .collect(),
+            );
         }
 
         let mut networking_config: Option<NetworkingConfig> = None;

@@ -26,6 +26,7 @@ public final class ContainerizedComponentBuilder {
     config.set("runtime_args", ArenaJson.array());
     config.set("port_mappings", ArenaJson.array());
     config.set("host_mappings", ArenaJson.array());
+    config.set("bind_mounts", ArenaJson.array());
   }
 
   public ContainerizedComponentBuilder withBuildContext(String path) {
@@ -54,6 +55,21 @@ public final class ContainerizedComponentBuilder {
 
   public ContainerizedComponentBuilder withHostMapping(String hostMapping) {
     ((ArrayNode) config.get("host_mappings")).add(hostMapping);
+    return this;
+  }
+
+  public ContainerizedComponentBuilder withBindMount(String hostPath, String containerPath) {
+    return withBindMount(hostPath, containerPath, false);
+  }
+
+  public ContainerizedComponentBuilder withBindMount(
+      String hostPath, String containerPath, boolean readOnly) {
+    ArrayNode arr = (ArrayNode) config.get("bind_mounts");
+    ObjectNode m = ArenaJson.object();
+    m.put("host_path", hostPath);
+    m.put("container_path", containerPath);
+    m.put("read_only", readOnly);
+    arr.add(m);
     return this;
   }
 

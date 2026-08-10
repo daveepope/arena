@@ -16,6 +16,7 @@ class ContainerizedComponentBuilder:
             "runtime_args": [],
             "port_mappings": [],
             "host_mappings": [],
+            "bind_mounts": [],
         }
         self._readiness_checks: List[ReadinessCheckEntry] = []
         self._children: List[Any] = []
@@ -40,6 +41,18 @@ class ContainerizedComponentBuilder:
 
     def with_host_mapping(self, host_mapping: str) -> "ContainerizedComponentBuilder":
         self._config["host_mappings"].append(host_mapping)
+        return self
+
+    def with_bind_mount(
+        self, host_path: str, container_path: str, read_only: bool = False
+    ) -> "ContainerizedComponentBuilder":
+        self._config["bind_mounts"].append(
+            {
+                "host_path": host_path,
+                "container_path": container_path,
+                "read_only": read_only,
+            }
+        )
         return self
 
     def with_env_var(self, key: str, value: str) -> "ContainerizedComponentBuilder":
