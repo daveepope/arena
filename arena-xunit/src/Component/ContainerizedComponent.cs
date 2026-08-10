@@ -16,10 +16,10 @@ public sealed class ContainerizedComponent : IArenaComponent
     public string? Network { get; }
     public IReadOnlyDictionary<string, string> EnvVars { get; }
     public IReadOnlyList<string> HostMappings { get; }
-    public IReadOnlyList<BindMountEntry> BindMounts { get; }
 
     private readonly List<RuntimeArgEntry> _runtimeArgs;
     private readonly List<PortMappingEntry> _portMappings;
+    private readonly List<BindMountEntry> _bindMounts;
     private readonly List<ReadinessCheckEntry> _readinessChecks;
     private readonly List<IArenaComponent> _children;
 
@@ -38,7 +38,7 @@ public sealed class ContainerizedComponent : IArenaComponent
         _runtimeArgs = runtimeArgs;
         _portMappings = portMappings;
         HostMappings = hostMappings;
-        BindMounts = bindMounts;
+        _bindMounts = bindMounts;
         _readinessChecks = readinessChecks;
         _children = children;
     }
@@ -57,7 +57,7 @@ public sealed class ContainerizedComponent : IArenaComponent
             RuntimeArgs = RuntimeArgEntry.Build(_runtimeArgs),
             PortMappings = PortMappingEntry.Build(_portMappings),
             HostMappings = new List<string>(HostMappings),
-            BindMounts = BindMountEntry.Build(BindMounts),
+            BindMounts = BindMountEntry.Build(_bindMounts),
             ReadinessChecks = ReadinessCheckWireFormat.Build(_readinessChecks),
             Children = ChildrenWireFormat.Build(_children),
         });
@@ -102,7 +102,7 @@ internal sealed class PortMappingEntry
     }
 }
 
-public sealed class BindMountEntry
+internal sealed class BindMountEntry
 {
     public BindMountEntry(string hostPath, string containerPath, bool readOnly)
     {
