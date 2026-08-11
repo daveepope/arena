@@ -150,7 +150,6 @@ version = "5.2.0"
 dependencies = [
  "arc-swap",
  "arena",
- "arena-container",
  "arena-containerized-component",
  "arena-executable-component",
  "arena-http",

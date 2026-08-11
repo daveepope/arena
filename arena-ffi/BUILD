@@ -3,7 +3,6 @@ load("@crates//:defs.bzl", "all_crate_deps")
 
 _ARENA_FFI_DEPS = all_crate_deps(normal = True) + [
     "//arena",
-    "//arena-container:arena_container",
     "//arena-containerized-component:arena_containerized_component",
     "//arena-executable-component:arena_executable_component",
     "//arena-http:arena_http",
@@ -116,6 +115,23 @@ rust_test(
 rust_test(
     name = "ffi_postgres_playbook_validation_test",
     srcs = ["tests/playbook/postgres_playbook_ffi_validation.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_containerized_component_validation_test",
+    srcs = ["tests/component/containerized_component_ffi_validation.rs"],
     size = "small",
     edition = "2021",
     deps = all_crate_deps(

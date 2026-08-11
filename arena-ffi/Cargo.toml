@@ -30,7 +30,6 @@ path = "tests/dependency/smtp/smtp_dependency_test.rs"
 [dependencies]
 arc-swap = { workspace = true }
 arena = { workspace = true }
-arena-container = { workspace = true }
 arena-http = { workspace = true }
 async-trait = { workspace = true }
 arena-containerized-component = { workspace = true }
@@ -48,4 +47,4 @@ tracing-subscriber = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true, features = ["rt-multi-thread", "time", "net", "macros"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "time", "net"] }
