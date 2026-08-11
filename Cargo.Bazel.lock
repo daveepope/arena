@@ -32458,6 +32458,7 @@
   },
   "binary_crates": [],
   "workspace_members": {
+<<<<<<< HEAD
     "arena 5.2.0": "arena",
     "arena-container 5.2.0": "arena-container",
     "arena-containerized-component 5.2.0": "arena-containerized-component",
@@ -32473,6 +32474,23 @@
     "arena-postgres 5.2.0": "arena-postgres",
     "arena-smtp 5.2.0": "arena-smtp",
     "arena-temporal 5.2.0": "arena-temporal"
+=======
+    "arena 5.1.1": "arena",
+    "arena-container 5.1.1": "arena-container",
+    "arena-containerized-component 5.1.1": "arena-containerized-component",
+    "arena-cryptography 5.1.1": "arena-cryptography",
+    "arena-examples 5.1.1": "examples",
+    "arena-executable-component 5.1.1": "arena-executable-component",
+    "arena-ffi 5.1.1": "arena-ffi",
+    "arena-http 5.1.1": "arena-http",
+    "arena-kafka 5.1.1": "arena-kafka",
+    "arena-localstack 5.1.1": "arena-localstack",
+    "arena-mssql 5.1.1": "arena-mssql",
+    "arena-oauth 5.1.1": "arena-oauth",
+    "arena-postgres 5.1.1": "arena-postgres",
+    "arena-smtp 5.1.1": "arena-smtp",
+    "arena-temporal 5.1.1": "arena-temporal"
+>>>>>>> master
   },
   "conditions": {
     "aarch64-apple-darwin": [
