@@ -1,10 +1,8 @@
-use crate::containerized_component::ContainerizedComponent;
+use crate::containerized_component::container_impl::BollardContainerImpl;
+use crate::containerized_component::{ContainerizedComponent, ContainerizedComponentImpl};
 use arena::healthcheck::ReadinessCheck;
 use arena::Component;
 use arena_container::mount::{MountSpec, MountType};
-use bollard::query_parameters::BuildImageOptionsBuilder;
-use bollard::{body_full, Docker};
-use futures::StreamExt;
 use std::path::PathBuf;
 
 pub struct ContainerizedComponentBuilder {
@@ -21,6 +19,7 @@ pub struct ContainerizedComponentBuilder {
     readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
     host_mappings: Vec<String>,
     mounts: Vec<MountSpec>,
+    container_impl: Option<Box<dyn ContainerizedComponentImpl>>,
 }
 
 const DEFAULT_READINESS_TIMEOUT_MS: u64 = 10_000;
@@ -44,7 +43,16 @@ impl ContainerizedComponentBuilder {
             readiness_checks: Vec::new(),
             host_mappings: Vec::new(),
             mounts: Vec::new(),
+            container_impl: None,
         }
+    }
+
+    pub fn with_impl<W>(mut self, wrapper: W) -> Self
+    where
+        W: ContainerizedComponentImpl + 'static,
+    {
+        self.container_impl = Some(Box::new(wrapper));
+        self
     }
 
     pub fn with_child_components(mut self, children: Vec<Component>) -> Self {
@@ -187,68 +195,6 @@ impl ContainerizedComponentBuilder {
             .collect()
     }
 
-    async fn build_image(
-        identifier: &str,
-        containerfile: &str,
-        image_tag: &str,
-        build_context: &Option<PathBuf>,
-        runtime_client: &Docker,
-    ) {
-        tracing::debug!(
-            component = %identifier,
-            image = %image_tag,
-            phase = "image_build_begin",
-            "building container image",
-        );
-
-        let tar_body = arena_container::build_context::create_tar(
-            identifier,
-            containerfile,
-            build_context.as_deref(),
-        );
-
-        let options = BuildImageOptionsBuilder::default()
-            .dockerfile(".arena.Dockerfile")
-            .t(image_tag)
-            .rm(true)
-            .build();
-
-        let mut stream =
-            runtime_client.build_image(options, None, Some(body_full(tar_body.into())));
-
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(info) => {
-                    if let Some(ref stream_msg) = info.stream {
-                        let msg = stream_msg.trim_end();
-                        if !msg.is_empty() {
-                            tracing::debug!(
-                                component = %identifier,
-                                text = %msg,
-                                phase = "image_build_stream",
-                                "image build output line",
-                            );
-                        }
-                    }
-                    if let Some(ref error_detail) = info.error_detail {
-                        let message = error_detail.message.as_deref().unwrap_or("");
-                        panic!("{}: image build error: {}", identifier, message);
-                    }
-                }
-                Err(e) => {
-                    panic!("{}: image build failed: {}", identifier, e);
-                }
-            }
-        }
-
-        tracing::debug!(
-            component = %identifier,
-            image = %image_tag,
-            phase = "image_build_done",
-            "container image built",
-        );
-    }
-
     pub async fn build(self) -> ContainerizedComponent {
         let mounts = Self::resolve_bind_mounts(&self.identifier, self.mounts);
 
@@ -258,17 +204,18 @@ impl ContainerizedComponentBuilder {
             arena_container::identifier::sanitize_for_container(&self.identifier)
         });
 
-        let runtime_client =
-            Docker::connect_with_local_defaults().expect("connect to container runtime");
+        let container_impl: Box<dyn ContainerizedComponentImpl> = self
+            .container_impl
+            .unwrap_or_else(|| Box::new(BollardContainerImpl::new()));
 
-        Self::build_image(
-            &self.identifier,
-            &self.containerfile,
-            &image_tag,
-            &build_context,
-            &runtime_client,
-        )
-        .await;
+        container_impl
+            .build_image(
+                &self.identifier,
+                &self.containerfile,
+                &image_tag,
+                build_context.as_deref(),
+            )
+            .await;
 
         ContainerizedComponent {
             identifier: self.identifier,
@@ -282,7 +229,7 @@ impl ContainerizedComponentBuilder {
             readiness_checks: self.readiness_checks,
             host_mappings: self.host_mappings,
             mounts,
-            runtime_client,
+            container_impl,
             container_id: None,
             stopped: false,
         }
