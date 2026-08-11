@@ -3,6 +3,7 @@ load("@crates//:defs.bzl", "all_crate_deps")
 
 _ARENA_FFI_DEPS = all_crate_deps(normal = True) + [
     "//arena",
+    "//arena-container:arena_container",
     "//arena-containerized-component:arena_containerized_component",
     "//arena-executable-component:arena_executable_component",
     "//arena-http:arena_http",
