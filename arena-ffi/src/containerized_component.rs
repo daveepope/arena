@@ -132,3 +132,114 @@ pub(crate) async fn build(config: &ContainerizedComponentConfig) -> Result<Compo
     }
     Ok(Box::new(builder.build().await))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mount_config_bind_deserializes_with_default_read_only() {
+        let mount: MountConfig = serde_json::from_str(
+            r#"{"type": "bind", "source": "/host/data", "container_path": "/mnt/data"}"#,
+        )
+        .expect("bind mount config should deserialize");
+
+        match mount {
+            MountConfig::Bind {
+                source,
+                container_path,
+                read_only,
+            } => {
+                assert_eq!(source, "/host/data");
+                assert_eq!(container_path, "/mnt/data");
+                assert!(!read_only);
+            }
+            other => panic!("expected Bind variant, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn mount_config_volume_deserializes_with_explicit_read_only() {
+        let mount: MountConfig = serde_json::from_str(
+            r#"{"type": "volume", "source": "my-volume", "container_path": "/mnt/data", "read_only": true}"#,
+        )
+        .expect("volume mount config should deserialize");
+
+        match mount {
+            MountConfig::Volume {
+                source,
+                container_path,
+                read_only,
+            } => {
+                assert_eq!(source, "my-volume");
+                assert_eq!(container_path, "/mnt/data");
+                assert!(read_only);
+            }
+            other => panic!("expected Volume variant, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn mount_config_tmpfs_deserializes_with_default_size() {
+        let mount: MountConfig =
+            serde_json::from_str(r#"{"type": "tmpfs", "container_path": "/mnt/scratch"}"#)
+                .expect("tmpfs mount config should deserialize");
+
+        match mount {
+            MountConfig::Tmpfs {
+                container_path,
+                size_bytes,
+            } => {
+                assert_eq!(container_path, "/mnt/scratch");
+                assert_eq!(size_bytes, None);
+            }
+            other => panic!("expected Tmpfs variant, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn mount_config_tmpfs_deserializes_with_explicit_size() {
+        let mount: MountConfig = serde_json::from_str(
+            r#"{"type": "tmpfs", "container_path": "/mnt/scratch", "size_bytes": 1048576}"#,
+        )
+        .expect("tmpfs mount config should deserialize");
+
+        match mount {
+            MountConfig::Tmpfs { size_bytes, .. } => assert_eq!(size_bytes, Some(1_048_576)),
+            other => panic!("expected Tmpfs variant, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn containerized_component_config_dockerfile_alias_populates_containerfile() {
+        let config: ContainerizedComponentConfig =
+            serde_json::from_str(r#"{"identifier": "web", "dockerfile": "FROM alpine"}"#)
+                .expect("config should deserialize using the dockerfile alias");
+
+        assert_eq!(config.identifier, "web");
+        assert_eq!(config.containerfile, "FROM alpine");
+        assert!(config.mounts.is_none());
+    }
+
+    #[test]
+    fn containerized_component_config_with_mounts_deserializes_all_variants() {
+        let config: ContainerizedComponentConfig = serde_json::from_str(
+            r#"{
+                "identifier": "web",
+                "containerfile": "FROM alpine",
+                "mounts": [
+                    {"type": "bind", "source": "/host", "container_path": "/mnt/bind"},
+                    {"type": "volume", "source": "vol", "container_path": "/mnt/vol"},
+                    {"type": "tmpfs", "container_path": "/mnt/tmp"}
+                ]
+            }"#,
+        )
+        .expect("config with mounts should deserialize");
+
+        let mounts = config.mounts.expect("mounts should be present");
+        assert_eq!(mounts.len(), 3);
+        assert!(matches!(mounts[0], MountConfig::Bind { .. }));
+        assert!(matches!(mounts[1], MountConfig::Volume { .. }));
+        assert!(matches!(mounts[2], MountConfig::Tmpfs { .. }));
+    }
+}
