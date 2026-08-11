@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Containerized component: bind, volume, and tmpfs mounts (`with_bind_mount`/`with_volume_mount`/`with_tmpfs_mount` and language equivalents), across Rust, FFI, Java, Python, and .NET clients
+- Containerized component bind mounts: relative source paths resolve to absolute and are validated to exist before start; named volumes persist across runs and are not removed on teardown
 
 ## [5.1.0]
 

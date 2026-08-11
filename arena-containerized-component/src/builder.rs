@@ -197,6 +197,30 @@ impl ContainerizedComponentBuilder {
         }
     }
 
+    fn resolve_bind_mounts(identifier: &str, mounts: Vec<MountSpec>) -> Vec<MountSpec> {
+        mounts
+            .into_iter()
+            .map(|mut mount| {
+                if mount.mount_type == MountType::Bind {
+                    let source = mount
+                        .source
+                        .take()
+                        .expect("bind mount source path must be set");
+                    let resolved = Self::resolve_path(PathBuf::from(&source));
+                    if !resolved.exists() {
+                        panic!(
+                            "{}: bind mount source path does not exist: {}",
+                            identifier,
+                            resolved.display()
+                        );
+                    }
+                    mount.source = Some(resolved.to_string_lossy().into_owned());
+                }
+                mount
+            })
+            .collect()
+    }
+
     const SKIP_DIRS: &'static [&'static str] = &[
         ".git",
         "target",
@@ -371,6 +395,8 @@ impl ContainerizedComponentBuilder {
     }
 
     pub async fn build(self) -> ContainerizedComponent {
+        let mounts = Self::resolve_bind_mounts(&self.identifier, self.mounts);
+
         let build_context = self.build_context.map(Self::resolve_path);
 
         let image_tag = self.image_tag.unwrap_or_else(|| {
@@ -400,7 +426,7 @@ impl ContainerizedComponentBuilder {
             port_mappings: self.port_mappings,
             readiness_checks: self.readiness_checks,
             host_mappings: self.host_mappings,
-            mounts: self.mounts,
+            mounts,
             runtime_client,
             container_id: None,
             stopped: false,
