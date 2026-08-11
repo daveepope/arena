@@ -26,7 +26,7 @@ public final class ContainerizedComponentBuilder {
     config.set("runtime_args", ArenaJson.array());
     config.set("port_mappings", ArenaJson.array());
     config.set("host_mappings", ArenaJson.array());
-    config.set("bind_mounts", ArenaJson.array());
+    config.set("mounts", ArenaJson.array());
   }
 
   public ContainerizedComponentBuilder withBuildContext(String path) {
@@ -64,12 +64,43 @@ public final class ContainerizedComponentBuilder {
 
   public ContainerizedComponentBuilder withBindMount(
       String hostPath, String containerPath, boolean readOnly) {
-    ArrayNode arr = (ArrayNode) config.get("bind_mounts");
+    return withSourceMount("bind", hostPath, containerPath, readOnly);
+  }
+
+  public ContainerizedComponentBuilder withVolumeMount(String volumeName, String containerPath) {
+    return withVolumeMount(volumeName, containerPath, false);
+  }
+
+  public ContainerizedComponentBuilder withVolumeMount(
+      String volumeName, String containerPath, boolean readOnly) {
+    return withSourceMount("volume", volumeName, containerPath, readOnly);
+  }
+
+  public ContainerizedComponentBuilder withTmpfsMount(String containerPath) {
     ObjectNode m = ArenaJson.object();
-    m.put("host_path", hostPath);
+    m.put("type", "tmpfs");
+    m.put("container_path", containerPath);
+    ((ArrayNode) config.get("mounts")).add(m);
+    return this;
+  }
+
+  public ContainerizedComponentBuilder withTmpfsMount(String containerPath, long sizeBytes) {
+    ObjectNode m = ArenaJson.object();
+    m.put("type", "tmpfs");
+    m.put("container_path", containerPath);
+    m.put("size_bytes", sizeBytes);
+    ((ArrayNode) config.get("mounts")).add(m);
+    return this;
+  }
+
+  private ContainerizedComponentBuilder withSourceMount(
+      String type, String source, String containerPath, boolean readOnly) {
+    ObjectNode m = ArenaJson.object();
+    m.put("type", type);
+    m.put("source", source);
     m.put("container_path", containerPath);
     m.put("read_only", readOnly);
-    arr.add(m);
+    ((ArrayNode) config.get("mounts")).add(m);
     return this;
   }
 

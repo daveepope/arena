@@ -19,13 +19,22 @@ pub struct ContainerizedComponentBuilder {
     port_mappings: Vec<(u16, u16)>,
     readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
     host_mappings: Vec<String>,
-    bind_mounts: Vec<BindMount>,
+    mounts: Vec<MountSpec>,
 }
 
-pub(crate) struct BindMount {
-    pub(crate) host_path: String,
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MountType {
+    Bind,
+    Volume,
+    Tmpfs,
+}
+
+pub(crate) struct MountSpec {
+    pub(crate) mount_type: MountType,
+    pub(crate) source: Option<String>,
     pub(crate) container_path: String,
     pub(crate) read_only: bool,
+    pub(crate) tmpfs_size_bytes: Option<i64>,
 }
 
 const DEFAULT_READINESS_TIMEOUT_MS: u64 = 10_000;
@@ -48,7 +57,7 @@ impl ContainerizedComponentBuilder {
             port_mappings: Vec::new(),
             readiness_checks: Vec::new(),
             host_mappings: Vec::new(),
-            bind_mounts: Vec::new(),
+            mounts: Vec::new(),
         }
     }
 
@@ -98,15 +107,51 @@ impl ContainerizedComponentBuilder {
     }
 
     pub fn with_bind_mount(
-        mut self,
+        self,
         host_path: impl Into<String>,
         container_path: impl Into<String>,
         read_only: bool,
     ) -> Self {
-        self.bind_mounts.push(BindMount {
-            host_path: host_path.into(),
+        self.with_source_mount(MountType::Bind, host_path, container_path, read_only)
+    }
+
+    pub fn with_volume_mount(
+        self,
+        volume_name: impl Into<String>,
+        container_path: impl Into<String>,
+        read_only: bool,
+    ) -> Self {
+        self.with_source_mount(MountType::Volume, volume_name, container_path, read_only)
+    }
+
+    pub fn with_tmpfs_mount(
+        mut self,
+        container_path: impl Into<String>,
+        size_bytes: Option<i64>,
+    ) -> Self {
+        self.mounts.push(MountSpec {
+            mount_type: MountType::Tmpfs,
+            source: None,
+            container_path: container_path.into(),
+            read_only: false,
+            tmpfs_size_bytes: size_bytes,
+        });
+        self
+    }
+
+    fn with_source_mount(
+        mut self,
+        mount_type: MountType,
+        source: impl Into<String>,
+        container_path: impl Into<String>,
+        read_only: bool,
+    ) -> Self {
+        self.mounts.push(MountSpec {
+            mount_type,
+            source: Some(source.into()),
             container_path: container_path.into(),
             read_only,
+            tmpfs_size_bytes: None,
         });
         self
     }
@@ -355,7 +400,7 @@ impl ContainerizedComponentBuilder {
             port_mappings: self.port_mappings,
             readiness_checks: self.readiness_checks,
             host_mappings: self.host_mappings,
-            bind_mounts: self.bind_mounts,
+            mounts: self.mounts,
             runtime_client,
             container_id: None,
             stopped: false,

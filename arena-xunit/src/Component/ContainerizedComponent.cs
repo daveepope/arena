@@ -19,14 +19,14 @@ public sealed class ContainerizedComponent : IArenaComponent
 
     private readonly List<RuntimeArgEntry> _runtimeArgs;
     private readonly List<PortMappingEntry> _portMappings;
-    private readonly List<BindMountEntry> _bindMounts;
+    private readonly List<MountEntry> _mounts;
     private readonly List<ReadinessCheckEntry> _readinessChecks;
     private readonly List<IArenaComponent> _children;
 
     internal ContainerizedComponent(string identifier, string containerfile, string? buildContext,
         string? imageTag, string? network, Dictionary<string, string> envVars,
         List<RuntimeArgEntry> runtimeArgs, List<PortMappingEntry> portMappings,
-        List<string> hostMappings, List<BindMountEntry> bindMounts,
+        List<string> hostMappings, List<MountEntry> mounts,
         List<ReadinessCheckEntry> readinessChecks, List<IArenaComponent> children)
     {
         Identifier = identifier;
@@ -38,7 +38,7 @@ public sealed class ContainerizedComponent : IArenaComponent
         _runtimeArgs = runtimeArgs;
         _portMappings = portMappings;
         HostMappings = hostMappings;
-        _bindMounts = bindMounts;
+        _mounts = mounts;
         _readinessChecks = readinessChecks;
         _children = children;
     }
@@ -57,7 +57,7 @@ public sealed class ContainerizedComponent : IArenaComponent
             RuntimeArgs = RuntimeArgEntry.Build(_runtimeArgs),
             PortMappings = PortMappingEntry.Build(_portMappings),
             HostMappings = new List<string>(HostMappings),
-            BindMounts = BindMountEntry.Build(_bindMounts),
+            Mounts = MountEntry.Build(_mounts),
             ReadinessChecks = ReadinessCheckWireFormat.Build(_readinessChecks),
             Children = ChildrenWireFormat.Build(_children),
         });
@@ -76,7 +76,7 @@ public sealed class ContainerizedComponent : IArenaComponent
         [JsonProperty("runtime_args")] public List<object> RuntimeArgs { get; set; } = default!;
         [JsonProperty("port_mappings")] public List<object> PortMappings { get; set; } = default!;
         [JsonProperty("host_mappings")] public List<string> HostMappings { get; set; } = default!;
-        [JsonProperty("bind_mounts")] public List<object> BindMounts { get; set; } = default!;
+        [JsonProperty("mounts")] public List<object> Mounts { get; set; } = default!;
         [JsonProperty("readiness_checks")] public List<object>? ReadinessChecks { get; set; }
         [JsonProperty("children")] public List<JToken>? Children { get; set; }
     }
@@ -102,26 +102,69 @@ internal sealed class PortMappingEntry
     }
 }
 
-internal sealed class BindMountEntry
+internal enum MountKind
 {
-    public BindMountEntry(string hostPath, string containerPath, bool readOnly)
+    Bind,
+    Volume,
+    Tmpfs,
+}
+
+internal sealed class MountEntry
+{
+    private static readonly Dictionary<MountKind, string> WireTypes = new()
     {
-        HostPath = hostPath;
+        [MountKind.Bind] = "bind",
+        [MountKind.Volume] = "volume",
+        [MountKind.Tmpfs] = "tmpfs",
+    };
+
+    private MountEntry(MountKind kind, string? source, string containerPath, bool readOnly, long? sizeBytes)
+    {
+        Kind = kind;
+        Source = source;
         ContainerPath = containerPath;
         ReadOnly = readOnly;
+        SizeBytes = sizeBytes;
     }
 
-    public string HostPath { get; }
+    public MountKind Kind { get; }
+    public string? Source { get; }
     public string ContainerPath { get; }
     public bool ReadOnly { get; }
+    public long? SizeBytes { get; }
 
-    public static List<object> Build(IReadOnlyList<BindMountEntry> entries)
+    public static MountEntry Bind(string hostPath, string containerPath, bool readOnly) =>
+        new(MountKind.Bind, hostPath, containerPath, readOnly, null);
+
+    public static MountEntry Volume(string volumeName, string containerPath, bool readOnly) =>
+        new(MountKind.Volume, volumeName, containerPath, readOnly, null);
+
+    public static MountEntry Tmpfs(string containerPath, long? sizeBytes) =>
+        new(MountKind.Tmpfs, null, containerPath, false, sizeBytes);
+
+    public static List<object> Build(IReadOnlyList<MountEntry> entries)
     {
         var result = new List<object>(entries.Count);
         foreach (var entry in entries)
-            result.Add(new { host_path = entry.HostPath, container_path = entry.ContainerPath, read_only = entry.ReadOnly });
+            result.Add(new MountWireFormat
+            {
+                Type = WireTypes[entry.Kind],
+                Source = entry.Source,
+                ContainerPath = entry.ContainerPath,
+                ReadOnly = entry.ReadOnly,
+                SizeBytes = entry.SizeBytes,
+            });
         return result;
     }
+}
+
+internal sealed class MountWireFormat
+{
+    [JsonProperty("type")] public string Type { get; set; } = default!;
+    [JsonProperty("source", NullValueHandling = NullValueHandling.Ignore)] public string? Source { get; set; }
+    [JsonProperty("container_path")] public string ContainerPath { get; set; } = default!;
+    [JsonProperty("read_only")] public bool ReadOnly { get; set; }
+    [JsonProperty("size_bytes", NullValueHandling = NullValueHandling.Ignore)] public long? SizeBytes { get; set; }
 }
 
 public sealed class ContainerizedComponentBuilder
@@ -135,7 +178,7 @@ public sealed class ContainerizedComponentBuilder
     private readonly List<RuntimeArgEntry> _runtimeArgs = new();
     private readonly List<PortMappingEntry> _portMappings = new();
     private readonly List<string> _hostMappings = new();
-    private readonly List<BindMountEntry> _bindMounts = new();
+    private readonly List<MountEntry> _mounts = new();
     private readonly List<ReadinessCheckEntry> _readinessChecks = new();
     private readonly List<IArenaComponent> _children = new();
 
@@ -182,7 +225,19 @@ public sealed class ContainerizedComponentBuilder
 
     public ContainerizedComponentBuilder WithBindMount(string hostPath, string containerPath, bool readOnly = false)
     {
-        _bindMounts.Add(new BindMountEntry(hostPath, containerPath, readOnly));
+        _mounts.Add(MountEntry.Bind(hostPath, containerPath, readOnly));
+        return this;
+    }
+
+    public ContainerizedComponentBuilder WithVolumeMount(string volumeName, string containerPath, bool readOnly = false)
+    {
+        _mounts.Add(MountEntry.Volume(volumeName, containerPath, readOnly));
+        return this;
+    }
+
+    public ContainerizedComponentBuilder WithTmpfsMount(string containerPath, long? sizeBytes = null)
+    {
+        _mounts.Add(MountEntry.Tmpfs(containerPath, sizeBytes));
         return this;
     }
 
@@ -223,7 +278,7 @@ public sealed class ContainerizedComponentBuilder
         return new ContainerizedComponent(identifier, _containerfile, _buildContext, _imageTag, _network,
             new Dictionary<string, string>(_envVars), new List<RuntimeArgEntry>(_runtimeArgs),
             new List<PortMappingEntry>(_portMappings), new List<string>(_hostMappings),
-            new List<BindMountEntry>(_bindMounts),
+            new List<MountEntry>(_mounts),
             new List<ReadinessCheckEntry>(_readinessChecks), new List<IArenaComponent>(_children));
     }
 }

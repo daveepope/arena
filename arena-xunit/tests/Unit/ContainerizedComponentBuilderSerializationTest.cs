@@ -96,10 +96,11 @@ public class ContainerizedComponentBuilderSerializationTest
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Single(obj["bind_mounts"]);
-        Assert.Equal("/host/data", obj["bind_mounts"][0]["host_path"]);
-        Assert.Equal("/mnt/data", obj["bind_mounts"][0]["container_path"]);
-        Assert.Equal(true, obj["bind_mounts"][0]["read_only"]);
+        Assert.Single(obj["mounts"]);
+        Assert.Equal("bind", obj["mounts"][0]["type"]);
+        Assert.Equal("/host/data", obj["mounts"][0]["source"]);
+        Assert.Equal("/mnt/data", obj["mounts"][0]["container_path"]);
+        Assert.Equal(true, obj["mounts"][0]["read_only"]);
     }
 
     [Fact]
@@ -111,7 +112,61 @@ public class ContainerizedComponentBuilderSerializationTest
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Equal(false, obj["bind_mounts"][0]["read_only"]);
+        Assert.Equal(false, obj["mounts"][0]["read_only"]);
+    }
+
+    [Fact]
+    public void Build_WithVolumeMount_SerializesCorrectJson()
+    {
+        var comp = new ContainerizedComponentBuilder("test")
+            .WithContainerfile("./Dockerfile")
+            .WithVolumeMount("my-volume", "/mnt/data", true)
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Single(obj["mounts"]);
+        Assert.Equal("volume", obj["mounts"][0]["type"]);
+        Assert.Equal("my-volume", obj["mounts"][0]["source"]);
+        Assert.Equal("/mnt/data", obj["mounts"][0]["container_path"]);
+        Assert.Equal(true, obj["mounts"][0]["read_only"]);
+    }
+
+    [Fact]
+    public void Build_WithTmpfsMount_SerializesCorrectJson()
+    {
+        var comp = new ContainerizedComponentBuilder("test")
+            .WithContainerfile("./Dockerfile")
+            .WithTmpfsMount("/mnt/data", 1024)
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Single(obj["mounts"]);
+        Assert.Equal("tmpfs", obj["mounts"][0]["type"]);
+        Assert.Equal("/mnt/data", obj["mounts"][0]["container_path"]);
+        Assert.Equal(1024, obj["mounts"][0]["size_bytes"]);
+    }
+
+    [Fact]
+    public void Build_WithTmpfsMount_NoSizeBytesArgOmitsSizeBytes()
+    {
+        var comp = new ContainerizedComponentBuilder("test")
+            .WithContainerfile("./Dockerfile")
+            .WithTmpfsMount("/mnt/data")
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Null(obj["mounts"][0]["size_bytes"]);
+    }
+
+    [Fact]
+    public void Build_WithoutMounts_SerializesEmptyList()
+    {
+        var comp = new ContainerizedComponentBuilder("test")
+            .WithContainerfile("./Dockerfile")
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Empty(obj["mounts"]);
     }
 
     [Fact]

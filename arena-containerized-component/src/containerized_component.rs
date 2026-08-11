@@ -1,11 +1,11 @@
-use crate::builder::{BindMount, ContainerizedComponentBuilder};
+use crate::builder::{ContainerizedComponentBuilder, MountSpec, MountType};
 use arena::component::RunnableComponent;
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
 use bollard::container::LogOutput;
 use bollard::models::{
-    ContainerCreateBody, EndpointSettings, HostConfig, Mount, MountTypeEnum, NetworkingConfig,
-    PortBinding,
+    ContainerCreateBody, EndpointSettings, HostConfig, Mount, MountTmpfsOptions, MountTypeEnum,
+    NetworkingConfig, PortBinding,
 };
 use bollard::query_parameters::{
     CreateContainerOptionsBuilder, LogsOptionsBuilder, RemoveContainerOptionsBuilder,
@@ -26,7 +26,7 @@ pub struct ContainerizedComponent {
     pub(crate) port_mappings: Vec<(u16, u16)>,
     pub(crate) readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
     pub(crate) host_mappings: Vec<String>,
-    pub(crate) bind_mounts: Vec<BindMount>,
+    pub(crate) mounts: Vec<MountSpec>,
     pub(crate) runtime_client: Docker,
     pub(crate) container_id: Option<String>,
     pub(crate) stopped: bool,
@@ -89,19 +89,8 @@ impl ContainerizedComponent {
             host_config.extra_hosts = Some(self.host_mappings.clone());
         }
 
-        if !self.bind_mounts.is_empty() {
-            host_config.mounts = Some(
-                self.bind_mounts
-                    .iter()
-                    .map(|bind_mount| Mount {
-                        target: Some(bind_mount.container_path.clone()),
-                        source: Some(bind_mount.host_path.clone()),
-                        typ: Some(MountTypeEnum::BIND),
-                        read_only: Some(bind_mount.read_only),
-                        ..Default::default()
-                    })
-                    .collect(),
-            );
+        if !self.mounts.is_empty() {
+            host_config.mounts = Some(self.mounts.iter().map(Self::to_docker_mount).collect());
         }
 
         let mut networking_config: Option<NetworkingConfig> = None;
@@ -194,6 +183,24 @@ impl ContainerizedComponent {
             phase = "container_running",
             "container started",
         );
+    }
+
+    fn to_docker_mount(mount: &MountSpec) -> Mount {
+        Mount {
+            target: Some(mount.container_path.clone()),
+            source: mount.source.clone(),
+            typ: Some(match mount.mount_type {
+                MountType::Bind => MountTypeEnum::BIND,
+                MountType::Volume => MountTypeEnum::VOLUME,
+                MountType::Tmpfs => MountTypeEnum::TMPFS,
+            }),
+            read_only: Some(mount.read_only),
+            tmpfs_options: mount.tmpfs_size_bytes.map(|size_bytes| MountTmpfsOptions {
+                size_bytes: Some(size_bytes),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
     }
 
     fn spawn_log_follower(&self) {

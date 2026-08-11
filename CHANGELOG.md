@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Containerized component: `with_bind_mount`/`WithBindMount`/`withBindMount` for host bind mounts, across Rust, FFI, Java, Python, and .NET clients
+- Containerized component: bind, volume, and tmpfs mounts (`with_bind_mount`/`with_volume_mount`/`with_tmpfs_mount` and language equivalents), across Rust, FFI, Java, Python, and .NET clients
 
 ## [5.1.0]
 

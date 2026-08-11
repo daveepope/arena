@@ -13,11 +13,25 @@ pub(crate) struct PortMappingConfig {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct BindMountConfig {
-    pub host_path: String,
-    pub container_path: String,
-    #[serde(default)]
-    pub read_only: bool,
+#[serde(tag = "type", rename_all = "snake_case")]
+pub(crate) enum MountConfig {
+    Bind {
+        source: String,
+        container_path: String,
+        #[serde(default)]
+        read_only: bool,
+    },
+    Volume {
+        source: String,
+        container_path: String,
+        #[serde(default)]
+        read_only: bool,
+    },
+    Tmpfs {
+        container_path: String,
+        #[serde(default)]
+        size_bytes: Option<i64>,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -42,7 +56,7 @@ pub(crate) struct ContainerizedComponentConfig {
     #[serde(default)]
     pub host_mappings: Option<Vec<String>>,
     #[serde(default)]
-    pub bind_mounts: Option<Vec<BindMountConfig>>,
+    pub mounts: Option<Vec<MountConfig>>,
 }
 
 pub(crate) async fn build(config: &ContainerizedComponentConfig) -> Result<Component, String> {
@@ -76,9 +90,24 @@ pub(crate) async fn build(config: &ContainerizedComponentConfig) -> Result<Compo
             builder = builder.with_host_mapping(h);
         }
     }
-    if let Some(mounts) = &config.bind_mounts {
+    if let Some(mounts) = &config.mounts {
         for m in mounts {
-            builder = builder.with_bind_mount(&m.host_path, &m.container_path, m.read_only);
+            builder = match m {
+                MountConfig::Bind {
+                    source,
+                    container_path,
+                    read_only,
+                } => builder.with_bind_mount(source, container_path, *read_only),
+                MountConfig::Volume {
+                    source,
+                    container_path,
+                    read_only,
+                } => builder.with_volume_mount(source, container_path, *read_only),
+                MountConfig::Tmpfs {
+                    container_path,
+                    size_bytes,
+                } => builder.with_tmpfs_mount(container_path, *size_bytes),
+            };
         }
     }
     if let Some(checks) = &config.readiness_checks {

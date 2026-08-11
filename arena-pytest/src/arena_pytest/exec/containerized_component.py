@@ -16,7 +16,7 @@ class ContainerizedComponentBuilder:
             "runtime_args": [],
             "port_mappings": [],
             "host_mappings": [],
-            "bind_mounts": [],
+            "mounts": [],
         }
         self._readiness_checks: List[ReadinessCheckEntry] = []
         self._children: List[Any] = []
@@ -46,13 +46,36 @@ class ContainerizedComponentBuilder:
     def with_bind_mount(
         self, host_path: str, container_path: str, read_only: bool = False
     ) -> "ContainerizedComponentBuilder":
-        self._config["bind_mounts"].append(
+        self._config["mounts"].append(
             {
-                "host_path": host_path,
+                "type": "bind",
+                "source": host_path,
                 "container_path": container_path,
                 "read_only": read_only,
             }
         )
+        return self
+
+    def with_volume_mount(
+        self, volume_name: str, container_path: str, read_only: bool = False
+    ) -> "ContainerizedComponentBuilder":
+        self._config["mounts"].append(
+            {
+                "type": "volume",
+                "source": volume_name,
+                "container_path": container_path,
+                "read_only": read_only,
+            }
+        )
+        return self
+
+    def with_tmpfs_mount(
+        self, container_path: str, size_bytes: Optional[int] = None
+    ) -> "ContainerizedComponentBuilder":
+        entry: Dict[str, Any] = {"type": "tmpfs", "container_path": container_path}
+        if size_bytes is not None:
+            entry["size_bytes"] = size_bytes
+        self._config["mounts"].append(entry)
         return self
 
     def with_env_var(self, key: str, value: str) -> "ContainerizedComponentBuilder":
