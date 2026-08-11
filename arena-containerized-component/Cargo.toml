@@ -16,7 +16,6 @@ async-trait = { workspace = true }
 bollard = { workspace = true }
 futures = { workspace = true }
 tracing = { workspace = true }
-tar = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]

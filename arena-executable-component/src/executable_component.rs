@@ -66,26 +66,12 @@ impl ExecutableComponent {
         );
     }
 
-    fn log_line(identifier: &str, line: &str) {
-        if line.contains(" ERROR ") {
-            tracing::error!(component = %identifier, "{}", line);
-        } else if line.contains(" WARN ") {
-            tracing::warn!(component = %identifier, "{}", line);
-        } else if line.contains(" DEBUG ") {
-            tracing::debug!(component = %identifier, "{}", line);
-        } else if line.contains(" TRACE ") {
-            tracing::trace!(component = %identifier, "{}", line);
-        } else {
-            tracing::debug!(component = %identifier, "{}", line);
-        }
-    }
-
     fn spawn_output_reader(stream: impl std::io::Read + Send + 'static, identifier: String) {
         thread::spawn(move || {
             let reader = BufReader::new(stream);
             for line in reader.lines() {
                 if let Ok(line) = line {
-                    Self::log_line(&identifier, &line);
+                    arena_container::logging::log_line(&identifier, &line);
                 }
             }
         });

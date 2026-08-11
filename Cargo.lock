@@ -74,6 +74,7 @@ name = "arena-container"
 version = "5.2.0"
 dependencies = [
  "bollard",
+ "tar",
  "tokio",
  "tracing",
 ]
@@ -88,7 +89,6 @@ dependencies = [
  "bollard",
  "futures",
  "mockall",
- "tar",
  "tokio",
  "tracing",
  "tracing-subscriber",

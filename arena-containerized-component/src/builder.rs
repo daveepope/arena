@@ -1,10 +1,11 @@
 use crate::containerized_component::ContainerizedComponent;
 use arena::healthcheck::ReadinessCheck;
 use arena::Component;
+use arena_container::mount::{MountSpec, MountType};
 use bollard::query_parameters::BuildImageOptionsBuilder;
 use bollard::{body_full, Docker};
 use futures::StreamExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub struct ContainerizedComponentBuilder {
     identifier: String,
@@ -20,21 +21,6 @@ pub struct ContainerizedComponentBuilder {
     readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
     host_mappings: Vec<String>,
     mounts: Vec<MountSpec>,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum MountType {
-    Bind,
-    Volume,
-    Tmpfs,
-}
-
-pub(crate) struct MountSpec {
-    pub(crate) mount_type: MountType,
-    pub(crate) source: Option<String>,
-    pub(crate) container_path: String,
-    pub(crate) read_only: bool,
-    pub(crate) tmpfs_size_bytes: Option<i64>,
 }
 
 const DEFAULT_READINESS_TIMEOUT_MS: u64 = 10_000;
@@ -177,26 +163,6 @@ impl ContainerizedComponentBuilder {
         self
     }
 
-    fn resolve_path(path: PathBuf) -> PathBuf {
-        if path.is_absolute() {
-            path
-        } else {
-            let current_dir = std::env::current_dir().expect("get current directory");
-
-            current_dir
-                .ancestors()
-                .find_map(|ancestor| {
-                    let candidate = ancestor.join(&path);
-                    if candidate.exists() {
-                        Some(candidate)
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or_else(|| current_dir.join(&path))
-        }
-    }
-
     fn resolve_bind_mounts(identifier: &str, mounts: Vec<MountSpec>) -> Vec<MountSpec> {
         mounts
             .into_iter()
@@ -206,7 +172,7 @@ impl ContainerizedComponentBuilder {
                         .source
                         .take()
                         .expect("bind mount source path must be set");
-                    let resolved = Self::resolve_path(PathBuf::from(&source));
+                    let resolved = arena_container::path::resolve(PathBuf::from(&source));
                     if !resolved.exists() {
                         panic!(
                             "{}: bind mount source path does not exist: {}",
@@ -219,121 +185,6 @@ impl ContainerizedComponentBuilder {
                 mount
             })
             .collect()
-    }
-
-    const SKIP_DIRS: &'static [&'static str] = &[
-        ".git",
-        "target",
-        "node_modules",
-        ".idea",
-        ".vscode",
-        ".arena",
-    ];
-
-    fn create_build_context_tar(
-        identifier: &str,
-        containerfile: &str,
-        build_context: &Option<PathBuf>,
-    ) -> Vec<u8> {
-        let buf = Vec::new();
-        let mut tar = tar::Builder::new(buf);
-
-        let containerfile_bytes = containerfile.as_bytes();
-        let mut header = tar::Header::new_ustar();
-        header.set_size(containerfile_bytes.len() as u64);
-        header.set_mode(0o644);
-        header.set_cksum();
-        tar.append_data(&mut header, ".arena.Dockerfile", containerfile_bytes)
-            .expect("add containerfile to image build context");
-
-        if let Some(ref context_path) = build_context {
-            Self::append_dir_recursive(&mut tar, context_path, context_path, identifier);
-        }
-
-        tar.into_inner().expect("finalize tar archive")
-    }
-
-    fn append_dir_recursive(
-        tar: &mut tar::Builder<Vec<u8>>,
-        base_path: &Path,
-        current_path: &Path,
-        identifier: &str,
-    ) {
-        let entries = match std::fs::read_dir(current_path) {
-            Ok(entries) => entries,
-            Err(e) => {
-                tracing::warn!(
-                    component = %identifier,
-                    path = ?current_path,
-                    error = %e,
-                    "skipping unreadable directory",
-                );
-                return;
-            }
-        };
-
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let name = entry.file_name();
-            let name_str = name.to_string_lossy();
-
-            if name_str.starts_with('.') || Self::SKIP_DIRS.contains(&name_str.as_ref()) {
-                continue;
-            }
-
-            let relative = match path.strip_prefix(base_path) {
-                Ok(r) => r,
-                Err(_) => continue,
-            };
-
-            let metadata = match std::fs::metadata(&path) {
-                Ok(m) => m,
-                Err(_) => continue,
-            };
-
-            if metadata.is_dir() {
-                let mut header = tar::Header::new_ustar();
-                header.set_entry_type(tar::EntryType::Directory);
-                header.set_size(0);
-                header.set_mode(0o755);
-                header.set_cksum();
-                if let Err(e) = tar.append_data(&mut header, relative, &[] as &[u8]) {
-                    tracing::warn!(
-                        component = %identifier,
-                        path = ?relative,
-                        error = %e,
-                        "skipping directory archive entry",
-                    );
-                    continue;
-                }
-                Self::append_dir_recursive(tar, base_path, &path, identifier);
-            } else if metadata.is_file() {
-                let content = match std::fs::read(&path) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        tracing::warn!(
-                            component = %identifier,
-                            path = ?relative,
-                            error = %e,
-                            "skipping unreadable file",
-                        );
-                        continue;
-                    }
-                };
-                let mut header = tar::Header::new_ustar();
-                header.set_size(content.len() as u64);
-                header.set_mode(0o644);
-                header.set_cksum();
-                if let Err(e) = tar.append_data(&mut header, relative, content.as_slice()) {
-                    tracing::warn!(
-                        component = %identifier,
-                        path = ?relative,
-                        error = %e,
-                        "skipping tar file append failure",
-                    );
-                }
-            }
-        }
     }
 
     async fn build_image(
@@ -350,7 +201,11 @@ impl ContainerizedComponentBuilder {
             "building container image",
         );
 
-        let tar_body = Self::create_build_context_tar(identifier, containerfile, build_context);
+        let tar_body = arena_container::build_context::create_tar(
+            identifier,
+            containerfile,
+            build_context.as_deref(),
+        );
 
         let options = BuildImageOptionsBuilder::default()
             .dockerfile(".arena.Dockerfile")
@@ -397,7 +252,7 @@ impl ContainerizedComponentBuilder {
     pub async fn build(self) -> ContainerizedComponent {
         let mounts = Self::resolve_bind_mounts(&self.identifier, self.mounts);
 
-        let build_context = self.build_context.map(Self::resolve_path);
+        let build_context = self.build_context.map(arena_container::path::resolve);
 
         let image_tag = self.image_tag.unwrap_or_else(|| {
             arena_container::identifier::sanitize_for_container(&self.identifier)

@@ -1,5 +1,5 @@
 {
-  "checksum": "41e3719c5094dd34de247e84c4276b99d35f0283a18aa4b9cb2a7ec3647abd6a",
+  "checksum": "2affaacebeb5a42bffda08fd19597ae89a1639006b0ade44b93dede77fbd567a",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -476,6 +476,10 @@
               "target": "bollard"
             },
             {
+              "id": "tar 0.4.46",
+              "target": "tar"
+            },
+            {
               "id": "tracing 0.1.44",
               "target": "tracing"
             }
@@ -542,10 +546,6 @@
             {
               "id": "futures 0.3.32",
               "target": "futures"
-            },
-            {
-              "id": "tar 0.4.46",
-              "target": "tar"
             },
             {
               "id": "tokio 1.52.1",

@@ -1,11 +1,11 @@
-use crate::builder::{ContainerizedComponentBuilder, MountSpec, MountType};
+use crate::builder::ContainerizedComponentBuilder;
 use arena::component::RunnableComponent;
 use arena::healthcheck::ReadinessCheck;
+use arena_container::mount::MountSpec;
 use async_trait::async_trait;
 use bollard::container::LogOutput;
 use bollard::models::{
-    ContainerCreateBody, EndpointSettings, HostConfig, Mount, MountTmpfsOptions, MountTypeEnum,
-    NetworkingConfig, PortBinding,
+    ContainerCreateBody, EndpointSettings, HostConfig, NetworkingConfig, PortBinding,
 };
 use bollard::query_parameters::{
     CreateContainerOptionsBuilder, LogsOptionsBuilder, RemoveContainerOptionsBuilder,
@@ -90,7 +90,12 @@ impl ContainerizedComponent {
         }
 
         if !self.mounts.is_empty() {
-            host_config.mounts = Some(self.mounts.iter().map(Self::to_docker_mount).collect());
+            host_config.mounts = Some(
+                self.mounts
+                    .iter()
+                    .map(arena_container::mount::to_docker_mount)
+                    .collect(),
+            );
         }
 
         let mut networking_config: Option<NetworkingConfig> = None;
@@ -185,24 +190,6 @@ impl ContainerizedComponent {
         );
     }
 
-    fn to_docker_mount(mount: &MountSpec) -> Mount {
-        Mount {
-            target: Some(mount.container_path.clone()),
-            source: mount.source.clone(),
-            typ: Some(match mount.mount_type {
-                MountType::Bind => MountTypeEnum::BIND,
-                MountType::Volume => MountTypeEnum::VOLUME,
-                MountType::Tmpfs => MountTypeEnum::TMPFS,
-            }),
-            read_only: Some(mount.read_only),
-            tmpfs_options: mount.tmpfs_size_bytes.map(|size_bytes| MountTmpfsOptions {
-                size_bytes: Some(size_bytes),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }
-    }
-
     fn spawn_log_follower(&self) {
         let container_id = match &self.container_id {
             Some(id) => id.clone(),
@@ -233,7 +220,7 @@ impl ContainerizedComponent {
                             _ => continue,
                         };
                         if !line.is_empty() {
-                            Self::log_line(&identifier, &line);
+                            arena_container::logging::log_line(&identifier, &line);
                         }
                     }
                     Err(e) => {
@@ -247,20 +234,6 @@ impl ContainerizedComponent {
                 }
             }
         });
-    }
-
-    fn log_line(identifier: &str, line: &str) {
-        if line.contains(" ERROR ") {
-            tracing::error!(component = %identifier, "{}", line);
-        } else if line.contains(" WARN ") {
-            tracing::warn!(component = %identifier, "{}", line);
-        } else if line.contains(" DEBUG ") {
-            tracing::debug!(component = %identifier, "{}", line);
-        } else if line.contains(" TRACE ") {
-            tracing::trace!(component = %identifier, "{}", line);
-        } else {
-            tracing::debug!(component = %identifier, "{}", line);
-        }
     }
 
     async fn wait_until_ready(&self) {
