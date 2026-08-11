@@ -248,3 +248,87 @@ async fn wait_until_ready_retries_until_impl_reports_admin_url() {
     assert_eq!(dep.admin_url(), Some("http://127.0.0.1:8081".to_string()));
     dep.stop().await;
 }
+
+struct DefaultHttpsUrlImpl {
+    base_url: Option<String>,
+}
+
+#[async_trait]
+impl HttpImpl for DefaultHttpsUrlImpl {
+    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) {
+        self.base_url = Some("http://127.0.0.1:8080".to_string());
+    }
+
+    async fn stop(&mut self) {
+        self.base_url = None;
+    }
+
+    fn base_url(&self) -> Option<&str> {
+        self.base_url.as_deref()
+    }
+
+    fn admin_url(&self) -> Option<String> {
+        self.base_url.as_deref().map(|url| format!("{url}/__admin"))
+    }
+}
+
+#[test]
+fn https_base_url_default_trait_impl_returns_none() {
+    let dep = HttpDependency::builder("http-default-https")
+        .with_impl(DefaultHttpsUrlImpl { base_url: None })
+        .with_port(0)
+        .with_readiness_check(ImmediateReadinessCheck)
+        .build();
+
+    assert_eq!(dep.https_base_url(), None);
+}
+
+#[tokio::test]
+async fn reset_journal_not_running_returns_without_panic() {
+    let dep = HttpDependency::builder("http-reset-not-running")
+        .with_impl(DefaultHttpsUrlImpl { base_url: None })
+        .with_port(0)
+        .with_readiness_check(ImmediateReadinessCheck)
+        .build();
+
+    dep.reset_journal().await;
+}
+
+#[tokio::test]
+async fn soft_reset_not_running_returns_without_panic() {
+    let dep = HttpDependency::builder("http-soft-reset-not-running")
+        .with_impl(DefaultHttpsUrlImpl { base_url: None })
+        .with_port(0)
+        .with_readiness_check(ImmediateReadinessCheck)
+        .build();
+
+    dep.soft_reset().await;
+}
+
+#[tokio::test]
+async fn hard_reset_not_running_returns_without_panic() {
+    let mut dep = HttpDependency::builder("http-hard-reset-not-running")
+        .with_impl(DefaultHttpsUrlImpl { base_url: None })
+        .with_port(0)
+        .with_readiness_check(ImmediateReadinessCheck)
+        .build();
+
+    dep.hard_reset().await;
+}
+
+#[tokio::test]
+async fn hard_reset_running_restarts_impl_stays_ready() {
+    let mut dep = HttpDependency::builder("http-hard-reset")
+        .with_impl(DefaultHttpsUrlImpl { base_url: None })
+        .with_port(0)
+        .with_readiness_check(ImmediateReadinessCheck)
+        .build();
+
+    dep.start().await;
+    assert_eq!(dep.base_url(), Some("http://127.0.0.1:8080"));
+
+    dep.hard_reset().await;
+    assert_eq!(dep.base_url(), Some("http://127.0.0.1:8080"));
+
+    dep.stop().await;
+}
