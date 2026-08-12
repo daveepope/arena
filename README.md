@@ -13,7 +13,7 @@
 [![Supply Chain Protection](https://img.shields.io/github/actions/workflow/status/daveepope/arena/build-test-publish-arena.yml?branch=master&label=Supply%20Chain%20Protection%20(%3C3d))](https://github.com/daveepope/arena/actions/workflows/build-test-publish-arena.yml)
 [![Best Effort Default Container CVE Search](https://github.com/daveepope/arena/actions/workflows/container-cves.yml/badge.svg?branch=master)](https://github.com/daveepope/arena/actions/workflows/container-cves.yml)
 
-Client packages (all built from the same release, so their versions always match):
+Client packages (API surface is the same across clients):
 
 [![PyPI](https://img.shields.io/pypi/v/arena-pytest.svg?label=PyPI)](https://pypi.org/project/arena-pytest/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.stationdevx/arena-junit.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.stationdevx/arena-junit)
