@@ -28,14 +28,6 @@ Use a prefix that describes the kind of change, followed by a short, hyphenated 
 - Do not add new markdown or documentation files unless the change calls for it.
 - If your change adds a new third-party dependency (any language), call it out explicitly in the PR description. Ensure the 3rd party dependency is absolutely necceasry.
 
-## Developer Certificate of Origin
-
-Every pull request must be signed off on the [DCO](DCO.md) by replying to
-the bot comment with the phrase it provides. **That comment is your
-permanent, public signature** for this pull request, tied to your GitHub
-account and timestamped by GitHub; the merge is blocked until you do.
-Signing on a past PR does not carry over — it's required again each time.
-
 ## AI-assisted contributions
 
 It's okay to use AI to assist in development, but do not submit PRs that are entirely AI-generated without review. These tend to contain incoherent changes, unnecessary abstractions, or outright hallucinations ("AI slop"). You are responsible for understanding and standing behind every line you submit. See [AI.md](AI.md): this project may not be used to train AI models.
