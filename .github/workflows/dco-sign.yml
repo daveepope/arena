@@ -1,0 +1,39 @@
+name: DCO Sign-off
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, closed, synchronize]
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  dco-sign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: DCO Sign-off Assistant
+        if: >
+          (github.event.comment.body == 'recheck' ||
+           github.event.comment.body == 'I have read the DCO and I hereby sign off on it for this and future contributions to this project') ||
+          github.event_name == 'pull_request_target'
+        uses: contributor-assistant/github-action@v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          path-to-signatures: "signatures/dco.json"
+          path-to-document: "https://github.com/daveepope/arena/blob/master/DCO.md"
+          branch: "master"
+          allowlist: dependabot[bot]
+          custom-pr-sign-comment: "I have read the DCO and I hereby sign off on it for this and future contributions to this project"
+          custom-notsigned-prcomment: >
+            Thanks for the contribution! Before this can be merged, please read
+            the [Developer Certificate of Origin](DCO.md) and reply to this
+            comment with the sign-off phrase below to record your signature:
+
+            > I have read the DCO and I hereby sign off on it for this and future contributions to this project
+          custom-allsigned-prcomment: "All contributors have signed off on the DCO. ✅"
