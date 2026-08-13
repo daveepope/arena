@@ -7,9 +7,7 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+  contents: read
 
 env:
   SIGN_PHRASE: "I have read the DCO and I hereby sign off on it for this contribution"
@@ -18,6 +16,10 @@ env:
 jobs:
   dco-sign:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
     steps:
       - name: Check sign-off and record signature
         uses: actions/github-script@v7
