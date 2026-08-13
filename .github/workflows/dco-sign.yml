@@ -11,21 +11,18 @@ permissions:
 
 env:
   SIGN_PHRASE: "I have read the DCO and I hereby sign off on it for this contribution"
-  SIGNATURES_PATH: "signatures/dco.json"
 
 jobs:
   dco-sign:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
       pull-requests: write
       issues: write
     steps:
-      - name: Check sign-off and record signature
+      - name: Check sign-off comment
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
-            const signaturesPath = process.env.SIGNATURES_PATH
             const signPhrase = process.env.SIGN_PHRASE
 
             if (context.eventName === "issue_comment" && !context.payload.issue.pull_request) {
@@ -53,73 +50,27 @@ jobs:
               c => c.user.login === author && c.body.trim() === signPhrase
             )
 
-            if (!hasSigned) {
-              const askText = [
-                `@${author} before this pull request can be merged, please sign the [DCO](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/master/DCO.md) by replying to this comment with exactly:`,
-                "",
-                `> ${signPhrase}`,
-                "",
-                "Your GitHub username and the timestamp of your reply will be recorded as your signature for this pull request."
-              ].join("\n")
-
-              const alreadyAsked = comments.some(
-                c => c.user.type === "Bot" && c.body.includes(signPhrase)
-              )
-              if (!alreadyAsked) {
-                await github.rest.issues.createComment({
-                  ...context.repo,
-                  issue_number: prNumber,
-                  body: askText
-                })
-              }
-              core.setFailed(`${author} has not signed the DCO for this pull request yet`)
+            if (hasSigned) {
+              core.info(`${author} has signed the DCO for pull request #${prNumber}`)
               return
             }
 
-            const maxAttempts = 5
-            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-              let signatures = { signatures: [] }
-              let sha
-              try {
-                const { data } = await github.rest.repos.getContent({
-                  ...context.repo,
-                  path: signaturesPath,
-                  ref: "master"
-                })
-                sha = data.sha
-                signatures = JSON.parse(Buffer.from(data.content, "base64").toString("utf-8"))
-              } catch (err) {
-                if (err.status !== 404) throw err
-              }
+            const askText = [
+              `@${author} before this pull request can be merged, please sign the [DCO](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/master/DCO.md) by replying to this comment with exactly:`,
+              "",
+              `> ${signPhrase}`,
+              "",
+              "Your comment on this pull request is your permanent, timestamped signature."
+            ].join("\n")
 
-              const alreadyRecorded = signatures.signatures.some(
-                s => s.username === author && s.pull_request === prNumber
-              )
-              if (alreadyRecorded) {
-                core.info(`${author} has signed the DCO for pull request #${prNumber}`)
-                return
-              }
-
-              signatures.signatures.push({
-                username: author,
-                pull_request: prNumber,
-                signed_at: new Date().toISOString()
+            const alreadyAsked = comments.some(
+              c => c.user.type === "Bot" && c.body.includes(signPhrase)
+            )
+            if (!alreadyAsked) {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: prNumber,
+                body: askText
               })
-
-              try {
-                await github.rest.repos.createOrUpdateFileContents({
-                  ...context.repo,
-                  path: signaturesPath,
-                  message: `Record DCO sign-off for ${author} on #${prNumber}`,
-                  content: Buffer.from(JSON.stringify(signatures, null, 2) + "\n").toString("base64"),
-                  sha,
-                  branch: "master"
-                })
-                core.info(`${author} has signed the DCO for pull request #${prNumber}`)
-                return
-              } catch (err) {
-                const isConflict = err.status === 409 || err.status === 422
-                if (!isConflict || attempt === maxAttempts) throw err
-                core.info(`Signature file write conflict, retrying (attempt ${attempt}/${maxAttempts})`)
-              }
             }
+            core.setFailed(`${author} has not signed the DCO for this pull request yet`)

@@ -31,9 +31,9 @@ Use a prefix that describes the kind of change, followed by a short, hyphenated 
 ## Developer Certificate of Origin
 
 Every pull request must be signed off on the [DCO](DCO.md) by replying to
-the bot comment with the phrase it provides. **Your GitHub username will be
-tracked** alongside the timestamp in `signatures/dco.json` as a permanent,
-public record for that pull request; the merge is blocked until you do.
+the bot comment with the phrase it provides. **That comment is your
+permanent, public signature** for this pull request, tied to your GitHub
+account and timestamped by GitHub; the merge is blocked until you do.
 Signing on a past PR does not carry over — it's required again each time.
 
 ## AI-assisted contributions
