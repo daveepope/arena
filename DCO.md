@@ -1,9 +1,11 @@
 ## Signing
 
-To sign off on the Developer Certificate of Origin below for this pull
-request, reply to the DCO Sign-off bot comment with the sign-off phrase it
-provides. Your GitHub username and the timestamp will be recorded as your
-signature. This is required once per contributor, not once per PR.
+To sign off on the Developer Certificate of Origin below, reply to the DCO
+Sign-off bot comment on your pull request with the sign-off phrase it
+provides. Your GitHub username and the timestamp are recorded in
+`signatures/dco.json`, one entry per pull request. Signing a previous pull
+request does not carry over: this is required again on every new pull
+request.
 
 ---
 

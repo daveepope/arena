@@ -30,15 +30,11 @@ Use a prefix that describes the kind of change, followed by a short, hyphenated 
 
 ## Developer Certificate of Origin
 
-Every commit must include a `Signed-off-by` line certifying you have the
-right to submit the change under this project's license (the [DCO](DCO.md)).
-Add it with `git commit -s`, or `git commit --amend -s` to sign an existing
-commit. A CI check blocks merge until all commits in the PR are signed off.
-
-In addition, first-time contributors must sign off on the DCO once by
-replying to the bot comment on their pull request with the phrase it
-provides. This is recorded as a permanent signature and only needs doing
-once per contributor, not once per PR; the merge is blocked until you do.
+Every pull request must be signed off on the [DCO](DCO.md) by replying to
+the bot comment with the phrase it provides. **Your GitHub username will be
+tracked** alongside the timestamp in `signatures/dco.json` as a permanent,
+public record for that pull request; the merge is blocked until you do.
+Signing on a past PR does not carry over — it's required again each time.
 
 ## AI-assisted contributions
 
