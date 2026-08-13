@@ -2,6 +2,7 @@ package arena.junit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import arena.junit.playbook.HttpHeaderPattern;
@@ -130,6 +131,49 @@ final class HttpPlaybookBuilderSerializationTest {
     assertEquals("flow", row.path("scenario_name").asText());
     assertEquals("ready", row.path("when_state_is").asText());
     assertEquals("done", row.path("will_set_state_to").asText());
+  }
+
+  @Test
+  void putAndDelete_methods_serializeUppercaseMethodField() {
+    ObjectNode putRow =
+        (ObjectNode)
+            new HttpPlaybookBuilder("dep-id")
+                .put("/api/x")
+                .willReturn(HttpResponse.ok())
+                .intoPlaybook()
+                .mappingsForFfi()
+                .getFirst();
+    assertEquals("PUT", putRow.path("method").asText());
+
+    ObjectNode deleteRow =
+        (ObjectNode)
+            new HttpPlaybookBuilder("dep-id")
+                .delete("/api/x")
+                .willReturn(HttpResponse.noContent())
+                .intoPlaybook()
+                .mappingsForFfi()
+                .getFirst();
+    assertEquals("DELETE", deleteRow.path("method").asText());
+  }
+
+  @Test
+  void mappingsForFfi_noMappingsAdded_throwsIllegalArgumentException() {
+    assertThrows(
+        IllegalArgumentException.class, () -> new HttpPlaybookBuilder("dep-id").mappingsForFfi());
+  }
+
+  @Test
+  void headerPattern_equalTo_serializesEqualToField() {
+    ObjectNode row =
+        (ObjectNode)
+            new HttpPlaybookBuilder("dep-id")
+                .get("/api/x")
+                .withHeader("X-Trace-Id", HttpHeaderPattern.equalTo("abc-123"))
+                .willReturn(HttpResponse.ok())
+                .intoPlaybook()
+                .mappingsForFfi()
+                .getFirst();
+    assertEquals("abc-123", row.path("headers").path("X-Trace-Id").path("equal_to").asText());
   }
 
   @Test
