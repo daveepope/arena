@@ -1,5 +1,5 @@
 {
-  "checksum": "6bf1e9a45e61bd95bd79ae3eac0855cc297e3d3d61e4dde817b7a364b2324aa6",
+  "checksum": "c228448339d022e99f6b0cdd63f02ee13f941867e28f65f737b75e6404788ff7",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -355,9 +355,9 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arena 5.1.2": {
+    "arena 5.1.3": {
       "name": "arena",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -423,15 +423,15 @@
           ],
           "selects": {}
         },
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-container 5.1.2": {
+    "arena-container 5.1.3": {
       "name": "arena-container",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -468,7 +468,7 @@
         "deps": {
           "common": [
             {
-              "id": "arena-container 5.1.2",
+              "id": "arena-container 5.1.3",
               "target": "build_script_build"
             },
             {
@@ -492,7 +492,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -509,9 +509,9 @@
       "license_ids": [],
       "license_file": null
     },
-    "arena-containerized-component 5.1.2": {
+    "arena-containerized-component 5.1.3": {
       "name": "arena-containerized-component",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -581,15 +581,15 @@
           ],
           "selects": {}
         },
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-cryptography 5.1.2": {
+    "arena-cryptography 5.1.3": {
       "name": "arena-cryptography",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -621,15 +621,15 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-examples 5.1.2": {
+    "arena-examples 5.1.3": {
       "name": "arena-examples",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -727,15 +727,15 @@
           ],
           "selects": {}
         },
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-executable-component 5.1.2": {
+    "arena-executable-component 5.1.3": {
       "name": "arena-executable-component",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -797,15 +797,15 @@
           ],
           "selects": {}
         },
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-ffi 5.1.2": {
+    "arena-ffi 5.1.3": {
       "name": "arena-ffi",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -874,15 +874,15 @@
           ],
           "selects": {}
         },
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "license": null,
       "license_ids": [],
       "license_file": null
     },
-    "arena-http 5.1.2": {
+    "arena-http 5.1.3": {
       "name": "arena-http",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -960,15 +960,15 @@
           ],
           "selects": {}
         },
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-kafka 5.1.2": {
+    "arena-kafka 5.1.3": {
       "name": "arena-kafka",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1038,15 +1038,15 @@
           ],
           "selects": {}
         },
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-localstack 5.1.2": {
+    "arena-localstack 5.1.3": {
       "name": "arena-localstack",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1152,15 +1152,15 @@
           ],
           "selects": {}
         },
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-mssql 5.1.2": {
+    "arena-mssql 5.1.3": {
       "name": "arena-mssql",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1230,15 +1230,15 @@
           ],
           "selects": {}
         },
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-oauth 5.1.2": {
+    "arena-oauth 5.1.3": {
       "name": "arena-oauth",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1340,15 +1340,15 @@
           ],
           "selects": {}
         },
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-postgres 5.1.2": {
+    "arena-postgres 5.1.3": {
       "name": "arena-postgres",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1414,15 +1414,15 @@
           ],
           "selects": {}
         },
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-smtp 5.1.2": {
+    "arena-smtp 5.1.3": {
       "name": "arena-smtp",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1492,15 +1492,15 @@
           ],
           "selects": {}
         },
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-temporal 5.1.2": {
+    "arena-temporal 5.1.3": {
       "name": "arena-temporal",
-      "version": "5.1.2",
+      "version": "5.1.3",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1578,7 +1578,7 @@
           ],
           "selects": {}
         },
-        "version": "5.1.2"
+        "version": "5.1.3"
       },
       "license": "todo",
       "license_ids": [],
@@ -5905,6 +5905,54 @@
         "MIT"
       ],
       "license_file": "LICENSE.txt"
+    },
+    "cmake 0.1.58": {
+      "name": "cmake",
+      "version": "0.1.58",
+      "package_url": "https://github.com/rust-lang/cmake-rs",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/cmake/0.1.58/download",
+          "sha256": "c0f78a02292a74a88ac736019ab962ece0bc380e3f977bf72e376c5d78ff0678"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "cmake",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "cmake",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "cc 1.2.60",
+              "target": "cc"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.1.58"
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
     },
     "cmov 0.5.4": {
       "name": "cmov",
@@ -19133,7 +19181,11 @@
             "libz",
             "tokio"
           ],
-          "selects": {}
+          "selects": {
+            "x86_64-pc-windows-msvc": [
+              "cmake-build"
+            ]
+          }
         },
         "deps": {
           "common": [
@@ -19240,7 +19292,12 @@
             "libz",
             "libz-sys"
           ],
-          "selects": {}
+          "selects": {
+            "x86_64-pc-windows-msvc": [
+              "cmake",
+              "cmake-build"
+            ]
+          }
         },
         "deps": {
           "common": [
@@ -19283,7 +19340,14 @@
               "target": "pkg_config"
             }
           ],
-          "selects": {}
+          "selects": {
+            "x86_64-pc-windows-msvc": [
+              {
+                "id": "cmake 0.1.58",
+                "target": "cmake"
+              }
+            ]
+          }
         },
         "link_deps": {
           "common": [
@@ -32458,21 +32522,21 @@
   },
   "binary_crates": [],
   "workspace_members": {
-    "arena 5.1.2": "arena",
-    "arena-container 5.1.2": "arena-container",
-    "arena-containerized-component 5.1.2": "arena-containerized-component",
-    "arena-cryptography 5.1.2": "arena-cryptography",
-    "arena-examples 5.1.2": "examples",
-    "arena-executable-component 5.1.2": "arena-executable-component",
-    "arena-ffi 5.1.2": "arena-ffi",
-    "arena-http 5.1.2": "arena-http",
-    "arena-kafka 5.1.2": "arena-kafka",
-    "arena-localstack 5.1.2": "arena-localstack",
-    "arena-mssql 5.1.2": "arena-mssql",
-    "arena-oauth 5.1.2": "arena-oauth",
-    "arena-postgres 5.1.2": "arena-postgres",
-    "arena-smtp 5.1.2": "arena-smtp",
-    "arena-temporal 5.1.2": "arena-temporal"
+    "arena 5.1.3": "arena",
+    "arena-container 5.1.3": "arena-container",
+    "arena-containerized-component 5.1.3": "arena-containerized-component",
+    "arena-cryptography 5.1.3": "arena-cryptography",
+    "arena-examples 5.1.3": "examples",
+    "arena-executable-component 5.1.3": "arena-executable-component",
+    "arena-ffi 5.1.3": "arena-ffi",
+    "arena-http 5.1.3": "arena-http",
+    "arena-kafka 5.1.3": "arena-kafka",
+    "arena-localstack 5.1.3": "arena-localstack",
+    "arena-mssql 5.1.3": "arena-mssql",
+    "arena-oauth 5.1.3": "arena-oauth",
+    "arena-postgres 5.1.3": "arena-postgres",
+    "arena-smtp 5.1.3": "arena-smtp",
+    "arena-temporal 5.1.3": "arena-temporal"
   },
   "conditions": {
     "aarch64-apple-darwin": [

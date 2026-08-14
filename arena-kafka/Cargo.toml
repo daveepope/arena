@@ -16,6 +16,9 @@ futures-timer = { workspace = true }
 rdkafka = { workspace = true }
 futures = { workspace = true }
 
+[target.'cfg(windows)'.dependencies]
+rdkafka = { workspace = true, features = ["cmake-build"] }
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing-subscriber = { workspace = true }
