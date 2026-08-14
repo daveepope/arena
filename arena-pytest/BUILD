@@ -33,6 +33,7 @@ compile_pip_requirements(
     src = "requirements.txt",
     requirements_txt = "requirements_lock.txt",
     generate_hashes = False,
+    tags = ["no-windows"],
 )
 
 config_setting(
