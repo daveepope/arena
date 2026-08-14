@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: [ "master" ]
     types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 concurrency:
   group: build-test-publish-${{ github.event.pull_request.number || github.ref }}
@@ -576,6 +577,51 @@ jobs:
         run: |
           bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test,-no-windows
           bazel test //... --config=ci --build_tests_only --test_tag_filters=component_test --local_test_jobs=4
+
+  generate_windows_pip_lock:
+    name: Generate Windows pip lock files
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-windows
+          repository-cache: true
+
+      - name: Configure BuildBuddy remote cache
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
+          fi
+        shell: bash
+
+      - name: Regenerate Windows pip lock files
+        shell: bash
+        run: |
+          bazel run --config=ci //arena-pytest:pip_requirements.update
+          bazel run --config=ci //examples:pip_requirements.update
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-pip-lock-files
+          path: |
+            arena-pytest/requirements_windows.txt
+            examples/requirements_windows.txt
+          if-no-files-found: error
 
   publish_gate:
     name: Publish gate

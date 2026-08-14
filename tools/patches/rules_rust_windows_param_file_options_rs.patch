@@ -1,0 +1,30 @@
+--- a/util/process_wrapper/options.rs
++++ b/util/process_wrapper/options.rs
+@@ -51,6 +51,18 @@
+     pub(crate) rustc_output_format: Option<rustc::ErrorFormat>,
+ }
+ 
++fn expand_leading_param_file(args: Vec<String>) -> Result<Vec<String>, OptionError> {
++    match args.get(1).and_then(|a| a.strip_prefix('@')) {
++        Some(param_file) => {
++            let mut expanded = vec![args[0].clone()];
++            expanded.extend(read_file_to_array(param_file).map_err(OptionError::Generic)?);
++            expanded.extend(args.into_iter().skip(2));
++            Ok(expanded)
++        }
++        None => Ok(args),
++    }
++}
++
+ pub(crate) fn options() -> Result<Options, OptionError> {
+     // Process argument list until -- is encountered.
+     // Everything after is sent to the child process.
+@@ -134,7 +146,7 @@
+     );
+ 
+     let mut child_args = match flags
+-        .parse(env::args().collect())
++        .parse(expand_leading_param_file(env::args().collect())?)
+         .map_err(OptionError::FlagError)?
+     {
+         ParseOutcome::Help(help) => {

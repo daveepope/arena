@@ -8,6 +8,15 @@ use_repo(arena_version_ext, "arena_version")
 
 bazel_dep(name = "rules_python", version = "1.4.1")
 bazel_dep(name = "rules_rust", version = "0.71.0")
+single_version_override(
+    module_name = "rules_rust",
+    version = "0.71.0",
+    patches = [
+        "//tools/patches:rules_rust_windows_param_file_rustc_bzl.patch",
+        "//tools/patches:rules_rust_windows_param_file_options_rs.patch",
+    ],
+    patch_strip = 1,
+)
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "rules_java", version = "9.0.0")
 bazel_dep(name = "rules_jvm_external", version = "6.7")
@@ -119,11 +128,13 @@ pip.parse(
     hub_name = "pip",
     python_version = "3.12",
     requirements_lock = "//arena-pytest:requirements_lock.txt",
+    requirements_windows = "//arena-pytest:requirements_windows.txt",
 )
 pip.parse(
     hub_name = "pip_examples",
     python_version = "3.12",
     requirements_lock = "//examples:requirements_lock.txt",
+    requirements_windows = "//examples:requirements_windows.txt",
 )
 use_repo(pip, "pip", "pip_examples")
 
