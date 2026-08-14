@@ -1,25 +1,40 @@
 --- a/util/process_wrapper/options.rs
 +++ b/util/process_wrapper/options.rs
-@@ -51,6 +51,18 @@
+@@ -51,6 +51,33 @@
      pub(crate) rustc_output_format: Option<rustc::ErrorFormat>,
  }
  
 +fn expand_leading_param_file(args: Vec<String>) -> Result<Vec<String>, OptionError> {
 +    match args.get(1).and_then(|a| a.strip_prefix('@')) {
 +        Some(param_file) => {
++            let param_file = param_file.to_string();
++            let file_args = read_file_to_array(&param_file).map_err(OptionError::Generic)?;
++            eprintln!(
++                "process_wrapper: expand_leading_param_file: file={} count={} first={:?} last={:?}",
++                param_file,
++                file_args.len(),
++                file_args.first(),
++                file_args.last(),
++            );
 +            let mut expanded = vec![args[0].clone()];
-+            expanded.extend(read_file_to_array(param_file).map_err(OptionError::Generic)?);
++            expanded.extend(file_args);
 +            expanded.extend(args.into_iter().skip(2));
 +            Ok(expanded)
 +        }
-+        None => Ok(args),
++        None => {
++            eprintln!(
++                "process_wrapper: expand_leading_param_file: no leading @param file, argv={:?}",
++                args,
++            );
++            Ok(args)
++        }
 +    }
 +}
 +
  pub(crate) fn options() -> Result<Options, OptionError> {
      // Process argument list until -- is encountered.
      // Everything after is sent to the child process.
-@@ -134,7 +146,7 @@
+@@ -134,7 +161,7 @@
      );
  
      let mut child_args = match flags
