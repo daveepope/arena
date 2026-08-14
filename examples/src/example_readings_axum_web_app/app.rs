@@ -1,8 +1,9 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use arena_kafka::kafka_dependency::client::{connect_client, partition_client_for};
 use arena_mssql::Client as MssqlClient;
-use rdkafka::producer::BaseProducer;
+use rskafka::client::partition::PartitionClient;
 use tokio::sync::Mutex;
 use tokio_postgres::Client as PgClient;
 
@@ -12,8 +13,7 @@ use super::state::{build_http_client_trusting_oauth_ca, AppState};
 
 pub struct ExampleAxumWebApp {
     pg: Arc<PgClient>,
-    kafka: Arc<BaseProducer>,
-    kafka_topic: Arc<str>,
+    kafka: Arc<PartitionClient>,
     http_client: reqwest::Client,
     calibration_url: Arc<str>,
     mssql: Arc<Mutex<MssqlClient>>,
@@ -30,7 +30,6 @@ impl ExampleAxumWebApp {
         oauth_issuer_url: &str,
         oauth_tls_ca_pem: &str,
     ) -> Self {
-        use rdkafka::config::ClientConfig;
         use tokio_postgres::NoTls;
 
         let (pg, connection) = tokio_postgres::connect(postgres_connection_string, NoTls)
@@ -43,11 +42,12 @@ impl ExampleAxumWebApp {
             }
         });
 
-        let kafka: BaseProducer = ClientConfig::new()
-            .set("bootstrap.servers", kafka_bootstrap)
-            .set("message.timeout.ms", "5000")
-            .create()
-            .expect("create kafka producer");
+        let kafka_client = connect_client(kafka_bootstrap)
+            .await
+            .expect("create kafka client");
+        let kafka = partition_client_for(&kafka_client, kafka_topic)
+            .await
+            .expect("create kafka partition client");
 
         let mssql = arena_mssql::connect(mssql_connection_string)
             .await
@@ -58,7 +58,6 @@ impl ExampleAxumWebApp {
         Self {
             pg: Arc::new(pg),
             kafka: Arc::new(kafka),
-            kafka_topic: Arc::from(kafka_topic),
             http_client,
             calibration_url: Arc::from(calibration_url),
             mssql: Arc::new(Mutex::new(mssql)),
@@ -92,7 +91,6 @@ impl ExampleAxumWebApp {
         let state = AppState {
             pg: self.pg,
             kafka: self.kafka,
-            kafka_topic: self.kafka_topic,
             http_client: self.http_client,
             calibration_url: self.calibration_url,
             mssql: self.mssql,

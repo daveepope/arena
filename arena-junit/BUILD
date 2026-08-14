@@ -41,6 +41,16 @@ arena_junit_classifier_native_lib(
     classifier_artifacts = _ARENA_JUNIT_CLASSIFIER_ARTIFACTS,
 )
 
+arena_junit_classifier_native_lib(
+    name = "arena_junit_native_windows_x86_64",
+    classifier = "windows-x86_64",
+    resources = glob(
+        ["prebuilt/src/main/resources/windows-x86-64/**"],
+        allow_empty = True,
+    ),
+    classifier_artifacts = _ARENA_JUNIT_CLASSIFIER_ARTIFACTS,
+)
+
 _ARENA_JUNIT_JAVACOPTS = [
     "--release",
     "25",

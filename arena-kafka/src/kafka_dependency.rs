@@ -1,3 +1,4 @@
+pub mod client;
 pub(crate) mod container_impl;
 mod healthcheck;
 pub(crate) mod topic_creator;
@@ -136,13 +137,19 @@ impl KafkaDependency {
             .expect("bootstrap for topic creation")
             .to_string();
 
+        let kafka_client = client::connect_client(&bootstrap)
+            .await
+            .unwrap_or_else(|e| panic!("[Kafka-{}] connect failed: {e}", self.identifier));
+
         for topic in &self.topics {
-            TopicCreator::create_topic(&bootstrap, topic).unwrap_or_else(|e| {
-                panic!(
-                    "[Kafka-{}] topic create failed for {topic}: {e}",
-                    self.identifier
-                )
-            });
+            TopicCreator::create_topic(&kafka_client, topic)
+                .await
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "[Kafka-{}] topic create failed for {topic}: {e}",
+                        self.identifier
+                    )
+                });
         }
         tracing::debug!(
             dependency = %self.identifier,
@@ -271,8 +278,20 @@ impl RunnableDependency for KafkaDependency {
             .expect("bootstrap for soft reset")
             .to_string();
 
+        let kafka_client = match client::connect_client(&bootstrap).await {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!(
+                    dependency = %self.identifier,
+                    error = %e,
+                    "soft reset: kafka connect failed"
+                );
+                return;
+            }
+        };
+
         for topic in &self.topics {
-            if let Err(e) = TopicCreator::clear_messages(&bootstrap, topic) {
+            if let Err(e) = TopicCreator::clear_messages(&kafka_client, topic).await {
                 tracing::warn!(
                     dependency = %self.identifier,
                     topic = %topic,

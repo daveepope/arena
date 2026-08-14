@@ -1,17 +1,17 @@
 use arena_examples::example_readings_axum_web_app::state::build_http_client_trusting_oauth_ca;
-use rdkafka::config::ClientConfig;
-use rdkafka::consumer::{BaseConsumer, Consumer};
-use rdkafka::message::Message;
+use arena_kafka::kafka_dependency::client::{connect_client, consume_until, partition_client_for};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::sync::OnceCell;
 
 use crate::arena::{oauth_issuer, oauth_server_tls_cert_pem};
 
 static OAUTH_HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
 static ACCESS_TOKEN: OnceCell<String> = OnceCell::const_new();
+
+const KAFKA_CONSUME_FETCH_MAX_WAIT_MS: i32 = 100;
 
 fn oauth_http_client() -> &'static Client {
     OAUTH_HTTP_CLIENT.get_or_init(|| build_http_client_trusting_oauth_ca(oauth_server_tls_cert_pem()))
@@ -84,69 +84,35 @@ pub async fn get_readings(port: u16) -> Vec<Reading> {
         .expect("GET /readings returned invalid JSON")
 }
 
-pub fn consume_reading_created_event(
+pub async fn consume_reading_created_event(
     bootstrap: String,
     topic: String,
-    warmed_tx: std::sync::mpsc::Sender<()>,
-    id_rx: std::sync::mpsc::Receiver<i64>,
+    warmed_tx: tokio::sync::oneshot::Sender<()>,
+    id_rx: tokio::sync::oneshot::Receiver<i64>,
     timeout: Duration,
 ) -> Result<ReadingCreatedEvent, String> {
-    let consumer: BaseConsumer = ClientConfig::new()
-        .set("bootstrap.servers", &bootstrap)
-        .set("group.id", format!("component-test-{}", std::process::id()))
-        .set("auto.offset.reset", "earliest")
-        .set("enable.auto.commit", "false")
-        .create()
-        .map_err(|e| format!("create kafka consumer failed: {e}"))?;
-
-    consumer
-        .subscribe(&[&topic])
-        .map_err(|e| format!("kafka subscribe failed: {e}"))?;
-
-    warm_assignment(&consumer)?;
+    let client = connect_client(&bootstrap).await?;
+    let partition = partition_client_for(&client, &topic).await?;
 
     warmed_tx
         .send(())
         .map_err(|_| "warmed signal channel closed".to_string())?;
 
-    let expected_id = id_rx.recv().map_err(|_| "id channel closed".to_string())?;
+    let expected_id = id_rx.await.map_err(|_| "id channel closed".to_string())?;
 
-    let deadline = Instant::now() + timeout;
-    while Instant::now() < deadline {
-        match consumer.poll(Duration::from_millis(100)) {
-            None => continue,
-            Some(Err(e)) => return Err(format!("kafka consume error: {e}")),
-            Some(Ok(msg)) => {
-                let payload = match msg.payload() {
-                    Some(bytes) => bytes,
-                    None => continue,
-                };
-                let event: ReadingCreatedEvent = serde_json::from_slice(payload)
-                    .map_err(|e| format!("parse ReadingCreatedEvent failed: {e}"))?;
-                if event.id == expected_id {
-                    return Ok(event);
-                }
-            }
-        }
-    }
-    Err("did not receive expected ReadingCreatedEvent before timeout".to_string())
-}
+    let deadline = tokio::time::Instant::now() + timeout;
+    let found = consume_until(&partition, KAFKA_CONSUME_FETCH_MAX_WAIT_MS, deadline, |r| {
+        let payload = match r.record.value.as_deref() {
+            Some(bytes) => bytes,
+            None => return Ok(None),
+        };
+        let event: ReadingCreatedEvent = serde_json::from_slice(payload)
+            .map_err(|e| format!("parse ReadingCreatedEvent failed: {e}"))?;
+        Ok((event.id == expected_id).then_some(event))
+    })
+    .await?;
 
-fn warm_assignment(consumer: &BaseConsumer) -> Result<(), String> {
-    let deadline = Instant::now() + Duration::from_secs(3);
-    while Instant::now() < deadline {
-        let _ = consumer.poll(Duration::from_millis(100));
-        let assigned = consumer
-            .assignment()
-            .map_err(|e| format!("kafka assignment query failed: {e}"))?;
-        if assigned.count() > 0 {
-            return Ok(());
-        }
-    }
-    eprintln!(
-        "WARN: kafka consumer partition assignment not ready after 3s; continuing consume poll"
-    );
-    Ok(())
+    found.ok_or_else(|| "did not receive expected ReadingCreatedEvent before timeout".to_string())
 }
 
 pub async fn post_reading_raw(

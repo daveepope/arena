@@ -1,15 +1,15 @@
-use arena_kafka::TopicCreator;
+use arena_kafka::kafka_dependency::client::connect_client;
 
 const UNREACHABLE_BOOTSTRAP: &str = "127.0.0.1:1";
 
-#[test]
-fn clear_messages_unreachable_bootstrap_returns_err() {
-    let result = TopicCreator::clear_messages(UNREACHABLE_BOOTSTRAP, "topic-creator-unreachable");
+#[tokio::test]
+async fn connect_client_unreachable_bootstrap_returns_err() {
+    let result = connect_client(UNREACHABLE_BOOTSTRAP).await;
     assert!(result.is_err());
 }
 
-#[test]
-fn clear_messages_invalid_bootstrap_string_returns_err() {
-    let result = TopicCreator::clear_messages("", "topic-creator-invalid");
+#[tokio::test]
+async fn connect_client_invalid_bootstrap_string_returns_err() {
+    let result = connect_client("").await;
     assert!(result.is_err());
 }
