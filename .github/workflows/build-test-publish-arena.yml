@@ -44,13 +44,14 @@ jobs:
           CHANGED: ${{ steps.filter.outputs.all_changed_files }}
         run: |
           docs_path() {
-            case "$1" in
+            local base="${1%%:*}"
+            case "$base" in
               *.md|AGENTS.md|CLAUDE.md) return 0 ;;
               .gitignore|.gitattributes|.editorconfig|.dockerignore|.bazelignore) return 0 ;;
               .codecov.yml|LICENSE) return 0 ;;
               *.png) return 0 ;;
             esac
-            [[ "$1" == .cursor/* || "$1" == .idea/* || "$1" == .vscode/* ]]
+            [[ "$base" == .cursor/* || "$base" == .idea/* || "$base" == .vscode/* ]]
           }
           ci_only_path() {
             [[ "$1" == .github/workflows/* || "$1" == .github/dependabot.yml ]]
