@@ -67,7 +67,7 @@
          child_environment: vars,
          touch_file,
          copy_output,
-@@ -304,6 +336,52 @@
+@@ -304,6 +336,51 @@
      })
  }
  
@@ -101,19 +101,18 @@
 +        writeln!(writer, "{line}").map_err(format_err)?;
 +    }
 +    writer.flush().map_err(format_err)?;
-+    eprintln!(
-+        "process_wrapper: collapse_into_param_file: file={} pre_count={} flattened_count={} arena_lines={:?} first5={:?} last5={:?}",
-+        param_file,
-+        args.len(),
-+        flattened.len(),
-+        flattened
-+            .iter()
-+            .filter(|l| l.to_lowercase().contains("arena"))
-+            .take(10)
-+            .collect::<Vec<_>>(),
-+        flattened.iter().take(5).collect::<Vec<_>>(),
-+        flattened.iter().rev().take(5).collect::<Vec<_>>(),
-+    );
++    // Only dump full content for the one target we're actively debugging;
++    // every other crate's compile also goes through this path and would
++    // otherwise flood the log.
++    if param_file.contains("arena-ffi") {
++        eprintln!(
++            "process_wrapper: collapse_into_param_file: file={} pre_count={} flattened_count={} full={:?}",
++            param_file,
++            args.len(),
++            flattened.len(),
++            flattened,
++        );
++    }
 +    Ok(vec![format!("@{param_file}")])
 +}
 +
