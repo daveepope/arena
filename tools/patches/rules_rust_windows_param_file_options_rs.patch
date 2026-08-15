@@ -67,7 +67,7 @@
          child_environment: vars,
          touch_file,
          copy_output,
-@@ -304,6 +336,51 @@
+@@ -304,6 +336,58 @@
      })
  }
  
@@ -101,15 +101,22 @@
 +        writeln!(writer, "{line}").map_err(format_err)?;
 +    }
 +    writer.flush().map_err(format_err)?;
++    drop(writer);
 +    // Only dump full content for the one target we're actively debugging;
 +    // every other crate's compile also goes through this path and would
 +    // otherwise flood the log.
 +    if param_file.contains("arena-ffi") {
++        let on_disk_bytes = std::fs::metadata(&param_file).map(|m| m.len()).ok();
++        let read_back = read_file_to_array(&param_file).ok();
++        let read_back_matches = read_back.as_ref() == Some(&flattened);
 +        eprintln!(
-+            "process_wrapper: collapse_into_param_file: file={} pre_count={} flattened_count={} full={:?}",
++            "process_wrapper: collapse_into_param_file: file={} pre_count={} flattened_count={} on_disk_bytes={:?} read_back_count={:?} read_back_matches={} full={:?}",
 +            param_file,
 +            args.len(),
 +            flattened.len(),
++            on_disk_bytes,
++            read_back.as_ref().map(|v| v.len()),
++            read_back_matches,
 +            flattened,
 +        );
 +    }
