@@ -1,12 +1,14 @@
 name: Build, test, publish arena
 
+# TEMP: push/pull_request triggers disabled while debugging arena-ffi windows
+# build in isolation. Restore the two blocks below before merging.
 on:
-  push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
-    types: [opened, synchronize, reopened]
   workflow_dispatch:
+  # push:
+  #   branches: [ "master" ]
+  # pull_request:
+  #   branches: [ "master" ]
+  #   types: [opened, synchronize, reopened]
 
 concurrency:
   group: build-test-publish-${{ github.event.pull_request.number || github.ref }}
