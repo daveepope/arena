@@ -34,4 +34,7 @@ jobs:
 
       - name: Build arena-ffi only
         shell: bash
+        env:
+          MSYS_NO_PATHCONV: "1"
+          MSYS2_ARG_CONV_EXCL: "//"
         run: bazel build --config=ci //arena-ffi:ffi_lib_unit_test
