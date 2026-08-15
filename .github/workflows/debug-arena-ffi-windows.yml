@@ -30,11 +30,11 @@ jobs:
           fi
         shell: bash
 
-      - name: Build arena-ffi only
+      - name: Build canary (same deps as arena-ffi, trivial source)
         id: build
         shell: pwsh
         continue-on-error: true
-        run: bazel build --config=ci //arena-ffi:ffi_lib_unit_test
+        run: bazel build --config=ci //arena-ffi:canary_test
 
       - name: Collect final_args artifacts
         shell: pwsh

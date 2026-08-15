@@ -1,4 +1,4 @@
-load("@rules_rust//rust:defs.bzl", "rust_library", "rust_shared_library", "rust_test")
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_shared_library", "rust_test")
 load("@crates//:defs.bzl", "all_crate_deps")
 
 _ARENA_FFI_DEPS = all_crate_deps(normal = True) + [
@@ -16,6 +16,14 @@ _ARENA_FFI_DEPS = all_crate_deps(normal = True) + [
 ]
 
 _ARENA_FFI_PROC_MACRO_DEPS = all_crate_deps(proc_macro = True)
+
+rust_binary(
+    name = "canary_test",
+    srcs = ["src/canary_bin.rs"],
+    edition = "2021",
+    deps = _ARENA_FFI_DEPS,
+    proc_macro_deps = _ARENA_FFI_PROC_MACRO_DEPS,
+)
 
 rust_library(
     name = "arena_ffi",
