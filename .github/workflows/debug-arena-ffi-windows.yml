@@ -31,5 +31,29 @@ jobs:
         shell: bash
 
       - name: Build arena-ffi only
+        id: build
         shell: pwsh
+        continue-on-error: true
         run: bazel build --config=ci //arena-ffi:ffi_lib_unit_test
+
+      - name: Collect final_args artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          Get-ChildItem -Path D:\ -Recurse -Filter "*final_args*" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "arena-ffi" } |
+            ForEach-Object {
+              Copy-Item $_.FullName -Destination "artifacts\$($_.Name)"
+            }
+          Get-ChildItem artifacts
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: arena-ffi-final-args
+          path: artifacts
+          if-no-files-found: warn
+
+      - name: Fail if build failed
+        if: steps.build.outcome == 'failure'
+        shell: pwsh
+        run: exit 1
