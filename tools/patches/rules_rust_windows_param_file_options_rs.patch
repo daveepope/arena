@@ -67,7 +67,7 @@
          child_environment: vars,
          touch_file,
          copy_output,
-@@ -304,6 +336,51 @@
+@@ -304,6 +336,52 @@
      })
  }
  
@@ -102,16 +102,17 @@
 +    }
 +    writer.flush().map_err(format_err)?;
 +    eprintln!(
-+        "process_wrapper: collapse_into_param_file: file={} pre_count={} flattened_count={} has_extern_arena={} sample_externs={:?}",
++        "process_wrapper: collapse_into_param_file: file={} pre_count={} flattened_count={} arena_lines={:?} first5={:?} last5={:?}",
 +        param_file,
 +        args.len(),
 +        flattened.len(),
-+        flattened.iter().any(|l| l == "--extern" ) && flattened.iter().any(|l| l.starts_with("arena=")),
 +        flattened
 +            .iter()
-+            .filter(|l| l.starts_with("arena") && l.contains('='))
-+            .take(5)
++            .filter(|l| l.to_lowercase().contains("arena"))
++            .take(10)
 +            .collect::<Vec<_>>(),
++        flattened.iter().take(5).collect::<Vec<_>>(),
++        flattened.iter().rev().take(5).collect::<Vec<_>>(),
 +    );
 +    Ok(vec![format!("@{param_file}")])
 +}
