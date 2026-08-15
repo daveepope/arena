@@ -1,79 +1,55 @@
-use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
-use rdkafka::config::ClientConfig;
-use rdkafka::consumer::{BaseConsumer, Consumer};
-use rdkafka::metadata::MetadataTopic;
-use rdkafka::topic_partition_list::{Offset, TopicPartitionList};
-use std::time::Duration;
+use super::client::{connect_client, partition_client_for_existing};
+use rskafka::client::error::{Error as ClientError, ProtocolError};
+use rskafka::client::partition::OffsetAt;
+use rskafka::client::Client;
+
+const TOPIC_PARTITION_COUNT: i32 = 1;
+const TOPIC_REPLICATION_FACTOR: i16 = 1;
+const CREATE_TOPIC_TIMEOUT_MS: i32 = 500;
+const DELETE_RECORDS_TIMEOUT_MS: i32 = 500;
 
 pub struct TopicCreator;
 
 impl TopicCreator {
-    pub fn create_topic(bootstrap: &str, topic: &str) -> Result<(), String> {
-        let admin: AdminClient<_> = ClientConfig::new()
-            .set("bootstrap.servers", bootstrap)
-            .set("log_level", "0")
-            .create()
-            .map_err(|e| format!("create kafka admin client failed: {e}"))?;
+    pub async fn create_topic(client: &Client, topic: &str) -> Result<(), String> {
+        let controller = client
+            .controller_client()
+            .map_err(|e| format!("create kafka controller client failed: {e}"))?;
 
-        let new_topic = NewTopic::new(topic, 1, TopicReplication::Fixed(1));
-        let opts = AdminOptions::new().operation_timeout(Some(Duration::from_millis(1000)));
-
-        match futures::executor::block_on(admin.create_topics([&new_topic], &opts)) {
-            Ok(results) => {
-                for r in results {
-                    if let Err((_t, e)) = r {
-                        if e.to_string().to_lowercase().contains("already exists") {
-                            return Ok(());
-                        }
-                        return Err(format!("kafka topic create failed: {e}"));
-                    }
-                }
-                Ok(())
-            }
-            Err(err) => Err(format!("kafka topic create request failed: {err}")),
+        match controller
+            .create_topic(
+                topic,
+                TOPIC_PARTITION_COUNT,
+                TOPIC_REPLICATION_FACTOR,
+                CREATE_TOPIC_TIMEOUT_MS,
+            )
+            .await
+        {
+            Ok(()) => Ok(()),
+            Err(ClientError::ServerError {
+                protocol_error: ProtocolError::TopicAlreadyExists,
+                ..
+            }) => Ok(()),
+            Err(e) => Err(format!("kafka topic create failed: {e}")),
         }
     }
 
-    pub fn clear_messages(bootstrap: &str, topic: &str) -> Result<(), String> {
-        let consumer: BaseConsumer = ClientConfig::new()
-            .set("bootstrap.servers", bootstrap)
-            .set("log_level", "0")
-            .create()
-            .map_err(|e| format!("create kafka consumer for metadata failed: {e}"))?;
+    pub async fn create_topic_on(bootstrap: &str, topic: &str) -> Result<(), String> {
+        let client = connect_client(bootstrap).await?;
+        Self::create_topic(&client, topic).await
+    }
 
-        let metadata = consumer
-            .fetch_metadata(Some(topic), Duration::from_secs(5))
-            .map_err(|e| format!("fetch topic metadata failed: {e}"))?;
+    pub async fn clear_messages(client: &Client, topic: &str) -> Result<(), String> {
+        let partition = partition_client_for_existing(client, topic).await?;
 
-        let topic_meta = metadata
-            .topics()
-            .iter()
-            .find(|t: &&MetadataTopic| t.name() == topic)
-            .ok_or_else(|| format!("topic {topic} not found"))?;
+        let latest = partition
+            .get_offset(OffsetAt::Latest)
+            .await
+            .map_err(|e| format!("get kafka latest offset failed: {e}"))?;
 
-        if topic_meta.error().is_some() {
-            return Err(format!(
-                "topic {topic} metadata error: {:?}",
-                topic_meta.error()
-            ));
-        }
-
-        let mut offsets = TopicPartitionList::new();
-        for p in topic_meta.partitions() {
-            let partition_id: i32 = p.id();
-            offsets
-                .add_partition_offset(topic, partition_id, Offset::End)
-                .map_err(|e| format!("add partition to delete list failed: {e}"))?;
-        }
-
-        let admin: AdminClient<_> = ClientConfig::new()
-            .set("bootstrap.servers", bootstrap)
-            .set("log_level", "0")
-            .create()
-            .map_err(|e| format!("create kafka admin client failed: {e}"))?;
-
-        let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(5)));
-        futures::executor::block_on(admin.delete_records(&offsets, &opts))
+        partition
+            .delete_records(latest, DELETE_RECORDS_TIMEOUT_MS)
+            .await
             .map_err(|e| format!("kafka delete_records failed: {e}"))?;
 
         Ok(())

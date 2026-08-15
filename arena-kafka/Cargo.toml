@@ -13,8 +13,9 @@ async-trait = { workspace = true }
 testcontainers-modules = { workspace = true, features = ["kafka"] }
 tracing = { workspace = true }
 futures-timer = { workspace = true }
-rdkafka = { workspace = true }
+rskafka = { workspace = true }
 futures = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

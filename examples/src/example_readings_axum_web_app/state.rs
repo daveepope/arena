@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use arena_mssql::Client as MssqlClient;
-use rdkafka::producer::BaseProducer;
+use rskafka::client::partition::PartitionClient;
 use tokio::sync::Mutex;
 use tokio_postgres::Client as PgClient;
 
@@ -10,8 +10,7 @@ use super::oauth::JwksValidator;
 #[derive(Clone)]
 pub struct AppState {
     pub pg: Arc<PgClient>,
-    pub kafka: Arc<BaseProducer>,
-    pub kafka_topic: Arc<str>,
+    pub kafka: Arc<PartitionClient>,
     pub http_client: reqwest::Client,
     pub calibration_url: Arc<str>,
     pub mssql: Arc<Mutex<MssqlClient>>,

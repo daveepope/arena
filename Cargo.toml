@@ -19,7 +19,7 @@ members = [
 ]
 
 [workspace.package]
-version = "5.1.2"
+version = "5.1.3"
 [workspace.dependencies]
 arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }
@@ -40,7 +40,7 @@ serde_json = "1"
 serde_urlencoded = "0.7.1"
 tokio-postgres = "0.7.18"
 postgres = "0.19"
-rdkafka = { version = "0.39.0" }
+rskafka = "0.6.0"
 backon = "1.5.2"
 arc-swap = "1.7"
 async-trait = "0.1"
