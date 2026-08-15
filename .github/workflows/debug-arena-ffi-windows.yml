@@ -1,0 +1,35 @@
+name: Debug arena-ffi Windows
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build arena-ffi
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-windows
+          repository-cache: true
+
+      - name: Configure BuildBuddy remote cache
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
+          fi
+        shell: bash
+
+      - name: Build arena-ffi only
+        shell: bash
+        run: bazel build --config=ci //arena-ffi:ffi_lib_unit_test
