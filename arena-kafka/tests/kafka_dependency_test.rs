@@ -126,3 +126,59 @@ async fn soft_reset_running_dep_with_no_topics_is_noop() {
     dep.stop().await;
 }
 
+struct UnreachableKafkaImpl {
+    events: Arc<Mutex<Vec<Event>>>,
+}
+
+#[async_trait]
+impl KafkaImpl for UnreachableKafkaImpl {
+    async fn start(
+        &mut self,
+        _port: u16,
+        _image_name: &str,
+        _image_tag: &str,
+        _container_name: &str,
+    ) {
+        self.events.lock().unwrap().push(Event::KafkaStart);
+    }
+
+    async fn stop(&mut self) {
+        self.events.lock().unwrap().push(Event::KafkaStop);
+    }
+
+    fn bootstrap_servers(&self) -> Option<&str> {
+        Some("127.0.0.1:1")
+    }
+}
+
+#[tokio::test]
+#[should_panic(expected = "connect failed")]
+async fn start_with_topics_and_unreachable_bootstrap_panics_creating_topics() {
+    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
+    let readiness_calls = Arc::new(AtomicUsize::new(0));
+    let mut dep = KafkaDependency::builder("kafka-topics-panic")
+        .with_impl(UnreachableKafkaImpl { events })
+        .with_port(0)
+        .with_image_tag("x")
+        .with_topic("orders")
+        .with_readiness_check(OkReadinessCheck {
+            calls: readiness_calls,
+        })
+        .build();
+
+    dep.start().await;
+}
+
+#[tokio::test]
+#[should_panic(expected = "readiness check failed")]
+async fn start_with_default_readiness_check_and_unreachable_bootstrap_panics() {
+    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
+    let mut dep = KafkaDependency::builder("kafka-default-readiness-panic")
+        .with_impl(UnreachableKafkaImpl { events })
+        .with_port(0)
+        .with_image_tag("x")
+        .build();
+
+    dep.start().await;
+}
+
