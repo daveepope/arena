@@ -43,3 +43,70 @@
          .map_err(OptionError::FlagError)?
      {
          ParseOutcome::Help(help) => {
+@@ -275,6 +302,10 @@
+         require_explicit_unstable_features.is_some_and(|s| s == "true");
+ 
+     // Append all the arguments fetched from files to those provided via command line.
++    let original_rustc_param_file = child_args
++        .get(1)
++        .and_then(|a| a.strip_prefix('@'))
++        .map(str::to_owned);
+     child_args.append(&mut file_arguments);
+     let child_args = prepare_args(
+         child_args,
+@@ -289,10 +320,11 @@
+             "at least one argument after -- is required (the child process path)".to_owned(),
+         )
+     })?;
++    let args = collapse_into_param_file(args, original_rustc_param_file.as_deref())?;
+ 
+     Ok(Options {
+         executable: exec_path.to_owned(),
+-        child_arguments: args.to_vec(),
++        child_arguments: args,
+         child_environment: vars,
+         touch_file,
+         copy_output,
+@@ -304,6 +336,42 @@
+     })
+ }
+ 
++fn collapse_into_param_file(args: &[String], key: Option<&str>) -> Result<Vec<String>, OptionError> {
++    if args.len() <= 1 {
++        return Ok(args.to_vec());
++    }
++    let param_file = format!("{}.final_args", key.unwrap_or("process_wrapper_rustc_args"));
++    let format_err = |err: io::Error| {
++        OptionError::Generic(format!(
++            "{} writing path: {:?}, current directory: {:?}",
++            err,
++            param_file,
++            std::env::current_dir()
++        ))
++    };
++    let mut writer = io::BufWriter::new(File::create(&param_file).map_err(format_err)?);
++    for arg in args {
++        // rustc's own @file expansion is not recursive: inline any nested
++        // @file reference's content rather than leaving it as a literal
++        // "@path" line, which rustc would otherwise try to open verbatim.
++        match arg.strip_prefix('@') {
++            Some(nested) => {
++                for line in read_file_to_array(nested).map_err(OptionError::Generic)? {
++                    writeln!(writer, "{line}").map_err(format_err)?;
++                }
++            }
++            None => writeln!(writer, "{arg}").map_err(format_err)?,
++        }
++    }
++    writer.flush().map_err(format_err)?;
++    eprintln!(
++        "process_wrapper: collapse_into_param_file: file={} count={}",
++        param_file,
++        args.len(),
++    );
++    Ok(vec![format!("@{param_file}")])
++}
++
+ fn args_from_file(paths: Vec<String>) -> Result<Vec<String>, OptionError> {
+     let mut args = vec![];
+     for path in paths.iter() {
