@@ -31,5 +31,5 @@ jobs:
         shell: bash
 
       - name: Build arena-ffi only
-        shell: bash
+        shell: pwsh
         run: bazel build --config=ci //arena-ffi:ffi_lib_unit_test
