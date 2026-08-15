@@ -422,7 +422,6 @@ exports_files(
     [
         "requirements.txt",
         "requirements_lock.txt",
-        "requirements_windows.txt",
     ],
     visibility = ["//visibility:public"],
 )
@@ -431,9 +430,7 @@ compile_pip_requirements(
     name = "pip_requirements",
     src = "requirements.txt",
     requirements_txt = "requirements_lock.txt",
-    requirements_windows = "requirements_windows.txt",
     generate_hashes = False,
-    tags = ["no-windows"],
 )
 
 py_library(

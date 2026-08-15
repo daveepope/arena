@@ -1,1 +1,1 @@
-exports_files(["VERSION", "Cargo.toml", "MODULE.bazel", "container_defaults.toml", "README.md"])
+exports_files(["VERSION", "container_defaults.toml", "README.md"])

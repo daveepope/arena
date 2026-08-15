@@ -6,7 +6,6 @@ on:
   pull_request:
     branches: [ "master" ]
     types: [opened, synchronize, reopened]
-  workflow_dispatch:
 
 concurrency:
   group: build-test-publish-${{ github.event.pull_request.number || github.ref }}
@@ -45,14 +44,13 @@ jobs:
           CHANGED: ${{ steps.filter.outputs.all_changed_files }}
         run: |
           docs_path() {
-            local base="${1%%:*}"
-            case "$base" in
+            case "$1" in
               *.md|AGENTS.md|CLAUDE.md) return 0 ;;
               .gitignore|.gitattributes|.editorconfig|.dockerignore|.bazelignore) return 0 ;;
               .codecov.yml|LICENSE) return 0 ;;
               *.png) return 0 ;;
             esac
-            [[ "$base" == .cursor/* || "$base" == .idea/* || "$base" == .vscode/* ]]
+            [[ "$1" == .cursor/* || "$1" == .idea/* || "$1" == .vscode/* ]]
           }
           ci_only_path() {
             [[ "$1" == .github/workflows/* || "$1" == .github/dependabot.yml ]]
@@ -520,109 +518,6 @@ jobs:
       - name: Build and test
         run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
 
-  test_windows:
-    name: Test Windows
-    needs: [changes, master_merge_guard]
-    if: >-
-      always() && !cancelled() &&
-      needs.changes.result == 'success' &&
-      (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
-      needs.changes.outputs.has_ci_relevant == 'true' &&
-      (
-        (
-          github.event_name == 'pull_request' &&
-          needs.master_merge_guard.result == 'skipped' &&
-          !(
-            github.event.pull_request.user.login == 'dependabot[bot]' &&
-            needs.changes.outputs.version_changed != 'true'
-          )
-        ) ||
-        (
-          github.event_name == 'push' &&
-          needs.master_merge_guard.result == 'success' &&
-          needs.master_merge_guard.outputs.from_merged_pr != 'true'
-        )
-      )
-    runs-on: windows-latest
-    permissions:
-      contents: read
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
-          fetch-depth: 0
-
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
-        with:
-          bazelisk-cache: true
-          disk-cache: build-test-publish-arena-windows
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
-        shell: bash
-
-      - name: Build and test
-        shell: bash
-        run: |
-          bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test,-no-windows
-          bazel test //... --config=ci --build_tests_only --test_tag_filters=component_test --local_test_jobs=4
-
-  generate_windows_pip_lock:
-    name: Generate Windows pip lock files
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: windows-latest
-    permissions:
-      contents: read
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          fetch-depth: 0
-
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
-        with:
-          bazelisk-cache: true
-          disk-cache: build-test-publish-arena-windows
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
-        shell: bash
-
-      - name: Regenerate Windows pip lock files
-        shell: bash
-        run: |
-          bazel run --config=ci //arena-pytest:pip_requirements.update
-          bazel run --config=ci //examples:pip_requirements.update
-
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: windows-pip-lock-files
-          path: |
-            arena-pytest/requirements_windows.txt
-            examples/requirements_windows.txt
-          if-no-files-found: error
-
   publish_gate:
     name: Publish gate
     needs:
@@ -634,7 +529,6 @@ jobs:
       - coverage_ubuntu_24_04
       - test_macos_intel
       - test_macos_arm64
-      - test_windows
     if: >-
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
@@ -650,8 +544,7 @@ jobs:
           needs.test_ubuntu_24_04.result == 'success' &&
           needs.coverage_ubuntu_24_04.result == 'success' &&
           needs.test_macos_intel.result == 'success' &&
-          needs.test_macos_arm64.result == 'success' &&
-          needs.test_windows.result == 'success'
+          needs.test_macos_arm64.result == 'success'
         ) ||
         (
           github.event_name == 'push' &&
@@ -663,8 +556,7 @@ jobs:
               needs.verify.result == 'success' &&
               needs.test_ubuntu_24_04.result == 'success' &&
               needs.test_macos_intel.result == 'success' &&
-              needs.test_macos_arm64.result == 'success' &&
-              needs.test_windows.result == 'success'
+              needs.test_macos_arm64.result == 'success'
             )
           )
         )
@@ -703,11 +595,6 @@ jobs:
             disk-cache: build-test-publish-arena-macos-intel
             built-lib-name: libarena_ffi.dylib
             staged-lib-name: libarena_ffi_shared.dylib
-          - runner: windows-latest
-            artifact: arena-ffi-windows-x86-64
-            disk-cache: build-test-publish-arena-windows
-            built-lib-name: arena_ffi.dll
-            staged-lib-name: arena_ffi_shared.dll
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -731,13 +618,11 @@ jobs:
             echo "common:ci --remote_cache=" >> .bazelrc.user
             echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
-        shell: bash
 
       - name: Build arena_ffi_shared
         run: bazel build //arena-ffi:arena_ffi_shared --config=ci --config=release
 
       - name: Stage arena_ffi_shared for release bundling
-        shell: bash
         run: |
           mkdir -p staged-arena-ffi
           cp bazel-bin/arena-ffi/${{ matrix.built-lib-name }} staged-arena-ffi/${{ matrix.staged-lib-name }}
@@ -778,11 +663,6 @@ jobs:
             disk-cache: build-test-publish-arena-macos-intel
             arena-ffi-artifact: arena-ffi-darwin-x86-64
             arena-ffi-prebuilt-dir: darwin-x86-64
-          - runner: windows-latest
-            artifact: arena-pytest-wheel-windows-x86-64
-            disk-cache: build-test-publish-arena-windows
-            arena-ffi-artifact: arena-ffi-windows-x86-64
-            arena-ffi-prebuilt-dir: windows-x86-64
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -797,7 +677,6 @@ jobs:
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
-        shell: bash
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
         run: |
@@ -816,7 +695,6 @@ jobs:
 
       - name: Unique version for TestPyPI
         if: github.event_name == 'pull_request'
-        shell: bash
         env:
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
@@ -832,7 +710,6 @@ jobs:
           PY
 
       - name: Build wheel
-        shell: bash
         run: |
           rm -f bazel-bin/arena-pytest/arena_pytest-*.whl
           bazel build //arena-pytest:arena_pytest_wheel --config=ci --config=release
@@ -954,17 +831,10 @@ jobs:
           name: arena-ffi-darwin-x86-64
           path: arena-junit/prebuilt/src/main/resources/darwin-x86-64
 
-      - name: Download arena_ffi_shared (Windows x86-64)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: arena-ffi-windows-x86-64
-          path: arena-junit/prebuilt/src/main/resources/windows-x86-64
-
       - name: Verify staged native libraries
         run: |
           test -s arena-junit/prebuilt/src/main/resources/darwin-aarch64/libarena_ffi_shared.dylib
           test -s arena-junit/prebuilt/src/main/resources/darwin-x86-64/libarena_ffi_shared.dylib
-          test -s arena-junit/prebuilt/src/main/resources/windows-x86-64/arena_ffi_shared.dll
 
       - name: Publish snapshot to Maven Central
         env:
@@ -1025,17 +895,10 @@ jobs:
           name: arena-ffi-darwin-x86-64
           path: arena-junit/prebuilt/src/main/resources/darwin-x86-64
 
-      - name: Download arena_ffi_shared (Windows x86-64)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: arena-ffi-windows-x86-64
-          path: arena-junit/prebuilt/src/main/resources/windows-x86-64
-
       - name: Verify staged native libraries
         run: |
           test -s arena-junit/prebuilt/src/main/resources/darwin-aarch64/libarena_ffi_shared.dylib
           test -s arena-junit/prebuilt/src/main/resources/darwin-x86-64/libarena_ffi_shared.dylib
-          test -s arena-junit/prebuilt/src/main/resources/windows-x86-64/arena_ffi_shared.dll
 
       - name: Build release artifacts
         run: |
@@ -1045,7 +908,6 @@ jobs:
             //arena-junit:arena_junit_native_linux_x86_64 \
             //arena-junit:arena_junit_native_osx_aarch64 \
             //arena-junit:arena_junit_native_osx_x86_64 \
-            //arena-junit:arena_junit_native_windows_x86_64 \
             --config=ci --config=release
 
       - name: Import GPG key
@@ -1066,8 +928,7 @@ jobs:
             "$PWD/bazel-bin/arena-junit/arena_junit_maven-docs.jar" \
             --classifier-jar "linux-x86_64=$PWD/bazel-bin/arena-junit/libarena_junit_native_linux_x86_64.jar" \
             --classifier-jar "osx-aarch_64=$PWD/bazel-bin/arena-junit/libarena_junit_native_osx_aarch64.jar" \
-            --classifier-jar "osx-x86_64=$PWD/bazel-bin/arena-junit/libarena_junit_native_osx_x86_64.jar" \
-            --classifier-jar "windows-x86_64=$PWD/bazel-bin/arena-junit/libarena_junit_native_windows_x86_64.jar"
+            --classifier-jar "osx-x86_64=$PWD/bazel-bin/arena-junit/libarena_junit_native_osx_x86_64.jar"
 
   publish_nuget_snapshot:
     name: Publish NuGet snapshot (Ubuntu 24.04)
@@ -1117,12 +978,6 @@ jobs:
         with:
           name: arena-ffi-darwin-aarch64
           path: arena-xunit/prebuilt/darwin-aarch64
-
-      - name: Download arena_ffi_shared (Windows x86-64)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: arena-ffi-windows-x86-64
-          path: arena-xunit/prebuilt/windows-x86-64
 
       - name: NuGet login (OIDC trusted publishing)
         id: nuget_login
@@ -1189,12 +1044,6 @@ jobs:
         with:
           name: arena-ffi-darwin-aarch64
           path: arena-xunit/prebuilt/darwin-aarch64
-
-      - name: Download arena_ffi_shared (Windows x86-64)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: arena-ffi-windows-x86-64
-          path: arena-xunit/prebuilt/windows-x86-64
 
       - name: NuGet login (OIDC trusted publishing)
         id: nuget_login
