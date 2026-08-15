@@ -67,7 +67,7 @@
          child_environment: vars,
          touch_file,
          copy_output,
-@@ -304,6 +336,42 @@
+@@ -304,6 +336,51 @@
      })
  }
  
@@ -84,25 +84,34 @@
 +            std::env::current_dir()
 +        ))
 +    };
-+    let mut writer = io::BufWriter::new(File::create(&param_file).map_err(format_err)?);
++    let mut flattened: Vec<String> = Vec::new();
 +    for arg in args {
 +        // rustc's own @file expansion is not recursive: inline any nested
 +        // @file reference's content rather than leaving it as a literal
 +        // "@path" line, which rustc would otherwise try to open verbatim.
 +        match arg.strip_prefix('@') {
 +            Some(nested) => {
-+                for line in read_file_to_array(nested).map_err(OptionError::Generic)? {
-+                    writeln!(writer, "{line}").map_err(format_err)?;
-+                }
++                flattened.extend(read_file_to_array(nested).map_err(OptionError::Generic)?);
 +            }
-+            None => writeln!(writer, "{arg}").map_err(format_err)?,
++            None => flattened.push(arg.clone()),
 +        }
++    }
++    let mut writer = io::BufWriter::new(File::create(&param_file).map_err(format_err)?);
++    for line in &flattened {
++        writeln!(writer, "{line}").map_err(format_err)?;
 +    }
 +    writer.flush().map_err(format_err)?;
 +    eprintln!(
-+        "process_wrapper: collapse_into_param_file: file={} count={}",
++        "process_wrapper: collapse_into_param_file: file={} pre_count={} flattened_count={} has_extern_arena={} sample_externs={:?}",
 +        param_file,
 +        args.len(),
++        flattened.len(),
++        flattened.iter().any(|l| l == "--extern" ) && flattened.iter().any(|l| l.starts_with("arena=")),
++        flattened
++            .iter()
++            .filter(|l| l.starts_with("arena") && l.contains('='))
++            .take(5)
++            .collect::<Vec<_>>(),
 +    );
 +    Ok(vec![format!("@{param_file}")])
 +}
