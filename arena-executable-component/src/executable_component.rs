@@ -22,7 +22,11 @@ fn resolve_shell_invocation(
                 first.1 = "/c".to_string();
             }
         }
-        return (PathBuf::from("cmd.exe"), args);
+        // A bare "cmd.exe" relies on PATH search, which Bazel's sandboxed test
+        // environment doesn't always include System32 on; COMSPEC always holds
+        // the interpreter's full path.
+        let comspec = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string());
+        return (PathBuf::from(comspec), args);
     }
     (executable_path.to_path_buf(), runtime_args.to_vec())
 }

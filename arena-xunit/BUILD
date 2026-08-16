@@ -189,7 +189,7 @@ dotnet_coverage_test(
 
 csharp_test(
     name = "component_test",
-    size = "small",
+    size = "medium",
     tags = ["component_test"],
     target_frameworks = ["net8.0"],
     nullable = "enable",
