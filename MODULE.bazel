@@ -7,7 +7,17 @@ arena_version_ext = use_extension("//tools:arena_version.bzl", "arena_version")
 use_repo(arena_version_ext, "arena_version")
 
 bazel_dep(name = "rules_python", version = "0.34.0")
-bazel_dep(name = "rules_rust", version = "0.69.0")
+bazel_dep(name = "rules_rust", version = "0.71.0")
+single_version_override(
+    module_name = "rules_rust",
+    version = "0.71.0",
+    patches = [
+        "//tools/patches:rules_rust_windows_param_file_rustc_bzl.patch",
+        "//tools/patches:rules_rust_windows_param_file_options_rs.patch",
+        "//tools/patches:rules_rust_windows_symlink_deps_rustc_bzl.patch",
+    ],
+    patch_strip = 1,
+)
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "rules_java", version = "9.0.0")
 bazel_dep(name = "rules_jvm_external", version = "6.6")
