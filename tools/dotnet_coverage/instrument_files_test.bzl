@@ -1,5 +1,6 @@
 """Unit tests for `is_unscoped_instrument_pattern`."""
 
+load("@bazel_skylib//lib:partial.bzl", "partial")
 load("@bazel_skylib//lib:unittest.bzl", "asserts", "unittest")
 load(":instrument_files.bzl", "is_unscoped_instrument_pattern")
 
@@ -55,10 +56,10 @@ _is_unscoped_instrument_pattern_partialNameWildcard_returnsFalse_test = unittest
 def instrument_files_test_suite(name):
     unittest.suite(
         name,
-        _is_unscoped_instrument_pattern_starDotDll_returnsTrue_test,
-        _is_unscoped_instrument_pattern_recursiveStarDotDll_returnsTrue_test,
-        _is_unscoped_instrument_pattern_uppercaseExtension_returnsTrue_test,
-        _is_unscoped_instrument_pattern_directoryScopedWildcard_returnsTrue_test,
-        _is_unscoped_instrument_pattern_namedAssembly_returnsFalse_test,
-        _is_unscoped_instrument_pattern_partialNameWildcard_returnsFalse_test,
+        partial.make(_is_unscoped_instrument_pattern_starDotDll_returnsTrue_test, size = "small"),
+        partial.make(_is_unscoped_instrument_pattern_recursiveStarDotDll_returnsTrue_test, size = "small"),
+        partial.make(_is_unscoped_instrument_pattern_uppercaseExtension_returnsTrue_test, size = "small"),
+        partial.make(_is_unscoped_instrument_pattern_directoryScopedWildcard_returnsTrue_test, size = "small"),
+        partial.make(_is_unscoped_instrument_pattern_namedAssembly_returnsFalse_test, size = "small"),
+        partial.make(_is_unscoped_instrument_pattern_partialNameWildcard_returnsFalse_test, size = "small"),
     )
