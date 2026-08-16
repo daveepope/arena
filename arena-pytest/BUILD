@@ -24,7 +24,7 @@ ARENA_PYTEST_CLASSIFIERS = [
 ]
 
 exports_files(
-    ["LICENSE", "requirements.txt", "requirements_lock.txt", "requirements_windows.txt"],
+    ["LICENSE", "requirements.txt", "requirements_lock.txt", "requirements_windows.txt", "pyproject.toml"],
     visibility = ["//visibility:public"],
 )
 
