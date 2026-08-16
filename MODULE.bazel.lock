@@ -205,7 +205,7 @@
     "//tools:arena_version.bzl%arena_version": {
       "general": {
         "bzlTransitiveDigest": "DKya/O7/G21oGTUpyPEcPOtxkNd6MuOComr8gCuG21I=",
-        "usagesDigest": "qD6krO9/JZv1+6mncUbJ6AZIzo9Gw5mBb/KTBViNpos=",
+        "usagesDigest": "mX6aBL5WSCc1oY0HMXPM6+5ZAMt7HwQf/KRmtKBUlkw=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -352,7 +352,7 @@
     "@@rules_dotnet~//dotnet:extensions.bzl%dotnet": {
       "general": {
         "bzlTransitiveDigest": "455CyqHKbuSpans6TInT87vzKVKvfKsBe2ueLAeTx+A=",
-        "usagesDigest": "YlIwNMEs5sMEDNltjt7H+hgVOCt9KSakGd1KnJZIoRY=",
+        "usagesDigest": "ogF/U7wzk7qG8cr36Y8Q/gNK+PGevSXfXNyT6VfOywE=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -518,7 +518,7 @@
     },
     "@@rules_rust~//crate_universe/private:internal_extensions.bzl%cu_nr": {
       "general": {
-        "bzlTransitiveDigest": "hVHjx35mCA0ZLu2+M5RqAmLBxaZiWZF96CT/W8Sos7Y=",
+        "bzlTransitiveDigest": "Qsbg5kcyMy9ZiSaYPCyQl8UgeQWuXZZnt0zoljjpd9I=",
         "usagesDigest": "eSe7BrgOmwVIFfGaW8ey5gXU8nreiir1Odb5iaY4/VU=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
