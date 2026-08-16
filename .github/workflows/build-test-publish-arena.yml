@@ -344,8 +344,14 @@ jobs:
 
       - name: Build and test
         run: |
+          set +e
           bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
+          status1=$?
           bazel test //... --config=ci --build_tests_only --test_tag_filters=component_test --local_test_jobs=4
+          status2=$?
+          if [ $status1 -ne 0 ] || [ $status2 -ne 0 ]; then
+            exit 1
+          fi
 
   coverage_ubuntu_24_04:
     name: Coverage Ubuntu 24.04
@@ -578,8 +584,14 @@ jobs:
       - name: Build and test
         shell: bash
         run: |
+          set +e
           bazel test --config=ci --enable_runfiles --build_tests_only --test_tag_filters=-component_test,-no-windows -- //...
+          status1=$?
           bazel test --config=ci --enable_runfiles --build_tests_only --test_tag_filters=component_test --local_test_jobs=4 --test_env=DOCKER_HOST -- //...
+          status2=$?
+          if [ $status1 -ne 0 ] || [ $status2 -ne 0 ]; then
+            exit 1
+          fi
 
   generate_windows_pip_lock:
     name: Generate Windows pip lock files
@@ -614,12 +626,16 @@ jobs:
 
       - name: Regenerate Windows pip lock files
         shell: pwsh
-        run: bazel run --config=ci //arena-pytest:pip_requirements.update
+        run: |
+          bazel run --config=ci //arena-pytest:pip_requirements.update
+          bazel run --config=ci //examples:pip_requirements.update
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: windows-pip-lock-files
-          path: arena-pytest/requirements_windows.txt
+          path: |
+            arena-pytest/requirements_windows.txt
+            examples/requirements_windows.txt
           if-no-files-found: error
 
   publish_gate:
