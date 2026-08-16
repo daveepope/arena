@@ -890,6 +890,10 @@ java_test(
         "--select-class=arena.junit.ChildrenLifecycleComponentTest",
     ],
     tags = ["component_test"],
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     runtime_deps = [
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
         "@arena_java_maven//:org_junit_platform_junit_platform_console",

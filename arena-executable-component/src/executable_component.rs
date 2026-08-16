@@ -3,44 +3,9 @@ use arena::component::RunnableComponent;
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::thread;
-
-// `/bin/sh` doesn't exist on Windows; translate it (and its `-c` flag) to the
-// platform's equivalent shell invocation so callers can target "the POSIX
-// shell" portably without branching on OS themselves. Must run before the
-// builder's absolute-path resolution: `/bin/sh` has no drive prefix, so
-// `Path::is_absolute()` is false for it on Windows, and it would otherwise
-// get silently rewritten into a bogus path relative to the current directory.
-#[cfg(windows)]
-pub(crate) fn resolve_shell_invocation(
-    executable_path: &Path,
-    runtime_args: &[(String, String)],
-) -> (PathBuf, Vec<(String, String)>) {
-    if executable_path == Path::new("/bin/sh") {
-        let mut args = runtime_args.to_vec();
-        if let Some(first) = args.first_mut() {
-            if first.1 == "-c" {
-                first.1 = "/c".to_string();
-            }
-        }
-        // A bare "cmd.exe" relies on PATH search, which Bazel's sandboxed test
-        // environment doesn't always include System32 on; COMSPEC always holds
-        // the interpreter's full path.
-        let comspec = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string());
-        return (PathBuf::from(comspec), args);
-    }
-    (executable_path.to_path_buf(), runtime_args.to_vec())
-}
-
-#[cfg(not(windows))]
-pub(crate) fn resolve_shell_invocation(
-    executable_path: &Path,
-    runtime_args: &[(String, String)],
-) -> (PathBuf, Vec<(String, String)>) {
-    (executable_path.to_path_buf(), runtime_args.to_vec())
-}
 
 pub struct ExecutableComponent {
     pub(crate) identifier: String,
