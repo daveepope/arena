@@ -572,6 +572,10 @@ jobs:
           echo "startup --output_base=C:/bzl-out" >> .bazelrc.user
         shell: bash
 
+      - name: Setup WSL2 Docker
+        shell: pwsh
+        run: .github/scripts/setup_wsl2_docker.ps1
+
       - name: Build and test
         shell: bash
         run: |
