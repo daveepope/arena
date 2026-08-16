@@ -8,5 +8,5 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyCulture("")]
 [assembly: AssemblyConfiguration("Release")]
 [assembly: InternalsVisibleTo("ArenaDotnet.Xunit.UnitTest")]
-[assembly: InternalsVisibleTo("arena_xunit_unit_test_bin")]
-[assembly: InternalsVisibleTo("arena_xunit_unit_test_plain")]
+[assembly: InternalsVisibleTo("xunit_unit_test_bin")]
+[assembly: InternalsVisibleTo("xunit_unit_test_plain")]

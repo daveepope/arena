@@ -24,7 +24,7 @@ internal sealed class RecordedLogLogger : ILogger
         }
     }
 
-    public IDisposable? BeginScope<TState>(TState state) => null;
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
     public bool IsEnabled(LogLevel logLevel) => true;
 

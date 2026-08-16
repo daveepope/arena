@@ -11,6 +11,7 @@ public class RegisteredPlaybookTest
         var playbook = new TestManagedHttpPlaybook("id", "dep-id");
         var rp = new RegisteredPlaybook(playbook, false);
         var config = rp.ToConfig();
+        Assert.NotNull(config);
         var kind = config.GetType().GetProperty("kind")?.GetValue(config);
         Assert.Equal("http", kind);
     }
@@ -21,6 +22,7 @@ public class RegisteredPlaybookTest
         var playbook = new TestManagedMssqlPlaybook("id", "dep-id");
         var rp = new RegisteredPlaybook(playbook, true);
         var config = rp.ToConfig();
+        Assert.NotNull(config);
         var kind = config.GetType().GetProperty("kind")?.GetValue(config);
         Assert.Equal("mssql", kind);
     }
@@ -31,6 +33,7 @@ public class RegisteredPlaybookTest
         var playbook = new TestManagedLocalstackPlaybook("id", "dep-id");
         var rp = new RegisteredPlaybook(playbook, false);
         var config = rp.ToConfig();
+        Assert.NotNull(config);
         var kind = config.GetType().GetProperty("kind")?.GetValue(config);
         Assert.Equal("localstack", kind);
     }

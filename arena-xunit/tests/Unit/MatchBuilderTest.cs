@@ -19,7 +19,7 @@ public class MatchBuilderTest
     [Fact]
     public void Build_WithNullName_Throws()
     {
-        Assert.Throws<System.ArgumentNullException>(() => new MatchBuilder(null));
+        Assert.Throws<System.ArgumentNullException>(() => new MatchBuilder(null!));
     }
 
     [Fact]

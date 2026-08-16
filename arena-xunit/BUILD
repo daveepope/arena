@@ -113,6 +113,7 @@ csharp_library(
     target_frameworks = ["netstandard2.0"],
     visibility = ["//visibility:public"],
     compiler_options = ["/langversion:latest", "/debug:pdbonly"],
+    nullable = "enable",
     deps = [
         ":xunit_extensibility_lib",
         ":xunit_extensibility_core_lib",
@@ -165,9 +166,10 @@ dotnet_nuget_push(
 )
 
 dotnet_coverage_test(
-    name = "arena_xunit_unit_test",
+    name = "xunit_unit_test",
     size = "small",
     target_frameworks = ["net8.0"],
+    nullable = "enable",
     instrument_files = ["**/ArenaDotnet.Xunit.dll"],
     srcs = glob(["tests/Unit/**/*.cs"]),
     data = ["//arena-ffi:arena_ffi_shared", ":xunit_core_netstandard"],
@@ -190,6 +192,7 @@ csharp_test(
     size = "small",
     tags = ["component_test"],
     target_frameworks = ["net8.0"],
+    nullable = "enable",
     srcs = glob(["tests/Component/**/*.cs"]),
     data = ["//arena-ffi:arena_ffi_shared", ":xunit_core_netstandard"],
     deps = [

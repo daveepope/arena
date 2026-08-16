@@ -35,8 +35,9 @@ public class LocalstackDependencyBuilderSerializationTest
         var dep = new LocalstackDependencyBuilder("test").WithService("sqs").Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["services"]);
-        Assert.Equal("sqs", obj["services"][0]);
+        var services = obj["services"];
+        Assert.NotNull(services);
+        Assert.Equal("sqs", services[0]);
     }
 
     [Fact]
@@ -45,8 +46,9 @@ public class LocalstackDependencyBuilderSerializationTest
         var dep = new LocalstackDependencyBuilder("test").WithServices("sqs", "s3").Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["services"]);
-        Assert.Equal(2, obj["services"].Count());
+        var services = obj["services"];
+        Assert.NotNull(services);
+        Assert.Equal(2, services.Count());
     }
 
     [Fact]
@@ -55,9 +57,11 @@ public class LocalstackDependencyBuilderSerializationTest
         var dep = new LocalstackDependencyBuilder("test").WithQueue("myqueue").Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["queues"]);
-        Assert.Equal("myqueue", obj["queues"][0]["name"]);
-        Assert.Equal(false, obj["queues"][0]["fifo"]);
+        var queues = obj["queues"];
+        Assert.NotNull(queues);
+        var queue = Assert.Single(queues);
+        Assert.Equal("myqueue", queue["name"]);
+        Assert.Equal(false, queue["fifo"]);
     }
 
     [Fact]
@@ -66,9 +70,11 @@ public class LocalstackDependencyBuilderSerializationTest
         var dep = new LocalstackDependencyBuilder("test").WithFifoQueue("myqueue.fifo").Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["queues"]);
-        Assert.Equal("myqueue.fifo", obj["queues"][0]["name"]);
-        Assert.Equal(true, obj["queues"][0]["fifo"]);
+        var queues = obj["queues"];
+        Assert.NotNull(queues);
+        var queue = Assert.Single(queues);
+        Assert.Equal("myqueue.fifo", queue["name"]);
+        Assert.Equal(true, queue["fifo"]);
     }
 
     [Fact]
@@ -77,8 +83,10 @@ public class LocalstackDependencyBuilderSerializationTest
         var dep = new LocalstackDependencyBuilder("test").WithEventBus("my-bus").Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["event_buses"]);
-        Assert.Equal("my-bus", obj["event_buses"][0]["name"]);
+        var eventBuses = obj["event_buses"];
+        Assert.NotNull(eventBuses);
+        var eventBus = Assert.Single(eventBuses);
+        Assert.Equal("my-bus", eventBus["name"]);
     }
 
     [Fact]
@@ -126,9 +134,14 @@ public class LocalstackDependencyBuilderSerializationTest
         var dep = new LocalstackDependencyBuilder("test").WithEventRule(rule).Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["event_rules"]);
-        Assert.Equal("rule1", obj["event_rules"][0]["name"]);
-        Assert.Equal("sqs_queue", obj["event_rules"][0]["targets"][0]["kind"]);
+        var eventRules = obj["event_rules"];
+        Assert.NotNull(eventRules);
+        var eventRule = Assert.Single(eventRules);
+        Assert.Equal("rule1", eventRule["name"]);
+        var targets = eventRule["targets"];
+        Assert.NotNull(targets);
+        var eventTarget = Assert.Single(targets);
+        Assert.Equal("sqs_queue", eventTarget["kind"]);
     }
 
     [Fact]
@@ -145,7 +158,13 @@ public class LocalstackDependencyBuilderSerializationTest
         var dep = new LocalstackDependencyBuilder("test").WithEventRule(rule).Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Equal("lambda", obj["event_rules"][0]["targets"][0]["kind"]);
-        Assert.Equal("func1", obj["event_rules"][0]["targets"][0]["function_name"]);
+        var eventRules = obj["event_rules"];
+        Assert.NotNull(eventRules);
+        var eventRule = Assert.Single(eventRules);
+        var targets = eventRule["targets"];
+        Assert.NotNull(targets);
+        var eventTarget = Assert.Single(targets);
+        Assert.Equal("lambda", eventTarget["kind"]);
+        Assert.Equal("func1", eventTarget["function_name"]);
     }
 }
