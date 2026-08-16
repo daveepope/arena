@@ -3,9 +3,37 @@ use arena::component::RunnableComponent;
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::thread;
+
+// `/bin/sh` doesn't exist on Windows; translate it (and its `-c` flag) to the
+// platform's equivalent shell invocation so callers can target "the POSIX
+// shell" portably without branching on OS themselves.
+#[cfg(windows)]
+fn resolve_shell_invocation(
+    executable_path: &Path,
+    runtime_args: &[(String, String)],
+) -> (PathBuf, Vec<(String, String)>) {
+    if executable_path == Path::new("/bin/sh") {
+        let mut args = runtime_args.to_vec();
+        if let Some(first) = args.first_mut() {
+            if first.1 == "-c" {
+                first.1 = "/c".to_string();
+            }
+        }
+        return (PathBuf::from("cmd.exe"), args);
+    }
+    (executable_path.to_path_buf(), runtime_args.to_vec())
+}
+
+#[cfg(not(windows))]
+fn resolve_shell_invocation(
+    executable_path: &Path,
+    runtime_args: &[(String, String)],
+) -> (PathBuf, Vec<(String, String)>) {
+    (executable_path.to_path_buf(), runtime_args.to_vec())
+}
 
 pub struct ExecutableComponent {
     pub(crate) identifier: String,
@@ -97,6 +125,9 @@ impl ExecutableComponent {
             .as_ref()
             .ok_or_else(|| "executable_path not configured".to_string())?;
 
+        let (executable_path, runtime_args) =
+            resolve_shell_invocation(executable_path, &self.runtime_args);
+
         tracing::debug!(
             component = %self.identifier,
             executable_path = ?executable_path,
@@ -104,13 +135,13 @@ impl ExecutableComponent {
             "spawning child process",
         );
 
-        let mut cmd = Command::new(executable_path);
+        let mut cmd = Command::new(&executable_path);
 
         for (key, value) in &self.env_vars {
             cmd.env(key, value);
         }
 
-        for (_key, value) in &self.runtime_args {
+        for (_key, value) in &runtime_args {
             cmd.arg(value);
         }
 

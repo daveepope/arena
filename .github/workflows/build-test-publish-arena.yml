@@ -569,7 +569,6 @@ jobs:
             echo "common:ci --remote_cache=" >> .bazelrc.user
             echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
-          echo "startup --output_base=C:/bzl-out" >> .bazelrc.user
         shell: bash
 
       - name: Setup WSL2 Docker
