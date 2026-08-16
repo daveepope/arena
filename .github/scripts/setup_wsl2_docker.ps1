@@ -18,6 +18,13 @@ function Wsl-Run([string]$Command) {
   if ($LASTEXITCODE -ne 0) { throw "WSL command failed ($LASTEXITCODE): $Command" }
 }
 
+# WSL2's kernel has bridge and br_netfilter compiled directly in, but ships no
+# /lib/modules metadata at all, so Docker's modprobe sanity-check before enabling the
+# bridge network driver fails and Docker silently drops "bridge" from its plugin
+# registry ("could not find plugin bridge in v1 plugin registry"). Declaring them
+# built-in lets modprobe report success without needing an actual loadable module.
+Wsl-Run "mkdir -p /lib/modules/`$(uname -r) && printf 'kernel/net/bridge/bridge.ko\nkernel/net/bridge/br_netfilter.ko\n' > /lib/modules/`$(uname -r)/modules.builtin && depmod `$(uname -r)"
+
 Wsl-Run "command -v docker >/dev/null 2>&1 || (apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --yes docker.io)"
 
 # Docker's default bridge (172.17.0.0/16) can collide with WSL2's randomly assigned NAT

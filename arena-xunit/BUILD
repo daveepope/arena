@@ -188,7 +188,7 @@ dotnet_coverage_test(
 )
 
 csharp_test(
-    name = "arena_xunit_lifecycle_component_test",
+    name = "xunit_lifecycle_component_test",
     size = "small",
     tags = ["component_test"],
     target_frameworks = ["net8.0"],

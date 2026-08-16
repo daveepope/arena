@@ -58,7 +58,9 @@ impl HttpImpl for HttpContainerImpl {
             image = image.with_exposed_port(https_p.tcp());
         }
 
-        let mut request = image.with_container_name(container_name);
+        let mut request = image
+            .with_container_name(container_name)
+            .with_platform(arena_container::platform::docker_platform());
 
         if !http_disabled && port > 0 {
             request = request.with_mapped_port(port, container_port);

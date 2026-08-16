@@ -88,7 +88,8 @@ impl MssqlImpl for MssqlContainerImpl {
             .with_mapped_port(port, ContainerPort::from(DEFAULT_CONTAINER_PORT))
             .with_name(image_name)
             .with_tag(image_tag)
-            .with_container_name(container_name);
+            .with_container_name(container_name)
+            .with_platform(arena_container::platform::docker_platform());
 
         if let Some(ref network) = self.network {
             arena_container::network::ensure_network_exists(network).await;
