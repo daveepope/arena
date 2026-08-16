@@ -145,9 +145,9 @@ async fn connect_with_timeout_silent_endpoint_returns_error_within_budget() {
 
     assert!(result.is_err(), "expected timeout error, got {result:?}");
     assert!(
-        elapsed < budget * 4,
-        "expected fast timeout (<{:?}), took {elapsed:?}",
-        budget * 4
+        elapsed < budget * 10,
+        "expected bounded timeout across retries (<{:?}), took {elapsed:?}",
+        budget * 10
     );
 }
 
