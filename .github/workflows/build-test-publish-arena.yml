@@ -610,7 +610,7 @@ jobs:
         shell: bash
 
       - name: Regenerate Windows pip lock files
-        shell: bash
+        shell: pwsh
         run: bazel run --config=ci //arena-pytest:pip_requirements.update
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
