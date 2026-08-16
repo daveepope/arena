@@ -1,4 +1,4 @@
-use crate::executable_component::ExecutableComponent;
+use crate::executable_component::{resolve_shell_invocation, ExecutableComponent};
 use arena::healthcheck::ReadinessCheck;
 use arena::Component;
 use std::path::PathBuf;
@@ -94,7 +94,13 @@ impl ExecutableComponentBuilder {
         self
     }
 
-    pub fn build(self) -> ExecutableComponent {
+    pub fn build(mut self) -> ExecutableComponent {
+        if let Some(ref path) = self.executable_path {
+            let (resolved_path, resolved_args) = resolve_shell_invocation(path, &self.runtime_args);
+            self.executable_path = Some(resolved_path);
+            self.runtime_args = resolved_args;
+        }
+
         if let (Some(ref source_path), Some(ref build_tool)) = (&self.source_path, &self.build_tool)
         {
             tracing::debug!(
