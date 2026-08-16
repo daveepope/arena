@@ -8,6 +8,8 @@ certifi==2024.8.30
     # via requests
 charset-normalizer==3.4.0
     # via requests
+colorama==0.4.6
+    # via pytest
 idna==3.15
     # via requests
 iniconfig==2.0.0
