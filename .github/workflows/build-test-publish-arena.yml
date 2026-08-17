@@ -848,6 +848,8 @@ jobs:
 
       - name: Build wheel
         shell: bash
+        env:
+          MSYS_NO_PATHCONV: "1"
         run: |
           rm -f bazel-bin/arena-pytest/arena_pytest-*.whl
           bazel build //arena-pytest:arena_pytest_wheel --config=ci --config=release
