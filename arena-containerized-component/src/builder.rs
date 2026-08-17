@@ -19,6 +19,7 @@ pub struct ContainerizedComponentBuilder {
     port_mappings: Vec<(u16, u16)>,
     readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
     host_mappings: Vec<String>,
+    volume_mappings: Vec<(String, String)>,
 }
 
 const DEFAULT_READINESS_TIMEOUT_MS: u64 = 10_000;
@@ -41,6 +42,7 @@ impl ContainerizedComponentBuilder {
             port_mappings: Vec::new(),
             readiness_checks: Vec::new(),
             host_mappings: Vec::new(),
+            volume_mappings: Vec::new(),
         }
     }
 
@@ -86,6 +88,16 @@ impl ContainerizedComponentBuilder {
 
     pub fn with_host_mapping(mut self, host_mapping: impl Into<String>) -> Self {
         self.host_mappings.push(host_mapping.into());
+        self
+    }
+
+    pub fn with_volume_mapping(
+        mut self,
+        host_path: impl Into<String>,
+        container_path: impl Into<String>,
+    ) -> Self {
+        self.volume_mappings
+            .push((host_path.into(), container_path.into()));
         self
     }
 
@@ -265,6 +277,7 @@ impl ContainerizedComponentBuilder {
             .dockerfile(".arena.Dockerfile")
             .t(image_tag)
             .rm(true)
+            .platform(arena_container::platform::docker_platform().as_str())
             .build();
 
         let mut stream =
@@ -333,6 +346,7 @@ impl ContainerizedComponentBuilder {
             port_mappings: self.port_mappings,
             readiness_checks: self.readiness_checks,
             host_mappings: self.host_mappings,
+            volume_mappings: self.volume_mappings,
             runtime_client,
             container_id: None,
             stopped: false,

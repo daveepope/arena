@@ -26,6 +26,7 @@ public final class ContainerizedComponentBuilder {
     config.set("runtime_args", ArenaJson.array());
     config.set("port_mappings", ArenaJson.array());
     config.set("host_mappings", ArenaJson.array());
+    config.set("volume_mappings", ArenaJson.array());
   }
 
   public ContainerizedComponentBuilder withBuildContext(String path) {
@@ -54,6 +55,15 @@ public final class ContainerizedComponentBuilder {
 
   public ContainerizedComponentBuilder withHostMapping(String hostMapping) {
     ((ArrayNode) config.get("host_mappings")).add(hostMapping);
+    return this;
+  }
+
+  public ContainerizedComponentBuilder withVolumeMapping(String hostPath, String containerPath) {
+    ArrayNode arr = (ArrayNode) config.get("volume_mappings");
+    ObjectNode m = ArenaJson.object();
+    m.put("host_path", hostPath);
+    m.put("container_path", containerPath);
+    arr.add(m);
     return this;
   }
 
