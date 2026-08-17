@@ -1,11 +1,27 @@
 use arena::component::RunnableComponent;
 use arena_containerized_component::containerized_component::ContainerizedComponent;
+use bollard::query_parameters::CreateImageOptionsBuilder;
+use bollard::Docker;
+use futures::StreamExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 const CONTAINERFILE: &str = r#"FROM alpine:3.20
 CMD ["sh", "-c", "echo mounted-ok > /mnt/test/marker.txt && sleep 30"]
 "#;
+
+async fn ensure_base_image_pulled() {
+    let docker = Docker::connect_with_local_defaults().expect("connect to container runtime");
+    let options = CreateImageOptionsBuilder::default()
+        .from_image("alpine")
+        .tag("3.20")
+        .platform(arena_container::platform::docker_platform().as_str())
+        .build();
+    let mut stream = docker.create_image(Some(options), None, None);
+    while let Some(result) = stream.next().await {
+        result.expect("pull alpine:3.20 base image");
+    }
+}
 
 fn unique_host_dir(name: &str) -> PathBuf {
     let nanos = std::time::SystemTime::now()
@@ -35,6 +51,8 @@ async fn wait_for_marker(path: &Path, timeout: Duration) -> Option<String> {
 
 #[tokio::test]
 async fn start_with_volume_mapping_writes_file_visible_on_host() {
+    ensure_base_image_pulled().await;
+
     let host_dir = unique_host_dir("volume-mapping-probe");
     let marker_path = host_dir.join("marker.txt");
 
