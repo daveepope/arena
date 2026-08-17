@@ -19,14 +19,15 @@ public sealed class ContainerizedComponent : IArenaComponent
 
     private readonly List<RuntimeArgEntry> _runtimeArgs;
     private readonly List<PortMappingEntry> _portMappings;
+    private readonly List<VolumeMappingEntry> _volumeMappings;
     private readonly List<ReadinessCheckEntry> _readinessChecks;
     private readonly List<IArenaComponent> _children;
 
     internal ContainerizedComponent(string identifier, string containerfile, string? buildContext,
         string? imageTag, string? network, Dictionary<string, string> envVars,
         List<RuntimeArgEntry> runtimeArgs, List<PortMappingEntry> portMappings,
-        List<string> hostMappings, List<ReadinessCheckEntry> readinessChecks,
-        List<IArenaComponent> children)
+        List<string> hostMappings, List<VolumeMappingEntry> volumeMappings,
+        List<ReadinessCheckEntry> readinessChecks, List<IArenaComponent> children)
     {
         Identifier = identifier;
         Containerfile = containerfile;
@@ -37,6 +38,7 @@ public sealed class ContainerizedComponent : IArenaComponent
         _runtimeArgs = runtimeArgs;
         _portMappings = portMappings;
         HostMappings = hostMappings;
+        _volumeMappings = volumeMappings;
         _readinessChecks = readinessChecks;
         _children = children;
     }
@@ -55,6 +57,7 @@ public sealed class ContainerizedComponent : IArenaComponent
             RuntimeArgs = RuntimeArgEntry.Build(_runtimeArgs),
             PortMappings = PortMappingEntry.Build(_portMappings),
             HostMappings = new List<string>(HostMappings),
+            VolumeMappings = VolumeMappingEntry.Build(_volumeMappings),
             ReadinessChecks = ReadinessCheckWireFormat.Build(_readinessChecks),
             Children = ChildrenWireFormat.Build(_children),
         });
@@ -73,8 +76,29 @@ public sealed class ContainerizedComponent : IArenaComponent
         [JsonProperty("runtime_args")] public List<object> RuntimeArgs { get; set; } = default!;
         [JsonProperty("port_mappings")] public List<object> PortMappings { get; set; } = default!;
         [JsonProperty("host_mappings")] public List<string> HostMappings { get; set; } = default!;
+        [JsonProperty("volume_mappings")] public List<object> VolumeMappings { get; set; } = default!;
         [JsonProperty("readiness_checks")] public List<object>? ReadinessChecks { get; set; }
         [JsonProperty("children")] public List<JToken>? Children { get; set; }
+    }
+}
+
+internal sealed class VolumeMappingEntry
+{
+    public VolumeMappingEntry(string hostPath, string containerPath)
+    {
+        HostPath = hostPath;
+        ContainerPath = containerPath;
+    }
+
+    public string HostPath { get; }
+    public string ContainerPath { get; }
+
+    public static List<object> Build(IReadOnlyList<VolumeMappingEntry> entries)
+    {
+        var result = new List<object>(entries.Count);
+        foreach (var entry in entries)
+            result.Add(new { host_path = entry.HostPath, container_path = entry.ContainerPath });
+        return result;
     }
 }
 
@@ -109,6 +133,7 @@ public sealed class ContainerizedComponentBuilder
     private readonly List<RuntimeArgEntry> _runtimeArgs = new();
     private readonly List<PortMappingEntry> _portMappings = new();
     private readonly List<string> _hostMappings = new();
+    private readonly List<VolumeMappingEntry> _volumeMappings = new();
     private readonly List<ReadinessCheckEntry> _readinessChecks = new();
     private readonly List<IArenaComponent> _children = new();
 
@@ -153,6 +178,12 @@ public sealed class ContainerizedComponentBuilder
         return this;
     }
 
+    public ContainerizedComponentBuilder WithVolumeMapping(string hostPath, string containerPath)
+    {
+        _volumeMappings.Add(new VolumeMappingEntry(hostPath, containerPath));
+        return this;
+    }
+
     public ContainerizedComponentBuilder WithEnvVar(string key, string value)
     {
         _envVars[key] = value;
@@ -190,6 +221,7 @@ public sealed class ContainerizedComponentBuilder
         return new ContainerizedComponent(identifier, _containerfile, _buildContext, _imageTag, _network,
             new Dictionary<string, string>(_envVars), new List<RuntimeArgEntry>(_runtimeArgs),
             new List<PortMappingEntry>(_portMappings), new List<string>(_hostMappings),
+            new List<VolumeMappingEntry>(_volumeMappings),
             new List<ReadinessCheckEntry>(_readinessChecks), new List<IArenaComponent>(_children));
     }
 }

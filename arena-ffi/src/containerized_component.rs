@@ -13,6 +13,12 @@ pub(crate) struct PortMappingConfig {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct VolumeMappingConfig {
+    pub host_path: String,
+    pub container_path: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct ContainerizedComponentConfig {
     pub identifier: String,
     #[serde(alias = "dockerfile")]
@@ -33,6 +39,8 @@ pub(crate) struct ContainerizedComponentConfig {
     pub readiness_checks: Option<Vec<ReadinessCheckConfig>>,
     #[serde(default)]
     pub host_mappings: Option<Vec<String>>,
+    #[serde(default)]
+    pub volume_mappings: Option<Vec<VolumeMappingConfig>>,
 }
 
 pub(crate) async fn build(config: &ContainerizedComponentConfig) -> Result<Component, String> {
@@ -66,6 +74,11 @@ pub(crate) async fn build(config: &ContainerizedComponentConfig) -> Result<Compo
             builder = builder.with_host_mapping(h);
         }
     }
+    if let Some(volumes) = &config.volume_mappings {
+        for v in volumes {
+            builder = builder.with_volume_mapping(&v.host_path, &v.container_path);
+        }
+    }
     if let Some(checks) = &config.readiness_checks {
         for c in checks {
             builder = match c {
@@ -87,4 +100,44 @@ pub(crate) async fn build(config: &ContainerizedComponentConfig) -> Result<Compo
         }
     }
     Ok(Box::new(builder.build().await))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserialize_no_volume_mappings_defaults_to_none() {
+        let config: ContainerizedComponentConfig = serde_json::from_str(
+            r#"{
+                "identifier": "web",
+                "containerfile": "FROM alpine:3.20"
+            }"#,
+        )
+        .expect("deserialize config");
+
+        assert!(config.volume_mappings.is_none());
+    }
+
+    #[test]
+    fn deserialize_volume_mappings_parses_host_and_container_paths() {
+        let config: ContainerizedComponentConfig = serde_json::from_str(
+            r#"{
+                "identifier": "web",
+                "containerfile": "FROM alpine:3.20",
+                "volume_mappings": [
+                    {"host_path": "/host/one", "container_path": "/container/one"},
+                    {"host_path": "/host/two", "container_path": "/container/two"}
+                ]
+            }"#,
+        )
+        .expect("deserialize config");
+
+        let mappings = config.volume_mappings.expect("volume_mappings present");
+        assert_eq!(mappings.len(), 2);
+        assert_eq!(mappings[0].host_path, "/host/one");
+        assert_eq!(mappings[0].container_path, "/container/one");
+        assert_eq!(mappings[1].host_path, "/host/two");
+        assert_eq!(mappings[1].container_path, "/container/two");
+    }
 }

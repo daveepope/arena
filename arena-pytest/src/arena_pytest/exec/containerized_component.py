@@ -16,6 +16,7 @@ class ContainerizedComponentBuilder:
             "runtime_args": [],
             "port_mappings": [],
             "host_mappings": [],
+            "volume_mappings": [],
         }
         self._readiness_checks: List[ReadinessCheckEntry] = []
         self._children: List[Any] = []
@@ -40,6 +41,12 @@ class ContainerizedComponentBuilder:
 
     def with_host_mapping(self, host_mapping: str) -> "ContainerizedComponentBuilder":
         self._config["host_mappings"].append(host_mapping)
+        return self
+
+    def with_volume_mapping(self, host_path: str, container_path: str) -> "ContainerizedComponentBuilder":
+        self._config["volume_mappings"].append(
+            {"host_path": host_path, "container_path": container_path}
+        )
         return self
 
     def with_env_var(self, key: str, value: str) -> "ContainerizedComponentBuilder":

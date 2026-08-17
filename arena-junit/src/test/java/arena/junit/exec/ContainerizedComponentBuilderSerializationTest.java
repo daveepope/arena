@@ -33,6 +33,7 @@ final class ContainerizedComponentBuilderSerializationTest {
     assertTrue(config.path("runtime_args").isEmpty());
     assertTrue(config.path("port_mappings").isEmpty());
     assertTrue(config.path("host_mappings").isEmpty());
+    assertTrue(config.path("volume_mappings").isEmpty());
     assertFalse(config.has("readiness_checks"));
     assertFalse(config.has("children"));
   }
@@ -72,6 +73,18 @@ final class ContainerizedComponentBuilderSerializationTest {
             .forFfi();
     assertEquals(
         "db.local:127.0.0.1", config.path("host_mappings").get(0).asText());
+  }
+
+  @Test
+  void withVolumeMapping_appendsHostAndContainerPaths() {
+    ObjectNode config =
+        new ContainerizedComponentBuilder("web", "Containerfile")
+            .withVolumeMapping("/host/path", "/container/path")
+            .build()
+            .forFfi();
+    ObjectNode mapping = (ObjectNode) config.path("volume_mappings").get(0);
+    assertEquals("/host/path", mapping.path("host_path").asText());
+    assertEquals("/container/path", mapping.path("container_path").asText());
   }
 
   @Test

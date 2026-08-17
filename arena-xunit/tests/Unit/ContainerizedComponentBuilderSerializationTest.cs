@@ -95,6 +95,22 @@ public class ContainerizedComponentBuilderSerializationTest
     }
 
     [Fact]
+    public void Build_WithVolumeMapping_SerializesHostAndContainerPath()
+    {
+        var comp = new ContainerizedComponentBuilder("test")
+            .WithContainerfile("./Dockerfile")
+            .WithVolumeMapping("/host/path", "/container/path")
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        var volumeMappings = obj["volume_mappings"];
+        Assert.NotNull(volumeMappings);
+        var mapping = Assert.Single(volumeMappings);
+        Assert.Equal("/host/path", mapping["host_path"]);
+        Assert.Equal("/container/path", mapping["container_path"]);
+    }
+
+    [Fact]
     public void Build_WithReadinessCheck_SerializesHttpKind()
     {
         var comp = new ContainerizedComponentBuilder("test")
