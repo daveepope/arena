@@ -42,6 +42,25 @@ final class Runfiles {
     return "";
   }
 
+  // Like findRunfile, but for executable binaries: the real file may carry a
+  // platform-specific extension the candidates don't include (e.g. `.exe` on
+  // Windows), so on a miss this hands back a best-guess path unconditionally
+  // instead of failing here, and lets the caller's own executable resolution
+  // (which already knows how to try the platform's extension) verify it and
+  // report a clear error if it's genuinely missing.
+  static String findExecutableRunfile(String... candidates) throws Exception {
+    String found = findRunfile(candidates);
+    if (!found.isEmpty()) {
+      return found;
+    }
+    String runfiles = System.getenv("RUNFILES_DIR");
+    if (runfiles != null && candidates.length > 0) {
+      String bestGuess = candidates.length > 1 ? candidates[1] : candidates[0];
+      return Path.of(runfiles).resolve(bestGuess).toString();
+    }
+    return "";
+  }
+
   static String findSchema(String filename) throws Exception {
     return findRunfile(
         "arena/examples/resources/" + filename,
@@ -50,7 +69,7 @@ final class Runfiles {
   }
 
   static String findWebAppLauncher() throws Exception {
-    return findRunfile(
+    return findExecutableRunfile(
         "arena/examples/example-readings-spring-boot-web-app",
         "_main/examples/example-readings-spring-boot-web-app",
         "examples/example-readings-spring-boot-web-app");

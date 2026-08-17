@@ -48,7 +48,8 @@ impl KafkaImpl for KafkaContainerImpl {
             .with_tag(image_tag)
             .with_mapped_port(port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)
-            .with_container_name(container_name);
+            .with_container_name(container_name)
+            .with_platform(arena_container::platform::docker_platform());
 
         if let Some(ref network) = self.network {
             arena_container::network::ensure_network_exists(network).await;
@@ -158,7 +159,8 @@ impl KafkaImpl for ConfluentKafkaContainerImpl {
             .with_tag(image_tag)
             .with_mapped_port(port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)
-            .with_container_name(container_name);
+            .with_container_name(container_name)
+            .with_platform(arena_container::platform::docker_platform());
 
         if let Some(ref network) = self.network {
             arena_container::network::ensure_network_exists(network).await;

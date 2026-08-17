@@ -5,13 +5,15 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Map;
 
 final class ArenaPaths {
   private ArenaPaths() {}
 
   static <T extends Library> T loadFromClasspath(Class<T> libraryInterface) {
     try {
-      return Native.load("arena_ffi_shared", libraryInterface);
+      Map<String, Object> options = Map.of(Library.OPTION_STRING_ENCODING, "UTF-8");
+      return Native.load("arena_ffi_shared", libraryInterface, options);
     } catch (LinkageError e) {
       return null;
     }

@@ -103,6 +103,7 @@ impl LocalstackImpl for LocalstackContainerImpl {
             .with_mapped_port(host_port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)
             .with_container_name(container_name)
+            .with_platform(arena_container::platform::docker_platform())
             .with_env_var("LS_LOG", "error")
             .with_env_var("DEBUG", "0")
             .with_env_var("PERSISTENCE", "0");

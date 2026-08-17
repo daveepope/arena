@@ -28,9 +28,9 @@ internal static class ArenaNativeLib
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_dispatcher_default_logging_target_publish_level_fn(int level);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void arena_dispatcher_dependency_allow_json_set_fn(string jsonUtf8Nullable);
+    private delegate void arena_dispatcher_dependency_allow_json_set_fn(string? jsonUtf8Nullable);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void arena_dispatcher_component_allow_json_set_fn(string jsonUtf8Nullable);
+    private delegate void arena_dispatcher_component_allow_json_set_fn(string? jsonUtf8Nullable);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void arena_free_string_fn(IntPtr ptr);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -84,7 +84,7 @@ internal static class ArenaNativeLib
                 return;
 
             var path = ArenaPaths.ResolveArenaSharedLibrary();
-            if (string.IsNullOrEmpty(path))
+            if (path is null || path.Length == 0)
             {
                 throw new ArenaBindingError(
                     $"arena shared library not found (set ARENA_FFI_LIB or use Bazel runfiles)");
@@ -218,10 +218,10 @@ internal static class ArenaNativeLib
     internal static int arena_dispatcher_default_logging_target_publish_level(int level) =>
         _arena_dispatcher_default_logging_target_publish_level!.Invoke(level);
 
-    internal static void arena_dispatcher_dependency_allow_json_set(string jsonUtf8Nullable) =>
+    internal static void arena_dispatcher_dependency_allow_json_set(string? jsonUtf8Nullable) =>
         _arena_dispatcher_dependency_allow_json_set!.Invoke(jsonUtf8Nullable);
 
-    internal static void arena_dispatcher_component_allow_json_set(string jsonUtf8Nullable) =>
+    internal static void arena_dispatcher_component_allow_json_set(string? jsonUtf8Nullable) =>
         _arena_dispatcher_component_allow_json_set!.Invoke(jsonUtf8Nullable);
 
     internal static void arena_free_string(IntPtr ptr) =>

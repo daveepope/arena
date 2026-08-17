@@ -26,8 +26,9 @@ public class ContainerizedComponentBuilderSerializationTest
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["env_vars"]);
-        Assert.Equal("value", obj["env_vars"]["KEY"]);
+        var envVars = obj["env_vars"];
+        Assert.NotNull(envVars);
+        Assert.Equal("value", envVars["KEY"]);
     }
 
     [Fact]
@@ -39,9 +40,11 @@ public class ContainerizedComponentBuilderSerializationTest
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Single(obj["runtime_args"]);
-        Assert.Equal("flag", obj["runtime_args"][0]["name"]);
-        Assert.Equal("arg1", obj["runtime_args"][0]["value"]);
+        var runtimeArgs = obj["runtime_args"];
+        Assert.NotNull(runtimeArgs);
+        var arg = Assert.Single(runtimeArgs);
+        Assert.Equal("flag", arg["name"]);
+        Assert.Equal("arg1", arg["value"]);
     }
 
     [Fact]
@@ -69,9 +72,11 @@ public class ContainerizedComponentBuilderSerializationTest
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Single(obj["port_mappings"]);
-        Assert.Equal(8080, obj["port_mappings"][0]["host_port"]);
-        Assert.Equal(80, obj["port_mappings"][0]["container_port"]);
+        var portMappings = obj["port_mappings"];
+        Assert.NotNull(portMappings);
+        var mapping = Assert.Single(portMappings);
+        Assert.Equal(8080, mapping["host_port"]);
+        Assert.Equal(80, mapping["container_port"]);
     }
 
     [Fact]
@@ -83,8 +88,10 @@ public class ContainerizedComponentBuilderSerializationTest
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Single(obj["host_mappings"]);
-        Assert.Equal("host.docker.internal:host-gateway", obj["host_mappings"][0]);
+        var hostMappings = obj["host_mappings"];
+        Assert.NotNull(hostMappings);
+        var mapping = Assert.Single(hostMappings);
+        Assert.Equal("host.docker.internal:host-gateway", mapping);
     }
 
     [Fact]
@@ -96,8 +103,10 @@ public class ContainerizedComponentBuilderSerializationTest
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Single(obj["readiness_checks"]);
-        Assert.Equal("http", obj["readiness_checks"][0]["kind"]);
+        var readinessChecks = obj["readiness_checks"];
+        Assert.NotNull(readinessChecks);
+        var check = Assert.Single(readinessChecks);
+        Assert.Equal("http", check["kind"]);
     }
 
     [Fact]

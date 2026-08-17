@@ -26,18 +26,18 @@ class BumpPatchReleaseFromBaseTest(unittest.TestCase):
             encoding="utf-8",
         )
 
+    _GIT_IDENTITY = ["-c", "user.email=test@example.com", "-c", "user.name=test"]
+
     def _setup_git_repo(self, root: Path, base_version: str, head_version: str) -> None:
         self._write_workspace_files(root, base_version)
         subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True)
-        subprocess.run(["git", "config", "user.name", "test"], cwd=root, check=True)
         subprocess.run(["git", "add", "."], cwd=root, check=True)
-        subprocess.run(["git", "commit", "-m", "base"], cwd=root, check=True)
+        subprocess.run(["git", *self._GIT_IDENTITY, "commit", "-m", "base"], cwd=root, check=True)
         subprocess.run(["git", "branch", "base"], cwd=root, check=True)
         if base_version != head_version:
             self._write_workspace_files(root, head_version)
             subprocess.run(["git", "add", "."], cwd=root, check=True)
-            subprocess.run(["git", "commit", "-m", "head"], cwd=root, check=True)
+            subprocess.run(["git", *self._GIT_IDENTITY, "commit", "-m", "head"], cwd=root, check=True)
 
     def test_bump_patch_release_from_base_stale_head_bumps_patch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

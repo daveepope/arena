@@ -184,7 +184,7 @@ public sealed class ContainerizedComponentBuilder
 
     public ContainerizedComponent Build()
     {
-        if (string.IsNullOrEmpty(_containerfile))
+        if (_containerfile is null || _containerfile.Length == 0)
             throw new System.InvalidOperationException("containerfile must be set");
         var identifier = ArenaIdentifiers.Build("arena-container", _name);
         return new ContainerizedComponent(identifier, _containerfile, _buildContext, _imageTag, _network,

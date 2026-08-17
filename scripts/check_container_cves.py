@@ -262,6 +262,8 @@ def scan_error_reason(error: ScanError) -> str:
 
 
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     entries = load_container_defaults()
     trivy_bin = find_trivy_bin()
     severities = severities_from_env()

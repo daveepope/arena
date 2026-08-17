@@ -129,7 +129,7 @@ public sealed class ExecutableComponentBuilder
 
     public ExecutableComponent Build()
     {
-        if (string.IsNullOrEmpty(_executablePath))
+        if (_executablePath is null || _executablePath.Length == 0)
             throw new System.InvalidOperationException("executable path must be set");
         var identifier = ArenaIdentifiers.Build("arena-exec", _name);
         return new ExecutableComponent(identifier, _executablePath, _sourcePath, _buildTool,

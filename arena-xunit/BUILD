@@ -113,6 +113,7 @@ csharp_library(
     target_frameworks = ["netstandard2.0"],
     visibility = ["//visibility:public"],
     compiler_options = ["/langversion:latest", "/debug:pdbonly"],
+    nullable = "enable",
     deps = [
         ":xunit_extensibility_lib",
         ":xunit_extensibility_core_lib",
@@ -165,9 +166,10 @@ dotnet_nuget_push(
 )
 
 dotnet_coverage_test(
-    name = "arena_xunit_unit_test",
+    name = "xunit_unit_test",
     size = "small",
     target_frameworks = ["net8.0"],
+    nullable = "enable",
     instrument_files = ["**/ArenaDotnet.Xunit.dll"],
     srcs = glob(["tests/Unit/**/*.cs"]),
     data = ["//arena-ffi:arena_ffi_shared", ":xunit_core_netstandard"],
@@ -186,12 +188,45 @@ dotnet_coverage_test(
 )
 
 csharp_test(
-    name = "arena_xunit_lifecycle_component_test",
+    name = "component_test",
+    size = "medium",
+    tags = ["component_test"],
+    target_frameworks = ["net8.0"],
+    nullable = "enable",
+    srcs = glob(
+        ["tests/Component/**/*.cs"],
+        exclude = ["tests/Component/ArenaExecutableComponentChildrenComponentTest.cs"],
+    ),
+    data = ["//arena-ffi:arena_ffi_shared", ":xunit_core_netstandard"],
+    deps = [
+        ":arena_xunit_lib",
+        ":xunit_assert_lib",
+        ":xunit_abstractions_lib",
+        ":xunit_extensibility_lib",
+        ":xunit_extensibility_core_lib",
+        ":xunit_runner_utility_lib",
+        ":xunit_runner_reporters_lib",
+        ":newtonsoft_json_lib",
+        ":ms_logging_abstractions_lib",
+        "//tools/dotnet_xunit_runner:xunit_console_runner",
+    ],
+)
+
+csharp_test(
+    name = "executable_component_children_test",
     size = "small",
     tags = ["component_test"],
     target_frameworks = ["net8.0"],
-    srcs = glob(["tests/Component/**/*.cs"]),
+    nullable = "enable",
+    srcs = [
+        "tests/Component/ArenaExecutableComponentChildrenComponentTest.cs",
+        "tests/Component/Program.cs",
+    ],
     data = ["//arena-ffi:arena_ffi_shared", ":xunit_core_netstandard"],
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":arena_xunit_lib",
         ":xunit_assert_lib",

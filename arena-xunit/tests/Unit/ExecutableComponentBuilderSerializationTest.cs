@@ -28,8 +28,9 @@ public class ExecutableComponentBuilderSerializationTest
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["env_vars"]);
-        Assert.Equal("value", obj["env_vars"]["KEY"]);
+        var envVars = obj["env_vars"];
+        Assert.NotNull(envVars);
+        Assert.Equal("value", envVars["KEY"]);
     }
 
     [Fact]
@@ -41,9 +42,11 @@ public class ExecutableComponentBuilderSerializationTest
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Single(obj["runtime_args"]);
-        Assert.Equal("web_app_port", obj["runtime_args"][0]["name"]);
-        Assert.Equal("8080", obj["runtime_args"][0]["value"]);
+        var runtimeArgs = obj["runtime_args"];
+        Assert.NotNull(runtimeArgs);
+        var arg = Assert.Single(runtimeArgs);
+        Assert.Equal("web_app_port", arg["name"]);
+        Assert.Equal("8080", arg["value"]);
     }
 
     [Fact]
@@ -69,8 +72,10 @@ public class ExecutableComponentBuilderSerializationTest
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Equal("make", obj["build_tool"]["command"]);
-        Assert.Equal("release", obj["build_tool"]["args"][0]);
+        var buildTool = obj["build_tool"];
+        Assert.NotNull(buildTool);
+        Assert.Equal("make", buildTool["command"]);
+        Assert.Equal("release", buildTool["args"]?[0]);
     }
 
     [Fact]
@@ -82,10 +87,12 @@ public class ExecutableComponentBuilderSerializationTest
             .Build();
         var json = comp.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Single(obj["readiness_checks"]);
-        Assert.Equal("http", obj["readiness_checks"][0]["kind"]);
-        Assert.Equal("http://127.0.0.1:8080/health", obj["readiness_checks"][0]["target"]);
-        Assert.Equal(5000, obj["readiness_checks"][0]["timeout_ms"]);
+        var readinessChecks = obj["readiness_checks"];
+        Assert.NotNull(readinessChecks);
+        var check = Assert.Single(readinessChecks);
+        Assert.Equal("http", check["kind"]);
+        Assert.Equal("http://127.0.0.1:8080/health", check["target"]);
+        Assert.Equal(5000, check["timeout_ms"]);
     }
 
     [Fact]
