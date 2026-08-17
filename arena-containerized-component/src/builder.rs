@@ -277,6 +277,7 @@ impl ContainerizedComponentBuilder {
             .dockerfile(".arena.Dockerfile")
             .t(image_tag)
             .rm(true)
+            .platform(arena_container::platform::docker_platform().as_str())
             .build();
 
         let mut stream =
