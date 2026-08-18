@@ -10,14 +10,14 @@ mod open_arena;
 mod panic_payload;
 pub(crate) mod strings;
 
-mod containerized_component;
+pub mod containerized_component;
 mod executable_component;
 pub mod healthcheck;
 mod kafka_dependency;
 mod managed_playbook;
 mod matches;
 mod postgres_dependency;
-mod runtime_args;
+pub mod runtime_args;
 
 pub use active_playbook::{
     arena_active_playbook_drop, arena_match_playbook_run, ArenaActivePlaybookHandle,

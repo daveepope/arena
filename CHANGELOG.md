@@ -5,6 +5,12 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.4.0]
+
+### Added
+
+- `ContainerizedComponentBuilder.fromImage()` to run an already-published registry image instead of building from a Containerfile, `withPlatform()` to override the container platform, and validation that rejects `withImageTag()`/`withBuildContext()` combined with `fromImage()` (#198)
+
 ## [5.3.1]
 
 ### Added

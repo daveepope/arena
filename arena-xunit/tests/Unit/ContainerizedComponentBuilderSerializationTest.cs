@@ -133,6 +133,37 @@ public class ContainerizedComponentBuilderSerializationTest
     }
 
     [Fact]
+    public void Build_WithContainerfileAndImage_Throws()
+    {
+        var builder = ContainerizedComponentBuilder.FromImage("test", "postgres:18-bookworm")
+            .WithContainerfile("./Dockerfile");
+        Assert.Throws<System.InvalidOperationException>(() => builder.Build());
+    }
+
+    [Fact]
+    public void Build_FromImage_SerializesImageWithoutContainerfile()
+    {
+        var comp = ContainerizedComponentBuilder.FromImage("test", "postgres:18-bookworm").Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("container", obj["type"]);
+        Assert.Equal("postgres:18-bookworm", obj["image"]);
+        Assert.Null(obj["containerfile"]);
+    }
+
+    [Fact]
+    public void Build_WithPlatform_SerializesPlatform()
+    {
+        var comp = new ContainerizedComponentBuilder("test")
+            .WithContainerfile("./Dockerfile")
+            .WithPlatform("linux/arm64")
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("linux/arm64", obj["platform"]);
+    }
+
+    [Fact]
     public void Build_Identifier_MatchesPattern()
     {
         var comp = new ContainerizedComponentBuilder("test").WithContainerfile("./Dockerfile").Build();

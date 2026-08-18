@@ -56,6 +56,23 @@ rust_test(
 )
 
 rust_test(
+    name = "image_test",
+    srcs = ["tests/image_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_container",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
     name = "default_images_test",
     srcs = ["tests/default_images_test.rs"],
     size = "small",

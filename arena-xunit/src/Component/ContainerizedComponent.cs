@@ -10,9 +10,11 @@ public sealed class ContainerizedComponent : IArenaComponent
 {
     public string Type => "container";
     public string Identifier { get; }
-    public string Containerfile { get; }
+    public string? Containerfile { get; }
+    public string? Image { get; }
     public string? BuildContext { get; }
     public string? ImageTag { get; }
+    public string? Platform { get; }
     public string? Network { get; }
     public IReadOnlyDictionary<string, string> EnvVars { get; }
     public IReadOnlyList<string> HostMappings { get; }
@@ -23,16 +25,18 @@ public sealed class ContainerizedComponent : IArenaComponent
     private readonly List<ReadinessCheckEntry> _readinessChecks;
     private readonly List<IArenaComponent> _children;
 
-    internal ContainerizedComponent(string identifier, string containerfile, string? buildContext,
-        string? imageTag, string? network, Dictionary<string, string> envVars,
+    internal ContainerizedComponent(string identifier, string? containerfile, string? image, string? buildContext,
+        string? imageTag, string? platform, string? network, Dictionary<string, string> envVars,
         List<RuntimeArgEntry> runtimeArgs, List<PortMappingEntry> portMappings,
         List<string> hostMappings, List<VolumeMappingEntry> volumeMappings,
         List<ReadinessCheckEntry> readinessChecks, List<IArenaComponent> children)
     {
         Identifier = identifier;
         Containerfile = containerfile;
+        Image = image;
         BuildContext = buildContext;
         ImageTag = imageTag;
+        Platform = platform;
         Network = network;
         EnvVars = envVars;
         _runtimeArgs = runtimeArgs;
@@ -50,8 +54,10 @@ public sealed class ContainerizedComponent : IArenaComponent
             Type = Type,
             Identifier = Identifier,
             Containerfile = Containerfile,
+            Image = Image,
             BuildContext = BuildContext,
             ImageTag = ImageTag,
+            Platform = Platform,
             Network = Network,
             EnvVars = EnvVars.ToDictionary(kv => kv.Key, kv => kv.Value),
             RuntimeArgs = RuntimeArgEntry.Build(_runtimeArgs),
@@ -68,9 +74,11 @@ public sealed class ContainerizedComponent : IArenaComponent
     {
         [JsonProperty("type")] public string Type { get; set; } = default!;
         [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
-        [JsonProperty("containerfile")] public string Containerfile { get; set; } = default!;
+        [JsonProperty("containerfile")] public string? Containerfile { get; set; }
+        [JsonProperty("image")] public string? Image { get; set; }
         [JsonProperty("build_context")] public string? BuildContext { get; set; }
         [JsonProperty("image_tag")] public string? ImageTag { get; set; }
+        [JsonProperty("platform")] public string? Platform { get; set; }
         [JsonProperty("network")] public string? Network { get; set; }
         [JsonProperty("env_vars")] public Dictionary<string, string> EnvVars { get; set; } = default!;
         [JsonProperty("runtime_args")] public List<object> RuntimeArgs { get; set; } = default!;
@@ -126,8 +134,10 @@ public sealed class ContainerizedComponentBuilder
 {
     private readonly string _name;
     private string? _containerfile;
+    private string? _image;
     private string? _buildContext;
     private string? _imageTag;
+    private string? _platform;
     private string? _network;
     private readonly Dictionary<string, string> _envVars = new();
     private readonly List<RuntimeArgEntry> _runtimeArgs = new();
@@ -140,6 +150,13 @@ public sealed class ContainerizedComponentBuilder
     public ContainerizedComponentBuilder(string name)
     {
         _name = name;
+    }
+
+    public static ContainerizedComponentBuilder FromImage(string name, string image)
+    {
+        var builder = new ContainerizedComponentBuilder(name);
+        builder._image = image;
+        return builder;
     }
 
     public ContainerizedComponentBuilder WithContainerfile(string path)
@@ -157,6 +174,12 @@ public sealed class ContainerizedComponentBuilder
     public ContainerizedComponentBuilder WithImageTag(string tag)
     {
         _imageTag = tag;
+        return this;
+    }
+
+    public ContainerizedComponentBuilder WithPlatform(string platform)
+    {
+        _platform = platform;
         return this;
     }
 
@@ -215,10 +238,14 @@ public sealed class ContainerizedComponentBuilder
 
     public ContainerizedComponent Build()
     {
-        if (_containerfile is null || _containerfile.Length == 0)
-            throw new System.InvalidOperationException("containerfile must be set");
+        var hasContainerfile = !string.IsNullOrEmpty(_containerfile);
+        var hasImage = !string.IsNullOrEmpty(_image);
+        if (hasContainerfile == hasImage)
+            throw new System.InvalidOperationException(
+                "exactly one of containerfile or image must be set");
         var identifier = ArenaIdentifiers.Build("arena-container", _name);
-        return new ContainerizedComponent(identifier, _containerfile, _buildContext, _imageTag, _network,
+        return new ContainerizedComponent(identifier, _containerfile, _image, _buildContext, _imageTag,
+            _platform, _network,
             new Dictionary<string, string>(_envVars), new List<RuntimeArgEntry>(_runtimeArgs),
             new List<PortMappingEntry>(_portMappings), new List<string>(_hostMappings),
             new List<VolumeMappingEntry>(_volumeMappings),

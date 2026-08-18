@@ -16,17 +16,32 @@ public final class ContainerizedComponentBuilder {
   private final List<ReadinessChecksFfi.ReadinessEntry> readiness = new ArrayList<>();
   private final List<ArenaRunnableComponent> children = new ArrayList<>();
 
-  public ContainerizedComponentBuilder(String name, String containerfile) {
+  private ContainerizedComponentBuilder(String name) {
     config =
         ArenaJson.object()
             .put("type", "container")
-            .put("identifier", ArenaIdentifiers.build("arena-containerized-component", name))
-            .put("containerfile", containerfile);
+            .put("identifier", ArenaIdentifiers.build("arena-containerized-component", name));
     config.set("env_vars", ArenaJson.object());
     config.set("runtime_args", ArenaJson.array());
     config.set("port_mappings", ArenaJson.array());
     config.set("host_mappings", ArenaJson.array());
     config.set("volume_mappings", ArenaJson.array());
+  }
+
+  public ContainerizedComponentBuilder(String name, String containerfile) {
+    this(name);
+    config.put("containerfile", containerfile);
+  }
+
+  public static ContainerizedComponentBuilder fromImage(String name, String image) {
+    ContainerizedComponentBuilder builder = new ContainerizedComponentBuilder(name);
+    builder.config.put("image", image);
+    return builder;
+  }
+
+  public ContainerizedComponentBuilder withPlatform(String platform) {
+    config.put("platform", platform);
+    return this;
   }
 
   public ContainerizedComponentBuilder withBuildContext(String path) {
