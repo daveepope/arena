@@ -68,7 +68,7 @@ def csharp_nuget_package(
         dependencies = "",
         allow_prerelease = False,
         readme = None,
-        native_libs = [],
+        native_libs_by_rid = {},
         tags = None,
         visibility = None):
     """Builds `name.nupkg` from `dll` (a `csharp_library`) and `nuspec_template`.
@@ -163,7 +163,7 @@ def csharp_nuget_package(
     lib_files_name = name + "_lib_files"
     pkg_files(
         name = lib_files_name,
-        srcs = [dll] + native_libs,
+        srcs = [dll],
         strip_prefix = strip_prefix.files_only(),
         prefix = "lib/" + target_framework,
         tags = tags,
@@ -174,6 +174,19 @@ def csharp_nuget_package(
         ":" + nuspec_files_name,
         ":" + lib_files_name,
     ]
+
+    for rid, libs in native_libs_by_rid.items():
+        if not libs:
+            continue
+        native_files_name = name + "_native_" + rid.replace("-", "_") + "_files"
+        pkg_files(
+            name = native_files_name,
+            srcs = libs,
+            strip_prefix = strip_prefix.files_only(),
+            prefix = "runtimes/" + rid + "/native",
+            tags = tags,
+        )
+        zip_srcs.append(":" + native_files_name)
 
     if readme:
         readme_files_name = name + "_readme_files"

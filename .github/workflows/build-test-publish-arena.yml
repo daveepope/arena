@@ -856,6 +856,10 @@ jobs:
           rm -f bazel-bin/arena-pytest/arena_pytest-*-py3-none-any.whl || true
           ls -la bazel-bin/arena-pytest/*.whl
 
+      - name: Smoke test wheel
+        shell: bash
+        run: bazel run --config=ci --config=release //tools/predeploy_smoke/pypi:pypi_smoke_test
+
       - name: Upload wheel artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -920,16 +924,82 @@ jobs:
           print-hash: true
           skip-existing: true
 
+  maven_smoke_test_cross_platform:
+    name: Smoke test Maven (${{ matrix.runner }})
+    needs: [changes, publish_gate, build_arena_ffi]
+    if: >-
+      always() && !cancelled() &&
+      needs.publish_gate.result == 'success' &&
+      needs.build_arena_ffi.result == 'success'
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            disk-cache: build-test-publish-arena-macos-arm64
+            arena-ffi-artifact: arena-ffi-darwin-aarch64
+            prebuilt-dir: darwin-aarch64
+            smoke-test-target: //tools/predeploy_smoke/maven:maven_snapshot_smoke_test_osx_aarch64
+          - runner: macos-15-intel
+            disk-cache: build-test-publish-arena-macos-intel
+            arena-ffi-artifact: arena-ffi-darwin-x86-64
+            prebuilt-dir: darwin-x86-64
+            smoke-test-target: //tools/predeploy_smoke/maven:maven_snapshot_smoke_test_osx_x86_64
+          - runner: windows-latest
+            disk-cache: build-test-publish-arena-windows
+            arena-ffi-artifact: arena-ffi-windows-x86-64
+            prebuilt-dir: windows-x86-64
+            smoke-test-target: //tools/predeploy_smoke/maven:maven_snapshot_smoke_test_windows_x86_64
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ matrix.disk-cache }}
+          repository-cache: true
+
+      - name: Configure BuildBuddy remote cache
+        shell: bash
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
+          fi
+
+      - name: Download arena_ffi_shared
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ matrix.arena-ffi-artifact }}
+          path: arena-junit/prebuilt/src/main/resources/${{ matrix.prebuilt-dir }}
+
+      - name: Smoke test Maven artifact
+        shell: bash
+        run: bazel run --config=ci --config=release --enable_runfiles ${{ matrix.smoke-test-target }}
+
   publish_maven_snapshot:
     name: Publish Maven snapshot (Ubuntu 24.04)
     needs:
       - changes
       - publish_gate
       - build_arena_ffi
+      - maven_smoke_test_cross_platform
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
       needs.build_arena_ffi.result == 'success' &&
+      needs.maven_smoke_test_cross_platform.result == 'success' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
@@ -983,6 +1053,15 @@ jobs:
           test -s arena-junit/prebuilt/src/main/resources/darwin-x86-64/libarena_ffi_shared.dylib
           test -s arena-junit/prebuilt/src/main/resources/windows-x86-64/arena_ffi_shared.dll
 
+      - name: Build Maven snapshot artifacts
+        run: |
+          bazel build --config=ci --config=release \
+            //arena-junit:arena_junit_maven_snapshot-lib //arena-junit:arena_junit_maven_snapshot-pom \
+            //arena-junit:arena_junit_native_linux_x86_64
+
+      - name: Smoke test Maven snapshot artifacts
+        run: bazel run --config=ci --config=release //tools/predeploy_smoke/maven:maven_snapshot_smoke_test
+
       - name: Publish snapshot to Maven Central
         env:
           MAVEN_REPO: https://central.sonatype.com/repository/maven-snapshots/
@@ -996,10 +1075,12 @@ jobs:
       - changes
       - publish_gate
       - build_arena_ffi
+      - maven_smoke_test_cross_platform
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
       needs.build_arena_ffi.result == 'success' &&
+      needs.maven_smoke_test_cross_platform.result == 'success' &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/master' &&
       needs.changes.outputs.version_changed == 'true'
@@ -1065,6 +1146,9 @@ jobs:
             //arena-junit:arena_junit_native_windows_x86_64 \
             --config=ci --config=release
 
+      - name: Smoke test Maven release artifacts
+        run: bazel run --config=ci --config=release //tools/predeploy_smoke/maven:maven_smoke_test
+
       - name: Import GPG key
         run: echo "$GPG_PRIVATE_KEY" | gpg --batch --import
         env:
@@ -1086,19 +1170,96 @@ jobs:
             --classifier-jar "osx-x86_64=$PWD/bazel-bin/arena-junit/libarena_junit_native_osx_x86_64.jar" \
             --classifier-jar "windows-x86_64=$PWD/bazel-bin/arena-junit/libarena_junit_native_windows_x86_64.jar"
 
-  publish_nuget_snapshot:
-    name: Publish NuGet snapshot (Ubuntu 24.04)
+  nuget_smoke_test_cross_platform:
+    name: Smoke test NuGet (${{ matrix.runner }})
     needs: [changes, publish_gate, build_arena_ffi]
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
+      needs.build_arena_ffi.result == 'success'
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            disk-cache: build-test-publish-arena-macos-arm64
+          - runner: macos-15-intel
+            disk-cache: build-test-publish-arena-macos-intel
+          - runner: windows-latest
+            disk-cache: build-test-publish-arena-windows
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ matrix.disk-cache }}
+          repository-cache: true
+
+      - name: Configure BuildBuddy remote cache
+        shell: bash
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
+          fi
+
+      - name: Download arena_ffi_shared (Linux x86-64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-linux-x86-64
+          path: arena-xunit/prebuilt/linux-x86-64
+
+      - name: Download arena_ffi_shared (macOS ARM64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-darwin-aarch64
+          path: arena-xunit/prebuilt/darwin-aarch64
+
+      - name: Download arena_ffi_shared (macOS Intel)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-darwin-x86-64
+          path: arena-xunit/prebuilt/darwin-x86-64
+
+      - name: Download arena_ffi_shared (Windows x86-64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-windows-x86-64
+          path: arena-xunit/prebuilt/windows-x86-64
+
+      - name: Smoke test NuGet package
+        shell: bash
+        run: bazel run --config=ci --config=release --enable_runfiles //tools/predeploy_smoke/dotnet:nuget_snapshot_smoke_test
+
+  publish_nuget_snapshot:
+    name: Publish NuGet snapshot (Ubuntu 24.04)
+    needs: [changes, publish_gate, build_arena_ffi, nuget_smoke_test_cross_platform]
+    if: >-
+      always() && !cancelled() &&
+      needs.publish_gate.result == 'success' &&
       needs.build_arena_ffi.result == 'success' &&
+      needs.nuget_smoke_test_cross_platform.result == 'success' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -1135,11 +1296,34 @@ jobs:
           name: arena-ffi-darwin-aarch64
           path: arena-xunit/prebuilt/darwin-aarch64
 
+      - name: Download arena_ffi_shared (macOS Intel)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-darwin-x86-64
+          path: arena-xunit/prebuilt/darwin-x86-64
+
       - name: Download arena_ffi_shared (Windows x86-64)
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: arena-ffi-windows-x86-64
           path: arena-xunit/prebuilt/windows-x86-64
+
+      - name: Verify staged native libraries
+        run: |
+          test -s arena-xunit/prebuilt/linux-x86-64/libarena_ffi_shared.so
+          test -s arena-xunit/prebuilt/darwin-aarch64/libarena_ffi_shared.dylib
+          test -s arena-xunit/prebuilt/darwin-x86-64/libarena_ffi_shared.dylib
+          test -s arena-xunit/prebuilt/windows-x86-64/arena_ffi_shared.dll
+
+      - name: Build NuGet snapshot package
+        run: |
+          bazel build --config=ci --config=release --define=arena_xunit_prerelease=pr${PR_NUMBER}-${PR_SHA:0:7} \
+            //arena-xunit:arena_xunit_nuget_snapshot
+
+      - name: Smoke test NuGet snapshot package
+        run: |
+          bazel run --config=ci --config=release --define=arena_xunit_prerelease=pr${PR_NUMBER}-${PR_SHA:0:7} \
+            //tools/predeploy_smoke/dotnet:nuget_snapshot_smoke_test
 
       - name: NuGet login (OIDC trusted publishing)
         id: nuget_login
@@ -1151,19 +1335,18 @@ jobs:
         env:
           NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
           NUGET_SOURCE: https://api.nuget.org/v3/index.json
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           bazel run --config=ci --config=release --define=arena_xunit_prerelease=pr${PR_NUMBER}-${PR_SHA:0:7} \
             //arena-xunit:arena_xunit_nuget_snapshot_push
 
   publish_nuget:
     name: Publish NuGet (Ubuntu 24.04)
-    needs: [changes, publish_gate, build_arena_ffi]
+    needs: [changes, publish_gate, build_arena_ffi, nuget_smoke_test_cross_platform]
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
       needs.build_arena_ffi.result == 'success' &&
+      needs.nuget_smoke_test_cross_platform.result == 'success' &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/master' &&
       needs.changes.outputs.version_changed == 'true'
@@ -1207,11 +1390,30 @@ jobs:
           name: arena-ffi-darwin-aarch64
           path: arena-xunit/prebuilt/darwin-aarch64
 
+      - name: Download arena_ffi_shared (macOS Intel)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-ffi-darwin-x86-64
+          path: arena-xunit/prebuilt/darwin-x86-64
+
       - name: Download arena_ffi_shared (Windows x86-64)
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: arena-ffi-windows-x86-64
           path: arena-xunit/prebuilt/windows-x86-64
+
+      - name: Verify staged native libraries
+        run: |
+          test -s arena-xunit/prebuilt/linux-x86-64/libarena_ffi_shared.so
+          test -s arena-xunit/prebuilt/darwin-aarch64/libarena_ffi_shared.dylib
+          test -s arena-xunit/prebuilt/darwin-x86-64/libarena_ffi_shared.dylib
+          test -s arena-xunit/prebuilt/windows-x86-64/arena_ffi_shared.dll
+
+      - name: Build NuGet package
+        run: bazel build --config=ci --config=release //arena-xunit:arena_xunit_nuget
+
+      - name: Smoke test NuGet package
+        run: bazel run --config=ci --config=release //tools/predeploy_smoke/dotnet:nuget_smoke_test
 
       - name: NuGet login (OIDC trusted publishing)
         id: nuget_login
