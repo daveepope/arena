@@ -5,11 +5,15 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [5.3.1]
 
 ### Added
 
 - Developer Certificate of Origin (DCO) sign-off requirement and enforcement workflow
+
+### Security
+
+- Bumped `jackson-databind` to 2.22.2 in `arena-junit` (transitive resolution was picking 2.21.4, vulnerable to GHSA-5gvw-p9qm-jgwh, GHSA-5jmj-h7xm-6q6v, GHSA-mhm7-754m-9p8w)
 
 ## [5.3.0]
 

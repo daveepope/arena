@@ -10,6 +10,8 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened]
 
+permissions: read-all
+
 jobs:
   check-sign-off:
     if: github.event_name == 'pull_request_target' || github.event.issue.pull_request != null
