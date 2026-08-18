@@ -10,15 +10,14 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened]
 
-permissions:
-  issues: read
-  pull-requests: read
-  statuses: write
-
 jobs:
   check-sign-off:
     if: github.event_name == 'pull_request_target' || github.event.issue.pull_request != null
     runs-on: ubuntu-24.04
+    permissions:
+      issues: read
+      pull-requests: read
+      statuses: write
     steps:
       - name: Check PR comments for DCO sign-off
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
