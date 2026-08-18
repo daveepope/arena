@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `ContainerizedComponentBuilder.fromImage()` to run an already-published registry image instead of building from a Containerfile, `withPlatform()` to override the container platform, and validation that rejects `withImageTag()`/`withBuildContext()` combined with `fromImage()` (#197)
+- `ContainerizedComponentBuilder.fromImage()` to run an already-published registry image instead of building from a Containerfile, `withPlatform()` to override the container platform, and validation that rejects `withImageTag()`/`withBuildContext()` combined with `fromImage()` (#198)
 
 ## [5.3.1]
 
