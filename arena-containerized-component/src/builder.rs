@@ -142,7 +142,7 @@ impl ContainerizedComponentBuilder {
         self
     }
 
-    fn resolve_path(path: PathBuf) -> PathBuf {
+    pub fn resolve_path(path: PathBuf) -> PathBuf {
         if path.is_absolute() {
             path
         } else {
@@ -171,7 +171,7 @@ impl ContainerizedComponentBuilder {
         ".arena",
     ];
 
-    fn create_build_context_tar(
+    pub fn create_build_context_tar(
         identifier: &str,
         containerfile: &str,
         build_context: &Option<PathBuf>,
