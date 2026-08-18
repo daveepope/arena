@@ -62,6 +62,24 @@ rust_test(
 )
 
 rust_test(
+    name = "ffi_containerized_component_test",
+    srcs = ["tests/containerized_component_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        "//arena",
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
     name = "ffi_http_mapping_spec_test",
     srcs = ["tests/playbook/http_mapping_spec.rs"],
     size = "small",

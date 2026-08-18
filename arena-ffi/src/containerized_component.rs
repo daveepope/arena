@@ -7,26 +7,30 @@ use crate::healthcheck::{HttpReadinessCheck, ReadinessCheckConfig, TcpReadinessC
 use crate::runtime_args::RuntimeArgConfig;
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct PortMappingConfig {
+pub struct PortMappingConfig {
     pub host_port: u16,
     pub container_port: u16,
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct VolumeMappingConfig {
+pub struct VolumeMappingConfig {
     pub host_path: String,
     pub container_path: String,
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct ContainerizedComponentConfig {
+pub struct ContainerizedComponentConfig {
     pub identifier: String,
-    #[serde(alias = "dockerfile")]
-    pub containerfile: String,
+    #[serde(alias = "dockerfile", default)]
+    pub containerfile: Option<String>,
+    #[serde(default)]
+    pub image: Option<String>,
     #[serde(default)]
     pub build_context: Option<String>,
     #[serde(default)]
     pub image_tag: Option<String>,
+    #[serde(default)]
+    pub platform: Option<String>,
     #[serde(default)]
     pub network: Option<String>,
     #[serde(default)]
@@ -43,8 +47,28 @@ pub(crate) struct ContainerizedComponentConfig {
     pub volume_mappings: Option<Vec<VolumeMappingConfig>>,
 }
 
-pub(crate) async fn build(config: &ContainerizedComponentConfig) -> Result<Component, String> {
-    let mut builder = ContainerizedComponent::builder(&config.identifier, &config.containerfile);
+pub async fn build(config: &ContainerizedComponentConfig) -> Result<Component, String> {
+    let mut builder = match (&config.containerfile, &config.image) {
+        (Some(containerfile), None) => {
+            ContainerizedComponent::builder(&config.identifier, containerfile)
+        }
+        (None, Some(image)) => ContainerizedComponent::from_image(&config.identifier, image),
+        (Some(_), Some(_)) => {
+            return Err(format!(
+                "{}: specify either containerfile or image, not both",
+                config.identifier
+            ))
+        }
+        (None, None) => {
+            return Err(format!(
+                "{}: one of containerfile or image is required",
+                config.identifier
+            ))
+        }
+    };
+    if let Some(platform) = &config.platform {
+        builder = builder.with_platform(platform);
+    }
     if let Some(ctx) = &config.build_context {
         builder = builder.with_build_context(ctx);
     }
@@ -100,44 +124,4 @@ pub(crate) async fn build(config: &ContainerizedComponentConfig) -> Result<Compo
         }
     }
     Ok(Box::new(builder.build().await))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn deserialize_no_volume_mappings_defaults_to_none() {
-        let config: ContainerizedComponentConfig = serde_json::from_str(
-            r#"{
-                "identifier": "web",
-                "containerfile": "FROM alpine:3.20"
-            }"#,
-        )
-        .expect("deserialize config");
-
-        assert!(config.volume_mappings.is_none());
-    }
-
-    #[test]
-    fn deserialize_volume_mappings_parses_host_and_container_paths() {
-        let config: ContainerizedComponentConfig = serde_json::from_str(
-            r#"{
-                "identifier": "web",
-                "containerfile": "FROM alpine:3.20",
-                "volume_mappings": [
-                    {"host_path": "/host/one", "container_path": "/container/one"},
-                    {"host_path": "/host/two", "container_path": "/container/two"}
-                ]
-            }"#,
-        )
-        .expect("deserialize config");
-
-        let mappings = config.volume_mappings.expect("volume_mappings present");
-        assert_eq!(mappings.len(), 2);
-        assert_eq!(mappings[0].host_path, "/host/one");
-        assert_eq!(mappings[0].container_path, "/container/one");
-        assert_eq!(mappings[1].host_path, "/host/two");
-        assert_eq!(mappings[1].container_path, "/container/two");
-    }
 }

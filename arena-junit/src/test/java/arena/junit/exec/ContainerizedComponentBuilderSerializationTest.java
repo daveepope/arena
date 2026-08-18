@@ -145,6 +145,24 @@ final class ContainerizedComponentBuilderSerializationTest {
   }
 
   @Test
+  void fromImage_minimalNameAndImage_serializesImageWithoutContainerfile() {
+    ObjectNode config = ContainerizedComponentBuilder.fromImage("web", "postgres:18-bookworm").build().forFfi();
+    assertEquals("container", config.path("type").asText());
+    assertEquals("postgres:18-bookworm", config.path("image").asText());
+    assertFalse(config.has("containerfile"));
+  }
+
+  @Test
+  void withPlatform_setsPlatformField() {
+    ObjectNode config =
+        new ContainerizedComponentBuilder("web", "Containerfile")
+            .withPlatform("linux/arm64")
+            .build()
+            .forFfi();
+    assertEquals("linux/arm64", config.path("platform").asText());
+  }
+
+  @Test
   void identifier_returnsConfiguredIdentifier() {
     ContainerizedComponent component =
         new ContainerizedComponentBuilder("web", "Containerfile").build();

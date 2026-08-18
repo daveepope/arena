@@ -8,10 +8,13 @@ from arena_pytest.readiness import HttpReadinessCheck, TcpReadinessCheck
 
 class ContainerizedComponentBuilder:
     def __init__(self, name: str, containerfile: str):
+        self._init_config(name)
+        self._config["containerfile"] = containerfile
+
+    def _init_config(self, name: str) -> None:
         self._config: Dict[str, Any] = {
             "type": "container",
             "identifier": _build_identifier("arena-containerized-component", name),
-            "containerfile": containerfile,
             "env_vars": {},
             "runtime_args": [],
             "port_mappings": [],
@@ -20,6 +23,17 @@ class ContainerizedComponentBuilder:
         }
         self._readiness_checks: List[ReadinessCheckEntry] = []
         self._children: List[Any] = []
+
+    @classmethod
+    def from_image(cls, name: str, image: str) -> "ContainerizedComponentBuilder":
+        builder = cls.__new__(cls)
+        builder._init_config(name)
+        builder._config["image"] = image
+        return builder
+
+    def with_platform(self, platform: str) -> "ContainerizedComponentBuilder":
+        self._config["platform"] = platform
+        return self
 
     def with_build_context(self, path: str) -> "ContainerizedComponentBuilder":
         self._config["build_context"] = path

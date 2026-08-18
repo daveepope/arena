@@ -39,6 +39,13 @@ impl ContainerizedComponent {
         ContainerizedComponentBuilder::new(identifier, containerfile)
     }
 
+    pub fn from_image(
+        identifier: impl Into<String>,
+        image: impl Into<String>,
+    ) -> ContainerizedComponentBuilder {
+        ContainerizedComponentBuilder::new_from_image(identifier, image)
+    }
+
     async fn create_and_start_container(&mut self) {
         arena_container::container::try_remove_existing_container(&self.identifier).await;
 

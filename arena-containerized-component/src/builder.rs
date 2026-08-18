@@ -6,12 +6,18 @@ use bollard::{body_full, Docker};
 use futures::StreamExt;
 use std::path::{Path, PathBuf};
 
+enum ImageSource {
+    Containerfile(String),
+    Image(String),
+}
+
 pub struct ContainerizedComponentBuilder {
     identifier: String,
     children: Option<Vec<Component>>,
-    containerfile: String,
+    image_source: ImageSource,
     build_context: Option<PathBuf>,
     image_tag: Option<String>,
+    platform: Option<String>,
     network: Option<String>,
     network_alias: Option<String>,
     env_vars: Vec<(String, String)>,
@@ -25,16 +31,17 @@ pub struct ContainerizedComponentBuilder {
 const DEFAULT_READINESS_TIMEOUT_MS: u64 = 10_000;
 
 impl ContainerizedComponentBuilder {
-    pub(crate) fn new(identifier: impl Into<String>, containerfile: impl Into<String>) -> Self {
+    fn empty(identifier: impl Into<String>, image_source: ImageSource) -> Self {
         Self {
             identifier: arena_container::identifier::build(
                 "arena-containerized-component",
                 &identifier.into(),
             ),
             children: None,
-            containerfile: containerfile.into(),
+            image_source,
             build_context: None,
             image_tag: None,
+            platform: None,
             network: None,
             network_alias: None,
             env_vars: Vec::new(),
@@ -44,6 +51,14 @@ impl ContainerizedComponentBuilder {
             host_mappings: Vec::new(),
             volume_mappings: Vec::new(),
         }
+    }
+
+    pub(crate) fn new(identifier: impl Into<String>, containerfile: impl Into<String>) -> Self {
+        Self::empty(identifier, ImageSource::Containerfile(containerfile.into()))
+    }
+
+    pub(crate) fn new_from_image(identifier: impl Into<String>, image: impl Into<String>) -> Self {
+        Self::empty(identifier, ImageSource::Image(image.into()))
     }
 
     pub fn with_child_components(mut self, children: Vec<Component>) -> Self {
@@ -58,6 +73,11 @@ impl ContainerizedComponentBuilder {
 
     pub fn with_image_tag(mut self, tag: impl Into<String>) -> Self {
         self.image_tag = Some(tag.into());
+        self
+    }
+
+    pub fn with_platform(mut self, platform: impl Into<String>) -> Self {
+        self.platform = Some(platform.into());
         self
     }
 
@@ -262,6 +282,7 @@ impl ContainerizedComponentBuilder {
         containerfile: &str,
         image_tag: &str,
         build_context: &Option<PathBuf>,
+        platform: &str,
         runtime_client: &Docker,
     ) {
         tracing::debug!(
@@ -277,7 +298,7 @@ impl ContainerizedComponentBuilder {
             .dockerfile(".arena.Dockerfile")
             .t(image_tag)
             .rm(true)
-            .platform(arena_container::platform::docker_platform().as_str())
+            .platform(platform)
             .build();
 
         let mut stream =
@@ -317,23 +338,58 @@ impl ContainerizedComponentBuilder {
     }
 
     pub async fn build(self) -> ContainerizedComponent {
-        let build_context = self.build_context.map(Self::resolve_path);
+        if let ImageSource::Image(_) = &self.image_source {
+            if self.build_context.is_some() {
+                panic!(
+                    "{}: with_build_context has no effect when using from_image",
+                    self.identifier
+                );
+            }
+            if self.image_tag.is_some() {
+                panic!(
+                    "{}: with_image_tag has no effect when using from_image",
+                    self.identifier
+                );
+            }
+        }
 
-        let image_tag = self.image_tag.unwrap_or_else(|| {
-            arena_container::identifier::sanitize_for_container(&self.identifier)
-        });
+        let platform = self
+            .platform
+            .unwrap_or_else(arena_container::platform::docker_platform);
 
         let runtime_client =
             Docker::connect_with_local_defaults().expect("connect to container runtime");
 
-        Self::build_image(
-            &self.identifier,
-            &self.containerfile,
-            &image_tag,
-            &build_context,
-            &runtime_client,
-        )
-        .await;
+        let image_tag = match self.image_source {
+            ImageSource::Image(image) => {
+                arena_container::image::pull_image(
+                    &self.identifier,
+                    &image,
+                    &platform,
+                    &runtime_client,
+                )
+                .await;
+                image
+            }
+            ImageSource::Containerfile(containerfile) => {
+                let build_context = self.build_context.map(Self::resolve_path);
+                let image_tag = self.image_tag.unwrap_or_else(|| {
+                    arena_container::identifier::sanitize_for_container(&self.identifier)
+                });
+
+                Self::build_image(
+                    &self.identifier,
+                    &containerfile,
+                    &image_tag,
+                    &build_context,
+                    &platform,
+                    &runtime_client,
+                )
+                .await;
+
+                image_tag
+            }
+        };
 
         ContainerizedComponent {
             identifier: self.identifier,
