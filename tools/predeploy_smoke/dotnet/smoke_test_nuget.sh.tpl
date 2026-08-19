@@ -25,10 +25,6 @@ DOTNET_ROOT="$(dirname "$DOTNET")"
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "$WORKDIR"' EXIT
 
-export HOME="$WORKDIR/home"
-export NUGET_PACKAGES="$WORKDIR/nuget-cache"
-mkdir -p "$HOME" "$NUGET_PACKAGES"
-
 VERSION="$(unzip -p "$PACKAGE" "*.nuspec" | grep -oE '<version>[^<]+' | sed -E 's/<version>//')"
 if [ -z "$VERSION" ]; then
   echo "smoke test: could not read <version> from $PACKAGE's nuspec" >&2
@@ -57,29 +53,33 @@ EOF
 cat > "$PROJECT_DIR/probe.csproj" <<EOF
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="$PACKAGE_ID" Version="$VERSION" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
   </ItemGroup>
 </Project>
 EOF
 
-cat > "$PROJECT_DIR/Program.cs" <<'CSEOF'
+cat > "$PROJECT_DIR/SmokeTest.cs" <<'CSEOF'
 using ArenaDotnet.Xunit;
+using Xunit;
 
-var fixture = new SmokeTestFixture();
-if (fixture.Arena is null)
+public class SmokeTest
 {
-    Console.Error.WriteLine("smoke test: arena is null after open");
-    Environment.Exit(1);
+    [Fact]
+    public void OpenAndCloseArena_RealNugetPackage_Succeeds()
+    {
+        using var fixture = new SmokeTestFixture();
+        Assert.NotNull(fixture.Arena);
+    }
 }
-Console.WriteLine("SMOKE_TEST_ARENA_OPENED");
-fixture.Dispose();
-Console.WriteLine("SMOKE_TEST_ARENA_CLOSED");
 
 sealed class SmokeTestFixture : ArenaCollectionFixture
 {
@@ -89,18 +89,18 @@ CSEOF
 
 cd "$PROJECT_DIR"
 set +e
-OUTPUT="$("$DOTNET" run 2>&1)"
+OUTPUT="$("$DOTNET" test 2>&1)"
 STATUS=$?
 set -e
 echo "$OUTPUT"
 
 if [ "$STATUS" -ne 0 ]; then
-  echo "smoke test FAILED: dotnet run exited $STATUS" >&2
+  echo "smoke test FAILED: dotnet test exited $STATUS" >&2
   exit 1
 fi
-if ! grep -q "SMOKE_TEST_ARENA_OPENED" <<<"$OUTPUT" || ! grep -q "SMOKE_TEST_ARENA_CLOSED" <<<"$OUTPUT"; then
-  echo "smoke test FAILED: did not see expected open/close markers in output" >&2
+if ! grep -q "Passed!" <<<"$OUTPUT"; then
+  echo "smoke test FAILED: dotnet test exited 0 but did not report a passing test run (possible zero-test discovery)" >&2
   exit 1
 fi
 
-echo "smoke test PASSED: $PACKAGE_ID $VERSION restored from NuGet, opened and closed a real arena"
+echo "smoke test PASSED: $PACKAGE_ID $VERSION restored from NuGet via a real xunit test project run with 'dotnet test', opened and closed a real arena"

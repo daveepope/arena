@@ -5,6 +5,17 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.0.1]
+
+### Fixed
+
+- `arena-xunit` native library resolution now prefers a co-located `libarena_ffi_shared` over `.deps.json`/`AssemblyDependencyResolver`, fixing wrong-RID resolution on Apple Silicon
+
+### Added
+
+- NuGet predeploy smoke test now runs via a real xUnit test project (`dotnet test`) against the real global NuGet cache, not an isolated one
+- New Bazel-consumer predeploy smoke test (`//tools/predeploy_smoke/dotnet:bazel_consumer_smoke_test`) covers the `rules_dotnet csharp_import` + `bazel test` consumption path
+
 ## [6.0.0]
 
 ### Added

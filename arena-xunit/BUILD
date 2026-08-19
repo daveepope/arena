@@ -12,12 +12,32 @@ _ARENA_XUNIT_SRCS = glob(["src/**/*.cs"])
 
 _ARENA_XUNIT_NUGET_ID = "ArenaDotnet.Xunit"
 
+_PREDEPLOY_SMOKE_DOTNET_VISIBILITY = ["//tools/predeploy_smoke/dotnet:__pkg__"]
+
 _ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS_BY_RID = {
     "linux-x64": glob(["prebuilt/linux-x86-64/**"], allow_empty = True),
     "osx-arm64": glob(["prebuilt/darwin-aarch64/**"], allow_empty = True),
     "osx-x64": glob(["prebuilt/darwin-x86-64/**"], allow_empty = True),
     "win-x64": glob(["prebuilt/windows-x86-64/**"], allow_empty = True),
 }
+
+filegroup(
+    name = "prebuilt_native_libs_linux_x64",
+    srcs = _ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS_BY_RID["linux-x64"],
+    visibility = _PREDEPLOY_SMOKE_DOTNET_VISIBILITY,
+)
+
+filegroup(
+    name = "prebuilt_native_libs_osx_arm64",
+    srcs = _ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS_BY_RID["osx-arm64"],
+    visibility = _PREDEPLOY_SMOKE_DOTNET_VISIBILITY,
+)
+
+filegroup(
+    name = "prebuilt_native_libs_osx_x64",
+    srcs = _ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS_BY_RID["osx-x64"],
+    visibility = _PREDEPLOY_SMOKE_DOTNET_VISIBILITY,
+)
 
 # Sourced from pinned_dependency_versions.bzl, the same constants MODULE.bazel's
 # nuget_archive pins use, so this can't drift from what arena_xunit_lib is
@@ -34,6 +54,7 @@ import_library(
     libs = ["@xunit_extensibility//:libs"],
     refs = ["@xunit_extensibility//:refs"],
     tags = ["manual"],
+    visibility = _PREDEPLOY_SMOKE_DOTNET_VISIBILITY,
 )
 
 import_library(
@@ -42,6 +63,7 @@ import_library(
     libs = ["@xunit_assert//:libs"],
     refs = ["@xunit_assert//:refs"],
     tags = ["manual"],
+    visibility = _PREDEPLOY_SMOKE_DOTNET_VISIBILITY,
 )
 
 import_library(
@@ -50,6 +72,7 @@ import_library(
     libs = ["@newtonsoft_json//:libs"],
     refs = ["@newtonsoft_json//:refs"],
     tags = ["manual"],
+    visibility = _PREDEPLOY_SMOKE_DOTNET_VISIBILITY,
 )
 
 import_library(
@@ -58,6 +81,7 @@ import_library(
     libs = ["@ms_logging_abstractions//:libs"],
     refs = ["@ms_logging_abstractions//:refs"],
     tags = ["manual"],
+    visibility = _PREDEPLOY_SMOKE_DOTNET_VISIBILITY,
 )
 
 import_library(
@@ -66,6 +90,7 @@ import_library(
     libs = ["@xunit_abstractions//:libs"],
     refs = ["@xunit_abstractions//:refs"],
     tags = ["manual"],
+    visibility = _PREDEPLOY_SMOKE_DOTNET_VISIBILITY,
 )
 
 filegroup(
@@ -80,6 +105,7 @@ import_library(
     libs = [":xunit_core_netstandard"],
     refs = [":xunit_core_netstandard"],
     tags = ["manual"],
+    visibility = _PREDEPLOY_SMOKE_DOTNET_VISIBILITY,
 )
 
 filegroup(
@@ -93,6 +119,7 @@ import_library(
     libs = [":xunit_runner_utility_netstandard"],
     refs = [":xunit_runner_utility_netstandard"],
     tags = ["manual"],
+    visibility = _PREDEPLOY_SMOKE_DOTNET_VISIBILITY,
 )
 
 filegroup(
@@ -106,6 +133,7 @@ import_library(
     libs = [":xunit_runner_reporters_netstandard"],
     refs = [":xunit_runner_reporters_netstandard"],
     tags = ["manual"],
+    visibility = _PREDEPLOY_SMOKE_DOTNET_VISIBILITY,
 )
 
 csharp_library(
