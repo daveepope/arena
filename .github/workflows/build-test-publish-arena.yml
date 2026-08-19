@@ -857,8 +857,35 @@ jobs:
           ls -la bazel-bin/arena-pytest/*.whl
 
       - name: Smoke test wheel
+        if: matrix.runner != 'windows-latest'
         shell: bash
         run: bazel run --config=ci --config=release //tools/predeploy_smoke/pypi:pypi_smoke_test
+
+      - name: Verify wheel packaging (Windows)
+        if: matrix.runner == 'windows-latest'
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import glob
+          import sys
+          import zipfile
+
+          wheels = glob.glob("bazel-bin/arena-pytest/*.whl")
+          if len(wheels) != 1:
+              print(f"expected exactly one wheel, found: {wheels}", file=sys.stderr)
+              sys.exit(1)
+
+          expected = "arena_pytest/arena_ffi_shared.dll"
+          with zipfile.ZipFile(wheels[0]) as zf:
+              names = set(zf.namelist())
+
+          if expected not in names:
+              print(f"FAILED: {wheels[0]} is missing {expected}", file=sys.stderr)
+              print(f"actual entries: {sorted(n for n in names if 'arena_ffi' in n)}", file=sys.stderr)
+              sys.exit(1)
+
+          print(f"PASSED: {wheels[0]} contains {expected}")
+          PY
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
