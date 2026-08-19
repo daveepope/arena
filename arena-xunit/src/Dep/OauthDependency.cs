@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using ArenaDotnet.Xunit.Support;
 using Newtonsoft.Json;
@@ -12,6 +13,7 @@ public sealed class OauthDependency : IArenaDependency
     public int Port { get; }
     public string? ListenIp { get; }
     public string? MetadataBaseUrl { get; }
+    public string? Transport { get; }
     [JsonProperty("server_tls_certificate_pem")] public string? ServerTlsCert { get; }
     [JsonProperty("server_tls_private_key_pem")] public string? ServerTlsKey { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
@@ -19,12 +21,13 @@ public sealed class OauthDependency : IArenaDependency
     private readonly IReadOnlyList<IArenaDependency> _children;
 
     internal OauthDependency(string identifier, int port, string? listenIp, string? metadataBaseUrl,
-        string? serverTlsCert, string? serverTlsKey, IReadOnlyList<IArenaDependency> children)
+        string? transport, string? serverTlsCert, string? serverTlsKey, IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
         ListenIp = listenIp;
         MetadataBaseUrl = metadataBaseUrl;
+        Transport = transport;
         ServerTlsCert = serverTlsCert;
         ServerTlsKey = serverTlsKey;
         _children = children;
@@ -38,10 +41,25 @@ public sealed class OauthDependency : IArenaDependency
 
 public sealed class OauthDependencyBuilder
 {
+    public const int DefaultOauthPort = 9444;
+
+    public static readonly string OauthIssuer = IssuerFromEnv();
+
+    private static string IssuerFromEnv()
+    {
+        var v = Environment.GetEnvironmentVariable("ARENA_PYTEST_OAUTH_ISSUER");
+        if (!string.IsNullOrWhiteSpace(v))
+        {
+            return v.Trim().TrimEnd('/');
+        }
+        return $"https://127.0.0.1:{DefaultOauthPort}";
+    }
+
     private readonly string _name;
-    private int _port = 9443;
+    private int _port = DefaultOauthPort;
     private string? _listenIp;
     private string? _metadataBaseUrl;
+    private string? _transport;
     private string? _serverTlsCert;
     private string? _serverTlsKey;
     private readonly List<IArenaDependency> _children = new();
@@ -65,7 +83,13 @@ public sealed class OauthDependencyBuilder
 
     public OauthDependencyBuilder WithMetadataBaseUrl(string url)
     {
-        _metadataBaseUrl = url;
+        _metadataBaseUrl = url.TrimEnd('/');
+        return this;
+    }
+
+    public OauthDependencyBuilder WithHttp()
+    {
+        _transport = "http";
         return this;
     }
 
@@ -73,6 +97,7 @@ public sealed class OauthDependencyBuilder
     {
         _serverTlsCert = cert;
         _serverTlsKey = key;
+        _transport = "tls";
         return this;
     }
 
@@ -85,6 +110,7 @@ public sealed class OauthDependencyBuilder
     public OauthDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-oauth", _name);
-        return new OauthDependency(identifier, _port, _listenIp, _metadataBaseUrl, _serverTlsCert, _serverTlsKey, _children);
+        var metadataBaseUrl = string.IsNullOrWhiteSpace(_metadataBaseUrl) ? OauthIssuer : _metadataBaseUrl;
+        return new OauthDependency(identifier, _port, _listenIp, metadataBaseUrl, _transport, _serverTlsCert, _serverTlsKey, _children);
     }
 }

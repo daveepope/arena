@@ -98,6 +98,12 @@ public sealed class ExecutableComponentBuilder
         return this;
     }
 
+    public ExecutableComponentBuilder WithBuildToolCustom(string command, IEnumerable<string> args)
+    {
+        _buildTool = BuildTool.Custom(command, args);
+        return this;
+    }
+
     public ExecutableComponentBuilder WithEnvVar(string key, string value)
     {
         _envVars[key] = value;

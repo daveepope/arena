@@ -5,6 +5,22 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.0.0]
+
+### Added
+
+- `arena-xunit` API parity with `arena-pytest`/`arena-junit`: `WithImageName`/`WithImage`/`WithContainerName` on Kafka, Mssql, Postgres, and Smtp dependencies; `WithLambda` on Localstack; `WithHttp()`/`transport` and default-issuer fallback on Oauth; `WithBuildToolCustom` on `ExecutableComponentBuilder`
+
+### Fixed
+
+- `OauthDependencyBuilder` in `arena-xunit` defaulted to port 9443 instead of 9444, matching `arena-pytest`/`arena-junit`
+- `KafkaDependencyBuilder.Build()` in `arena-xunit` aliased its internal topic list instead of copying it, so mutating the builder after `Build()` mutated the already-built dependency
+- `LocalstackDependencyBuilder.WithLambda` source directory now expands a leading `~` before resolving to an absolute path
+
+### Removed
+
+- `LocalstackDependencyBuilder.WithImage(string)` in `arena-xunit`: sent a wire key the Rust FFI never read, making it a silent no-op; replaced with `WithImageName`/`WithImageTag`
+
 ## [5.4.1]
 
 ### Fixed
