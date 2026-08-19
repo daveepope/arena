@@ -98,6 +98,7 @@ public sealed class ExampleFixture : ArenaCollectionFixture
         new OauthDependencyBuilder("test-oauth")
             .WithPort(OauthPort)
             .WithServerTlsPem(OauthPem.CertificatePem, OauthPem.PrivateKeyPem)
+            .WithMetadataBaseUrl($"https://127.0.0.1:{OauthPort}")
             .Build();
 
     [ArenaDependency]
