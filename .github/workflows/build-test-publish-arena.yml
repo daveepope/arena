@@ -948,11 +948,6 @@ jobs:
             arena-ffi-artifact: arena-ffi-darwin-x86-64
             prebuilt-dir: darwin-x86-64
             smoke-test-target: //tools/predeploy_smoke/maven:maven_snapshot_smoke_test_osx_x86_64
-          - runner: windows-latest
-            disk-cache: build-test-publish-arena-windows
-            arena-ffi-artifact: arena-ffi-windows-x86-64
-            prebuilt-dir: windows-x86-64
-            smoke-test-target: //tools/predeploy_smoke/maven:maven_snapshot_smoke_test_windows_x86_64
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -1188,8 +1183,6 @@ jobs:
             disk-cache: build-test-publish-arena-macos-arm64
           - runner: macos-15-intel
             disk-cache: build-test-publish-arena-macos-intel
-          - runner: windows-latest
-            disk-cache: build-test-publish-arena-windows
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:

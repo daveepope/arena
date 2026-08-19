@@ -14,7 +14,9 @@ def main() -> int:
 
     expected = {
         "runtimes/osx-arm64/native/fake_native_osx_arm64.txt",
+        "runtimes/osx-x64/native/fake_native_osx_x64.txt",
         "runtimes/linux-x64/native/fake_native_linux_x64.txt",
+        "runtimes/win-x64/native/fake_native_win_x64.txt",
     }
     missing = expected - names
     if missing:

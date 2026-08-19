@@ -46,7 +46,9 @@ csharp_nuget_package(
     target_framework = "netstandard2.0",
     native_libs_by_rid = {
         "osx-arm64": ["testdata/fake_native_osx_arm64.txt"],
+        "osx-x64": ["testdata/fake_native_osx_x64.txt"],
         "linux-x64": ["testdata/fake_native_linux_x64.txt"],
+        "win-x64": ["testdata/fake_native_win_x64.txt"],
     },
 )
 

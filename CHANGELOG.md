@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Predeploy smoke test gates (`tools/predeploy_smoke/`) for arena-xunit, arena-junit, and arena-pytest: each publish job now installs the real built artifact via its real package manager and opens/closes an arena before publishing, including cross-platform coverage on macOS/Windows
+- Predeploy smoke test gates (`tools/predeploy_smoke/`) for arena-xunit, arena-junit, and arena-pytest: each publish job now installs the real built artifact via its real package manager and opens/closes an arena before publishing, with cross-platform execution coverage on macOS and a fast hermetic packaging-layout test covering all RIDs/classifiers including Windows
 
 ## [5.4.0]
 
