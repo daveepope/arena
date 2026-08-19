@@ -22,6 +22,7 @@ genrule(
     srcs = ["//arena-xunit:arena_xunit_nuget"],
     outs = ["ArenaDotnet.Xunit.dll"],
     cmd = "unzip -p $(location //arena-xunit:arena_xunit_nuget) lib/netstandard2.0/ArenaDotnet.Xunit.dll > $@",
+    tags = ["manual"],
 )
 
 config_setting(
@@ -53,6 +54,7 @@ genrule(
     ],
     cmd = "cp $(SRCS) $(RULEDIR)/libarena_ffi_shared.so && " +
           "cp $(SRCS) $(RULEDIR)/libarena_ffi_shared.dylib",
+    tags = ["manual"],
 )
 
 import_library(
