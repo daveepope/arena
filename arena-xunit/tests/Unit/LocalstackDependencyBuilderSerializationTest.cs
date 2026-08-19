@@ -90,12 +90,21 @@ public class LocalstackDependencyBuilderSerializationTest
     }
 
     [Fact]
-    public void Build_WithImage_SerializesCorrectJson()
+    public void Build_WithImageName_SerializesCorrectJson()
     {
-        var dep = new LocalstackDependencyBuilder("test").WithImage("custom:tag").Build();
+        var dep = new LocalstackDependencyBuilder("test").WithImageName("localstack/localstack-pro").Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Equal("custom:tag", obj["image"]);
+        Assert.Equal("localstack/localstack-pro", obj["image_name"]);
+    }
+
+    [Fact]
+    public void Build_WithImageTag_SerializesCorrectJson()
+    {
+        var dep = new LocalstackDependencyBuilder("test").WithImageTag("3.8").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("3.8", obj["image_tag"]);
     }
 
     [Fact]
@@ -142,6 +151,46 @@ public class LocalstackDependencyBuilderSerializationTest
         Assert.NotNull(targets);
         var eventTarget = Assert.Single(targets);
         Assert.Equal("sqs_queue", eventTarget["kind"]);
+    }
+
+    [Fact]
+    public void Build_WithLambda_SerializesCorrectJson()
+    {
+        var spec = new LambdaSpec(
+            "my-fn",
+            "python3.12",
+            "handler.main",
+            ".",
+            new[] { new System.Collections.Generic.KeyValuePair<string, string>("KEY", "VALUE") });
+        var dep = new LocalstackDependencyBuilder("test").WithLambda(spec).Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        var lambdas = obj["lambdas"];
+        Assert.NotNull(lambdas);
+        var lambda = Assert.Single(lambdas);
+        Assert.Equal("my-fn", lambda["name"]);
+        Assert.Equal("python3.12", lambda["runtime"]);
+        Assert.Equal("handler.main", lambda["handler"]);
+        Assert.True(System.IO.Path.IsPathRooted((string)lambda["source_dir"]!));
+        var environment = lambda["environment"];
+        Assert.NotNull(environment);
+        var pair = Assert.Single(environment);
+        Assert.Equal("KEY", pair[0]);
+        Assert.Equal("VALUE", pair[1]);
+    }
+
+    [Fact]
+    public void Build_WithLambdaHomeRelativeSourceDir_ExpandsToUserProfile()
+    {
+        var spec = new LambdaSpec("my-fn", "python3.12", "handler.main", "~/my-lambda-src");
+        var dep = new LocalstackDependencyBuilder("test").WithLambda(spec).Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        var lambda = Assert.Single(obj["lambdas"]!);
+        var sourceDir = (string)lambda["source_dir"]!;
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        Assert.StartsWith(home, sourceDir);
+        Assert.DoesNotContain("~", sourceDir);
     }
 
     [Fact]

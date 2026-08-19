@@ -12,6 +12,9 @@ public sealed class PostgresDependency : IArenaDependency
     public string? DatabaseName { get; }
     public string? DatabaseUsername { get; }
     public string? DatabasePassword { get; }
+    public string? ImageName { get; }
+    public string? Image { get; }
+    public string? ContainerName { get; }
     public IReadOnlyList<string> StartupSqlScripts { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
@@ -23,6 +26,9 @@ public sealed class PostgresDependency : IArenaDependency
         string? databaseName,
         string? databaseUsername,
         string? databasePassword,
+        string? imageName,
+        string? image,
+        string? containerName,
         IReadOnlyList<string> startupSqlScripts,
         IReadOnlyList<IArenaDependency> children)
     {
@@ -31,6 +37,9 @@ public sealed class PostgresDependency : IArenaDependency
         DatabaseName = databaseName;
         DatabaseUsername = databaseUsername;
         DatabasePassword = databasePassword;
+        ImageName = imageName;
+        Image = image;
+        ContainerName = containerName;
         StartupSqlScripts = startupSqlScripts;
         _children = children;
     }
@@ -48,6 +57,9 @@ public sealed class PostgresDependencyBuilder
     private string? _databaseName;
     private string? _databaseUsername;
     private string? _databasePassword;
+    private string? _imageName;
+    private string? _image;
+    private string? _containerName;
     private readonly List<string> _startupSqlScripts = new();
     private readonly List<IArenaDependency> _children = new();
 
@@ -80,6 +92,24 @@ public sealed class PostgresDependencyBuilder
         return this;
     }
 
+    public PostgresDependencyBuilder WithImageName(string imageName)
+    {
+        _imageName = imageName;
+        return this;
+    }
+
+    public PostgresDependencyBuilder WithImage(string image)
+    {
+        _image = image;
+        return this;
+    }
+
+    public PostgresDependencyBuilder WithContainerName(string containerName)
+    {
+        _containerName = containerName;
+        return this;
+    }
+
     public PostgresDependencyBuilder WithStartupSqlScripts(IEnumerable<string> scripts)
     {
         _startupSqlScripts.AddRange(scripts);
@@ -95,6 +125,6 @@ public sealed class PostgresDependencyBuilder
     public PostgresDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-postgres", _name);
-        return new PostgresDependency(identifier, _port, _databaseName, _databaseUsername, _databasePassword, _startupSqlScripts, _children);
+        return new PostgresDependency(identifier, _port, _databaseName, _databaseUsername, _databasePassword, _imageName, _image, _containerName, _startupSqlScripts, _children);
     }
 }
