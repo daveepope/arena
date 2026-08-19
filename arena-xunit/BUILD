@@ -12,10 +12,12 @@ _ARENA_XUNIT_SRCS = glob(["src/**/*.cs"])
 
 _ARENA_XUNIT_NUGET_ID = "ArenaDotnet.Xunit"
 
-_ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS = glob(
-    ["prebuilt/**"],
-    allow_empty = True,
-)
+_ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS_BY_RID = {
+    "linux-x64": glob(["prebuilt/linux-x86-64/**"], allow_empty = True),
+    "osx-arm64": glob(["prebuilt/darwin-aarch64/**"], allow_empty = True),
+    "osx-x64": glob(["prebuilt/darwin-x86-64/**"], allow_empty = True),
+    "win-x64": glob(["prebuilt/windows-x86-64/**"], allow_empty = True),
+}
 
 # Sourced from pinned_dependency_versions.bzl, the same constants MODULE.bazel's
 # nuget_archive pins use, so this can't drift from what arena_xunit_lib is
@@ -132,7 +134,7 @@ csharp_nuget_package(
     dll = ":arena_xunit_lib",
     target_framework = "netstandard2.0",
     dependencies = _ARENA_XUNIT_NUGET_DEPENDENCIES,
-    native_libs = _ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS,
+    native_libs_by_rid = _ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS_BY_RID,
     readme = "//:README.md",
     tags = ["manual"],
     visibility = ["//visibility:public"],
@@ -146,7 +148,7 @@ csharp_nuget_package(
     dll = ":arena_xunit_lib",
     target_framework = "netstandard2.0",
     dependencies = _ARENA_XUNIT_NUGET_DEPENDENCIES,
-    native_libs = _ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS,
+    native_libs_by_rid = _ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS_BY_RID,
     allow_prerelease = True,
     readme = "//:README.md",
     tags = ["manual"],

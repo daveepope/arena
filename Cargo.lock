@@ -58,7 +58,7 @@ dependencies = [
 
 [[package]]
 name = "arena"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "async-trait",
  "futures",
@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "arena-container"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "bollard",
  "futures",
@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "arena-containerized-component"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -97,14 +97,14 @@ dependencies = [
 
 [[package]]
 name = "arena-cryptography"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "rcgen",
 ]
 
 [[package]]
 name = "arena-examples"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "arena",
  "arena-containerized-component",
@@ -133,7 +133,7 @@ dependencies = [
 
 [[package]]
 name = "arena-executable-component"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -147,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "arena-ffi"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "arc-swap",
  "arena",
@@ -173,7 +173,7 @@ dependencies = [
 
 [[package]]
 name = "arena-http"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -191,7 +191,7 @@ dependencies = [
 
 [[package]]
 name = "arena-kafka"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -207,7 +207,7 @@ dependencies = [
 
 [[package]]
 name = "arena-localstack"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -232,7 +232,7 @@ dependencies = [
 
 [[package]]
 name = "arena-mssql"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -248,7 +248,7 @@ dependencies = [
 
 [[package]]
 name = "arena-oauth"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -273,7 +273,7 @@ dependencies = [
 
 [[package]]
 name = "arena-postgres"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -288,7 +288,7 @@ dependencies = [
 
 [[package]]
 name = "arena-smtp"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -305,7 +305,7 @@ dependencies = [
 
 [[package]]
 name = "arena-temporal"
-version = "5.4.0"
+version = "5.4.1"
 dependencies = [
  "arena",
  "arena-container",

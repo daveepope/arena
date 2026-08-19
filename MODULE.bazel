@@ -1,6 +1,6 @@
 module(
     name = "arena",
-    version = "5.4.0",
+    version = "5.4.1",
 )
 
 arena_version_ext = use_extension("//tools:arena_version.bzl", "arena_version")
@@ -48,6 +48,15 @@ http_archive(
     build_file_content = """exports_files(["trivy"])""",
     sha256 = "88f208680dc05da2b459e19b4f5aa2b4dc7c2117892ba4aab2ae63baba330016",
     urls = ["https://github.com/aquasecurity/trivy/releases/download/v{v}/trivy_{v}_macOS-ARM64.tar.gz".format(v = _TRIVY_VERSION)],
+)
+
+http_archive(
+    name = "apache_maven",
+    build_file_content = """exports_files(["bin/mvn"])
+filegroup(name = "dist", srcs = glob(["**"]), visibility = ["//visibility:public"])""",
+    sha256 = "7a9cdf674fc1703d6382f5f330b3d110ea1b512b51f1652846d9e4e8a588d766",
+    strip_prefix = "apache-maven-3.9.9",
+    urls = ["https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz"],
 )
 
 java_toolchains = use_extension("@rules_java//java:extensions.bzl", "toolchains")

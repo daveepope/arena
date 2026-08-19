@@ -5,6 +5,16 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.4.1]
+
+### Fixed
+
+- `arena-xunit` NuGet package placed native libraries under `lib/<tfm>/` instead of `runtimes/<rid>/native/`, so they were never deployed to consumers; `ArenaPaths` also gained an `AssemblyDependencyResolver` fallback for the common case where no `RuntimeIdentifier` is set
+
+### Added
+
+- Predeploy smoke test gates (`tools/predeploy_smoke/`) for arena-xunit, arena-junit, and arena-pytest: each publish job now installs the real built artifact via its real package manager and opens/closes an arena before publishing, with cross-platform execution coverage on macOS and a fast hermetic packaging-layout test covering all RIDs/classifiers including Windows
+
 ## [5.4.0]
 
 ### Added
