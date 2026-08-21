@@ -13,8 +13,8 @@ on:
 permissions: read-all
 
 jobs:
-  scan-scheduled:
-    if: ${{ github.event_name == 'push' || github.event_name == 'schedule' }}
+  scan-full:
+    if: ${{ github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     permissions:
       security-events: write
       contents: read

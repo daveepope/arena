@@ -1,5 +1,5 @@
 {
-  "checksum": "8cc5313734971808f1365fe8924ea23095a96f6500068d01f27e1ef549253d67",
+  "checksum": "0e8d435dfd077fa6ee713b1e9c9a5695a0253dab3a97071a781f4445ed63746a",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -3361,7 +3361,7 @@
               "target": "aws_smithy_types"
             },
             {
-              "id": "h2 0.4.13",
+              "id": "h2 0.4.16",
               "target": "h2"
             },
             {
@@ -8705,7 +8705,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ]
@@ -10592,14 +10592,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "h2 0.4.13": {
+    "h2 0.4.16": {
       "name": "h2",
-      "version": "0.4.13",
+      "version": "0.4.16",
       "package_url": "https://github.com/hyperium/h2",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/h2/0.4.13/download",
-          "sha256": "2f44da3a8150a6703ed5d34e164b875fd14c2cdab9af1252a9a1020bde2bdc54"
+          "url": "https://static.crates.io/crates/h2/0.4.16/download",
+          "sha256": "a9f37a958b41b3b19ee2707c06439c0e9e547e847223eb791ecb0cb821c65e27"
         }
       },
       "targets": [
@@ -10671,7 +10671,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.4.13"
+        "version": "0.4.16"
       },
       "license": "MIT",
       "license_ids": [
@@ -11610,7 +11610,7 @@
               "target": "futures_core"
             },
             {
-              "id": "h2 0.4.13",
+              "id": "h2 0.4.16",
               "target": "h2"
             },
             {
@@ -14924,7 +14924,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.60.2",
                 "target": "windows_sys",
                 "alias": "windows"
               }
@@ -20626,7 +20626,7 @@
                 "alias": "libc_errno"
               },
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ],
@@ -23305,7 +23305,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.60.2",
                 "target": "windows_sys"
               }
             ]
@@ -25695,7 +25695,7 @@
               "target": "bytes"
             },
             {
-              "id": "h2 0.4.13",
+              "id": "h2 0.4.16",
               "target": "h2"
             },
             {
@@ -29123,6 +29123,24 @@
         "compile_data_glob": [
           "**"
         ],
+        "crate_features": {
+          "common": [
+            "Win32",
+            "Win32_Foundation",
+            "Win32_Networking",
+            "Win32_Networking_WinSock",
+            "Win32_Security",
+            "Win32_Storage",
+            "Win32_Storage_FileSystem",
+            "Win32_System",
+            "Win32_System_Console",
+            "Win32_System_IO",
+            "Win32_System_Threading",
+            "Win32_System_WindowsProgramming",
+            "default"
+          ],
+          "selects": {}
+        },
         "deps": {
           "common": [
             {
