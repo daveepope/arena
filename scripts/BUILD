@@ -75,6 +75,66 @@ py_binary(
 )
 
 py_binary(
+    name = "generate_rust_sbom",
+    srcs = ["generate_rust_sbom.py"],
+    main = "generate_rust_sbom.py",
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "generate_rust_sbom_test",
+    size = "small",
+    srcs = [
+        "generate_rust_sbom.py",
+        "generate_rust_sbom_test.py",
+    ],
+    main = "generate_rust_sbom_test.py",
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "generate_maven_sbom",
+    srcs = ["generate_maven_sbom.py"],
+    main = "generate_maven_sbom.py",
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "generate_maven_sbom_test",
+    size = "small",
+    srcs = [
+        "generate_maven_sbom.py",
+        "generate_maven_sbom_test.py",
+    ],
+    main = "generate_maven_sbom_test.py",
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "generate_nuget_sbom",
+    srcs = ["generate_nuget_sbom.py"],
+    main = "generate_nuget_sbom.py",
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "generate_nuget_sbom_test",
+    size = "small",
+    srcs = [
+        "generate_nuget_sbom.py",
+        "generate_nuget_sbom_test.py",
+    ],
+    main = "generate_nuget_sbom_test.py",
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
     name = "check_version_bump",
     srcs = ["check_version_bump.py"],
     main = "check_version_bump.py",

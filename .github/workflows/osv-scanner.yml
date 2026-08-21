@@ -13,27 +13,77 @@ on:
 permissions: read-all
 
 jobs:
+  generate-sboms:
+    name: Generate cross-ecosystem SBOMs
+    if: ${{ github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: osv-scanner-sboms
+          repository-cache: true
+
+      - name: Configure BuildBuddy remote cache
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
+          fi
+        shell: bash
+
+      - name: Generate SBOMs
+        shell: bash
+        run: |
+          mkdir -p sboms
+          bazel run --config=ci //scripts:generate_rust_sbom -- --output="$PWD/sboms/arena-rust.cdx.json"
+          bazel run --config=ci //scripts:generate_maven_sbom -- --output="$PWD/sboms/arena-maven.cdx.json"
+          bazel run --config=ci //scripts:generate_nuget_sbom -- --output="$PWD/sboms/arena-nuget.cdx.json"
+
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: arena-sboms
+          path: sboms/
+          if-no-files-found: error
+
   scan-full:
+    needs: generate-sboms
     if: ${{ github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     permissions:
       security-events: write
       contents: read
       actions: read
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67
     with:
       fail-on-vuln: true
+      download-artifact: arena-sboms
       scan-args: |-
         -r
         ./
   scan-pr:
+    needs: generate-sboms
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     permissions:
       security-events: write
       contents: read
       actions: read
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@9a498708959aeaef5ef730655706c5a1df1edbc2
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67
     with:
       fail-on-vuln: true
+      download-artifact: arena-sboms
       scan-args: |-
         -r
         ./

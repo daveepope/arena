@@ -762,7 +762,6 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: staged-arena-ffi/${{ matrix.staged-lib-name }}
-          if-no-files-found: error
 
   wheel:
     name: Build wheel (${{ matrix.runner }})

@@ -15,10 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enabled hash verification (`generate_hashes = True`) for `arena-pytest` and `examples` pip lockfiles
 - Added floor constraints (`idna>=3.15`, `pygments>=2.20.0`) to `arena-pytest`/`examples` `requirements.txt` so OSV-Scanner's independent resolution of the unpinned manifest also picks up patched versions
 - Documented OSV-Scanner exceptions (`osv-scanner.toml`) for `rsa`, `rustls-pemfile`, and `rustls-webpki` advisories with no reachable fix through the `tiberius` dependency chain
+- Extended OSV-Scanner CI coverage across all 4 dependency ecosystems (Cargo, pip, Maven, NuGet) by adding generated CycloneDX SBOMs for `arena-ffi` (Rust), `arena-junit` (Maven), and `arena-xunit` (NuGet); pip was already natively scanned via `requirements_lock.txt`. Closes a gap where the actual published Maven/NuGet dependencies (as opposed to the example apps) had no CVE scanning at all
+- Bumped `kafka-clients` to 3.9.2, migrated `org.lz4:lz4-java` to its relocated `at.yawk.lz4:lz4-java` coordinates at 1.11.1, and bumped `micrometer-core` to 1.15.12, fixing CVEs surfaced by the new Maven SBOM scan
+- Closed a fail-open gap in `check_dependency_release_age.py` where Maven/BCR/NuGet dependencies silently passed the 3-day release-age check if their publish time couldn't be determined; also replaced the unreliable Maven Central search-index and empty BCR-timestamp lookups with direct repository/commit-history queries
+- Bumped the pinned `google/osv-scanner-action` from a May 2026 commit to v2.5.1, picking up native `.csproj` (NuGet) scanning support that the old pin lacked
 
 ### Added
 
 - `bazel run //scripts:repin` to force-repin Rust, Python, and Maven lockfiles independent of a version bump
+- `scripts/generate_rust_sbom.py`, `generate_maven_sbom.py`, `generate_nuget_sbom.py` to produce CycloneDX SBOMs for OSV-Scanner from `Cargo.Bazel.lock`, `arena_java_maven_install.json`, and `MODULE.bazel`
 
 ### Fixed
 

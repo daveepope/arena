@@ -104,7 +104,7 @@ class LocalCargoCratesFromBazelLockTest(unittest.TestCase):
 
 
 class CheckReleaseAgesTest(unittest.TestCase):
-    def test_maven_undeterminable_publish_time_is_skipped_not_failed(self) -> None:
+    def test_maven_undeterminable_publish_time_fails(self) -> None:
         with (
             mock.patch(
                 "check_dependency_release_age._changed_watched_files",
@@ -130,9 +130,10 @@ class CheckReleaseAgesTest(unittest.TestCase):
                 now=datetime.now(timezone.utc),
             )
 
-        self.assertEqual(failures, [])
+        self.assertEqual(len(failures), 1)
+        self.assertIn("maven org.postgresql:postgresql 42.7.12", failures[0])
 
-    def test_bcr_undeterminable_publish_time_is_skipped_not_failed(self) -> None:
+    def test_bcr_undeterminable_publish_time_fails(self) -> None:
         with (
             mock.patch(
                 "check_dependency_release_age._changed_watched_files",
@@ -158,9 +159,10 @@ class CheckReleaseAgesTest(unittest.TestCase):
                 now=datetime.now(timezone.utc),
             )
 
-        self.assertEqual(failures, [])
+        self.assertEqual(len(failures), 1)
+        self.assertIn("bcr rules_python 0.34.0", failures[0])
 
-    def test_nuget_undeterminable_publish_time_is_skipped_not_failed(self) -> None:
+    def test_nuget_undeterminable_publish_time_fails(self) -> None:
         with (
             mock.patch(
                 "check_dependency_release_age._changed_watched_files",
@@ -186,7 +188,8 @@ class CheckReleaseAgesTest(unittest.TestCase):
                 now=datetime.now(timezone.utc),
             )
 
-        self.assertEqual(failures, [])
+        self.assertEqual(len(failures), 1)
+        self.assertIn("nuget Newtonsoft.Json 13.0.4", failures[0])
 
     def test_nuget_recent_publish_time_fails(self) -> None:
         with (
