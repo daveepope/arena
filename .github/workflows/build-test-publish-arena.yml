@@ -53,8 +53,8 @@ jobs:
             esac
             [[ "$1" == .cursor/* || "$1" == .idea/* || "$1" == .vscode/* ]]
           }
-          ci_only_path() {
-            [[ "$1" == .github/workflows/* || "$1" == .github/dependabot.yml ]]
+          build_process_path() {
+            [[ "$1" == .github/workflows/* || "$1" == .github/dependabot.yml || "$1" == supply-chain/* ]]
           }
           only_non_publishable=false
           has_publishable=false
@@ -67,7 +67,7 @@ jobs:
               fi
               only_non_publishable=false
               has_ci_relevant=true
-              if ci_only_path "$path"; then
+              if build_process_path "$path"; then
                 continue
               fi
               has_publishable=true
