@@ -79,6 +79,21 @@ public class ExecutableComponentBuilderSerializationTest
     }
 
     [Fact]
+    public void Build_WithBuildToolCustom_SerializesCommandAndArgs()
+    {
+        var comp = new ExecutableComponentBuilder("test")
+            .WithExecutablePath("./myapp")
+            .WithBuildToolCustom("make", new[] { "release" })
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        var buildTool = obj["build_tool"];
+        Assert.NotNull(buildTool);
+        Assert.Equal("make", buildTool["command"]);
+        Assert.Equal("release", buildTool["args"]?[0]);
+    }
+
+    [Fact]
     public void Build_WithReadinessCheck_SerializesHttpKind()
     {
         var comp = new ExecutableComponentBuilder("test")

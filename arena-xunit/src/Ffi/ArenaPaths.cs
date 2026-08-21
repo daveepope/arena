@@ -14,19 +14,13 @@ internal static class ArenaPaths
 
         var assemblyDir = Path.GetDirectoryName(typeof(ArenaPaths).Assembly.Location);
 
+        var coLocated = ResolveCoLocated(assemblyDir);
+        if (!string.IsNullOrEmpty(coLocated))
+            return coLocated;
+
         var viaDepsFile = ResolveViaDepsFile(assemblyDir);
         if (!string.IsNullOrEmpty(viaDepsFile))
             return viaDepsFile;
-
-        if (!string.IsNullOrEmpty(assemblyDir))
-        {
-            foreach (var name in PlatformLibraryNames())
-            {
-                var candidate = Path.Combine(assemblyDir, name);
-                if (File.Exists(candidate))
-                    return candidate;
-            }
-        }
 
         var runfilesRoot = Environment.GetEnvironmentVariable("RUNFILES_DIR");
         if (!string.IsNullOrEmpty(runfilesRoot))
@@ -43,6 +37,20 @@ internal static class ArenaPaths
             }
         }
 
+        return null;
+    }
+
+    internal static string? ResolveCoLocated(string? assemblyDir)
+    {
+        if (string.IsNullOrEmpty(assemblyDir) || !Directory.Exists(assemblyDir))
+            return null;
+
+        foreach (var name in PlatformLibraryNames())
+        {
+            var candidate = Path.Combine(assemblyDir, name);
+            if (File.Exists(candidate))
+                return candidate;
+        }
         return null;
     }
 
@@ -79,7 +87,7 @@ internal static class ArenaPaths
 
     private static string[] UnmanagedLibraryNames() => new[] { "arena_ffi_shared", "arena_ffi" };
 
-    private static string[] PlatformLibraryNames()
+    internal static string[] PlatformLibraryNames()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             return new[] { "libarena_ffi_shared.dylib", "libarena_ffi.dylib" };

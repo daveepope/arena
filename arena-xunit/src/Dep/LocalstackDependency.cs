@@ -1,4 +1,7 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using ArenaDotnet.Xunit.Support;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -14,6 +17,29 @@ public sealed class QueueSpec
     {
         Name = name;
         Fifo = fifo;
+    }
+}
+
+public sealed class LambdaSpec
+{
+    public string Name { get; }
+    public string Runtime { get; }
+    public string Handler { get; }
+    public string SourceDir { get; }
+    public IReadOnlyList<KeyValuePair<string, string>> Environment { get; }
+
+    public LambdaSpec(
+        string name,
+        string runtime,
+        string handler,
+        string sourceDir,
+        IEnumerable<KeyValuePair<string, string>>? environment = null)
+    {
+        Name = name;
+        Runtime = runtime;
+        Handler = handler;
+        SourceDir = sourceDir;
+        Environment = (environment ?? Enumerable.Empty<KeyValuePair<string, string>>()).ToList();
     }
 }
 
@@ -82,6 +108,16 @@ internal sealed class LocalstackQueueConfig
 }
 
 [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
+internal sealed class LocalstackLambdaConfig
+{
+    [JsonProperty("name")] public string Name { get; set; } = default!;
+    [JsonProperty("runtime")] public string Runtime { get; set; } = default!;
+    [JsonProperty("handler")] public string Handler { get; set; } = default!;
+    [JsonProperty("source_dir")] public string SourceDir { get; set; } = default!;
+    [JsonProperty("environment")] public List<List<string>> Environment { get; set; } = new();
+}
+
+[JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
 internal sealed class LocalstackEventBusConfig
 {
     [JsonProperty("name")] public string Name { get; set; } = default!;
@@ -96,9 +132,11 @@ public sealed class LocalstackDependency : IArenaDependency
 
     private readonly List<string> _services;
     private readonly List<LocalstackQueueConfig> _queues;
+    private readonly List<LambdaSpec> _lambdas;
     private readonly List<LocalstackEventBusConfig> _eventBuses;
     private readonly List<LocalstackRuleConfig> _eventRules;
-    private readonly string? _image;
+    private readonly string? _imageName;
+    private readonly string? _imageTag;
     private readonly string? _containerName;
     private readonly List<IArenaDependency> _children;
 
@@ -107,9 +145,11 @@ public sealed class LocalstackDependency : IArenaDependency
         int port,
         List<string> services,
         List<LocalstackQueueConfig> queues,
+        List<LambdaSpec> lambdas,
         List<LocalstackEventBusConfig> eventBuses,
         List<LocalstackRuleConfig> eventRules,
-        string? image,
+        string? imageName,
+        string? imageTag,
         string? containerName,
         List<IArenaDependency> children)
     {
@@ -118,11 +158,25 @@ public sealed class LocalstackDependency : IArenaDependency
         EndpointUrl = $"http://localhost:{port}";
         _services = services;
         _queues = queues;
+        _lambdas = lambdas;
         _eventBuses = eventBuses;
         _eventRules = eventRules;
-        _image = image;
+        _imageName = imageName;
+        _imageTag = imageTag;
         _containerName = containerName;
         _children = children;
+    }
+
+    private static string ResolveSourceDir(string sourceDir)
+    {
+        if (sourceDir.Length == 0 || sourceDir[0] != '~')
+            return sourceDir;
+        if (sourceDir.Length == 1 || sourceDir[1] == '/' || sourceDir[1] == '\\')
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return home + sourceDir.Substring(1);
+        }
+        return sourceDir;
     }
 
     public string ForFfi()
@@ -136,9 +190,21 @@ public sealed class LocalstackDependency : IArenaDependency
 
         if (_services.Count > 0) config.Services = _services;
         if (_queues.Count > 0) config.Queues = _queues;
+        if (_lambdas.Count > 0)
+        {
+            config.Lambdas = _lambdas.Select(spec => new LocalstackLambdaConfig
+            {
+                Name = spec.Name,
+                Runtime = spec.Runtime,
+                Handler = spec.Handler,
+                SourceDir = Path.GetFullPath(ResolveSourceDir(spec.SourceDir)),
+                Environment = spec.Environment.Select(kv => new List<string> { kv.Key, kv.Value }).ToList(),
+            }).ToList();
+        }
         if (_eventBuses.Count > 0) config.EventBuses = _eventBuses;
         if (_eventRules.Count > 0) config.EventRules = _eventRules;
-        if (!string.IsNullOrEmpty(_image)) config.Image = _image;
+        if (!string.IsNullOrEmpty(_imageName)) config.ImageName = _imageName;
+        if (!string.IsNullOrEmpty(_imageTag)) config.ImageTag = _imageTag;
         if (!string.IsNullOrEmpty(_containerName)) config.ContainerName = _containerName;
         config.Children = ChildrenWireFormat.Build(_children);
 
@@ -153,9 +219,11 @@ public sealed class LocalstackDependency : IArenaDependency
         [JsonProperty("port")] public int Port { get; set; }
         [JsonProperty("services")] public List<string>? Services { get; set; }
         [JsonProperty("queues")] public List<LocalstackQueueConfig>? Queues { get; set; }
+        [JsonProperty("lambdas")] public List<LocalstackLambdaConfig>? Lambdas { get; set; }
         [JsonProperty("event_buses")] public List<LocalstackEventBusConfig>? EventBuses { get; set; }
         [JsonProperty("event_rules")] public List<LocalstackRuleConfig>? EventRules { get; set; }
-        [JsonProperty("image")] public string? Image { get; set; }
+        [JsonProperty("image_name")] public string? ImageName { get; set; }
+        [JsonProperty("image_tag")] public string? ImageTag { get; set; }
         [JsonProperty("container_name")] public string? ContainerName { get; set; }
         [JsonProperty("children")] public List<JToken>? Children { get; set; }
     }
@@ -167,9 +235,11 @@ public sealed class LocalstackDependencyBuilder
     private int _port = 4566;
     private readonly List<string> _services = new();
     private readonly List<QueueSpec> _queues = new();
+    private readonly List<LambdaSpec> _lambdas = new();
     private readonly List<string> _eventBuses = new();
     private readonly List<EventRuleSpec> _eventRules = new();
-    private string? _image;
+    private string? _imageName;
+    private string? _imageTag;
     private string? _containerName;
     private readonly List<IArenaDependency> _children = new();
 
@@ -212,6 +282,12 @@ public sealed class LocalstackDependencyBuilder
         return this;
     }
 
+    public LocalstackDependencyBuilder WithLambda(LambdaSpec spec)
+    {
+        _lambdas.Add(spec);
+        return this;
+    }
+
     public LocalstackDependencyBuilder WithEventBus(string name)
     {
         _eventBuses.Add(name);
@@ -224,9 +300,15 @@ public sealed class LocalstackDependencyBuilder
         return this;
     }
 
-    public LocalstackDependencyBuilder WithImage(string image)
+    public LocalstackDependencyBuilder WithImageName(string imageName)
     {
-        _image = image;
+        _imageName = imageName;
+        return this;
+    }
+
+    public LocalstackDependencyBuilder WithImageTag(string imageTag)
+    {
+        _imageTag = imageTag;
         return this;
     }
 
@@ -285,9 +367,11 @@ public sealed class LocalstackDependencyBuilder
             _port,
             new List<string>(_services),
             queues,
+            new List<LambdaSpec>(_lambdas),
             eventBuses,
             rules,
-            _image,
+            _imageName,
+            _imageTag,
             _containerName,
             _children);
     }

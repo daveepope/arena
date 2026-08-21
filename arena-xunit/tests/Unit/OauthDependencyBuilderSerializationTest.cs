@@ -16,8 +16,35 @@ public class OauthDependencyBuilderSerializationTest
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
         Assert.Equal("oauth", obj["type"]);
-        Assert.Equal(9443, obj["port"]);
+        Assert.Equal(9444, obj["port"]);
         Assert.NotNull(obj["identifier"]);
+    }
+
+    [Fact]
+    public void Build_NoMetadataBaseUrl_DefaultsToOauthIssuer()
+    {
+        var dep = new OauthDependencyBuilder("test").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal(OauthDependencyBuilder.OauthIssuer, obj["metadata_base_url"]);
+    }
+
+    [Fact]
+    public void WithMetadataBaseUrl_TrailingSlashes_Stripped()
+    {
+        var dep = new OauthDependencyBuilder("test").WithMetadataBaseUrl("https://issuer.example.com///").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("https://issuer.example.com", obj["metadata_base_url"]);
+    }
+
+    [Fact]
+    public void Build_WithHttp_SerializesCorrectJson()
+    {
+        var dep = new OauthDependencyBuilder("test").WithHttp().Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("http", obj["transport"]);
     }
 
     [Fact]
@@ -55,6 +82,7 @@ public class OauthDependencyBuilderSerializationTest
         var obj = JObject.Parse(json);
         Assert.Equal("cert", obj["server_tls_certificate_pem"]);
         Assert.Equal("key", obj["server_tls_private_key_pem"]);
+        Assert.Equal("tls", obj["transport"]);
     }
 
     [Fact]

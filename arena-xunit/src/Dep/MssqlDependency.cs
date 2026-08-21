@@ -19,6 +19,9 @@ public sealed class MssqlDependency : IArenaDependency
     public string? DatabaseName { get; }
     public string? DatabaseUsername { get; }
     public string? DatabasePassword { get; }
+    public string? ImageName { get; }
+    public string? Image { get; }
+    public string? ContainerName { get; }
     public IReadOnlyList<string> StartupSqlScripts { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
@@ -31,6 +34,9 @@ public sealed class MssqlDependency : IArenaDependency
         string? databaseName,
         string? databaseUsername,
         string? databasePassword,
+        string? imageName,
+        string? image,
+        string? containerName,
         IReadOnlyList<string> startupSqlScripts,
         IReadOnlyList<IArenaDependency> children)
     {
@@ -40,6 +46,9 @@ public sealed class MssqlDependency : IArenaDependency
         DatabaseName = databaseName;
         DatabaseUsername = databaseUsername;
         DatabasePassword = databasePassword;
+        ImageName = imageName;
+        Image = image;
+        ContainerName = containerName;
         StartupSqlScripts = startupSqlScripts;
         _children = children;
     }
@@ -58,6 +67,9 @@ public sealed class MssqlDependencyBuilder
     private string? _databaseName;
     private string? _databaseUsername;
     private string? _databasePassword;
+    private string? _imageName;
+    private string? _image;
+    private string? _containerName;
     private readonly List<string> _startupSqlScripts = new();
     private readonly List<IArenaDependency> _children = new();
 
@@ -96,6 +108,24 @@ public sealed class MssqlDependencyBuilder
         return this;
     }
 
+    public MssqlDependencyBuilder WithImageName(string imageName)
+    {
+        _imageName = imageName;
+        return this;
+    }
+
+    public MssqlDependencyBuilder WithImage(string image)
+    {
+        _image = image;
+        return this;
+    }
+
+    public MssqlDependencyBuilder WithContainerName(string containerName)
+    {
+        _containerName = containerName;
+        return this;
+    }
+
     public MssqlDependencyBuilder WithStartupSqlScripts(IEnumerable<string> scripts)
     {
         _startupSqlScripts.AddRange(scripts);
@@ -111,6 +141,6 @@ public sealed class MssqlDependencyBuilder
     public MssqlDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-mssql", _name);
-        return new MssqlDependency(identifier, _port, _encryption, _databaseName, _databaseUsername, _databasePassword, _startupSqlScripts, _children);
+        return new MssqlDependency(identifier, _port, _encryption, _databaseName, _databaseUsername, _databasePassword, _imageName, _image, _containerName, _startupSqlScripts, _children);
     }
 }

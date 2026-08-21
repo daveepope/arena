@@ -58,6 +58,15 @@ public class SmtpDependencyBuilderSerializationTest
     }
 
     [Fact]
+    public void Build_WithImageName_SerializesCorrectJson()
+    {
+        var dep = new SmtpDependencyBuilder("test").WithImageName("axllent/mailpit").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("axllent/mailpit", obj["image_name"]);
+    }
+
+    [Fact]
     public void Build_WithImage_SerializesCorrectJson()
     {
         var dep = new SmtpDependencyBuilder("test").WithImage("custom:tag").Build();
