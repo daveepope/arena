@@ -234,6 +234,21 @@ def _cargo_cdylib_name(crate_name: str) -> str:
     return f"lib{crate_name}.so"
 
 
+def regenerate_windows_pip_locks(root: Path) -> None:
+    if sys.platform != "win32":
+        print(
+            "skipping requirements_windows.txt regeneration: not running on native "
+            "Windows (WSL/Linux/macOS produce incorrect Windows wheel hashes). Run "
+            "this from native Windows, or dispatch the 'Generate Windows pip lock "
+            "files' GitHub Actions workflow."
+        )
+        return
+    bazel = os.environ.get("BAZEL", "bazel")
+    env = os.environ.copy()
+    for target in ["//arena-pytest:pip_requirements.update", "//examples:pip_requirements.update"]:
+        subprocess.run([bazel, "run", target], cwd=root, env=env, check=True)
+
+
 CARGO_AUDITABLE_VERSION = "0.7.5"
 CARGO_AUDIT_VERSION = "0.22.2"
 CARGO_VET_VERSION = "0.10.2"

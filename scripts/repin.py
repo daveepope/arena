@@ -6,7 +6,12 @@ import os
 import sys
 from pathlib import Path
 
-from arena_version import audit_arena_ffi_binary, repin_all_lockfiles, vet_rust_dependencies
+from arena_version import (
+    audit_arena_ffi_binary,
+    regenerate_windows_pip_locks,
+    repin_all_lockfiles,
+    vet_rust_dependencies,
+)
 
 
 def _repo_root() -> Path:
@@ -26,6 +31,7 @@ def main() -> int:
     )
     audit_arena_ffi_binary(root)
     vet_rust_dependencies(root)
+    regenerate_windows_pip_locks(root)
     return 0
 
 
