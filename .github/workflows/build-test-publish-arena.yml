@@ -1263,6 +1263,10 @@ jobs:
         shell: bash
         run: bazel run --config=ci --config=release --enable_runfiles //tools/predeploy_smoke/dotnet:nuget_snapshot_smoke_test
 
+      - name: Smoke test Bazel consumer (csharp_import)
+        shell: bash
+        run: bazel test --config=ci --config=release --enable_runfiles //tools/predeploy_smoke/dotnet:bazel_consumer_smoke_test
+
   publish_nuget_snapshot:
     name: Publish NuGet snapshot (Ubuntu 24.04)
     needs: [changes, publish_gate, build_arena_ffi, nuget_smoke_test_cross_platform]
@@ -1344,6 +1348,9 @@ jobs:
         run: |
           bazel run --config=ci --config=release --define=arena_xunit_prerelease=pr${PR_NUMBER}-${PR_SHA:0:7} \
             //tools/predeploy_smoke/dotnet:nuget_snapshot_smoke_test
+
+      - name: Smoke test Bazel consumer (csharp_import)
+        run: bazel test --config=ci --config=release //tools/predeploy_smoke/dotnet:bazel_consumer_smoke_test
 
       - name: NuGet login (OIDC trusted publishing)
         id: nuget_login
@@ -1434,6 +1441,9 @@ jobs:
 
       - name: Smoke test NuGet package
         run: bazel run --config=ci --config=release //tools/predeploy_smoke/dotnet:nuget_smoke_test
+
+      - name: Smoke test Bazel consumer (csharp_import)
+        run: bazel test --config=ci --config=release //tools/predeploy_smoke/dotnet:bazel_consumer_smoke_test
 
       - name: NuGet login (OIDC trusted publishing)
         id: nuget_login

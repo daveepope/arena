@@ -71,6 +71,35 @@ public class ArenaPathsTest : IDisposable
     }
 
     [Fact]
+    public void ResolveCoLocated_NativeLibraryPresentInDirectory_ReturnsPath()
+    {
+        var name = ArenaPaths.PlatformLibraryNames()[0];
+        var expected = Path.Combine(_tempDir, name);
+        File.WriteAllText(expected, "");
+
+        Assert.Equal(expected, ArenaPaths.ResolveCoLocated(_tempDir));
+    }
+
+    [Fact]
+    public void ResolveCoLocated_NoNativeLibraryInDirectory_ReturnsNull()
+    {
+        Assert.Null(ArenaPaths.ResolveCoLocated(_tempDir));
+    }
+
+    [Fact]
+    public void ResolveCoLocated_DirectoryDoesNotExist_ReturnsNull()
+    {
+        var missingDir = Path.Combine(_tempDir, "does-not-exist");
+        Assert.Null(ArenaPaths.ResolveCoLocated(missingDir));
+    }
+
+    [Fact]
+    public void ResolveCoLocated_NullDirectory_ReturnsNull()
+    {
+        Assert.Null(ArenaPaths.ResolveCoLocated(null));
+    }
+
+    [Fact]
     public void ResolveViaDepsFile_MultipleDepsJsonOneMalformed_SkipsItAndKeepsLooking()
     {
         File.WriteAllText(Path.Combine(_tempDir, "aaa_broken.deps.json"), "{ not json");

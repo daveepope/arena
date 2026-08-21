@@ -101,6 +101,7 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
         new OauthDependencyBuilder("test-chained-oauth")
             .WithPort(OauthPort)
             .WithServerTlsPem(OauthPem.CertificatePem, OauthPem.PrivateKeyPem)
+            .WithMetadataBaseUrl($"https://127.0.0.1:{OauthPort}")
             .Build();
 
     [ArenaDependency]

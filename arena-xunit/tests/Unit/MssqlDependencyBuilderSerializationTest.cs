@@ -53,4 +53,42 @@ public class MssqlDependencyBuilderSerializationTest
         var dep = new MssqlDependencyBuilder("test").Build();
         Assert.StartsWith("arena-mssql-", dep.Identifier);
     }
+
+    [Fact]
+    public void Build_WithImageName_SerializesCorrectJson()
+    {
+        var dep = new MssqlDependencyBuilder("test").WithImageName("mcr.microsoft.com/mssql/server").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("mcr.microsoft.com/mssql/server", obj["image_name"]);
+    }
+
+    [Fact]
+    public void Build_WithImage_SerializesCorrectJson()
+    {
+        var dep = new MssqlDependencyBuilder("test").WithImage("2025-CU7-ubuntu-24.04").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("2025-CU7-ubuntu-24.04", obj["image"]);
+    }
+
+    [Fact]
+    public void Build_WithContainerName_SerializesCorrectJson()
+    {
+        var dep = new MssqlDependencyBuilder("test").WithContainerName("my-mssql-container").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("my-mssql-container", obj["container_name"]);
+    }
+
+    [Fact]
+    public void Build_NoImageOverrides_OmitsImageFieldsFromJson()
+    {
+        var dep = new MssqlDependencyBuilder("test").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Null(obj["image_name"]);
+        Assert.Null(obj["image"]);
+        Assert.Null(obj["container_name"]);
+    }
 }
