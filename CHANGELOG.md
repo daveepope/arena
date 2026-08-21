@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [6.0.2]
 
+### Security
+
+- Bumped `h2` to 0.4.16, fixing RUSTSEC-2026-0258
+- Bumped `jackson-databind`, `grpc-core`/`grpc-netty-shaded`, `netty-codec`/`-http`/`-http2`, and `log4j-api` in the example Spring Boot app (`pom.xml` and `MODULE.bazel`) to patched versions
+- Pinned `arena_java_maven` to a checksum-verified lock file (`arena_java_maven_install.json`) instead of unverified live resolution
+- Enabled hash verification (`generate_hashes = True`) for `arena-pytest` and `examples` pip lockfiles
+
+### Added
+
+- `bazel run //scripts:repin` to force-repin Rust, Python, and Maven lockfiles independent of a version bump
+
+### Fixed
+
+- Example Axum web app now retries the Postgres connect and OAuth JWKS fetch on startup instead of panicking on the first attempt, fixing flaky example component tests under CI load
+
 ### Changed
 
 - Bumped `rustls` to 0.23.43

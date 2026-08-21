@@ -19,7 +19,7 @@ from arena_version import (
     release_lockfiles_need_repin,
     release_version_increased,
     release_version_only,
-    repin_release_lockfiles,
+    repin_all_lockfiles,
     sync_workspace_version,
     workspace_version_in_cargo_bazel_lock,
     write_version,
@@ -218,21 +218,21 @@ class SyncWorkspaceVersionTest(unittest.TestCase):
             (root / "Cargo.Bazel.lock").write_text(lock, encoding="utf-8")
             self.assertEqual(workspace_version_in_cargo_bazel_lock(root), "9.8.7")
 
-    def test_repin_release_lockfiles_invokes_bazel(self) -> None:
+    def test_repin_all_lockfiles_invokes_bazel(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with patch("arena_version.subprocess.run") as run:
-                repin_release_lockfiles(root)
-                self.assertEqual(run.call_count, 2)
+                repin_all_lockfiles(root)
+                self.assertEqual(run.call_count, 5)
 
-    def test_repin_release_lockfiles_passes_bazel_config(self) -> None:
+    def test_repin_all_lockfiles_passes_bazel_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with patch.dict(os.environ, {"ARENA_BAZEL_CONFIG": "ci"}):
                 with patch("arena_version.subprocess.run") as run:
-                    repin_release_lockfiles(root)
-                    build_args = run.call_args_list[0].args[0]
-                    self.assertIn("--config=ci", build_args)
+                    repin_all_lockfiles(root)
+                    for call in run.call_args_list:
+                        self.assertIn("--config=ci", call.args[0])
 
 
 if __name__ == "__main__":

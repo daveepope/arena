@@ -432,7 +432,7 @@ compile_pip_requirements(
     src = "requirements.txt",
     requirements_txt = "requirements_lock.txt",
     requirements_windows = "requirements_windows.txt",
-    generate_hashes = False,
+    generate_hashes = True,
 )
 
 py_library(

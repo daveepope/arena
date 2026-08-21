@@ -66,6 +66,15 @@ py_binary(
 )
 
 py_binary(
+    name = "repin",
+    srcs = ["repin.py"],
+    main = "repin.py",
+    deps = [":arena_version_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
     name = "check_version_bump",
     srcs = ["check_version_bump.py"],
     main = "check_version_bump.py",

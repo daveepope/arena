@@ -224,15 +224,20 @@ def release_lockfiles_need_repin(root: Path, target: str) -> bool:
     return locked != target
 
 
-def repin_release_lockfiles(root: Path) -> None:
+def repin_all_lockfiles(root: Path) -> None:
     bazel = os.environ.get("BAZEL", "bazel")
     env = os.environ.copy()
     env["CARGO_BAZEL_REPIN"] = "1"
-    build_args = [bazel, "build", "//..."]
-    mod_args = [bazel, "mod", "deps", "--lockfile_mode=update"]
     bazel_config = os.environ.get("ARENA_BAZEL_CONFIG", "").strip()
-    if bazel_config:
-        build_args.append(f"--config={bazel_config}")
-        mod_args.append(f"--config={bazel_config}")
-    subprocess.run(build_args, cwd=root, env=env, check=True)
-    subprocess.run(mod_args, cwd=root, env=env, check=True)
+
+    commands = [
+        [bazel, "build", "//..."],
+        [bazel, "mod", "deps", "--lockfile_mode=update"],
+        [bazel, "run", "@arena_java_maven//:pin"],
+        [bazel, "run", "//arena-pytest:pip_requirements.update"],
+        [bazel, "run", "//examples:pip_requirements.update"],
+    ]
+    for args in commands:
+        if bazel_config:
+            args.append(f"--config={bazel_config}")
+        subprocess.run(args, cwd=root, env=env, check=True)

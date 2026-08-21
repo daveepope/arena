@@ -11,7 +11,7 @@ from arena_version import (
     read_version,
     release_lockfiles_need_repin,
     release_version_only,
-    repin_release_lockfiles,
+    repin_all_lockfiles,
     sync_workspace_version,
 )
 
@@ -38,8 +38,11 @@ def main() -> int:
 
     if changed or release_lockfiles_need_repin(root, version):
         print("repinning release lockfiles")
-        repin_release_lockfiles(root)
-        print("updated Cargo.Bazel.lock, Cargo.lock, MODULE.bazel.lock")
+        repin_all_lockfiles(root)
+        print(
+            "updated Cargo.Bazel.lock, Cargo.lock, MODULE.bazel.lock, "
+            "arena_java_maven_install.json, requirements_lock.txt"
+        )
     return 0
 
 
