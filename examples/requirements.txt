@@ -7,3 +7,4 @@ asyncpg>=0.30.0
 fastmssql>=0.6.0
 pydantic-settings>=2.14.2
 temporalio>=1.30.0
+idna>=3.15

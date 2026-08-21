@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumped `jackson-databind`, `grpc-core`/`grpc-netty-shaded`, `netty-codec`/`-http`/`-http2`, and `log4j-api` in the example Spring Boot app (`pom.xml` and `MODULE.bazel`) to patched versions
 - Pinned `arena_java_maven` to a checksum-verified lock file (`arena_java_maven_install.json`) instead of unverified live resolution
 - Enabled hash verification (`generate_hashes = True`) for `arena-pytest` and `examples` pip lockfiles
+- Added floor constraints (`idna>=3.15`, `pygments>=2.20.0`) to `arena-pytest`/`examples` `requirements.txt` so OSV-Scanner's independent resolution of the unpinned manifest also picks up patched versions
+- Documented OSV-Scanner exceptions (`osv-scanner.toml`) for `rsa`, `rustls-pemfile`, and `rustls-webpki` advisories with no reachable fix through the `tiberius` dependency chain
 
 ### Added
 
