@@ -58,7 +58,7 @@ dependencies = [
 
 [[package]]
 name = "arena"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "async-trait",
  "futures",
@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "arena-container"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "bollard",
  "futures",
@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "arena-containerized-component"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -97,14 +97,14 @@ dependencies = [
 
 [[package]]
 name = "arena-cryptography"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "rcgen",
 ]
 
 [[package]]
 name = "arena-examples"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "arena",
  "arena-containerized-component",
@@ -133,7 +133,7 @@ dependencies = [
 
 [[package]]
 name = "arena-executable-component"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -147,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "arena-ffi"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "arc-swap",
  "arena",
@@ -173,7 +173,7 @@ dependencies = [
 
 [[package]]
 name = "arena-http"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -191,7 +191,7 @@ dependencies = [
 
 [[package]]
 name = "arena-kafka"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -207,7 +207,7 @@ dependencies = [
 
 [[package]]
 name = "arena-localstack"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -232,7 +232,7 @@ dependencies = [
 
 [[package]]
 name = "arena-mssql"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -248,7 +248,7 @@ dependencies = [
 
 [[package]]
 name = "arena-oauth"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -262,7 +262,7 @@ dependencies = [
  "rand 0.8.6",
  "reqwest",
  "rsa",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -273,7 +273,7 @@ dependencies = [
 
 [[package]]
 name = "arena-postgres"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -288,7 +288,7 @@ dependencies = [
 
 [[package]]
 name = "arena-smtp"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -305,7 +305,7 @@ dependencies = [
 
 [[package]]
 name = "arena-temporal"
-version = "5.4.1"
+version = "6.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -677,7 +677,7 @@ dependencies = [
  "hyper-rustls",
  "hyper-util",
  "pin-project-lite",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "rustls-native-certs 0.8.3",
  "rustls-pki-types",
  "tokio",
@@ -895,7 +895,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "pin-project-lite",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.4",
@@ -987,7 +987,7 @@ dependencies = [
  "num",
  "pin-project-lite",
  "rand 0.9.4",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "rustls-native-certs 0.8.3",
  "rustls-pki-types",
  "serde",
@@ -2047,7 +2047,7 @@ dependencies = [
  "http 1.4.0",
  "hyper",
  "hyper-util",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "rustls-native-certs 0.8.3",
  "tokio",
  "tokio-rustls 0.26.4",
@@ -3085,7 +3085,7 @@ dependencies = [
  "quinn-proto",
  "quinn-udp",
  "rustc-hash",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "socket2",
  "thiserror 2.0.18",
  "tokio",
@@ -3105,7 +3105,7 @@ dependencies = [
  "rand 0.9.4",
  "ring",
  "rustc-hash",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "rustls-pki-types",
  "slab",
  "thiserror 2.0.18",
@@ -3332,7 +3332,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "quinn",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "rustls-pki-types",
  "serde",
  "serde_json",
@@ -3487,9 +3487,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.38"
+version = "0.23.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69f9466fb2c14ea04357e91413efb882e2a6d4a406e625449bc0a5d360d53a21"
+checksum = "0283386ce02abc0151e1761d08802dfe86c173b0b494af5cbc086574e453da06"
 dependencies = [
  "log",
  "once_cell",
@@ -4256,7 +4256,7 @@ version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1729aa945f29d91ba541258c8df89027d5792d85a8841fb65e8bf0f4ede4ef61"
 dependencies = [
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "tokio",
 ]
 
@@ -4510,7 +4510,7 @@ dependencies = [
  "base64 0.22.1",
  "log",
  "percent-encoding",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "rustls-pki-types",
  "ureq-proto",
  "utf8-zero",

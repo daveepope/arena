@@ -64,6 +64,20 @@ arena_java_maven.install(
             },
         )
 
+    def test_parse_module_bazel_nuget_archive_returns_nuget(self) -> None:
+        text = """
+nuget_archive(
+    name = "newtonsoft_json",
+    id = "Newtonsoft.Json",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "13.0.4",
+)
+"""
+        self.assertEqual(
+            parse_module_bazel(text),
+            {("nuget", "Newtonsoft.Json", "13.0.4")},
+        )
+
 
 class LocalCargoCratesFromBazelLockTest(unittest.TestCase):
     def test_local_cargo_crates_null_package_url_returns_name_version(self) -> None:
@@ -145,6 +159,63 @@ class CheckReleaseAgesTest(unittest.TestCase):
             )
 
         self.assertEqual(failures, [])
+
+    def test_nuget_undeterminable_publish_time_is_skipped_not_failed(self) -> None:
+        with (
+            mock.patch(
+                "check_dependency_release_age._changed_watched_files",
+                return_value=["MODULE.bazel"],
+            ),
+            mock.patch(
+                "check_dependency_release_age._collect_new_versions",
+                return_value={("nuget", "Newtonsoft.Json", "13.0.4")},
+            ),
+            mock.patch(
+                "check_dependency_release_age._published_at",
+                return_value=None,
+            ),
+            mock.patch(
+                "check_dependency_release_age._read_file_at_ref",
+                return_value="",
+            ),
+        ):
+            failures = check_release_ages(
+                Path("."),
+                "origin/master",
+                minimum_age=timedelta(days=3),
+                now=datetime.now(timezone.utc),
+            )
+
+        self.assertEqual(failures, [])
+
+    def test_nuget_recent_publish_time_fails(self) -> None:
+        with (
+            mock.patch(
+                "check_dependency_release_age._changed_watched_files",
+                return_value=["MODULE.bazel"],
+            ),
+            mock.patch(
+                "check_dependency_release_age._collect_new_versions",
+                return_value={("nuget", "Newtonsoft.Json", "13.0.4")},
+            ),
+            mock.patch(
+                "check_dependency_release_age._published_at",
+                return_value=datetime.now(timezone.utc) - timedelta(hours=1),
+            ),
+            mock.patch(
+                "check_dependency_release_age._read_file_at_ref",
+                return_value="",
+            ),
+        ):
+            failures = check_release_ages(
+                Path("."),
+                "origin/master",
+                minimum_age=timedelta(days=3),
+                now=datetime.now(timezone.utc),
+            )
+
+        self.assertEqual(len(failures), 1)
+        self.assertIn("nuget Newtonsoft.Json 13.0.4", failures[0])
 
 
 if __name__ == "__main__":

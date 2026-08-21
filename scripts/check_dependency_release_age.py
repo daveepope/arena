@@ -131,6 +131,12 @@ def parse_module_bazel(text: str) -> set[tuple[str, str, str]]:
     pairs: set[tuple[str, str, str]] = set()
     for match in re.finditer(r'bazel_dep\(name = "([^"]+)", version = "([^"]+)"\)', text):
         pairs.add(("bcr", match.group(1), match.group(2)))
+    for match in re.finditer(r"nuget_archive\(([^)]*)\)", text, re.DOTALL):
+        body = match.group(1)
+        id_match = re.search(r'id\s*=\s*"([^"]+)"', body)
+        version_match = re.search(r'version\s*=\s*"([^"]+)"', body)
+        if id_match and version_match:
+            pairs.add(("nuget", id_match.group(1), version_match.group(1)))
     for match in re.finditer(r'"([^:"]+):([^:"]+):([^"]+)"', text):
         group, artifact, version = match.group(1), match.group(2), match.group(3)
         if ":" in version:
@@ -252,6 +258,23 @@ def _bcr_published_at(module: str, version: str) -> datetime | None:
     return None
 
 
+def _nuget_published_at(package_id: str, version: str) -> datetime | None:
+    registration_url = (
+        "https://api.nuget.org/v3/registration5-semver1/"
+        f"{package_id.lower()}/{version.lower()}.json"
+    )
+    payload = _http_json(registration_url)
+    if not payload:
+        return None
+    published = payload.get("published")
+    if not published:
+        catalog_entry = payload.get("catalogEntry") or {}
+        published = catalog_entry.get("published")
+    if not published:
+        return None
+    return _parse_timestamp(published)
+
+
 def _published_at(kind: str, name: str, version: str) -> datetime | None:
     if kind == "cargo":
         return _cargo_published_at(name, version)
@@ -261,6 +284,8 @@ def _published_at(kind: str, name: str, version: str) -> datetime | None:
         return _maven_published_at(name, version)
     if kind == "bcr":
         return _bcr_published_at(name, version)
+    if kind == "nuget":
+        return _nuget_published_at(name, version)
     return None
 
 
@@ -295,7 +320,7 @@ def check_release_ages(
         published_at = _published_at(kind, name, version)
         label = f"{kind} {name} {version}"
         if published_at is None:
-            if kind in ("bcr", "maven"):
+            if kind in ("bcr", "maven", "nuget"):
                 skipped.append(label)
                 continue
             failures.append(f"{label}: could not determine publish time")

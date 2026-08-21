@@ -1,5 +1,5 @@
 {
-  "checksum": "7b0ffa7261eaf1789480fbbc81e07364d0f0516a2c9b3eb440f7d3b62a20d23e",
+  "checksum": "c48887998e86cde684ab70e2b509d798722955cc78b74b2cb3e302575237833d",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -355,9 +355,9 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arena 5.4.1": {
+    "arena 6.0.1": {
       "name": "arena",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -423,15 +423,15 @@
           ],
           "selects": {}
         },
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-container 5.4.1": {
+    "arena-container 6.0.1": {
       "name": "arena-container",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -468,7 +468,7 @@
         "deps": {
           "common": [
             {
-              "id": "arena-container 5.4.1",
+              "id": "arena-container 6.0.1",
               "target": "build_script_build"
             },
             {
@@ -496,7 +496,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -513,9 +513,9 @@
       "license_ids": [],
       "license_file": null
     },
-    "arena-containerized-component 5.4.1": {
+    "arena-containerized-component 6.0.1": {
       "name": "arena-containerized-component",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -585,15 +585,15 @@
           ],
           "selects": {}
         },
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-cryptography 5.4.1": {
+    "arena-cryptography 6.0.1": {
       "name": "arena-cryptography",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -625,15 +625,15 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-examples 5.4.1": {
+    "arena-examples 6.0.1": {
       "name": "arena-examples",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -731,15 +731,15 @@
           ],
           "selects": {}
         },
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-executable-component 5.4.1": {
+    "arena-executable-component 6.0.1": {
       "name": "arena-executable-component",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -801,15 +801,15 @@
           ],
           "selects": {}
         },
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-ffi 5.4.1": {
+    "arena-ffi 6.0.1": {
       "name": "arena-ffi",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -878,15 +878,15 @@
           ],
           "selects": {}
         },
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "license": null,
       "license_ids": [],
       "license_file": null
     },
-    "arena-http 5.4.1": {
+    "arena-http 6.0.1": {
       "name": "arena-http",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -964,15 +964,15 @@
           ],
           "selects": {}
         },
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-kafka 5.4.1": {
+    "arena-kafka 6.0.1": {
       "name": "arena-kafka",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1042,15 +1042,15 @@
           ],
           "selects": {}
         },
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-localstack 5.4.1": {
+    "arena-localstack 6.0.1": {
       "name": "arena-localstack",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1156,15 +1156,15 @@
           ],
           "selects": {}
         },
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-mssql 5.4.1": {
+    "arena-mssql 6.0.1": {
       "name": "arena-mssql",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1234,15 +1234,15 @@
           ],
           "selects": {}
         },
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-oauth 5.4.1": {
+    "arena-oauth 6.0.1": {
       "name": "arena-oauth",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1299,7 +1299,7 @@
               "target": "rsa"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -1344,15 +1344,15 @@
           ],
           "selects": {}
         },
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-postgres 5.4.1": {
+    "arena-postgres 6.0.1": {
       "name": "arena-postgres",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1418,15 +1418,15 @@
           ],
           "selects": {}
         },
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-smtp 5.4.1": {
+    "arena-smtp 6.0.1": {
       "name": "arena-smtp",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1496,15 +1496,15 @@
           ],
           "selects": {}
         },
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-temporal 5.4.1": {
+    "arena-temporal 6.0.1": {
       "name": "arena-temporal",
-      "version": "5.4.1",
+      "version": "6.0.1",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1582,7 +1582,7 @@
           ],
           "selects": {}
         },
-        "version": "5.4.1"
+        "version": "6.0.1"
       },
       "license": "todo",
       "license_ids": [],
@@ -3386,7 +3386,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -4520,7 +4520,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -5081,7 +5081,7 @@
               "target": "rand"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -11789,7 +11789,7 @@
               "target": "hyper_util"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -19776,7 +19776,7 @@
               "target": "hyper_rustls"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -20770,14 +20770,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "rustls 0.23.38": {
+    "rustls 0.23.43": {
       "name": "rustls",
-      "version": "0.23.38",
+      "version": "0.23.43",
       "package_url": "https://github.com/rustls/rustls",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/rustls/0.23.38/download",
-          "sha256": "69f9466fb2c14ea04357e91413efb882e2a6d4a406e625449bc0a5d360d53a21"
+          "url": "https://static.crates.io/crates/rustls/0.23.43/download",
+          "sha256": "0283386ce02abc0151e1761d08802dfe86c173b0b494af5cbc086574e453da06"
         }
       },
       "targets": [
@@ -20836,7 +20836,7 @@
               "target": "ring"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "build_script_build"
             },
             {
@@ -20860,7 +20860,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.23.38"
+        "version": "0.23.43"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -25474,7 +25474,7 @@
         "deps": {
           "common": [
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -26938,7 +26938,7 @@
               "target": "percent_encoding"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -32640,21 +32640,21 @@
   },
   "binary_crates": [],
   "workspace_members": {
-    "arena 5.4.1": "arena",
-    "arena-container 5.4.1": "arena-container",
-    "arena-containerized-component 5.4.1": "arena-containerized-component",
-    "arena-cryptography 5.4.1": "arena-cryptography",
-    "arena-examples 5.4.1": "examples",
-    "arena-executable-component 5.4.1": "arena-executable-component",
-    "arena-ffi 5.4.1": "arena-ffi",
-    "arena-http 5.4.1": "arena-http",
-    "arena-kafka 5.4.1": "arena-kafka",
-    "arena-localstack 5.4.1": "arena-localstack",
-    "arena-mssql 5.4.1": "arena-mssql",
-    "arena-oauth 5.4.1": "arena-oauth",
-    "arena-postgres 5.4.1": "arena-postgres",
-    "arena-smtp 5.4.1": "arena-smtp",
-    "arena-temporal 5.4.1": "arena-temporal"
+    "arena 6.0.1": "arena",
+    "arena-container 6.0.1": "arena-container",
+    "arena-containerized-component 6.0.1": "arena-containerized-component",
+    "arena-cryptography 6.0.1": "arena-cryptography",
+    "arena-examples 6.0.1": "examples",
+    "arena-executable-component 6.0.1": "arena-executable-component",
+    "arena-ffi 6.0.1": "arena-ffi",
+    "arena-http 6.0.1": "arena-http",
+    "arena-kafka 6.0.1": "arena-kafka",
+    "arena-localstack 6.0.1": "arena-localstack",
+    "arena-mssql 6.0.1": "arena-mssql",
+    "arena-oauth 6.0.1": "arena-oauth",
+    "arena-postgres 6.0.1": "arena-postgres",
+    "arena-smtp 6.0.1": "arena-smtp",
+    "arena-temporal 6.0.1": "arena-temporal"
   },
   "conditions": {
     "aarch64-apple-darwin": [
@@ -32847,7 +32847,7 @@
     "reqwest 0.12.28",
     "rsa 0.9.10",
     "rskafka 0.6.0",
-    "rustls 0.23.38",
+    "rustls 0.23.43",
     "serde 1.0.228",
     "serde_json 1.0.149",
     "serde_urlencoded 0.7.1",
