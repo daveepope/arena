@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -224,15 +226,85 @@ def release_lockfiles_need_repin(root: Path, target: str) -> bool:
     return locked != target
 
 
-def repin_release_lockfiles(root: Path) -> None:
+def _cargo_cdylib_name(crate_name: str) -> str:
+    if sys.platform == "win32":
+        return f"{crate_name}.dll"
+    if sys.platform == "darwin":
+        return f"lib{crate_name}.dylib"
+    return f"lib{crate_name}.so"
+
+
+def regenerate_windows_pip_locks(root: Path) -> None:
+    if sys.platform != "win32":
+        print(
+            "skipping requirements_windows.txt regeneration: not running on native "
+            "Windows (WSL/Linux/macOS produce incorrect Windows wheel hashes). Run "
+            "this from native Windows, or dispatch the 'Generate Windows pip lock "
+            "files' GitHub Actions workflow."
+        )
+        return
+    bazel = os.environ.get("BAZEL", "bazel")
+    env = os.environ.copy()
+    for target in ["//arena-pytest:pip_requirements.update", "//examples:pip_requirements.update"]:
+        subprocess.run([bazel, "run", target], cwd=root, env=env, check=True)
+
+
+CARGO_AUDITABLE_VERSION = "0.7.5"
+CARGO_AUDIT_VERSION = "0.22.2"
+CARGO_VET_VERSION = "0.10.2"
+
+
+def audit_arena_ffi_binary(root: Path) -> None:
+    env = os.environ.copy()
+    if shutil.which("cargo-auditable") is None or shutil.which("cargo-audit") is None:
+        subprocess.run(
+            [
+                "cargo",
+                "install",
+                f"cargo-auditable@{CARGO_AUDITABLE_VERSION}",
+                f"cargo-audit@{CARGO_AUDIT_VERSION}",
+                "--locked",
+            ],
+            cwd=root,
+            env=env,
+            check=True,
+        )
+    subprocess.run(
+        ["cargo", "auditable", "build", "--release", "--lib", "-p", "arena-ffi"],
+        cwd=root,
+        env=env,
+        check=True,
+    )
+    binary = root / "target" / "release" / _cargo_cdylib_name("arena_ffi")
+    subprocess.run(["cargo", "audit", "bin", str(binary)], cwd=root, env=env, check=True)
+
+
+def vet_rust_dependencies(root: Path) -> None:
+    env = os.environ.copy()
+    if shutil.which("cargo-vet") is None:
+        subprocess.run(
+            ["cargo", "install", f"cargo-vet@{CARGO_VET_VERSION}", "--locked"],
+            cwd=root,
+            env=env,
+            check=True,
+        )
+    subprocess.run(["cargo", "vet"], cwd=root, env=env, check=True)
+
+
+def repin_all_lockfiles(root: Path) -> None:
     bazel = os.environ.get("BAZEL", "bazel")
     env = os.environ.copy()
     env["CARGO_BAZEL_REPIN"] = "1"
-    build_args = [bazel, "build", "//..."]
-    mod_args = [bazel, "mod", "deps", "--lockfile_mode=update"]
     bazel_config = os.environ.get("ARENA_BAZEL_CONFIG", "").strip()
-    if bazel_config:
-        build_args.append(f"--config={bazel_config}")
-        mod_args.append(f"--config={bazel_config}")
-    subprocess.run(build_args, cwd=root, env=env, check=True)
-    subprocess.run(mod_args, cwd=root, env=env, check=True)
+
+    commands = [
+        [bazel, "build", "//..."],
+        [bazel, "mod", "deps", "--lockfile_mode=update"],
+        [bazel, "run", "@arena_java_maven//:pin"],
+        [bazel, "run", "//arena-pytest:pip_requirements.update"],
+        [bazel, "run", "//examples:pip_requirements.update"],
+    ]
+    for args in commands:
+        if bazel_config:
+            args.append(f"--config={bazel_config}")
+        subprocess.run(args, cwd=root, env=env, check=True)

@@ -19,7 +19,7 @@ members = [
 ]
 
 [workspace.package]
-version = "6.0.1"
+version = "6.0.2"
 [workspace.dependencies]
 arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }
@@ -41,6 +41,7 @@ serde_urlencoded = "0.7.1"
 tokio-postgres = "0.7.18"
 postgres = "0.19"
 rskafka = "0.6.0"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 backon = "1.5.2"
 arc-swap = "1.7"
 async-trait = "0.1"

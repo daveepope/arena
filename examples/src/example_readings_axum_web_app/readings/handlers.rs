@@ -149,7 +149,7 @@ pub async fn create_reading(
         key: Some(key.into_bytes()),
         value: Some(payload.into_bytes()),
         headers: Default::default(),
-        timestamp: rskafka::chrono::Utc::now(),
+        timestamp: chrono::Utc::now(),
     };
     tokio::spawn(async move {
         match tokio::time::timeout(

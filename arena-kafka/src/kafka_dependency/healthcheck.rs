@@ -79,7 +79,7 @@ impl KafkaHealthcheckOps for RskafkaHealthcheckOps {
             key: Some(b"healthcheck".to_vec()),
             value: Some(payload.as_bytes().to_vec()),
             headers: Default::default(),
-            timestamp: rskafka::chrono::Utc::now(),
+            timestamp: chrono::Utc::now(),
         };
 
         tokio::time::timeout(

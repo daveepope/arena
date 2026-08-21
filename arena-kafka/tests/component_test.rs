@@ -44,7 +44,7 @@ async fn produce_payload_once(partition: &PartitionClient, payload: &str) -> Res
         key: Some(b"component-test".to_vec()),
         value: Some(payload.as_bytes().to_vec()),
         headers: Default::default(),
-        timestamp: rskafka::chrono::Utc::now(),
+        timestamp: chrono::Utc::now(),
     };
     partition
         .produce(vec![record], Compression::NoCompression)

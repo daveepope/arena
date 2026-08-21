@@ -5,6 +5,36 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.0.2]
+
+### Security
+
+- Bumped `h2` to 0.4.16, fixing RUSTSEC-2026-0258
+- Bumped `jackson-databind`, `grpc-core`/`grpc-netty-shaded`, `netty-codec`/`-http`/`-http2`, and `log4j-api` in the example Spring Boot app (`pom.xml` and `MODULE.bazel`) to patched versions
+- Pinned `arena_java_maven` to a checksum-verified lock file (`arena_java_maven_install.json`) instead of unverified live resolution
+- Enabled hash verification (`generate_hashes = True`) for `arena-pytest` and `examples` pip lockfiles
+- Added floor constraints (`idna>=3.15`, `pygments>=2.20.0`) to `arena-pytest`/`examples` `requirements.txt` so OSV-Scanner's independent resolution of the unpinned manifest also picks up patched versions
+- Documented OSV-Scanner exceptions (`osv-scanner.toml`) for `rsa`, `rustls-pemfile`, and `rustls-webpki` advisories with no reachable fix through the `tiberius` dependency chain
+- Extended OSV-Scanner CI coverage across all 4 dependency ecosystems (Cargo, pip, Maven, NuGet) by adding generated CycloneDX SBOMs for `arena-ffi` (Rust), `arena-junit` (Maven), and `arena-xunit` (NuGet); pip was already natively scanned via `requirements_lock.txt`. Closes a gap where the actual published Maven/NuGet dependencies (as opposed to the example apps) had no CVE scanning at all
+- Bumped `kafka-clients` to 3.9.2, migrated `org.lz4:lz4-java` to its relocated `at.yawk.lz4:lz4-java` coordinates at 1.11.1, and bumped `micrometer-core` to 1.15.12, fixing CVEs surfaced by the new Maven SBOM scan
+- Closed a fail-open gap in `check_dependency_release_age.py` where Maven/BCR/NuGet dependencies silently passed the 3-day release-age check if their publish time couldn't be determined; also replaced the unreliable Maven Central search-index and empty BCR-timestamp lookups with direct repository/commit-history queries
+- Bumped the pinned `google/osv-scanner-action` from a May 2026 commit to v2.5.1, picking up native `.csproj` (NuGet) scanning support that the old pin lacked
+
+### Added
+
+- `bazel run //scripts:repin` to force-repin Rust, Python, and Maven lockfiles independent of a version bump
+- `scripts/generate_rust_sbom.py`, `generate_maven_sbom.py`, `generate_nuget_sbom.py` to produce CycloneDX SBOMs for OSV-Scanner from `Cargo.Bazel.lock`, `arena_java_maven_install.json`, and `MODULE.bazel`
+- `cargo audit bin` and `cargo vet` against a `cargo-auditable`-built `arena_ffi_shared` binary, run as part of `bazel run //scripts:repin` and as a standalone, Rust-path-filtered CI job (`supply-chain/` cargo-vet config, bootstrapped with exemptions for all currently-used crates)
+- Added `chrono` as a direct workspace dependency (with the `clock` feature) so `arena-kafka`/`examples` no longer rely on `rskafka`'s re-exported `chrono` having that feature enabled only by incidental cross-crate feature unification; this is what made a standalone `cargo build -p arena-ffi` possible in the first place
+
+### Fixed
+
+- Example Axum web app now retries the Postgres connect and OAuth JWKS fetch on startup instead of panicking on the first attempt, fixing flaky example component tests under CI load
+
+### Changed
+
+- Bumped `rustls` to 0.23.43
+
 ## [6.0.1]
 
 ### Fixed

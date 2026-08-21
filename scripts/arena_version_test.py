@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from arena_version import (
+    audit_arena_ffi_binary,
     bump_major_version,
     bump_minor_version,
     bump_patch_version,
@@ -19,8 +20,9 @@ from arena_version import (
     release_lockfiles_need_repin,
     release_version_increased,
     release_version_only,
-    repin_release_lockfiles,
+    repin_all_lockfiles,
     sync_workspace_version,
+    vet_rust_dependencies,
     workspace_version_in_cargo_bazel_lock,
     write_version,
 )
@@ -218,21 +220,64 @@ class SyncWorkspaceVersionTest(unittest.TestCase):
             (root / "Cargo.Bazel.lock").write_text(lock, encoding="utf-8")
             self.assertEqual(workspace_version_in_cargo_bazel_lock(root), "9.8.7")
 
-    def test_repin_release_lockfiles_invokes_bazel(self) -> None:
+    def test_repin_all_lockfiles_invokes_bazel(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with patch("arena_version.subprocess.run") as run:
-                repin_release_lockfiles(root)
-                self.assertEqual(run.call_count, 2)
+                repin_all_lockfiles(root)
+                self.assertEqual(run.call_count, 5)
 
-    def test_repin_release_lockfiles_passes_bazel_config(self) -> None:
+    def test_repin_all_lockfiles_passes_bazel_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with patch.dict(os.environ, {"ARENA_BAZEL_CONFIG": "ci"}):
                 with patch("arena_version.subprocess.run") as run:
-                    repin_release_lockfiles(root)
-                    build_args = run.call_args_list[0].args[0]
-                    self.assertIn("--config=ci", build_args)
+                    repin_all_lockfiles(root)
+                    for call in run.call_args_list:
+                        self.assertIn("--config=ci", call.args[0])
+
+    def test_audit_arena_ffi_binary_toolsInstalled_skipsInstall(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with (
+                patch("arena_version.subprocess.run") as run,
+                patch("arena_version.shutil.which", return_value="/usr/bin/cargo-audit"),
+            ):
+                audit_arena_ffi_binary(root)
+                self.assertEqual(run.call_count, 2)
+
+    def test_audit_arena_ffi_binary_toolsMissing_installsFirst(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with (
+                patch("arena_version.subprocess.run") as run,
+                patch("arena_version.shutil.which", return_value=None),
+            ):
+                audit_arena_ffi_binary(root)
+                self.assertEqual(run.call_count, 3)
+                self.assertIn("install", run.call_args_list[0].args[0])
+
+    def test_vet_rust_dependencies_toolInstalled_skipsInstall(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with (
+                patch("arena_version.subprocess.run") as run,
+                patch("arena_version.shutil.which", return_value="/usr/bin/cargo-vet"),
+            ):
+                vet_rust_dependencies(root)
+                self.assertEqual(run.call_count, 1)
+                self.assertEqual(run.call_args_list[0].args[0], ["cargo", "vet"])
+
+    def test_vet_rust_dependencies_toolMissing_installsFirst(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with (
+                patch("arena_version.subprocess.run") as run,
+                patch("arena_version.shutil.which", return_value=None),
+            ):
+                vet_rust_dependencies(root)
+                self.assertEqual(run.call_count, 2)
+                self.assertIn("install", run.call_args_list[0].args[0])
 
 
 if __name__ == "__main__":

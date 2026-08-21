@@ -24,12 +24,17 @@ fn run_generator(script_path: &Path, toml_path: &Path, out_path: &Path) {
         &["python3", "python"]
     };
 
+    let scripts_dir = script_path
+        .parent()
+        .expect("write_default_images_rs.py path has a parent");
+
     let mut failures = Vec::new();
     for candidate in candidates {
         match Command::new(candidate)
             .arg(script_path)
             .arg(toml_path)
             .arg(out_path)
+            .env("PYTHONPATH", scripts_dir)
             .status()
         {
             Ok(status) if status.success() => return,

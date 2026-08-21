@@ -58,7 +58,7 @@ dependencies = [
 
 [[package]]
 name = "arena"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "async-trait",
  "futures",
@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "arena-container"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "bollard",
  "futures",
@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "arena-containerized-component"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "arena",
  "arena-container",
@@ -97,14 +97,14 @@ dependencies = [
 
 [[package]]
 name = "arena-cryptography"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "rcgen",
 ]
 
 [[package]]
 name = "arena-examples"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "arena",
  "arena-containerized-component",
@@ -116,6 +116,7 @@ dependencies = [
  "arena-postgres",
  "async-trait",
  "axum",
+ "chrono",
  "ctor",
  "futures",
  "futures-timer",
@@ -133,7 +134,7 @@ dependencies = [
 
 [[package]]
 name = "arena-executable-component"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "arena",
  "arena-container",
@@ -147,7 +148,7 @@ dependencies = [
 
 [[package]]
 name = "arena-ffi"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "arc-swap",
  "arena",
@@ -173,7 +174,7 @@ dependencies = [
 
 [[package]]
 name = "arena-http"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "arena",
  "arena-container",
@@ -191,11 +192,12 @@ dependencies = [
 
 [[package]]
 name = "arena-kafka"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "arena",
  "arena-container",
  "async-trait",
+ "chrono",
  "futures",
  "futures-timer",
  "rskafka",
@@ -207,7 +209,7 @@ dependencies = [
 
 [[package]]
 name = "arena-localstack"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "arena",
  "arena-container",
@@ -232,7 +234,7 @@ dependencies = [
 
 [[package]]
 name = "arena-mssql"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "arena",
  "arena-container",
@@ -248,7 +250,7 @@ dependencies = [
 
 [[package]]
 name = "arena-oauth"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "arena",
  "arena-container",
@@ -262,7 +264,7 @@ dependencies = [
  "rand 0.8.6",
  "reqwest",
  "rsa",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -273,7 +275,7 @@ dependencies = [
 
 [[package]]
 name = "arena-postgres"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "arena",
  "arena-container",
@@ -288,7 +290,7 @@ dependencies = [
 
 [[package]]
 name = "arena-smtp"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "arena",
  "arena-container",
@@ -305,7 +307,7 @@ dependencies = [
 
 [[package]]
 name = "arena-temporal"
-version = "6.0.1"
+version = "6.0.2"
 dependencies = [
  "arena",
  "arena-container",
@@ -677,7 +679,7 @@ dependencies = [
  "hyper-rustls",
  "hyper-util",
  "pin-project-lite",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "rustls-native-certs 0.8.3",
  "rustls-pki-types",
  "tokio",
@@ -895,7 +897,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "pin-project-lite",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.4",
@@ -987,7 +989,7 @@ dependencies = [
  "num",
  "pin-project-lite",
  "rand 0.9.4",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "rustls-native-certs 0.8.3",
  "rustls-pki-types",
  "serde",
@@ -1561,7 +1563,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1839,9 +1841,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.13"
+version = "0.4.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f44da3a8150a6703ed5d34e164b875fd14c2cdab9af1252a9a1020bde2bdc54"
+checksum = "a9f37a958b41b3b19ee2707c06439c0e9e547e847223eb791ecb0cb821c65e27"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -2047,7 +2049,7 @@ dependencies = [
  "http 1.4.0",
  "hyper",
  "hyper-util",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "rustls-native-certs 0.8.3",
  "tokio",
  "tokio-rustls 0.26.4",
@@ -2548,7 +2550,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -3085,7 +3087,7 @@ dependencies = [
  "quinn-proto",
  "quinn-udp",
  "rustc-hash",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "socket2",
  "thiserror 2.0.18",
  "tokio",
@@ -3105,7 +3107,7 @@ dependencies = [
  "rand 0.9.4",
  "ring",
  "rustc-hash",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "rustls-pki-types",
  "slab",
  "thiserror 2.0.18",
@@ -3332,7 +3334,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "quinn",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "rustls-pki-types",
  "serde",
  "serde_json",
@@ -3470,7 +3472,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3487,9 +3489,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.38"
+version = "0.23.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69f9466fb2c14ea04357e91413efb882e2a6d4a406e625449bc0a5d360d53a21"
+checksum = "0283386ce02abc0151e1761d08802dfe86c173b0b494af5cbc086574e453da06"
 dependencies = [
  "log",
  "once_cell",
@@ -3896,7 +3898,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -4256,7 +4258,7 @@ version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1729aa945f29d91ba541258c8df89027d5792d85a8841fb65e8bf0f4ede4ef61"
 dependencies = [
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "tokio",
 ]
 
@@ -4510,7 +4512,7 @@ dependencies = [
  "base64 0.22.1",
  "log",
  "percent-encoding",
- "rustls 0.23.38",
+ "rustls 0.23.43",
  "rustls-pki-types",
  "ureq-proto",
  "utf8-zero",

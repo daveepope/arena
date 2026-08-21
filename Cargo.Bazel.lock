@@ -1,5 +1,5 @@
 {
-  "checksum": "3b39bcd02efe0b81be231cea6b0860f3a3364155f1b36e261e19dfb7e4157dfc",
+  "checksum": "96b4851a312bf282773748ee646381d6255a2fb86c57edf7c2549cc33331c306",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -355,9 +355,9 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arena 6.0.1": {
+    "arena 6.0.2": {
       "name": "arena",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -423,15 +423,15 @@
           ],
           "selects": {}
         },
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-container 6.0.1": {
+    "arena-container 6.0.2": {
       "name": "arena-container",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -468,7 +468,7 @@
         "deps": {
           "common": [
             {
-              "id": "arena-container 6.0.1",
+              "id": "arena-container 6.0.2",
               "target": "build_script_build"
             },
             {
@@ -496,7 +496,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -513,9 +513,9 @@
       "license_ids": [],
       "license_file": null
     },
-    "arena-containerized-component 6.0.1": {
+    "arena-containerized-component 6.0.2": {
       "name": "arena-containerized-component",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -585,15 +585,15 @@
           ],
           "selects": {}
         },
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-cryptography 6.0.1": {
+    "arena-cryptography 6.0.2": {
       "name": "arena-cryptography",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -625,15 +625,15 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-examples 6.0.1": {
+    "arena-examples 6.0.2": {
       "name": "arena-examples",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -660,6 +660,10 @@
             {
               "id": "axum 0.8.9",
               "target": "axum"
+            },
+            {
+              "id": "chrono 0.4.44",
+              "target": "chrono"
             },
             {
               "id": "futures 0.3.32",
@@ -731,15 +735,15 @@
           ],
           "selects": {}
         },
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-executable-component 6.0.1": {
+    "arena-executable-component 6.0.2": {
       "name": "arena-executable-component",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -801,15 +805,15 @@
           ],
           "selects": {}
         },
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-ffi 6.0.1": {
+    "arena-ffi 6.0.2": {
       "name": "arena-ffi",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -878,15 +882,15 @@
           ],
           "selects": {}
         },
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "license": null,
       "license_ids": [],
       "license_file": null
     },
-    "arena-http 6.0.1": {
+    "arena-http 6.0.2": {
       "name": "arena-http",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -964,15 +968,15 @@
           ],
           "selects": {}
         },
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-kafka 6.0.1": {
+    "arena-kafka 6.0.2": {
       "name": "arena-kafka",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -996,6 +1000,10 @@
         ],
         "deps": {
           "common": [
+            {
+              "id": "chrono 0.4.44",
+              "target": "chrono"
+            },
             {
               "id": "futures 0.3.32",
               "target": "futures"
@@ -1042,15 +1050,15 @@
           ],
           "selects": {}
         },
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-localstack 6.0.1": {
+    "arena-localstack 6.0.2": {
       "name": "arena-localstack",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1156,15 +1164,15 @@
           ],
           "selects": {}
         },
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-mssql 6.0.1": {
+    "arena-mssql 6.0.2": {
       "name": "arena-mssql",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1234,15 +1242,15 @@
           ],
           "selects": {}
         },
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-oauth 6.0.1": {
+    "arena-oauth 6.0.2": {
       "name": "arena-oauth",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1299,7 +1307,7 @@
               "target": "rsa"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -1344,15 +1352,15 @@
           ],
           "selects": {}
         },
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-postgres 6.0.1": {
+    "arena-postgres 6.0.2": {
       "name": "arena-postgres",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1418,15 +1426,15 @@
           ],
           "selects": {}
         },
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-smtp 6.0.1": {
+    "arena-smtp 6.0.2": {
       "name": "arena-smtp",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1496,15 +1504,15 @@
           ],
           "selects": {}
         },
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-temporal 6.0.1": {
+    "arena-temporal 6.0.2": {
       "name": "arena-temporal",
-      "version": "6.0.1",
+      "version": "6.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1582,7 +1590,7 @@
           ],
           "selects": {}
         },
-        "version": "6.0.1"
+        "version": "6.0.2"
       },
       "license": "todo",
       "license_ids": [],
@@ -3361,7 +3369,7 @@
               "target": "aws_smithy_types"
             },
             {
-              "id": "h2 0.4.13",
+              "id": "h2 0.4.16",
               "target": "h2"
             },
             {
@@ -3386,7 +3394,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -4520,7 +4528,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -5081,7 +5089,7 @@
               "target": "rand"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -8705,7 +8713,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ]
@@ -10592,14 +10600,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "h2 0.4.13": {
+    "h2 0.4.16": {
       "name": "h2",
-      "version": "0.4.13",
+      "version": "0.4.16",
       "package_url": "https://github.com/hyperium/h2",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/h2/0.4.13/download",
-          "sha256": "2f44da3a8150a6703ed5d34e164b875fd14c2cdab9af1252a9a1020bde2bdc54"
+          "url": "https://static.crates.io/crates/h2/0.4.16/download",
+          "sha256": "a9f37a958b41b3b19ee2707c06439c0e9e547e847223eb791ecb0cb821c65e27"
         }
       },
       "targets": [
@@ -10671,7 +10679,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.4.13"
+        "version": "0.4.16"
       },
       "license": "MIT",
       "license_ids": [
@@ -11610,7 +11618,7 @@
               "target": "futures_core"
             },
             {
-              "id": "h2 0.4.13",
+              "id": "h2 0.4.16",
               "target": "h2"
             },
             {
@@ -11789,7 +11797,7 @@
               "target": "hyper_util"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -14924,7 +14932,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.60.2",
                 "target": "windows_sys",
                 "alias": "windows"
               }
@@ -19776,7 +19784,7 @@
               "target": "hyper_rustls"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -20626,7 +20634,7 @@
                 "alias": "libc_errno"
               },
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ],
@@ -20770,14 +20778,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "rustls 0.23.38": {
+    "rustls 0.23.43": {
       "name": "rustls",
-      "version": "0.23.38",
+      "version": "0.23.43",
       "package_url": "https://github.com/rustls/rustls",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/rustls/0.23.38/download",
-          "sha256": "69f9466fb2c14ea04357e91413efb882e2a6d4a406e625449bc0a5d360d53a21"
+          "url": "https://static.crates.io/crates/rustls/0.23.43/download",
+          "sha256": "0283386ce02abc0151e1761d08802dfe86c173b0b494af5cbc086574e453da06"
         }
       },
       "targets": [
@@ -20836,7 +20844,7 @@
               "target": "ring"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "build_script_build"
             },
             {
@@ -20860,7 +20868,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.23.38"
+        "version": "0.23.43"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -23305,7 +23313,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.60.2",
                 "target": "windows_sys"
               }
             ]
@@ -25474,7 +25482,7 @@
         "deps": {
           "common": [
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -25695,7 +25703,7 @@
               "target": "bytes"
             },
             {
-              "id": "h2 0.4.13",
+              "id": "h2 0.4.16",
               "target": "h2"
             },
             {
@@ -26938,7 +26946,7 @@
               "target": "percent_encoding"
             },
             {
-              "id": "rustls 0.23.38",
+              "id": "rustls 0.23.43",
               "target": "rustls"
             },
             {
@@ -29123,6 +29131,24 @@
         "compile_data_glob": [
           "**"
         ],
+        "crate_features": {
+          "common": [
+            "Win32",
+            "Win32_Foundation",
+            "Win32_Networking",
+            "Win32_Networking_WinSock",
+            "Win32_Security",
+            "Win32_Storage",
+            "Win32_Storage_FileSystem",
+            "Win32_System",
+            "Win32_System_Console",
+            "Win32_System_IO",
+            "Win32_System_Threading",
+            "Win32_System_WindowsProgramming",
+            "default"
+          ],
+          "selects": {}
+        },
         "deps": {
           "common": [
             {
@@ -32640,21 +32666,21 @@
   },
   "binary_crates": [],
   "workspace_members": {
-    "arena 6.0.1": "arena",
-    "arena-container 6.0.1": "arena-container",
-    "arena-containerized-component 6.0.1": "arena-containerized-component",
-    "arena-cryptography 6.0.1": "arena-cryptography",
-    "arena-examples 6.0.1": "examples",
-    "arena-executable-component 6.0.1": "arena-executable-component",
-    "arena-ffi 6.0.1": "arena-ffi",
-    "arena-http 6.0.1": "arena-http",
-    "arena-kafka 6.0.1": "arena-kafka",
-    "arena-localstack 6.0.1": "arena-localstack",
-    "arena-mssql 6.0.1": "arena-mssql",
-    "arena-oauth 6.0.1": "arena-oauth",
-    "arena-postgres 6.0.1": "arena-postgres",
-    "arena-smtp 6.0.1": "arena-smtp",
-    "arena-temporal 6.0.1": "arena-temporal"
+    "arena 6.0.2": "arena",
+    "arena-container 6.0.2": "arena-container",
+    "arena-containerized-component 6.0.2": "arena-containerized-component",
+    "arena-cryptography 6.0.2": "arena-cryptography",
+    "arena-examples 6.0.2": "examples",
+    "arena-executable-component 6.0.2": "arena-executable-component",
+    "arena-ffi 6.0.2": "arena-ffi",
+    "arena-http 6.0.2": "arena-http",
+    "arena-kafka 6.0.2": "arena-kafka",
+    "arena-localstack 6.0.2": "arena-localstack",
+    "arena-mssql 6.0.2": "arena-mssql",
+    "arena-oauth 6.0.2": "arena-oauth",
+    "arena-postgres 6.0.2": "arena-postgres",
+    "arena-smtp 6.0.2": "arena-smtp",
+    "arena-temporal 6.0.2": "arena-temporal"
   },
   "conditions": {
     "aarch64-apple-darwin": [
@@ -32837,6 +32863,7 @@
     "axum-server 0.8.0",
     "base64 0.22.1",
     "bollard 0.20.2",
+    "chrono 0.4.44",
     "futures 0.3.32",
     "futures-timer 3.0.3",
     "jsonwebtoken 10.4.0",
@@ -32847,7 +32874,7 @@
     "reqwest 0.12.28",
     "rsa 0.9.10",
     "rskafka 0.6.0",
-    "rustls 0.23.38",
+    "rustls 0.23.43",
     "serde 1.0.228",
     "serde_json 1.0.149",
     "serde_urlencoded 0.7.1",
