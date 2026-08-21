@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -222,6 +224,56 @@ def release_lockfiles_need_repin(root: Path, target: str) -> bool:
             return True
         return release_version_only(cargo) != target
     return locked != target
+
+
+def _cargo_cdylib_name(crate_name: str) -> str:
+    if sys.platform == "win32":
+        return f"{crate_name}.dll"
+    if sys.platform == "darwin":
+        return f"lib{crate_name}.dylib"
+    return f"lib{crate_name}.so"
+
+
+CARGO_AUDITABLE_VERSION = "0.7.5"
+CARGO_AUDIT_VERSION = "0.22.2"
+CARGO_VET_VERSION = "0.10.2"
+
+
+def audit_arena_ffi_binary(root: Path) -> None:
+    env = os.environ.copy()
+    if shutil.which("cargo-auditable") is None or shutil.which("cargo-audit") is None:
+        subprocess.run(
+            [
+                "cargo",
+                "install",
+                f"cargo-auditable@{CARGO_AUDITABLE_VERSION}",
+                f"cargo-audit@{CARGO_AUDIT_VERSION}",
+                "--locked",
+            ],
+            cwd=root,
+            env=env,
+            check=True,
+        )
+    subprocess.run(
+        ["cargo", "auditable", "build", "--release", "--lib", "-p", "arena-ffi"],
+        cwd=root,
+        env=env,
+        check=True,
+    )
+    binary = root / "target" / "release" / _cargo_cdylib_name("arena_ffi")
+    subprocess.run(["cargo", "audit", "bin", str(binary)], cwd=root, env=env, check=True)
+
+
+def vet_rust_dependencies(root: Path) -> None:
+    env = os.environ.copy()
+    if shutil.which("cargo-vet") is None:
+        subprocess.run(
+            ["cargo", "install", f"cargo-vet@{CARGO_VET_VERSION}", "--locked"],
+            cwd=root,
+            env=env,
+            check=True,
+        )
+    subprocess.run(["cargo", "vet"], cwd=root, env=env, check=True)
 
 
 def repin_all_lockfiles(root: Path) -> None:

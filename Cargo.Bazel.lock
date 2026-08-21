@@ -1,5 +1,5 @@
 {
-  "checksum": "0e8d435dfd077fa6ee713b1e9c9a5695a0253dab3a97071a781f4445ed63746a",
+  "checksum": "96b4851a312bf282773748ee646381d6255a2fb86c57edf7c2549cc33331c306",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -662,6 +662,10 @@
               "target": "axum"
             },
             {
+              "id": "chrono 0.4.44",
+              "target": "chrono"
+            },
+            {
               "id": "futures 0.3.32",
               "target": "futures"
             },
@@ -996,6 +1000,10 @@
         ],
         "deps": {
           "common": [
+            {
+              "id": "chrono 0.4.44",
+              "target": "chrono"
+            },
             {
               "id": "futures 0.3.32",
               "target": "futures"
@@ -32855,6 +32863,7 @@
     "axum-server 0.8.0",
     "base64 0.22.1",
     "bollard 0.20.2",
+    "chrono 0.4.44",
     "futures 0.3.32",
     "futures-timer 3.0.3",
     "jsonwebtoken 10.4.0",

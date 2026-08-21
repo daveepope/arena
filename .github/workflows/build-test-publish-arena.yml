@@ -291,6 +291,72 @@ jobs:
           bazel test //scripts:dependency_release_age_parse_test --config=ci
           bazel run //scripts:check_dependency_release_age --config=ci
 
+  audit_vet_rust:
+    name: Audit and vet arena_ffi_shared's Rust dependencies
+    needs: [changes, master_merge_guard]
+    if: >-
+      always() && !cancelled() &&
+      needs.changes.result == 'success' &&
+      (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
+      needs.changes.outputs.has_ci_relevant == 'true' &&
+      (
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped' &&
+          !(
+            github.event.pull_request.user.login == 'dependabot[bot]' &&
+            needs.changes.outputs.version_changed != 'true'
+          )
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
+      )
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590
+        id: paths
+        with:
+          filters: |
+            rust_crates:
+              - 'Cargo.toml'
+              - 'Cargo.Bazel.lock'
+              - '**/Cargo.toml'
+              - 'MODULE.bazel'
+
+      - name: Setup Bazel
+        if: steps.paths.outputs.rust_crates == 'true'
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-ubuntu-24.04
+          repository-cache: true
+
+      - name: Configure BuildBuddy remote cache
+        if: steps.paths.outputs.rust_crates == 'true'
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
+          fi
+
+      - name: Audit and vet arena_ffi_shared's compiled dependency tree
+        if: steps.paths.outputs.rust_crates == 'true'
+        run: bazel run //scripts:audit_and_vet_rust --config=ci
+
   test_ubuntu_24_04:
     name: Test Ubuntu 24.04
     needs: [changes, master_merge_guard]

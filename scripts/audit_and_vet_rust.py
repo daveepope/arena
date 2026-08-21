@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-from arena_version import audit_arena_ffi_binary, repin_all_lockfiles, vet_rust_dependencies
+from arena_version import audit_arena_ffi_binary, vet_rust_dependencies
 
 
 def _repo_root() -> Path:
@@ -18,12 +18,6 @@ def _repo_root() -> Path:
 
 def main() -> int:
     root = _repo_root()
-    print("repinning Rust, Python, and Maven lockfiles")
-    repin_all_lockfiles(root)
-    print(
-        "updated Cargo.Bazel.lock, Cargo.lock, MODULE.bazel.lock, "
-        "arena_java_maven_install.json, requirements_lock.txt"
-    )
     audit_arena_ffi_binary(root)
     vet_rust_dependencies(root)
     return 0

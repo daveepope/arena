@@ -75,6 +75,15 @@ py_binary(
 )
 
 py_binary(
+    name = "audit_and_vet_rust",
+    srcs = ["audit_and_vet_rust.py"],
+    main = "audit_and_vet_rust.py",
+    deps = [":arena_version_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
     name = "generate_rust_sbom",
     srcs = ["generate_rust_sbom.py"],
     main = "generate_rust_sbom.py",

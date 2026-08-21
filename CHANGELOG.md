@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `bazel run //scripts:repin` to force-repin Rust, Python, and Maven lockfiles independent of a version bump
 - `scripts/generate_rust_sbom.py`, `generate_maven_sbom.py`, `generate_nuget_sbom.py` to produce CycloneDX SBOMs for OSV-Scanner from `Cargo.Bazel.lock`, `arena_java_maven_install.json`, and `MODULE.bazel`
+- `cargo audit bin` and `cargo vet` against a `cargo-auditable`-built `arena_ffi_shared` binary, run as part of `bazel run //scripts:repin` and as a standalone, Rust-path-filtered CI job (`supply-chain/` cargo-vet config, bootstrapped with exemptions for all currently-used crates)
+- Added `chrono` as a direct workspace dependency (with the `clock` feature) so `arena-kafka`/`examples` no longer rely on `rskafka`'s re-exported `chrono` having that feature enabled only by incidental cross-crate feature unification; this is what made a standalone `cargo build -p arena-ffi` possible in the first place
 
 ### Fixed
 
