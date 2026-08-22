@@ -97,9 +97,9 @@ public final class ChainedComponentTestSuite {
   private static final String MSSQL_DB_USER = "sa";
   private static final String MSSQL_DB_PASS = "yourStrong(!)Password";
   private static final String ORACLE_DB_NAME = "weatherdb";
-  private static final String ORACLE_DB_USER = "weather_user";
-  private static final String ORACLE_DB_PASS = "weatherPassword1";
-  private static final String ORACLE_ADMIN_PASS = "weatherAdminPass1";
+  private static final String ORACLE_DB_USER = "weather_user_" + RT.runSuffix.substring(0, 8);
+  private static final String ORACLE_DB_PASS = "pw_" + RT.runSuffix.substring(8, 20);
+  private static final String ORACLE_ADMIN_PASS = "pw_" + RT.runSuffix.substring(20, 32);
   private static final String EVENT_BUS_NAME = "example-api-chained-events";
   private static final String EVENT_SOURCE = "readings.api";
   private static final String QUEUE_NAME = "example-api-chained-events-q";

@@ -9,6 +9,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public final class ApiClient {
 
@@ -126,13 +127,8 @@ public final class ApiClient {
   public HttpResponse<String> postWeatherReportRaw(
       double precipitation, double humidity, double pressure) throws Exception {
     String body =
-        "{\"precipitation\":"
-            + precipitation
-            + ",\"humidity\":"
-            + humidity
-            + ",\"pressure\":"
-            + pressure
-            + "}";
+        mapper.writeValueAsString(
+            Map.of("precipitation", precipitation, "humidity", humidity, "pressure", pressure));
     return post("/weather", body);
   }
 

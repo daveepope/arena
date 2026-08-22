@@ -51,9 +51,9 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
     private const string MssqlDbUser = "sa";
     private const string MssqlDbPassword = "Password123!";
     private const string OracleDbName = "weatherdb";
-    private const string OracleDbUser = "weather_user";
-    private const string OracleDbPassword = "weatherPassword1";
-    private const string OracleAdminPassword = "weatherAdminPass1";
+    private static readonly string OracleDbUser = "weather_user_" + EphemeralTestRuntime.RandomToken(8);
+    private static readonly string OracleDbPassword = "pw_" + EphemeralTestRuntime.RandomToken(12);
+    private static readonly string OracleAdminPassword = "pw_" + EphemeralTestRuntime.RandomToken(12);
 
     private static readonly PostgresDependency Postgres =
         new PostgresDependencyBuilder("test-chained-postgres")
