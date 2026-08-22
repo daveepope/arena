@@ -1,4 +1,4 @@
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::os::raw::c_char;
 use std::thread;
 
@@ -7,14 +7,9 @@ use arena_ffi::{
     OpenArenaHandle,
 };
 
-fn err_text(err: *mut c_char) -> String {
-    if err.is_null() {
-        return String::new();
-    }
-    let msg = unsafe { CStr::from_ptr(err).to_string_lossy().into_owned() };
-    arena_free_string(err);
-    msg
-}
+#[path = "ffi_error_text.rs"]
+mod ffi_error_text;
+use ffi_error_text::err_text;
 
 #[test]
 fn arena_open_valid_name_plain_returns_live_handle_and_close_drains_cleanly() {

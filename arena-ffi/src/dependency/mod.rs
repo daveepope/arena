@@ -3,6 +3,7 @@ pub mod kafka;
 pub mod localstack;
 pub mod mssql;
 pub mod oracle;
+pub(crate) mod playbook_dispatch;
 pub mod postgres;
 pub mod smtp;
 pub mod temporal;

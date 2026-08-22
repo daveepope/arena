@@ -1,16 +1,11 @@
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::os::raw::c_char;
 
-use arena_ffi::{arena_free_string, arena_http_playbook_open, arena_http_playbook_verify, ArenaStatus};
+use arena_ffi::{arena_http_playbook_open, arena_http_playbook_verify, ArenaStatus};
 
-fn err_text(err: *mut c_char) -> String {
-    if err.is_null() {
-        return String::new();
-    }
-    let msg = unsafe { CStr::from_ptr(err).to_string_lossy().into_owned() };
-    arena_free_string(err);
-    msg
-}
+#[path = "../../ffi_error_text.rs"]
+mod ffi_error_text;
+use ffi_error_text::err_text;
 
 #[test]
 fn http_playbook_open_null_arena_returns_null_and_error() {
