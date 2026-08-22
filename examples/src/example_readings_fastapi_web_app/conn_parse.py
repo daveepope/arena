@@ -19,7 +19,7 @@ def asyncpg_dsn_from_libpq(conn: str) -> str:
 
 
 def oracledb_connect_params_from_easy_connect(conn: str) -> tuple[str, str, str]:
-    m = re.match(r"^([^/]+)/([^@]+)@(.+)$", conn)
+    m = re.match(r"^([^/]+)/(.+)@([^@]+)$", conn)
     if not m:
         raise ValueError("oracle connection string incomplete")
     return m.group(1), m.group(2), m.group(3)

@@ -46,4 +46,20 @@ public class DataSourcesConfiguration {
   JdbcTemplate mssqlJdbcTemplate(@Qualifier("mssqlDataSource") DataSource ds) {
     return new JdbcTemplate(ds);
   }
+
+  @Bean("oracleDataSource")
+  DataSource oracleDataSource(@Value("${ORACLE_CONNECTION_STRING}") String easyConnect) {
+    ConnParse.OracleConn c = ConnParse.oracleConnFromEasyConnect(easyConnect);
+    return DataSourceBuilder.create()
+        .url(c.jdbcUrl())
+        .username(c.user())
+        .password(c.password())
+        .driverClassName("oracle.jdbc.OracleDriver")
+        .build();
+  }
+
+  @Bean("oracleJdbcTemplate")
+  JdbcTemplate oracleJdbcTemplate(@Qualifier("oracleDataSource") DataSource ds) {
+    return new JdbcTemplate(ds);
+  }
 }

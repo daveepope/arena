@@ -117,6 +117,16 @@ public class ApiClient
     {
         return await GetJsonAsync<List<ReadingRow>>("/Readings");
     }
+
+    public async Task<CreateWeatherReportResponse> CreateWeatherReportAsync(CreateWeatherReportRequest request)
+    {
+        return await PostJsonAsync<CreateWeatherReportRequest, CreateWeatherReportResponse>("/Weather", request);
+    }
+
+    public async Task<List<WeatherReportRow>> ListWeatherReportsAsync()
+    {
+        return await GetJsonAsync<List<WeatherReportRow>>("/Weather");
+    }
 }
 
 public class CreateReadingRequest
@@ -162,4 +172,25 @@ public class ReadingRow
     public string UserName { get; set; } = default!;
     public int Value { get; set; }
     public string? Comment { get; set; }
+}
+
+public class CreateWeatherReportRequest
+{
+    public double Precipitation { get; set; }
+    public double Humidity { get; set; }
+    public double Pressure { get; set; }
+}
+
+public class CreateWeatherReportResponse
+{
+    public long Id { get; set; }
+}
+
+public class WeatherReportRow
+{
+    public long Id { get; set; }
+    public DateTime RecordedAt { get; set; }
+    public double Precipitation { get; set; }
+    public double Humidity { get; set; }
+    public double Pressure { get; set; }
 }

@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageReference Include="Npgsql" Version="8.0.4" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.300" />
     <PackageReference Include="Temporalio" Version="0.1.0-alpha.1" />
     <PackageReference Include="AWSSDK.EventBridge" Version="3.7.400" />
     <PackageReference Include="AWSSDK.SQS" Version="3.7.502.57" />

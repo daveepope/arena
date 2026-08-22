@@ -32,24 +32,24 @@ async def create_weather_report(
     pool = request.app.state.oracle_pool
     recorded_at = datetime.now(timezone.utc)
     async with pool.acquire() as conn:
-        cursor = conn.cursor()
-        id_var = cursor.var(int)
-        await cursor.execute(
-            """
-            insert into weather_report (recorded_at, precipitation, humidity, pressure)
-            values (:recorded_at, :precipitation, :humidity, :pressure)
-            returning id into :id
-            """,
-            {
-                "recorded_at": recorded_at,
-                "precipitation": body.precipitation,
-                "humidity": body.humidity,
-                "pressure": body.pressure,
-                "id": id_var,
-            },
-        )
-        await conn.commit()
-        report_id = int(id_var.getvalue()[0])
+        with conn.cursor() as cursor:
+            id_var = cursor.var(int)
+            await cursor.execute(
+                """
+                insert into weather_report (recorded_at, precipitation, humidity, pressure)
+                values (:recorded_at, :precipitation, :humidity, :pressure)
+                returning id into :id
+                """,
+                {
+                    "recorded_at": recorded_at,
+                    "precipitation": body.precipitation,
+                    "humidity": body.humidity,
+                    "pressure": body.pressure,
+                    "id": id_var,
+                },
+            )
+            await conn.commit()
+            report_id = int(id_var.getvalue()[0])
     return CreateWeatherReportResponse(id=report_id)
 
 
@@ -57,15 +57,15 @@ async def create_weather_report(
 async def list_weather_reports(request: Request) -> List[WeatherReportResponse]:
     pool = request.app.state.oracle_pool
     async with pool.acquire() as conn:
-        cursor = conn.cursor()
-        await cursor.execute(
-            """
-            select id, recorded_at, precipitation, humidity, pressure
-            from weather_report
-            order by id desc
-            fetch first 50 rows only
-            """
-        )
-        columns = [c[0].lower() for c in cursor.description]
-        rows = await cursor.fetchall()
+        with conn.cursor() as cursor:
+            await cursor.execute(
+                """
+                select id, recorded_at, precipitation, humidity, pressure
+                from weather_report
+                order by id desc
+                fetch first 50 rows only
+                """
+            )
+            columns = [c[0].lower() for c in cursor.description]
+            rows = await cursor.fetchall()
     return [WeatherReportResponse(**dict(zip(columns, row))) for row in rows]
