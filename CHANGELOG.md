@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena-xunit`: Oracle dependency and playbook support (`OracleDependencyBuilder`, `ManagedOraclePlaybook`)
 - `arena-pytest`: Oracle dependency and playbook support (`OracleDependencyBuilder`, `ManagedOraclePlaybook`)
 - FastAPI example app: Oracle-backed weather report endpoints (`POST/GET /weather`), wired into both pytest component test suites
+- Spring Boot and ASP.NET example apps: Oracle-backed weather report endpoints, wired into both junit and xunit component/chained-component test suites
 
 ### Fixed
 
