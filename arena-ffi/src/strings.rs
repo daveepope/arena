@@ -1,7 +1,7 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
-pub(crate) unsafe fn c_str_to_string(ptr: *const c_char) -> Option<String> {
+pub unsafe fn c_str_to_string(ptr: *const c_char) -> Option<String> {
     if ptr.is_null() {
         return None;
     }

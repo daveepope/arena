@@ -11,24 +11,100 @@ crate-type = ["cdylib", "rlib"]
 bench-support = []
 
 [[test]]
-name = "ffi_test"
-path = "tests/lifecycle/open_close_dependency_reset.rs"
+name = "ffi_healthcheck_test"
+path = "tests/unit/healthcheck_test.rs"
 
 [[test]]
-name = "ffi_children_test"
-path = "tests/lifecycle/open_close_with_children.rs"
+name = "ffi_containerized_component_test"
+path = "tests/component/containerized/containerized_component_test.rs"
+
+[[test]]
+name = "ffi_matches_test"
+path = "tests/unit/matches_test.rs"
+
+[[test]]
+name = "ffi_managed_playbook_test"
+path = "tests/unit/managed_playbook_test.rs"
+
+[[test]]
+name = "ffi_postgres_dependency_test"
+path = "tests/unit/dependency/postgres/postgres_dependency_test.rs"
+
+[[test]]
+name = "ffi_http_mapping_spec_test"
+path = "tests/unit/dependency/http/http_mapping_spec.rs"
+
+[[test]]
+name = "ffi_playbook_validation_test"
+path = "tests/unit/dependency/http/http_playbook_ffi_validation.rs"
+
+[[test]]
+name = "ffi_mssql_dependency_test"
+path = "tests/unit/dependency/mssql/mssql_dependency_test.rs"
+
+[[test]]
+name = "ffi_mssql_playbook_validation_test"
+path = "tests/unit/dependency/mssql/mssql_playbook_ffi_validation.rs"
+
+[[test]]
+name = "ffi_oracle_dependency_test"
+path = "tests/unit/dependency/oracle/oracle_dependency_test.rs"
+
+[[test]]
+name = "ffi_oracle_playbook_validation_test"
+path = "tests/unit/dependency/oracle/oracle_playbook_ffi_validation.rs"
+
+[[test]]
+name = "ffi_postgres_playbook_validation_test"
+path = "tests/unit/dependency/postgres/postgres_playbook_ffi_validation.rs"
+
+[[test]]
+name = "ffi_executable_component_test"
+path = "tests/unit/component/executable/executable_component_test.rs"
+
+[[test]]
+name = "ffi_containerized_component_unit_test"
+path = "tests/unit/component/containerized/containerized_component_test.rs"
+
+[[test]]
+name = "ffi_error_test"
+path = "tests/unit/error_test.rs"
+
+[[test]]
+name = "ffi_strings_test"
+path = "tests/unit/strings_test.rs"
+
+[[test]]
+name = "ffi_panic_payload_test"
+path = "tests/unit/panic_payload_test.rs"
+
+[[test]]
+name = "ffi_runtime_args_test"
+path = "tests/unit/runtime_args_test.rs"
+
+[[test]]
+name = "ffi_active_playbook_test"
+path = "tests/unit/active_playbook_test.rs"
+
+[[test]]
+name = "ffi_loopback_tls_test"
+path = "tests/unit/loopback_tls_test.rs"
+
+[[test]]
+name = "ffi_arena_test"
+path = "tests/unit/arena_test.rs"
 
 [[test]]
 name = "ffi_logging_test"
-path = "tests/logging/logging_ffi_callbacks.rs"
+path = "tests/unit/logging/logging_ffi_callbacks.rs"
 
 [[test]]
 name = "ffi_temporal_dependency_test"
-path = "tests/dependency/temporal/temporal_dependency_test.rs"
+path = "tests/unit/dependency/temporal/temporal_dependency_test.rs"
 
 [[test]]
 name = "ffi_smtp_dependency_test"
-path = "tests/dependency/smtp/smtp_dependency_test.rs"
+path = "tests/unit/dependency/smtp/smtp_dependency_test.rs"
 
 [dependencies]
 arc-swap = { workspace = true }
@@ -41,6 +117,7 @@ arena-kafka = { workspace = true }
 arena-localstack = { workspace = true }
 arena-postgres = { workspace = true }
 arena-mssql = { workspace = true }
+arena-oracledb = { workspace = true }
 arena-oauth = { workspace = true }
 arena-temporal = { workspace = true }
 arena-smtp = { workspace = true }

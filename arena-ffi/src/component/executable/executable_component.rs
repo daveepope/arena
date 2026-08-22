@@ -10,13 +10,13 @@ use crate::runtime_args::RuntimeArgConfig;
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub(crate) enum BuildToolConfig {
+pub enum BuildToolConfig {
     Simple(String),
     Custom { command: String, args: Vec<String> },
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct ExecutableComponentConfig {
+pub struct ExecutableComponentConfig {
     pub identifier: String,
     pub executable_path: String,
     #[serde(default)]
@@ -33,7 +33,7 @@ pub(crate) struct ExecutableComponentConfig {
     pub readiness_check_url: Option<String>,
 }
 
-pub(crate) fn build(config: &ExecutableComponentConfig) -> Result<Component, String> {
+pub fn build(config: &ExecutableComponentConfig) -> Result<Component, String> {
     let mut builder = ExecutableComponent::builder(&config.identifier)
         .with_executable_path(&config.executable_path);
 

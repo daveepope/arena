@@ -176,6 +176,7 @@ dependencies = [
  "arena-localstack",
  "arena-mssql",
  "arena-oauth",
+ "arena-oracledb",
  "arena-postgres",
  "arena-smtp",
  "arena-temporal",
