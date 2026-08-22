@@ -13,10 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `fromImage` now resolves registry credentials (`credHelpers`, `credsStore`, `auths`, honoring `DOCKER_CONFIG`) instead of pulling anonymously
-- `fromImage` skips pulling when a locally cached image already matches the requested platform
-- Image pull/build failures now return a typed error instead of panicking
-- Registry credential resolution no longer blocks the async runtime and no longer silently swallows credential-helper failures
+- `fromImage` now resolves registry credentials (`credHelpers`, `credsStore`, `auths`, honoring `DOCKER_CONFIG`) instead of pulling anonymously (#210)
+- `fromImage` skips pulling when a locally cached image already matches the requested platform (#210)
+- Image pull/build failures now return a typed error instead of panicking (#210)
+- Registry credential resolution no longer blocks the async runtime and no longer silently swallows credential-helper failures (#210)
 
 ### Changed
 
