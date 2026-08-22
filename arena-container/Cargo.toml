@@ -11,8 +11,11 @@ path = "src/lib.rs"
 
 [dependencies]
 bollard = { workspace = true }
+docker_credential = { workspace = true }
 futures = { workspace = true }
+tokio = { workspace = true, features = ["rt"] }
 tracing = { workspace = true }
 
 [dev-dependencies]
+base64 = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

@@ -123,5 +123,9 @@ pub async fn build(config: &ContainerizedComponentConfig) -> Result<Component, S
             };
         }
     }
-    Ok(Box::new(builder.build().await))
+    builder
+        .build()
+        .await
+        .map(|component| Box::new(component) as Component)
+        .map_err(|e| e.to_string())
 }

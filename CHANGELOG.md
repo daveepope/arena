@@ -5,6 +5,19 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.1.0]
+
+### Fixed
+
+- `fromImage` now resolves registry credentials (`credHelpers`, `credsStore`, `auths`, honoring `DOCKER_CONFIG`) instead of pulling anonymously
+- `fromImage` skips pulling when a locally cached image already matches the requested platform
+- Image pull/build failures now return a typed error instead of panicking
+- Registry credential resolution no longer blocks the async runtime and no longer silently swallows credential-helper failures
+
+### Changed
+
+- PR pipeline no longer auto-publishes preview builds (TestPyPI, Maven snapshot, NuGet snapshot) on every push; apply the `pre-release` label to opt in
+
 ## [6.0.2]
 
 ### Security

@@ -36,21 +36,31 @@ fn from_image_with_platform_chains_for_further_building() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "with_build_context has no effect when using from_image")]
-async fn from_image_with_build_context_build_panics() {
-    ContainerizedComponent::from_image("probe", "alpine:3.20")
+async fn from_image_with_build_context_build_returns_invalid_configuration_error() {
+    let err = ContainerizedComponent::from_image("probe", "alpine:3.20")
         .with_build_context(".")
         .build()
-        .await;
+        .await
+        .err()
+        .expect("build should reject with_build_context combined with from_image");
+
+    assert!(err
+        .to_string()
+        .contains("with_build_context has no effect when using from_image"));
 }
 
 #[tokio::test]
-#[should_panic(expected = "with_image_tag has no effect when using from_image")]
-async fn from_image_with_image_tag_build_panics() {
-    ContainerizedComponent::from_image("probe", "alpine:3.20")
+async fn from_image_with_image_tag_build_returns_invalid_configuration_error() {
+    let err = ContainerizedComponent::from_image("probe", "alpine:3.20")
         .with_image_tag("custom-tag")
         .build()
-        .await;
+        .await
+        .err()
+        .expect("build should reject with_image_tag combined with from_image");
+
+    assert!(err
+        .to_string()
+        .contains("with_image_tag has no effect when using from_image"));
 }
 
 struct TempContextDir(PathBuf);

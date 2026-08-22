@@ -5,7 +5,7 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
 concurrency:
@@ -966,6 +966,7 @@ jobs:
       always() && !cancelled() &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'pre-release') &&
       needs.wheel.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
@@ -1088,7 +1089,8 @@ jobs:
       needs.build_arena_ffi.result == 'success' &&
       needs.maven_smoke_test_cross_platform.result == 'success' &&
       github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'pre-release')
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -1341,7 +1343,8 @@ jobs:
       needs.build_arena_ffi.result == 'success' &&
       needs.nuget_smoke_test_cross_platform.result == 'success' &&
       github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'pre-release')
     runs-on: ubuntu-24.04
     permissions:
       contents: read

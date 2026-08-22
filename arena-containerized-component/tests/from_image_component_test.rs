@@ -29,7 +29,8 @@ async fn start_from_image_pulls_and_runs_prebuilt_image() {
         .with_platform(arena_container::platform::docker_platform())
         .with_port_mapping(HOST_PORT, 6379)
         .build()
-        .await;
+        .await
+        .expect("build containerized component");
 
     component.start().await;
 
