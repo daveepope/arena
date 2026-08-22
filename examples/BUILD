@@ -374,6 +374,12 @@ filegroup(
 )
 
 filegroup(
+    name = "weather_db_schema",
+    srcs = ["resources/weather_db_schema.sql"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
     name = "arena_config",
     srcs = ["resources/arena_config.json"],
     visibility = ["//visibility:public"],
@@ -473,6 +479,7 @@ py_library(
         "@pip_examples//boto3",
         "@pip_examples//fastapi",
         "@pip_examples//httpx",
+        "@pip_examples//oracledb",
         "@pip_examples//pydantic_settings",
         "@pip_examples//pyjwt",
         "@pip_examples//fastmssql",
@@ -602,6 +609,7 @@ py_test(
         "//examples:instrument_reading_db_schema",
         "//examples:arena_config",
         "//examples:validation_db_schema",
+        "//examples:weather_db_schema",
     ],
     deps = [
         ":pytest_shared",
@@ -635,6 +643,7 @@ py_test(
         "//examples:instrument_reading_db_schema",
         "//examples:arena_config",
         "//examples:validation_db_schema",
+        "//examples:weather_db_schema",
     ],
     deps = [
         ":pytest_shared",

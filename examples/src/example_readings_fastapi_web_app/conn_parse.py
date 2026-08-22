@@ -18,6 +18,13 @@ def asyncpg_dsn_from_libpq(conn: str) -> str:
     return f"postgresql://{u}:{p}@{host}:{port}/{dbname}"
 
 
+def oracledb_connect_params_from_easy_connect(conn: str) -> tuple[str, str, str]:
+    m = re.match(r"^([^/]+)/([^@]+)@(.+)$", conn)
+    if not m:
+        raise ValueError("oracle connection string incomplete")
+    return m.group(1), m.group(2), m.group(3)
+
+
 def mssql_fastmssql_connection_string(conn: str) -> str:
     srv = re.search(r"Server=tcp:([^,;]+),(\d+)", conn, re.I)
     db = re.search(r"Database=([^;]+)", conn, re.I)

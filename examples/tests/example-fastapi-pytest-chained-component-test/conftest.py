@@ -37,6 +37,7 @@ from arena_pytest import (
     MatchBuilder,
     MssqlDependencyBuilder,
     OauthDependencyBuilder,
+    OracleDependencyBuilder,
     PostgresDependencyBuilder,
     SmtpDependencyBuilder,
     SqsQueueTarget,
@@ -53,6 +54,12 @@ from arena_config import (
     MSSQL_PORT,
     OAUTH_ISSUER,
     OAUTH_PORT,
+    ORACLE_ADMIN_PASS,
+    ORACLE_CONNECTION_STRING_LOCAL,
+    ORACLE_DB_NAME,
+    ORACLE_DB_PASS,
+    ORACLE_DB_USER,
+    ORACLE_PORT,
     POSTGRES_DB_NAME,
     POSTGRES_DB_PASS,
     POSTGRES_DB_USER,
@@ -149,7 +156,15 @@ _OAUTH_CA_FILE = ""
 
 
 def _build_web_app(
-    name: str, exe: str, port: int, pg_cs: str, mssql_cs: str, oauth_ca_file: str, ls_ep: str, children
+    name: str,
+    exe: str,
+    port: int,
+    pg_cs: str,
+    mssql_cs: str,
+    oracle_cs: str,
+    oauth_ca_file: str,
+    ls_ep: str,
+    children,
 ):
     builder = (
         ExecutableComponentBuilder(name)
@@ -158,6 +173,7 @@ def _build_web_app(
         .with_env_var("POSTGRES_CONNECTION_STRING", pg_cs)
         .with_env_var("CALIBRATION_URL", f"http://127.0.0.1:{CALIBRATION_HOST_PORT}")
         .with_env_var("MSSQL_CONNECTION_STRING", mssql_cs)
+        .with_env_var("ORACLE_CONNECTION_STRING", oracle_cs)
         .with_env_var("TEMPORAL_TARGET", f"127.0.0.1:{TEMPORAL_GRPC_PORT}")
         .with_env_var("SMTP_HOST", "127.0.0.1")
         .with_env_var("SMTP_PORT", str(SMTP_HOST_PORT))
@@ -195,8 +211,12 @@ def closed_arena() -> ClosedArena:
     mssql_schema_path = _find_resource_file("validation_db_schema.sql")
     if not mssql_schema_path:
         pytest.fail("validation_db_schema.sql not found")
+    oracle_schema_path = _find_resource_file("weather_db_schema.sql")
+    if not oracle_schema_path:
+        pytest.fail("weather_db_schema.sql not found")
     startup_sql = [open(schema_path, encoding="utf-8").read()]
     mssql_startup_sql = [open(mssql_schema_path, encoding="utf-8").read()]
+    oracle_startup_sql = [open(oracle_schema_path, encoding="utf-8").read()]
 
     oauth = (
         OauthDependencyBuilder("example-api-chained-oauth")
@@ -225,6 +245,17 @@ def closed_arena() -> ClosedArena:
         .with_database_username(MSSQL_DB_USER)
         .with_database_password(MSSQL_DB_PASS)
         .with_startup_sql_scripts(mssql_startup_sql)
+        .build()
+    )
+
+    oracle = (
+        OracleDependencyBuilder("example-api-chained-oracle")
+        .with_port(ORACLE_PORT)
+        .with_database_name(ORACLE_DB_NAME)
+        .with_database_username(ORACLE_DB_USER)
+        .with_database_password(ORACLE_DB_PASS)
+        .with_admin_password(ORACLE_ADMIN_PASS)
+        .with_startup_sql_scripts(oracle_startup_sql)
         .build()
     )
 
@@ -281,6 +312,7 @@ def closed_arena() -> ClosedArena:
         )
 
     mssql_cs = MSSQL_CONNECTION_STRING_LOCAL
+    oracle_cs = ORACLE_CONNECTION_STRING_LOCAL
     pg_cs = (
         f"host=localhost port={POSTGRES_PORT} user={POSTGRES_DB_USER} "
         f"password={POSTGRES_DB_PASS} dbname={POSTGRES_DB_NAME}"
@@ -290,16 +322,17 @@ def closed_arena() -> ClosedArena:
     web_app_name = "example-api-chained-web-app"
     web_app_child_name = "example-api-chained-web-app-child"
     fastapi_component_child = _build_web_app(
-        web_app_child_name, exe, WEB_APP_CHILD_PORT, pg_cs, mssql_cs, oauth_ca_file, ls_ep, None
+        web_app_child_name, exe, WEB_APP_CHILD_PORT, pg_cs, mssql_cs, oracle_cs, oauth_ca_file, ls_ep, None
     )
     fastapi_component = _build_web_app(
-        web_app_name, exe, WEB_APP_PORT, pg_cs, mssql_cs, oauth_ca_file, ls_ep, [fastapi_component_child]
+        web_app_name, exe, WEB_APP_PORT, pg_cs, mssql_cs, oracle_cs, oauth_ca_file, ls_ep, [fastapi_component_child]
     )
 
     a_match = (
         MatchBuilder(MATCH_NAME)
         .add_dependency(oauth)
         .add_dependency(mssql)
+        .add_dependency(oracle)
         .add_dependency(calibration)
         .add_dependency(localstack)
         .add_dependency(temporal)
@@ -325,6 +358,7 @@ def closed_arena() -> ClosedArena:
         log_dependency_ids=(
             oauth.identifier,
             mssql.identifier,
+            oracle.identifier,
             calibration.identifier,
             localstack.identifier,
             temporal.identifier,

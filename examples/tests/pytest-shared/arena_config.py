@@ -65,6 +65,7 @@ KAFKA_PORT = RUNTIME.kafka_port
 CALIBRATION_HOST_PORT = RUNTIME.calibration_host_port
 POSTGRES_PORT = RUNTIME.postgres_port
 MSSQL_PORT = RUNTIME.mssql_port
+ORACLE_PORT = RUNTIME.oracle_port
 OAUTH_PORT = RUNTIME.oauth_port
 OAUTH_ISSUER = RUNTIME.oauth_issuer
 LOCALSTACK_HOST_PORT = RUNTIME.localstack_host_port
@@ -79,6 +80,10 @@ POSTGRES_DB_PASS = _DATABASE["postgres_password"]
 MSSQL_DB_NAME = _DATABASE["mssql_name"]
 MSSQL_DB_USER = _DATABASE["mssql_user"]
 MSSQL_DB_PASS = _DATABASE["mssql_password"]
+ORACLE_DB_NAME = _DATABASE["oracle_name"]
+ORACLE_DB_USER = _DATABASE["oracle_user"]
+ORACLE_DB_PASS = _DATABASE["oracle_password"]
+ORACLE_ADMIN_PASS = _DATABASE["oracle_admin_password"]
 
 POSTGRES_CONTAINER_NAME = RUNTIME.container_name(_CTR_NAMES["postgres"])
 KAFKA_CONTAINER_NAME = RUNTIME.container_name(_CTR_NAMES["kafka"])
@@ -92,6 +97,7 @@ DEP_NAME_OAUTH = _DEP_NAMES["oauth"]
 DEP_NAME_POSTGRES = _DEP_NAMES["postgres"]
 DEP_NAME_KAFKA = _DEP_NAMES["kafka"]
 DEP_NAME_MSSQL = _DEP_NAMES["mssql"]
+DEP_NAME_ORACLE = _DEP_NAMES["oracle"]
 DEP_NAME_CALIBRATION_HTTP = _DEP_NAMES["calibration_http"]
 DEP_NAME_TEMPORAL = _DEP_NAMES["temporal"]
 DEP_NAME_SMTP = _DEP_NAMES["smtp"]
@@ -103,9 +109,14 @@ PLAYBOOK_CALIBRATION_API_HAPPY_PATH = _PB_NAMES["calibration_api_happy_path"]
 PLAYBOOK_CALIBRATION_API_ERROR_PATH = _PB_NAMES["calibration_api_error_path"]
 PLAYBOOK_CALIBRATION_API_FLAKY_PATH = _PB_NAMES["calibration_api_flaky_path"]
 PLAYBOOK_VALIDATION_DB_SCOPED = _PB_NAMES["validation_db_scoped"]
+PLAYBOOK_WEATHER_DB_SCOPED = _PB_NAMES["weather_db_scoped"]
 PLAYBOOK_EVENTS_PURGE = _PB_NAMES["events_purge"]
 
 MSSQL_CONNECTION_STRING_LOCAL = (
     f"Server=tcp:localhost,{MSSQL_PORT};Database={MSSQL_DB_NAME};"
     f"User Id={MSSQL_DB_USER};Password={MSSQL_DB_PASS};TrustServerCertificate=True;encrypt=DANGER_PLAINTEXT;"
+)
+
+ORACLE_CONNECTION_STRING_LOCAL = (
+    f"{ORACLE_DB_USER}/{ORACLE_DB_PASS}@localhost:{ORACLE_PORT}/{ORACLE_DB_NAME}"
 )
