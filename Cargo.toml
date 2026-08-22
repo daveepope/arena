@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "arena-postgres",
     "arena-mssql",
+    "arena-oracledb",
     "arena",
     "arena-kafka",
     "arena-localstack",
@@ -27,6 +28,7 @@ arena-kafka = { path = "arena-kafka" }
 arena-localstack = { path = "arena-localstack" }
 arena-postgres = { path = "arena-postgres" }
 arena-mssql = { path = "arena-mssql" }
+arena-oracledb = { path = "arena-oracledb" }
 arena-temporal = { path = "arena-temporal" }
 arena-smtp = { path = "arena-smtp" }
 arena-executable-component = { path = "arena-executable-component" }

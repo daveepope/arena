@@ -37,3 +37,8 @@ tag = "1.8.0"
 id = "smtp"
 image = "axllent/mailpit"
 tag = "v1.30.5"
+
+[[image]]
+id = "oracle"
+image = "gvenzl/oracle-free"
+tag = "23.26.2-slim-faststart"

@@ -1,5 +1,5 @@
 {
-  "checksum": "ef6926f1142bc25d02ce7d4d026d2b4982f1201d97dcc0381b79053f59ed1893",
+  "checksum": "6923c0a3629e2edfc3f8c02a6e3b454176006fd16b6bd712da630a3da36f25f1",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -1486,6 +1486,80 @@
             {
               "id": "serde_urlencoded 0.7.1",
               "target": "serde_urlencoded"
+            },
+            {
+              "id": "tokio 1.52.1",
+              "target": "tokio"
+            },
+            {
+              "id": "tracing 0.1.44",
+              "target": "tracing"
+            }
+          ],
+          "selects": {}
+        },
+        "deps_dev": {
+          "common": [
+            {
+              "id": "tracing-subscriber 0.3.23",
+              "target": "tracing_subscriber"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "proc_macro_deps": {
+          "common": [
+            {
+              "id": "async-trait 0.1.89",
+              "target": "async_trait"
+            }
+          ],
+          "selects": {}
+        },
+        "version": "6.1.0"
+      },
+      "license": "todo",
+      "license_ids": [],
+      "license_file": null
+    },
+    "arena-oracledb 6.1.0": {
+      "name": "arena-oracledb",
+      "version": "6.1.0",
+      "package_url": null,
+      "repository": null,
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "arena_oracledb",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "arena_oracledb",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "futures 0.3.32",
+              "target": "futures"
+            },
+            {
+              "id": "futures-timer 3.0.3",
+              "target": "futures_timer"
+            },
+            {
+              "id": "testcontainers-modules 0.15.0",
+              "target": "testcontainers_modules"
             },
             {
               "id": "tokio 1.52.1",
@@ -33822,6 +33896,7 @@
     "arena-localstack 6.1.0": "arena-localstack",
     "arena-mssql 6.1.0": "arena-mssql",
     "arena-oauth 6.1.0": "arena-oauth",
+    "arena-oracledb 6.1.0": "arena-oracledb",
     "arena-postgres 6.1.0": "arena-postgres",
     "arena-smtp 6.1.0": "arena-smtp",
     "arena-temporal 6.1.0": "arena-temporal"

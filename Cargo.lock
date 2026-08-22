@@ -299,6 +299,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "arena-oracledb"
+version = "6.1.0"
+dependencies = [
+ "arena",
+ "arena-container",
+ "async-trait",
+ "futures",
+ "futures-timer",
+ "testcontainers-modules",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "arena-postgres"
 version = "6.1.0"
 dependencies = [

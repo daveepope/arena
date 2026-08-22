@@ -1,4 +1,6 @@
-use arena_container::default_images::{ALL, HTTP, KAFKA_APACHE, KAFKA_CONFLUENT, LOCALSTACK, MSSQL, POSTGRES};
+use arena_container::default_images::{
+    ALL, HTTP, KAFKA_APACHE, KAFKA_CONFLUENT, LOCALSTACK, MSSQL, ORACLE, POSTGRES,
+};
 
 #[test]
 fn default_images_all_entries_have_distinct_ids() {
@@ -27,4 +29,6 @@ fn default_images_builder_ids_match_toml_defaults() {
     assert_eq!(MSSQL.tag, "2025-CU7-ubuntu-24.04");
     assert_eq!(LOCALSTACK.image, "localstack/localstack");
     assert_eq!(LOCALSTACK.tag, "4.14.0");
+    assert_eq!(ORACLE.image, "gvenzl/oracle-free");
+    assert_eq!(ORACLE.tag, "23.26.2-slim-faststart");
 }
