@@ -84,6 +84,8 @@ public class ChildrenWireFormatSerializationTest
             (child => { var b = new LocalstackDependencyBuilder("dep"); if (child != null) b.AddChildDependency(child); return b.Build(); }) };
         yield return new object[] { "mssql", (Func<IArenaDependency?, IArenaDependency>)
             (child => { var b = new MssqlDependencyBuilder("dep"); if (child != null) b.AddChildDependency(child); return b.Build(); }) };
+        yield return new object[] { "oracle", (Func<IArenaDependency?, IArenaDependency>)
+            (child => { var b = new OracleDependencyBuilder("dep"); if (child != null) b.AddChildDependency(child); return b.Build(); }) };
         yield return new object[] { "oauth", (Func<IArenaDependency?, IArenaDependency>)
             (child => { var b = new OauthDependencyBuilder("dep"); if (child != null) b.AddChildDependency(child); return b.Build(); }) };
         yield return new object[] { "postgres", (Func<IArenaDependency?, IArenaDependency>)

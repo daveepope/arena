@@ -23,6 +23,13 @@ public class ActivePlaybookTest
     }
 
     [Fact]
+    public void Verify_NullHandle_Oracle_ThrowsArenaBindingError()
+    {
+        using var playbook = new ActiveOraclePlaybook(IntPtr.Zero);
+        Assert.Throws<ArenaBindingError>(() => playbook.Verify("SELECT 1 FROM DUAL", 1));
+    }
+
+    [Fact]
     public void Verify_NullHandle_Http_ThrowsArenaBindingError()
     {
         using var playbook = new ActiveHttpPlaybook(IntPtr.Zero);
@@ -60,6 +67,14 @@ public class ActivePlaybookTest
         Assert.IsType<ActiveLocalstackPlaybook>(active);
     }
 
+    [Fact]
+    public void WrapHandle_OraclePlaybook_ReturnsActiveOraclePlaybook()
+    {
+        var playbook = new TestManagedOraclePlaybook("id", "dep-id");
+        using var active = playbook.WrapHandle(IntPtr.Zero);
+        Assert.IsType<ActiveOraclePlaybook>(active);
+    }
+
     private class TestManagedHttpPlaybook : ManagedHttpPlaybook
     {
         public TestManagedHttpPlaybook(string id, string depId)
@@ -74,5 +89,10 @@ public class ActivePlaybookTest
     private class TestManagedLocalstackPlaybook : ManagedLocalstackPlaybook
     {
         public TestManagedLocalstackPlaybook(string id, string depId) : base(id, depId) { }
+    }
+
+    private class TestManagedOraclePlaybook : ManagedOraclePlaybook
+    {
+        public TestManagedOraclePlaybook(string id, string depId) : base(id, depId) { }
     }
 }
