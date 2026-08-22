@@ -23,6 +23,8 @@ pub use active_playbook::{
     arena_active_playbook_drop, arena_match_playbook_run, ArenaActivePlaybookHandle,
 };
 pub use closed_arena::{arena_open, OpenArenaHandle};
+#[cfg(feature = "bench-support")]
+pub use closed_arena::parse_config_for_bench;
 pub use dependency_reset::{arena_hard_reset, arena_soft_reset};
 pub use error::ArenaStatus;
 pub use logging::{

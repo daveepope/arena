@@ -1,0 +1,15 @@
+[package]
+name = "arena-ffi-bench"
+version.workspace = true
+edition = "2021"
+publish = false
+
+[dependencies]
+arena-ffi = { workspace = true, features = ["bench-support"] }
+
+[dev-dependencies]
+criterion = { version = "0.8", default-features = false }
+
+[[bench]]
+name = "ffi_lifecycle_bench"
+harness = false

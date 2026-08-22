@@ -7,6 +7,9 @@ description = "C FFI layer for the Arena framework"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+bench-support = []
+
 [[test]]
 name = "ffi_test"
 path = "tests/lifecycle/open_close_dependency_reset.rs"

@@ -1,8 +1,23 @@
+use arena::healthcheck::ReadinessCheck;
 use arena_containerized_component::builder::ContainerizedComponentBuilder;
 use arena_containerized_component::containerized_component::ContainerizedComponent;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+struct FakeReadinessCheck;
+
+#[async_trait::async_trait]
+impl ReadinessCheck for FakeReadinessCheck {
+    async fn is_ready(
+        &self,
+        _identifier: &str,
+        _target: &str,
+        _timeout_ms: u64,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+}
 
 #[test]
 fn with_volume_mapping_single_mapping_chains_for_further_building() {
@@ -33,6 +48,56 @@ fn with_platform_chains_for_further_building() {
 fn from_image_with_platform_chains_for_further_building() {
     let _builder = ContainerizedComponent::from_image("probe", "alpine:3.20")
         .with_platform("linux/amd64");
+}
+
+#[test]
+fn with_network_chains_for_further_building() {
+    let _builder =
+        ContainerizedComponent::from_image("probe", "alpine:3.20").with_network("probe-net");
+}
+
+#[test]
+fn with_network_alias_chains_for_further_building() {
+    let _builder = ContainerizedComponent::from_image("probe", "alpine:3.20")
+        .with_network("probe-net")
+        .with_network_alias("probe-alias");
+}
+
+#[test]
+fn with_env_var_multiple_chains_for_further_building() {
+    let _builder = ContainerizedComponent::from_image("probe", "alpine:3.20")
+        .with_env_var("KEY_ONE", "value-one")
+        .with_env_var("KEY_TWO", "value-two");
+}
+
+#[test]
+fn with_runtime_arg_chains_for_further_building() {
+    let _builder = ContainerizedComponent::from_image("probe", "alpine:3.20")
+        .with_runtime_arg("some_arg", "some_value");
+}
+
+#[test]
+fn with_host_mapping_chains_for_further_building() {
+    let _builder = ContainerizedComponent::from_image("probe", "alpine:3.20")
+        .with_host_mapping("host.docker.internal:host-gateway");
+}
+
+#[test]
+fn with_child_components_chains_for_further_building() {
+    let _builder =
+        ContainerizedComponent::from_image("probe", "alpine:3.20").with_child_components(vec![]);
+}
+
+#[test]
+fn with_readiness_check_chains_for_further_building() {
+    let _builder = ContainerizedComponent::from_image("probe", "alpine:3.20")
+        .with_readiness_check(FakeReadinessCheck, "http://localhost:8080/health");
+}
+
+#[test]
+fn with_readiness_check_timeout_chains_for_further_building() {
+    let _builder = ContainerizedComponent::from_image("probe", "alpine:3.20")
+        .with_readiness_check_timeout(FakeReadinessCheck, "http://localhost:8080/health", 5_000);
 }
 
 #[tokio::test]
