@@ -11,9 +11,14 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 final class OracleDependencyBuilderSerializationTest {
+
+  private static String randomPassword() {
+    return "pw-" + UUID.randomUUID();
+  }
 
   static final class StubDependency implements ArenaRunnableDependency {
     @Override
@@ -38,6 +43,8 @@ final class OracleDependencyBuilderSerializationTest {
 
   @Test
   void withOverrides_allFields_serializesConfiguredFields() {
+    String databasePassword = randomPassword();
+    String adminPassword = randomPassword();
     ObjectNode config =
         new OracleDependencyBuilder("ora")
             .withImage("21-slim")
@@ -45,8 +52,8 @@ final class OracleDependencyBuilderSerializationTest {
             .withPort(1521)
             .withDatabaseName("arena")
             .withDatabaseUsername("arena_user")
-            .withDatabasePassword("secret")
-            .withAdminPassword("secret-admin")
+            .withDatabasePassword(databasePassword)
+            .withAdminPassword(adminPassword)
             .withContainerName("ora-box")
             .build()
             .forFfi();
@@ -55,8 +62,8 @@ final class OracleDependencyBuilderSerializationTest {
     assertEquals(1521, config.path("port").asInt());
     assertEquals("arena", config.path("database_name").asText());
     assertEquals("arena_user", config.path("database_username").asText());
-    assertEquals("secret", config.path("database_password").asText());
-    assertEquals("secret-admin", config.path("admin_password").asText());
+    assertEquals(databasePassword, config.path("database_password").asText());
+    assertEquals(adminPassword, config.path("admin_password").asText());
     assertEquals("ora-box", config.path("container_name").asText());
   }
 

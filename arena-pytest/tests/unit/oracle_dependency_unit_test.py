@@ -1,4 +1,10 @@
+import uuid
+
 from arena_pytest.dep.oracle import OracleDependencyBuilder
+
+
+def _random_password() -> str:
+    return f"pw-{uuid.uuid4()}"
 
 
 def test_build_minimal_name_serializes_type_and_identifier():
@@ -11,11 +17,14 @@ def test_build_minimal_name_serializes_type_and_identifier():
 
 
 def test_with_admin_password_sets_admin_password():
-    config = OracleDependencyBuilder("oracle").with_admin_password("secret").build()._for_ffi()
-    assert config["admin_password"] == "secret"
+    admin_password = _random_password()
+    config = OracleDependencyBuilder("oracle").with_admin_password(admin_password).build()._for_ffi()
+    assert config["admin_password"] == admin_password
 
 
 def test_build_with_overrides_serializes_configured_fields():
+    database_password = _random_password()
+    admin_password = _random_password()
     config = (
         OracleDependencyBuilder("oracle")
         .with_image("23.5.0.24.07")
@@ -23,8 +32,8 @@ def test_build_with_overrides_serializes_configured_fields():
         .with_port(11521)
         .with_database_name("orders")
         .with_database_username("orders_user")
-        .with_database_password("orders_pw")
-        .with_admin_password("admin_pw")
+        .with_database_password(database_password)
+        .with_admin_password(admin_password)
         .with_container_name("oracle-box")
         .with_startup_sql_scripts(["init.sql"])
         .build()
@@ -35,7 +44,7 @@ def test_build_with_overrides_serializes_configured_fields():
     assert config["port"] == 11521
     assert config["database_name"] == "orders"
     assert config["database_username"] == "orders_user"
-    assert config["database_password"] == "orders_pw"
-    assert config["admin_password"] == "admin_pw"
+    assert config["database_password"] == database_password
+    assert config["admin_password"] == admin_password
     assert config["container_name"] == "oracle-box"
     assert config["startup_sql_scripts"] == ["init.sql"]

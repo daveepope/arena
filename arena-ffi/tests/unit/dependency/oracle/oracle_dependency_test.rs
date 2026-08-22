@@ -1,4 +1,13 @@
 use arena_ffi::dependency::oracle::oracle_dependency::{build, OracleDependencyConfig};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+fn test_password() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time before unix epoch")
+        .as_nanos();
+    format!("pw-{nanos}")
+}
 
 fn minimal_oracle_config() -> OracleDependencyConfig {
     OracleDependencyConfig {
@@ -28,8 +37,8 @@ fn build_image_and_credential_overrides_apply() {
     config.port = Some(15210);
     config.database_name = Some("CUSTOMPDB".to_string());
     config.database_username = Some("custom_user".to_string());
-    config.database_password = Some("CustomPassword1!".to_string());
-    config.admin_password = Some("CustomAdmin1!".to_string());
+    config.database_password = Some(test_password());
+    config.admin_password = Some(test_password());
     config.container_name = Some("oracle-box".to_string());
     config.startup_sql_scripts = Some(vec!["CREATE TABLE widgets (id NUMBER);".to_string()]);
     assert!(build(&config, Some("arena-net")).is_ok());

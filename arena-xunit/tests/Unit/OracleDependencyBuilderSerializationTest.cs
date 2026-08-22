@@ -9,6 +9,8 @@ namespace ArenaDotnet.Xunit.UnitTest;
 
 public class OracleDependencyBuilderSerializationTest
 {
+    private static string RandomPassword() => "pw-" + Guid.NewGuid();
+
     [Fact]
     public void Build_DefaultPort_SerializesCorrectJson()
     {
@@ -66,26 +68,28 @@ public class OracleDependencyBuilderSerializationTest
     [Fact]
     public void Build_WithAdminPassword_SerializesCorrectJson()
     {
-        var dep = new OracleDependencyBuilder("test").WithAdminPassword("secret-admin").Build();
+        var adminPassword = RandomPassword();
+        var dep = new OracleDependencyBuilder("test").WithAdminPassword(adminPassword).Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Equal("secret-admin", obj["admin_password"]);
+        Assert.Equal(adminPassword, obj["admin_password"]);
     }
 
     [Fact]
     public void Build_WithDatabaseFieldsAndStartupScripts_SerializesCorrectJson()
     {
+        var databasePassword = RandomPassword();
         var dep = new OracleDependencyBuilder("test")
             .WithDatabaseName("arena")
             .WithDatabaseUsername("arena_user")
-            .WithDatabasePassword("secret")
+            .WithDatabasePassword(databasePassword)
             .WithStartupSqlScripts(new[] { "seed.sql", "grants.sql" })
             .Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
         Assert.Equal("arena", obj["database_name"]);
         Assert.Equal("arena_user", obj["database_username"]);
-        Assert.Equal("secret", obj["database_password"]);
+        Assert.Equal(databasePassword, obj["database_password"]);
         var scripts = Assert.IsType<JArray>(obj["startup_sql_scripts"]);
         Assert.Equal(2, scripts.Count);
         Assert.Equal("seed.sql", scripts[0]);
