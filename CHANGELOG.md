@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `audit_and_vet_rust` now fails if the count of cargo-vet audited or exempted packages changes, to catch silent supply-chain trust regressions (or acknowledge improvements)
 - arena-junit: Oracle dependency and playbook support (`OracleDependencyBuilder`, `ManagedOraclePlaybook`)
 - `arena-xunit`: Oracle dependency and playbook support (`OracleDependencyBuilder`, `ManagedOraclePlaybook`)
+- `arena-pytest`: Oracle dependency and playbook support (`OracleDependencyBuilder`, `ManagedOraclePlaybook`)
 
 ### Fixed
 
