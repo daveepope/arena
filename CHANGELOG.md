@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [6.1.0]
 
+### Added
+
+- `audit_and_vet_rust` now fails if the count of cargo-vet audited or exempted packages changes, to catch silent supply-chain trust regressions (or acknowledge improvements)
+
 ### Fixed
 
 - `fromImage` now resolves registry credentials (`credHelpers`, `credsStore`, `auths`, honoring `DOCKER_CONFIG`) instead of pulling anonymously
