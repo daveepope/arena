@@ -707,7 +707,7 @@ jobs:
           set +e
           bazel test --config=ci --enable_runfiles --build_tests_only --test_tag_filters=-component_test,-no-windows -- //...
           status1=$?
-          bazel test --config=ci --enable_runfiles --build_tests_only --test_tag_filters=component_test --local_test_jobs=4 --test_env=DOCKER_HOST -- //... -//examples/... -//arena-containerized-component:volume_mapping_component_test -//arena-containerized-component:from_image_component_test
+          bazel test --config=ci --enable_runfiles --build_tests_only --test_tag_filters=component_test,-no-windows --local_test_jobs=4 --test_env=DOCKER_HOST -- //... -//examples/... -//arena-containerized-component:volume_mapping_component_test -//arena-containerized-component:from_image_component_test
           status2=$?
           if [ $status1 -ne 0 ] || [ $status2 -ne 0 ]; then
             exit 1

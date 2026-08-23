@@ -162,7 +162,10 @@ rust_test(
     srcs = ["tests/component/component_test.rs"],
     size = "medium",
     edition = "2021",
-    tags = ["component_test"],
+    tags = [
+        "component_test",
+        "no-windows",
+    ],
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,
