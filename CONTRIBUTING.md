@@ -88,7 +88,7 @@ bazel run //scripts:bump_version -- --bump patch   # or minor / major
 - **Dependency Review** — blocks newly-added dependencies with a known moderate+ severity vulnerability.
 - **Cargo Audit** — checks Rust crates against RustSec advisories.
 - **OSV-Scanner** — cross-ecosystem CVE scan (Rust, Maven, NuGet, pip).
-- **`audit_vet_rust`** (cargo-vet) — flags new Rust dependencies that haven't been reviewed/exempted.
+- **`audit_vet_rust`** — builds `arena-ffi` as a `cargo auditable` binary and audits the compiled artifact itself against RustSec advisories, then runs cargo-vet (flags new Rust dependencies that haven't been reviewed/exempted) and its trust-watermark regression check.
 - **Bazel `--lockfile_mode=error`** — fails any CI build if resolved dependencies drift from the committed lockfile.
 - **Dependency release age** — blocks dependency versions published less than 3 days ago (`ARENA_MIN_RELEASE_AGE_DAYS`), a guard against freshly-published/compromised releases.
 - **OpenSSF Scorecard** — scores ~18 supply-chain and process checks (branch protection, token permissions, pinned dependencies, SAST, fuzzing, signed releases, etc.); informational, doesn't block the PR.
@@ -98,13 +98,14 @@ ClusterFuzzLite runs a weekly fuzzing pass against the default branch (not on in
 
 Locally, `bazel run //scripts:repin` repins lockfiles, runs cargo-vet, and audits the FFI binary — run it whenever you change a dependency.
 
-Agent instructions
+## Agent instructions
 
 - AGENTS.md is the source of truth for AI/editor rules. CLAUDE.md and .cursor/rules/arena-agent.mdc are generated from it; do not edit them by hand.
 - If you edit AGENTS.md, run bazel run //scripts:sync_agent_rules and commit AGENTS.md, CLAUDE.md, and .cursor/rules/arena-agent.mdc together.
 
-Submitting a pull request
+## Submitting a pull request
 
 - Ensure bazel build //... and bazel test //... pass locally before submitting.
 - Describe what changed and why in the PR description.
 - Link any related issue.
+- Add the `pre-release` label if you want the PR to publish a preview build (TestPyPI, Maven snapshot, NuGet snapshot) so you can test it before merge.
