@@ -8,7 +8,7 @@ fn test_password() -> String {
         .duration_since(UNIX_EPOCH)
         .expect("system time before unix epoch")
         .as_nanos();
-    format!("pw-{nanos}")
+    format!("test-pw-{nanos}")
 }
 
 struct FakeOracleImpl {
