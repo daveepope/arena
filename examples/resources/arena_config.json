@@ -49,10 +49,8 @@
   "database": {
     "postgres_name": "readings_db",
     "postgres_user": "readings_user",
-    "postgres_password": "readings_password",
     "mssql_name": "validationDb",
     "mssql_user": "sa",
-    "mssql_password": "yourStrong(!)Password",
     "oracle_name": "FREEPDB1"
   },
   "kafka_topic": "readings",

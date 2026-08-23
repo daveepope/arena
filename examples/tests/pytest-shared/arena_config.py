@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 
 from ephemeral_test_runtime import RUNTIME
 
@@ -76,10 +77,10 @@ SMTP_UI_PORT = RUNTIME.smtp_ui_port
 
 POSTGRES_DB_NAME = _DATABASE["postgres_name"]
 POSTGRES_DB_USER = _DATABASE["postgres_user"]
-POSTGRES_DB_PASS = _DATABASE["postgres_password"]
+POSTGRES_DB_PASS = "pw_" + uuid.uuid4().hex[:12]
 MSSQL_DB_NAME = _DATABASE["mssql_name"]
 MSSQL_DB_USER = _DATABASE["mssql_user"]
-MSSQL_DB_PASS = _DATABASE["mssql_password"]
+MSSQL_DB_PASS = "pw_" + uuid.uuid4().hex[:12] + "!Aa1"
 ORACLE_DB_NAME = _DATABASE["oracle_name"]
 ORACLE_DB_USER = "weather_user_" + RUNTIME.run_suffix[:8]
 ORACLE_DB_PASS = "pw_" + RUNTIME.run_suffix[8:20]

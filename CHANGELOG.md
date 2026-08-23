@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - FastAPI example app: Oracle-backed weather report endpoints (`POST/GET /weather`), wired into both pytest component test suites
 - Spring Boot and ASP.NET example apps: Oracle-backed weather report endpoints, wired into both junit and xunit component/chained-component test suites
 - Oracle dependency builders (`arena-oracledb`, `arena-junit`, `arena-xunit`, `arena-pytest`) require an explicit `.full_build()` opt-in for a non-default database name, and scale the SQL readiness timeout accordingly, since a custom name forces a slow from-scratch pluggable database build
+- CI: betterleaks secret scan on every PR, push to master, and daily cron
+- `bazel run //scripts:setup_local_bazelrc` for configuring a local BuildBuddy remote cache from `BUILDBUDDY_API_KEY` without hardcoding it in `.bazelrc.user`
 
 ### Fixed
 
@@ -23,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `fromImage` skips pulling when a locally cached image already matches the requested platform (#210)
 - Image pull/build failures now return a typed error instead of panicking (#210)
 - Registry credential resolution no longer blocks the async runtime and no longer silently swallows credential-helper failures (#210)
+- Example Postgres/MSSQL test credentials are now randomly generated instead of hardcoded, matching the existing Oracle credential pattern
 
 ### Changed
 

@@ -152,6 +152,8 @@ public final class ChainedComponentTestSuite {
           .withDatabasePassword(ORACLE_DB_PASS)
           .withAdminPassword(ORACLE_ADMIN_PASS)
           .withStartupSqlScripts(readSchema("weather_db_schema.sql"))
+          // Oracle container start times are inconsistent across CI runners, so a longer timeout is required.
+          .withSqlReadinessTimeout(Duration.ofMinutes(2))
           .build();
 
   @ArenaDependency(logs = false)

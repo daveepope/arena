@@ -46,10 +46,10 @@ public sealed class ExampleFixture : ArenaCollectionFixture
 
     private const string PostgresDbName = "testdb";
     private const string PostgresDbUser = "test";
-    private const string PostgresDbPassword = "test";
+    private static readonly string PostgresDbPassword = "pw_" + EphemeralTestRuntime.RandomToken(12);
     private const string MssqlDbName = "testdb";
     private const string MssqlDbUser = "sa";
-    private const string MssqlDbPassword = "Password123!";
+    private static readonly string MssqlDbPassword = "pw_" + EphemeralTestRuntime.RandomToken(12) + "!Aa1";
     private const string OracleDbName = "FREEPDB1";
     private static readonly string OracleDbUser = "weather_user_" + EphemeralTestRuntime.RandomToken(8);
     private static readonly string OracleDbPassword = "pw_" + EphemeralTestRuntime.RandomToken(12);
@@ -83,6 +83,8 @@ public sealed class ExampleFixture : ArenaCollectionFixture
             .WithDatabasePassword(OracleDbPassword)
             .WithAdminPassword(OracleAdminPassword)
             .WithStartupSqlScripts(new[] { ResolveSchemaScript("weather_db_schema.sql") })
+            // Oracle container start times are inconsistent across CI runners, so a longer timeout is required.
+            .WithSqlReadinessTimeout(TimeSpan.FromMinutes(2))
             .Build();
 
     [ArenaDependency]
