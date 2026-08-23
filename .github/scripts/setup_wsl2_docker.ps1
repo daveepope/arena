@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $wslConfigPath = Join-Path $Env:USERPROFILE ".wslconfig"
 if (-not (Test-Path $wslConfigPath)) {
-  Set-Content -Path $wslConfigPath -Value "[wsl2]`nmemory=4GB`nvmIdleTimeout=-1" -Encoding ASCII
+  Set-Content -Path $wslConfigPath -Value "[wsl2]`nmemory=5GB`nvmIdleTimeout=-1" -Encoding ASCII
 }
 
 wsl.exe --set-default-version 2 | Out-Null

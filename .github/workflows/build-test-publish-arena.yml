@@ -707,7 +707,7 @@ jobs:
           set +e
           bazel test --config=ci --enable_runfiles --build_tests_only --test_tag_filters=-component_test,-no-windows -- //...
           status1=$?
-          bazel test --config=ci --enable_runfiles --build_tests_only --test_tag_filters=component_test,-no-windows --local_test_jobs=4 --test_env=DOCKER_HOST -- //... -//examples/... -//arena-containerized-component:volume_mapping_component_test -//arena-containerized-component:from_image_component_test
+          bazel test --config=ci --enable_runfiles --build_tests_only --test_tag_filters=component_test,-no-windows --local_test_jobs=1 --test_env=DOCKER_HOST -- //... -//examples/... -//arena-containerized-component:volume_mapping_component_test -//arena-containerized-component:from_image_component_test
           status2=$?
           if [ $status1 -ne 0 ] || [ $status2 -ne 0 ]; then
             exit 1
@@ -773,7 +773,7 @@ jobs:
         shell: bash
         env:
           MSYS_NO_PATHCONV: "1"
-        run: bazel test --config=ci --enable_runfiles --build_tests_only --local_test_jobs=2 --test_env=DOCKER_HOST -- //examples:example-axum-component-test //examples:example-spring-boot-component-test
+        run: bazel test --config=ci --enable_runfiles --build_tests_only --local_test_jobs=1 --test_env=DOCKER_HOST -- //examples:example-axum-component-test //examples:example-spring-boot-component-test
 
   generate_windows_pip_lock:
     name: Generate Windows pip lock files
