@@ -176,6 +176,7 @@ public final class ComponentTestSuite {
           .withDatabasePassword(ORACLE_DB_PASS)
           .withAdminPassword(ORACLE_ADMIN_PASS)
           .withStartupSqlScripts(readSchema("weather_db_schema.sql"))
+          .withSqlReadinessTimeout(Duration.ofMinutes(2))
           .build();
 
   @ArenaDependency(logs = false)

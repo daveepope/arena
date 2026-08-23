@@ -235,6 +235,7 @@ async fn resolve_registry_credentials_configured_auth_returns_credentials() {
     assert_eq!(credentials.serveraddress.as_deref(), Some(host));
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn resolve_registry_credentials_ecr_style_cred_helper_returns_credentials() {
     let _guard = DOCKER_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());

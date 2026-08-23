@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
+from datetime import timedelta
 
 _TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _TESTS_DIR not in sys.path:
@@ -254,6 +255,7 @@ def closed_arena() -> ClosedArena:
         .with_database_password(ORACLE_DB_PASS)
         .with_admin_password(ORACLE_ADMIN_PASS)
         .with_startup_sql_scripts(oracle_startup_sql)
+        .with_sql_readiness_timeout(timedelta(minutes=2))
         .build()
     )
 

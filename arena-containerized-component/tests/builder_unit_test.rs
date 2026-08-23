@@ -277,6 +277,7 @@ fn create_build_context_tar_with_build_context_skips_git_and_node_modules_dirs()
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn create_build_context_tar_with_unreadable_nested_dir_skips_it_without_failing() {
     let context = TempContextDir::create("arena-build-context-unreadable-dir-test");
@@ -308,6 +309,7 @@ fn create_build_context_tar_with_unreadable_nested_dir_skips_it_without_failing(
     assert!(!entries.iter().any(|(path, _)| path.contains("secret.txt")));
 }
 
+#[cfg(unix)]
 #[test]
 fn create_build_context_tar_with_unreadable_nested_file_skips_it_without_failing() {
     let context = TempContextDir::create("arena-build-context-unreadable-file-test");
