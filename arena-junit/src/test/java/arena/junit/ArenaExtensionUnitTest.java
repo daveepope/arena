@@ -63,6 +63,21 @@ final class ArenaExtensionUnitTest {
     }
   }
 
+  static final class CountingFailureMatchPiece implements ArenaRunnableDependency {
+    static int forFfiCalls;
+
+    @Override
+    public ObjectNode forFfi() {
+      forFfiCalls++;
+      return MAPPER.createObjectNode();
+    }
+  }
+
+  static final class BeforeAllFailureCachingTopology {
+    @ArenaDependency static final CountingFailureMatchPiece dependency =
+        new CountingFailureMatchPiece();
+  }
+
   static final class NoArenaFieldsTopology {}
 
   static final class NonStaticDependencyFieldTopology {
@@ -180,6 +195,10 @@ final class ArenaExtensionUnitTest {
   }
 
   static final class AfterAllRefCountedTopology {
+    @ArenaDependency static final StubMatchPiece dependency = new StubMatchPiece();
+  }
+
+  static final class AfterAllFailedCacheEntryTopology {
     @ArenaDependency static final StubMatchPiece dependency = new StubMatchPiece();
   }
 
@@ -391,6 +410,23 @@ final class ArenaExtensionUnitTest {
   }
 
   @Test
+  void beforeAll_dependencyOpenFails_cachesFailureAndDoesNotReopenOnRepeatedCalls() throws Exception {
+    Class<?> root = BeforeAllFailureCachingTopology.class;
+    CountingFailureMatchPiece.forFfiCalls = 0;
+    ArenaExtension extension = new ArenaExtension();
+    try {
+      Throwable first =
+          assertThrows(IllegalStateException.class, () -> extension.beforeAll(contextFor(root)));
+      Throwable second =
+          assertThrows(IllegalStateException.class, () -> extension.beforeAll(contextFor(root)));
+      assertSame(first, second);
+      assertEquals(1, CountingFailureMatchPiece.forFfiCalls);
+    } finally {
+      cache().remove(root);
+    }
+  }
+
+  @Test
   void afterAll_suiteCompletedCountReachesExpectedMembers_closesAndRemovesCacheEntry() throws Exception {
     Class<?> root = AfterAllSuiteMemberCompleteTopology.class;
     Object cached = newCachedArena(new OpenArena(null, 0L, List.of()), 2);
@@ -418,6 +454,16 @@ final class ArenaExtensionUnitTest {
   void afterAll_refCountFallbackReachesZero_closesAndRemovesCacheEntry() throws Exception {
     Class<?> root = AfterAllRefCountedTopology.class;
     Object cached = newCachedArena(new OpenArena(null, 0L, List.of()), null);
+    setIntField(cached, "refs", 1);
+    cache().put(root, cached);
+    new ArenaExtension().afterAll(contextFor(root));
+    assertFalse(cache().containsKey(root));
+  }
+
+  @Test
+  void afterAll_cachedFailureRefCountReachesZero_removesCacheEntryWithoutClosing() throws Exception {
+    Class<?> root = AfterAllFailedCacheEntryTopology.class;
+    Object cached = newFailedCachedArena(new IllegalStateException("open failed"), null);
     setIntField(cached, "refs", 1);
     cache().put(root, cached);
     new ArenaExtension().afterAll(contextFor(root));
@@ -472,18 +518,26 @@ final class ArenaExtensionUnitTest {
   }
 
   private static Object newCachedArena(OpenArena openArena, Integer expectedSuiteMembers) throws Exception {
-    Class<?> cachedArenaClass = null;
-    for (Class<?> nested : ArenaExtension.class.getDeclaredClasses()) {
-      if (nested.getSimpleName().equals("CachedArena")) {
-        cachedArenaClass = nested;
-      }
-    }
-    if (cachedArenaClass == null) {
-      throw new IllegalStateException("ArenaExtension.CachedArena nested class not found");
-    }
-    Constructor<?> ctor = cachedArenaClass.getDeclaredConstructor(OpenArena.class, Integer.class);
+    Constructor<?> ctor = cachedArenaClass().getDeclaredConstructor(OpenArena.class, Integer.class);
     ctor.setAccessible(true);
     return ctor.newInstance(openArena, expectedSuiteMembers);
+  }
+
+  private static Object newFailedCachedArena(RuntimeException failure, Integer expectedSuiteMembers)
+      throws Exception {
+    Constructor<?> ctor =
+        cachedArenaClass().getDeclaredConstructor(RuntimeException.class, Integer.class);
+    ctor.setAccessible(true);
+    return ctor.newInstance(failure, expectedSuiteMembers);
+  }
+
+  private static Class<?> cachedArenaClass() {
+    for (Class<?> nested : ArenaExtension.class.getDeclaredClasses()) {
+      if (nested.getSimpleName().equals("CachedArena")) {
+        return nested;
+      }
+    }
+    throw new IllegalStateException("ArenaExtension.CachedArena nested class not found");
   }
 
   private static void setIntField(Object instance, String name, int value) throws Exception {
