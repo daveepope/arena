@@ -17,7 +17,7 @@ public class OracleDependencyBuilderSerializationTest
         var dep = new OracleDependencyBuilder("test").Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Equal("oracle", obj["type"]);
+        Assert.Equal("oracledb", obj["type"]);
         Assert.Equal(1521, obj["port"]);
         Assert.NotNull(obj["identifier"]);
     }
@@ -94,5 +94,29 @@ public class OracleDependencyBuilderSerializationTest
         Assert.Equal(2, scripts.Count);
         Assert.Equal("seed.sql", scripts[0]);
         Assert.Equal("grants.sql", scripts[1]);
+    }
+
+    [Fact]
+    public void Build_FullBuildWithSqlReadinessTimeout_SerializesCorrectJson()
+    {
+        var dep = new OracleDependencyBuilder("test")
+            .WithDatabaseName("weatherdb")
+            .FullBuild()
+            .WithSqlReadinessTimeout(TimeSpan.FromMinutes(4))
+            .Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("full_build", obj["setup_mode"]);
+        Assert.Equal(240000, obj["sql_readiness_timeout_ms"]);
+    }
+
+    [Fact]
+    public void Build_Default_OmitsSetupModeAndSqlReadinessTimeout()
+    {
+        var dep = new OracleDependencyBuilder("test").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Null(obj["setup_mode"]);
+        Assert.Null(obj["sql_readiness_timeout_ms"]);
     }
 }

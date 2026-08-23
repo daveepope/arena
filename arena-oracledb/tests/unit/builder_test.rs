@@ -90,12 +90,21 @@ fn build_defaults_sets_expected_database_identity() {
 }
 
 #[test]
-fn with_database_name_overrides_default() {
+fn with_database_name_and_full_build_overrides_default() {
     let dep = OracleDependency::builder("custom-db")
         .with_database_name("CUSTOMPDB")
+        .full_build()
         .build();
 
     assert_eq!(dep.database_name(), "CUSTOMPDB");
+}
+
+#[test]
+#[should_panic(expected = "requires .full_build()")]
+fn with_database_name_without_full_build_panics() {
+    OracleDependency::builder("custom-db-no-full-build")
+        .with_database_name("CUSTOMPDB")
+        .build();
 }
 
 #[test]

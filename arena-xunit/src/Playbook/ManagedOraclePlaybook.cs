@@ -9,7 +9,7 @@ public abstract class ManagedOraclePlaybook : ManagedPlaybook
     {
     }
 
-    internal override string Kind => "oracle";
+    internal override string Kind => "oracledb";
 
     internal override ActivePlaybook WrapHandle(IntPtr handle) => new ActiveOraclePlaybook(handle);
 }

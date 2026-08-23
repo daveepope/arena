@@ -33,6 +33,7 @@ pub struct MatchConfig {
 pub enum DependencyConfig {
     Postgres(postgres_dependency::PostgresDependencyConfig),
     Mssql(mssql_dependency::MssqlDependencyConfig),
+    #[serde(rename = "oracledb")]
     Oracle(oracle_dependency::OracleDependencyConfig),
     Kafka(kafka_dependency::KafkaDependencyConfig),
     Http(http_dependency::HttpDependencyConfig),

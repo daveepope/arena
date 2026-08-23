@@ -11,7 +11,7 @@ fn build_all_kinds_dispatches_to_each_builder() {
             r#"{"identifier": "pb-http", "kind": "http", "dependency_identifier": "http", "mappings": []}"#,
         ),
         playbook_config(r#"{"identifier": "pb-mssql", "kind": "mssql", "dependency_identifier": "mssql"}"#),
-        playbook_config(r#"{"identifier": "pb-oracle", "kind": "oracle", "dependency_identifier": "oracle"}"#),
+        playbook_config(r#"{"identifier": "pb-oracle", "kind": "oracledb", "dependency_identifier": "oracle"}"#),
         playbook_config(
             r#"{"identifier": "pb-localstack", "kind": "localstack", "dependency_identifier": "localstack"}"#,
         ),

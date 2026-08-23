@@ -50,7 +50,7 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
     private const string MssqlDbName = "testdb";
     private const string MssqlDbUser = "sa";
     private const string MssqlDbPassword = "Password123!";
-    private const string OracleDbName = "weatherdb";
+    private const string OracleDbName = "FREEPDB1";
     private static readonly string OracleDbUser = "weather_user_" + EphemeralTestRuntime.RandomToken(8);
     private static readonly string OracleDbPassword = "pw_" + EphemeralTestRuntime.RandomToken(12);
     private static readonly string OracleAdminPassword = "pw_" + EphemeralTestRuntime.RandomToken(12);
@@ -78,7 +78,6 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
     private static readonly OracleDependency Oracle =
         new OracleDependencyBuilder("test-chained-oracle")
             .WithPort(OraclePort)
-            .WithDatabaseName(OracleDbName)
             .WithDatabaseUsername(OracleDbUser)
             .WithDatabasePassword(OracleDbPassword)
             .WithAdminPassword(OracleAdminPassword)

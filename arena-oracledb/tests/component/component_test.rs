@@ -115,7 +115,6 @@ async fn oracle_dependency_component_test() {
 
     let mut oracle = OracleDependency::builder("oracle-component")
         .with_port(ephemeral_tcp_port())
-        .with_database_name("ARENACOMPONENT")
         .with_startup_sql_scripts(vec![
             "CREATE TABLE widgets (\n\
              id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n\

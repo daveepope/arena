@@ -27,6 +27,7 @@ fn default_exec_on_dependency_start() -> bool {
 pub enum PlaybookKindConfig {
     Http(HttpPlaybookConfig),
     Mssql(MssqlPlaybookConfig),
+    #[serde(rename = "oracledb")]
     Oracle(OraclePlaybookConfig),
     Localstack(LocalstackPlaybookConfig),
     Postgres(PostgresPlaybookConfig),

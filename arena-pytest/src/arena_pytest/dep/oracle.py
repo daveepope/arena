@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from arena_pytest.ffi._ffi import match_playbook_run
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
 class OracleDependencyBuilder:
     def __init__(self, name: str = ""):
         self._config: Dict[str, Any] = {
-            "type": "oracle",
+            "type": "oracledb",
             "identifier": _build_identifier("arena-oracle", name),
         }
         self._children: List[Any] = []
@@ -53,6 +54,14 @@ class OracleDependencyBuilder:
 
     def with_startup_sql_scripts(self, scripts: List[str]) -> "OracleDependencyBuilder":
         self._config["startup_sql_scripts"] = scripts
+        return self
+
+    def full_build(self) -> "OracleDependencyBuilder":
+        self._config["setup_mode"] = "full_build"
+        return self
+
+    def with_sql_readiness_timeout(self, timeout: timedelta) -> "OracleDependencyBuilder":
+        self._config["sql_readiness_timeout_ms"] = int(timeout.total_seconds() * 1000)
         return self
 
     def with_child_dependencies(self, children: List[Any]) -> "OracleDependencyBuilder":
@@ -107,7 +116,7 @@ class ManagedOraclePlaybook(ManagedPlaybook):
     def _for_ffi(self) -> Dict[str, Any]:
         return {
             "identifier": self._identifier,
-            "kind": "oracle",
+            "kind": "oracledb",
             "dependency_identifier": self._dependency_identifier,
         }
 

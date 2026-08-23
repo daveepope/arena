@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena-pytest`: Oracle dependency and playbook support (`OracleDependencyBuilder`, `ManagedOraclePlaybook`)
 - FastAPI example app: Oracle-backed weather report endpoints (`POST/GET /weather`), wired into both pytest component test suites
 - Spring Boot and ASP.NET example apps: Oracle-backed weather report endpoints, wired into both junit and xunit component/chained-component test suites
+- Oracle dependency builders (`arena-oracledb`, `arena-junit`, `arena-xunit`, `arena-pytest`) require an explicit `.full_build()` opt-in for a non-default database name, and scale the SQL readiness timeout accordingly, since a custom name forces a slow from-scratch pluggable database build
 
 ### Fixed
 

@@ -10,6 +10,7 @@ import arena.junit.support.ArenaJson;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -30,7 +31,7 @@ final class OracleDependencyBuilderSerializationTest {
   @Test
   void build_minimalName_serializesTypeAndIdentifier() {
     ObjectNode config = new OracleDependencyBuilder("ora").build().forFfi();
-    assertEquals("oracle", config.path("type").asText());
+    assertEquals("oracledb", config.path("type").asText());
     assertTrue(config.path("identifier").asText().startsWith("arena-oracle-ora-"));
     assertFalse(config.has("children"));
   }
@@ -94,5 +95,25 @@ final class OracleDependencyBuilderSerializationTest {
   void identifier_afterBuild_returnsConfiguredIdentifier() {
     OracleDependency dep = new OracleDependencyBuilder("ora").build();
     assertTrue(dep.identifier().startsWith("arena-oracle-ora-"));
+  }
+
+  @Test
+  void fullBuildWithSqlReadinessTimeout_serializesSetupModeAndTimeoutMs() {
+    ObjectNode config =
+        new OracleDependencyBuilder("ora")
+            .withDatabaseName("weatherdb")
+            .fullBuild()
+            .withSqlReadinessTimeout(Duration.ofMinutes(4))
+            .build()
+            .forFfi();
+    assertEquals("full_build", config.path("setup_mode").asText());
+    assertEquals(240_000L, config.path("sql_readiness_timeout_ms").asLong());
+  }
+
+  @Test
+  void build_minimalName_omitsSetupModeAndSqlReadinessTimeoutKeys() {
+    ObjectNode config = new OracleDependencyBuilder("ora").build().forFfi();
+    assertFalse(config.has("setup_mode"));
+    assertFalse(config.has("sql_readiness_timeout_ms"));
   }
 }

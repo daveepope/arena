@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using ArenaDotnet.Xunit.Support;
 using Newtonsoft.Json.Linq;
@@ -6,7 +7,7 @@ namespace ArenaDotnet.Xunit.Dep;
 
 public sealed class OracleDependency : IArenaDependency
 {
-    public string Type => "oracle";
+    public string Type => "oracledb";
     public string Identifier { get; }
     public int Port { get; }
     public string? DatabaseName { get; }
@@ -17,6 +18,8 @@ public sealed class OracleDependency : IArenaDependency
     public string? Image { get; }
     public string? ContainerName { get; }
     public IReadOnlyList<string> StartupSqlScripts { get; }
+    public string? SetupMode { get; }
+    public long? SqlReadinessTimeoutMs { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
     private readonly IReadOnlyList<IArenaDependency> _children;
@@ -32,6 +35,8 @@ public sealed class OracleDependency : IArenaDependency
         string? image,
         string? containerName,
         IReadOnlyList<string> startupSqlScripts,
+        string? setupMode,
+        long? sqlReadinessTimeoutMs,
         IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
@@ -44,6 +49,8 @@ public sealed class OracleDependency : IArenaDependency
         Image = image;
         ContainerName = containerName;
         StartupSqlScripts = startupSqlScripts;
+        SetupMode = setupMode;
+        SqlReadinessTimeoutMs = sqlReadinessTimeoutMs;
         _children = children;
     }
 
@@ -65,6 +72,8 @@ public sealed class OracleDependencyBuilder
     private string? _image;
     private string? _containerName;
     private readonly List<string> _startupSqlScripts = new();
+    private string? _setupMode;
+    private long? _sqlReadinessTimeoutMs;
     private readonly List<IArenaDependency> _children = new();
 
     public OracleDependencyBuilder(string name)
@@ -126,6 +135,18 @@ public sealed class OracleDependencyBuilder
         return this;
     }
 
+    public OracleDependencyBuilder FullBuild()
+    {
+        _setupMode = "full_build";
+        return this;
+    }
+
+    public OracleDependencyBuilder WithSqlReadinessTimeout(TimeSpan timeout)
+    {
+        _sqlReadinessTimeoutMs = (long)timeout.TotalMilliseconds;
+        return this;
+    }
+
     public OracleDependencyBuilder AddChildDependency(IArenaDependency child)
     {
         _children.Add(child);
@@ -135,6 +156,6 @@ public sealed class OracleDependencyBuilder
     public OracleDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-oracle", _name);
-        return new OracleDependency(identifier, _port, _databaseName, _databaseUsername, _databasePassword, _adminPassword, _imageName, _image, _containerName, _startupSqlScripts, _children);
+        return new OracleDependency(identifier, _port, _databaseName, _databaseUsername, _databasePassword, _adminPassword, _imageName, _image, _containerName, _startupSqlScripts, _setupMode, _sqlReadinessTimeoutMs, _children);
     }
 }

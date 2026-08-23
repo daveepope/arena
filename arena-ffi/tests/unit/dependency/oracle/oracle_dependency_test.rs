@@ -21,6 +21,8 @@ fn minimal_oracle_config() -> OracleDependencyConfig {
         admin_password: None,
         container_name: None,
         startup_sql_scripts: None,
+        setup_mode: None,
+        sql_readiness_timeout_ms: None,
     }
 }
 
@@ -41,5 +43,22 @@ fn build_image_and_credential_overrides_apply() {
     config.admin_password = Some(test_password());
     config.container_name = Some("oracle-box".to_string());
     config.startup_sql_scripts = Some(vec!["CREATE TABLE widgets (id NUMBER);".to_string()]);
+    config.setup_mode = Some("full_build".to_string());
+    config.sql_readiness_timeout_ms = Some(120_000);
     assert!(build(&config, Some("arena-net")).is_ok());
+}
+
+#[test]
+fn build_custom_database_name_without_full_build_setup_mode_panics() {
+    let mut config = minimal_oracle_config();
+    config.database_name = Some("CUSTOMPDB".to_string());
+    let result = std::panic::catch_unwind(|| build(&config, None));
+    assert!(result.is_err());
+}
+
+#[test]
+fn build_unknown_setup_mode_returns_err() {
+    let mut config = minimal_oracle_config();
+    config.setup_mode = Some("bogus".to_string());
+    assert!(build(&config, None).is_err());
 }

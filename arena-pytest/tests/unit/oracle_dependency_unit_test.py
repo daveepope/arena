@@ -1,4 +1,5 @@
 import uuid
+from datetime import timedelta
 
 from arena_pytest.dep.oracle import ManagedOraclePlaybook, OracleDependencyBuilder
 from arena_pytest.playbook import ActiveOraclePlaybook
@@ -10,7 +11,7 @@ def _random_password() -> str:
 
 def test_build_minimal_name_serializes_type_and_identifier():
     config = OracleDependencyBuilder("oracle").build()._for_ffi()
-    assert config["type"] == "oracle"
+    assert config["type"] == "oracledb"
     assert config["identifier"].startswith("arena-oracle-oracle-")
     assert "image" not in config
     assert "port" not in config
@@ -66,6 +67,25 @@ def test_build_minimal_name_omits_startup_sql_scripts():
     assert "startup_sql_scripts" not in config
 
 
+def test_full_build_with_sql_readiness_timeout_serializes_setup_mode_and_timeout_ms():
+    config = (
+        OracleDependencyBuilder("oracle")
+        .with_database_name("weatherdb")
+        .full_build()
+        .with_sql_readiness_timeout(timedelta(minutes=4))
+        .build()
+        ._for_ffi()
+    )
+    assert config["setup_mode"] == "full_build"
+    assert config["sql_readiness_timeout_ms"] == 240_000
+
+
+def test_build_minimal_name_omits_setup_mode_and_sql_readiness_timeout():
+    config = OracleDependencyBuilder("oracle").build()._for_ffi()
+    assert "setup_mode" not in config
+    assert "sql_readiness_timeout_ms" not in config
+
+
 def test_with_child_dependencies_nests_child_config_under_parent():
     child = OracleDependencyBuilder("child").with_port(11522).build()
     config = (
@@ -75,7 +95,7 @@ def test_with_child_dependencies_nests_child_config_under_parent():
         ._for_ffi()
     )
     assert len(config["children"]) == 1
-    assert config["children"][0]["type"] == "oracle"
+    assert config["children"][0]["type"] == "oracledb"
     assert config["children"][0]["port"] == 11522
     assert config["children"][0]["identifier"] == child.identifier
 
@@ -112,7 +132,7 @@ def test_managed_oracle_playbook_for_ffi_serializes_kind_and_identifiers():
     pb = ManagedOraclePlaybook(identifier="pb-1", dependency_identifier="dep-1")
     assert pb._for_ffi() == {
         "identifier": "pb-1",
-        "kind": "oracle",
+        "kind": "oracledb",
         "dependency_identifier": "dep-1",
     }
 

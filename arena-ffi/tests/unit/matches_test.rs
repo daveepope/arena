@@ -9,7 +9,7 @@ fn all_dependency_variants_config() -> MatchConfig {
             "dependencies": [
                 {"type": "postgres", "identifier": "pg"},
                 {"type": "mssql", "identifier": "mssql"},
-                {"type": "oracle", "identifier": "oracle"},
+                {"type": "oracledb", "identifier": "oracle"},
                 {"type": "kafka", "identifier": "kafka"},
                 {"type": "http", "identifier": "http"},
                 {"type": "localstack", "identifier": "localstack"},

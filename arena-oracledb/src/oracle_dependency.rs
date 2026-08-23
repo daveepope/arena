@@ -13,6 +13,8 @@ use std::time::Instant;
 
 pub(crate) const ADMIN_USERNAME: &str = "system";
 const READINESS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+pub(crate) const FAST_SQL_READINESS_TIMEOUT: std::time::Duration = READINESS_TIMEOUT;
+pub(crate) const FULL_BUILD_SQL_READINESS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 const SQL_READINESS_QUERY: &str = "SELECT 1 FROM DUAL";
 
 pub struct OracleDependency {

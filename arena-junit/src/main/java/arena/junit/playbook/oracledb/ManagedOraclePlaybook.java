@@ -37,7 +37,7 @@ public class ManagedOraclePlaybook implements ManagedPlaybook, PlaybookRegistrat
   public ObjectNode forRegisteredFfi() {
     ObjectNode n = ArenaJson.object();
     n.put("identifier", identifier);
-    n.put("kind", "oracle");
+    n.put("kind", "oracledb");
     n.put("dependency_identifier", dependencyIdentifier);
     return n;
   }

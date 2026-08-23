@@ -96,7 +96,7 @@ public final class ChainedComponentTestSuite {
   private static final String MSSQL_DB_NAME = "validationDb";
   private static final String MSSQL_DB_USER = "sa";
   private static final String MSSQL_DB_PASS = "yourStrong(!)Password";
-  private static final String ORACLE_DB_NAME = "weatherdb";
+  private static final String ORACLE_DB_NAME = "FREEPDB1";
   private static final String ORACLE_DB_USER = "weather_user_" + RT.runSuffix.substring(0, 8);
   private static final String ORACLE_DB_PASS = "pw_" + RT.runSuffix.substring(8, 20);
   private static final String ORACLE_ADMIN_PASS = "pw_" + RT.runSuffix.substring(20, 32);
@@ -148,7 +148,6 @@ public final class ChainedComponentTestSuite {
   static final OracleDependency ORACLE =
       new OracleDependencyBuilder("example-api-chained-oracle")
           .withPort(ORACLE_PORT)
-          .withDatabaseName(ORACLE_DB_NAME)
           .withDatabaseUsername(ORACLE_DB_USER)
           .withDatabasePassword(ORACLE_DB_PASS)
           .withAdminPassword(ORACLE_ADMIN_PASS)

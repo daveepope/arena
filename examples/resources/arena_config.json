@@ -53,7 +53,7 @@
     "mssql_name": "validationDb",
     "mssql_user": "sa",
     "mssql_password": "yourStrong(!)Password",
-    "oracle_name": "weatherdb"
+    "oracle_name": "FREEPDB1"
   },
   "kafka_topic": "readings",
   "calibration_validate_path": "/api/v1/validate"

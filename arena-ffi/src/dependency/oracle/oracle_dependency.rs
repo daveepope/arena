@@ -23,6 +23,10 @@ pub struct OracleDependencyConfig {
     pub container_name: Option<String>,
     #[serde(default)]
     pub startup_sql_scripts: Option<Vec<String>>,
+    #[serde(default)]
+    pub setup_mode: Option<String>,
+    #[serde(default)]
+    pub sql_readiness_timeout_ms: Option<u64>,
 }
 
 pub fn build(config: &OracleDependencyConfig, network: Option<&str>) -> Result<Dependency, String> {
@@ -56,6 +60,14 @@ pub fn build(config: &OracleDependencyConfig, network: Option<&str>) -> Result<D
     }
     if let Some(ref container_name) = config.container_name {
         builder = builder.with_container_name(container_name);
+    }
+    match config.setup_mode.as_deref() {
+        None | Some("fast") => {}
+        Some("full_build") => builder = builder.full_build(),
+        Some(other) => return Err(format!("unknown oracle setup_mode: {other}")),
+    }
+    if let Some(ms) = config.sql_readiness_timeout_ms {
+        builder = builder.with_sql_readiness_timeout(std::time::Duration::from_millis(ms));
     }
     Ok(Box::new(builder.build()))
 }

@@ -1,10 +1,19 @@
 use crate::oracle_dependency::oracle_container_impl::{
     OracleContainerImpl, OracleImpl, DEFAULT_SERVICE_NAME,
 };
-use crate::oracle_dependency::OracleDependency;
+use crate::oracle_dependency::{
+    OracleDependency, FAST_SQL_READINESS_TIMEOUT, FULL_BUILD_SQL_READINESS_TIMEOUT,
+};
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
 use std::sync::Arc;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OracleSetupMode {
+    #[default]
+    Fast,
+    FullBuild,
+}
 
 pub struct OracleDependencyBuilder {
     identifier: String,
@@ -22,6 +31,7 @@ pub struct OracleDependencyBuilder {
     network: Option<String>,
     readiness_check: Option<Box<dyn ReadinessCheck>>,
     sql_readiness_timeout: Option<std::time::Duration>,
+    setup_mode: OracleSetupMode,
 }
 
 impl OracleDependencyBuilder {
@@ -49,6 +59,7 @@ impl OracleDependencyBuilder {
             network: None,
             readiness_check: None,
             sql_readiness_timeout: None,
+            setup_mode: OracleSetupMode::Fast,
         }
     }
 
@@ -67,6 +78,11 @@ impl OracleDependencyBuilder {
 
     pub fn with_database_name(mut self, database_name: impl Into<String>) -> Self {
         self.database_name = Option::from(database_name.into());
+        self
+    }
+
+    pub fn full_build(mut self) -> Self {
+        self.setup_mode = OracleSetupMode::FullBuild;
         self
     }
 
@@ -148,6 +164,16 @@ impl OracleDependencyBuilder {
         let database_name = self
             .database_name
             .unwrap_or_else(|| DEFAULT_SERVICE_NAME.to_string());
+        if database_name != DEFAULT_SERVICE_NAME && self.setup_mode != OracleSetupMode::FullBuild {
+            panic!(
+                "OracleDependencyBuilder: database_name {database_name:?} requires \
+                 .full_build() -- a non-default database name forces Oracle to build a new \
+                 pluggable database from scratch on startup (several minutes), instead of \
+                 reusing the image's pre-built fast-start database. Call `.full_build()` if \
+                 you need a named database; otherwise drop `.with_database_name(...)` and use \
+                 the default {DEFAULT_SERVICE_NAME:?} for fast startup."
+            );
+        }
         let database_username = self
             .database_username
             .unwrap_or_else(|| Self::DEFAULT_DATABASE_USERNAME.to_string());
@@ -186,9 +212,11 @@ impl OracleDependencyBuilder {
         if let Some(check) = readiness_check {
             dep.set_readiness_check(check);
         }
-        if let Some(timeout) = self.sql_readiness_timeout {
-            dep.set_sql_readiness_timeout(timeout);
-        }
+        let sql_readiness_timeout = self.sql_readiness_timeout.unwrap_or(match self.setup_mode {
+            OracleSetupMode::Fast => FAST_SQL_READINESS_TIMEOUT,
+            OracleSetupMode::FullBuild => FULL_BUILD_SQL_READINESS_TIMEOUT,
+        });
+        dep.set_sql_readiness_timeout(sql_readiness_timeout);
 
         dep
     }

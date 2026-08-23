@@ -49,7 +49,7 @@ final class ManagedOraclePlaybookUnitTest {
     ManagedOraclePlaybook playbook = new ManagedOraclePlaybook("pb-ora", "dep-ora");
     ObjectNode n = playbook.forRegisteredFfi();
     assertEquals("pb-ora", n.path("identifier").asText());
-    assertEquals("oracle", n.path("kind").asText());
+    assertEquals("oracledb", n.path("kind").asText());
     assertEquals("dep-ora", n.path("dependency_identifier").asText());
   }
 

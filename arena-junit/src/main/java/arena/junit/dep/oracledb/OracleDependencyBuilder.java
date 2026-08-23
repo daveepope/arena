@@ -6,13 +6,14 @@ import arena.junit.support.ChildrenFfi;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
 public final class OracleDependencyBuilder {
   private final ObjectNode config =
       ArenaJson.object()
-          .put("type", "oracle")
+          .put("type", "oracledb")
           .put("identifier", ArenaIdentifiers.build("arena-oracle", ""));
   private final List<ArenaRunnableDependency> children = new ArrayList<>();
 
@@ -66,6 +67,16 @@ public final class OracleDependencyBuilder {
       a.add(s);
     }
     config.set("startup_sql_scripts", a);
+    return this;
+  }
+
+  public OracleDependencyBuilder fullBuild() {
+    config.put("setup_mode", "full_build");
+    return this;
+  }
+
+  public OracleDependencyBuilder withSqlReadinessTimeout(Duration timeout) {
+    config.put("sql_readiness_timeout_ms", timeout.toMillis());
     return this;
   }
 

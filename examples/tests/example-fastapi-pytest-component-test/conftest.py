@@ -70,7 +70,6 @@ from arena_config import (
     OAUTH_PORT,
     ORACLE_ADMIN_PASS,
     ORACLE_CONNECTION_STRING_LOCAL,
-    ORACLE_DB_NAME,
     ORACLE_DB_PASS,
     ORACLE_DB_USER,
     ORACLE_PORT,
@@ -262,7 +261,6 @@ def closed_arena() -> ClosedArena:
     oracle = (
         OracleDependencyBuilder(DEP_NAME_ORACLE)
         .with_port(ORACLE_PORT)
-        .with_database_name(ORACLE_DB_NAME)
         .with_database_username(ORACLE_DB_USER)
         .with_database_password(ORACLE_DB_PASS)
         .with_admin_password(ORACLE_ADMIN_PASS)
