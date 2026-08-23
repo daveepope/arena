@@ -1,4 +1,5 @@
 use crate::containerized_component::ContainerizedComponent;
+use crate::error::ContainerizedComponentBuildError;
 use arena::healthcheck::ReadinessCheck;
 use arena::Component;
 use bollard::query_parameters::BuildImageOptionsBuilder;
@@ -284,7 +285,7 @@ impl ContainerizedComponentBuilder {
         build_context: &Option<PathBuf>,
         platform: &str,
         runtime_client: &Docker,
-    ) {
+    ) -> Result<(), ContainerizedComponentBuildError> {
         tracing::debug!(
             component = %identifier,
             image = %image_tag,
@@ -320,11 +321,17 @@ impl ContainerizedComponentBuilder {
                     }
                     if let Some(ref error_detail) = info.error_detail {
                         let message = error_detail.message.as_deref().unwrap_or("");
-                        panic!("{}: image build error: {}", identifier, message);
+                        return Err(ContainerizedComponentBuildError::ImageBuild {
+                            identifier: identifier.to_string(),
+                            message: message.to_string(),
+                        });
                     }
                 }
                 Err(e) => {
-                    panic!("{}: image build failed: {}", identifier, e);
+                    return Err(ContainerizedComponentBuildError::ImageBuild {
+                        identifier: identifier.to_string(),
+                        message: e.to_string(),
+                    });
                 }
             }
         }
@@ -335,21 +342,23 @@ impl ContainerizedComponentBuilder {
             phase = "image_build_done",
             "container image built",
         );
+
+        Ok(())
     }
 
-    pub async fn build(self) -> ContainerizedComponent {
+    pub async fn build(self) -> Result<ContainerizedComponent, ContainerizedComponentBuildError> {
         if let ImageSource::Image(_) = &self.image_source {
             if self.build_context.is_some() {
-                panic!(
+                return Err(ContainerizedComponentBuildError::InvalidConfiguration(format!(
                     "{}: with_build_context has no effect when using from_image",
                     self.identifier
-                );
+                )));
             }
             if self.image_tag.is_some() {
-                panic!(
+                return Err(ContainerizedComponentBuildError::InvalidConfiguration(format!(
                     "{}: with_image_tag has no effect when using from_image",
                     self.identifier
-                );
+                )));
             }
         }
 
@@ -357,8 +366,12 @@ impl ContainerizedComponentBuilder {
             .platform
             .unwrap_or_else(arena_container::platform::docker_platform);
 
-        let runtime_client =
-            Docker::connect_with_local_defaults().expect("connect to container runtime");
+        let runtime_client = Docker::connect_with_local_defaults().map_err(|e| {
+            ContainerizedComponentBuildError::RuntimeUnavailable(format!(
+                "{}: failed to connect to container runtime: {}",
+                self.identifier, e
+            ))
+        })?;
 
         let image_tag = match self.image_source {
             ImageSource::Image(image) => {
@@ -368,7 +381,7 @@ impl ContainerizedComponentBuilder {
                     &platform,
                     &runtime_client,
                 )
-                .await;
+                .await?;
                 image
             }
             ImageSource::Containerfile(containerfile) => {
@@ -385,13 +398,13 @@ impl ContainerizedComponentBuilder {
                     &platform,
                     &runtime_client,
                 )
-                .await;
+                .await?;
 
                 image_tag
             }
         };
 
-        ContainerizedComponent {
+        Ok(ContainerizedComponent {
             identifier: self.identifier,
             children: self.children,
             image_tag,
@@ -406,6 +419,6 @@ impl ContainerizedComponentBuilder {
             runtime_client,
             container_id: None,
             stopped: false,
-        }
+        })
     }
 }

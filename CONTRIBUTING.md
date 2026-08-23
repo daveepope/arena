@@ -9,6 +9,7 @@ Contributions are welcome and encouraged. This document covers the basics for op
 - Build: `bazel build //...`
 - Test: `bazel test //...`
 - Do not run `pip`, `npm`, `maven`, or `nuget` directly on the host. Use the Bazel targets (e.g. `bazel run //arena-pytest:pip_requirements.update`).
+- Arena's CI uses [BuildBuddy](https://www.buildbuddy.io/) as a remote cache, so builds are cached and CI runs faster where applicable. Core CI workflows always use BuildBuddy. Access to BuildBuddy infrastructure for local development is restricted to approved, vetted, trusted members of the Arena development team.
 
 See the [README](README.md) for an overview of the project and its clients.
 
@@ -22,7 +23,7 @@ Use a prefix that describes the kind of change, followed by a short, hyphenated 
 
 ## Making changes
 
-- Keep pull requests small and focused where applicable. One logical change per PR is easier to review and revert.
+- Keep pull requests and commits small and focused where applicable: one logical change per commit, easier to review and revert. It's fine to bundle multiple commits into one PR/release, but try to keep the number to a minimum.
 - No drive-by refactors or unrelated file changes. If you spot something unrelated worth fixing, open a separate issue or PR.
 - Follow the conventions already established in the module you're touching (naming, layout, test structure). See [AGENTS.md](AGENTS.md) for the full set of project rules.
 - Do not add new markdown or documentation files unless the change calls for it.
@@ -78,14 +79,34 @@ Arena follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Bump t
 
 ```bash
 bazel run //scripts:bump_version -- --bump patch   # or minor / major
+```
 
-Agent instructions
+## Security checks in CI
+
+[OpenSSF](https://openssf.org/) (Open Source Security Foundation, a Linux Foundation project backed by Google, Microsoft, GitHub, and others) is a cross-industry body that produces open source security tooling and standards more broadly than just dependency supply-chain: Scorecard, the SLSA build-provenance framework, Sigstore signing, vulnerability disclosure guidance, and best-practices badging among them. Arena isn't a member or formally governed by it, but adopts its practices where they apply, tracked via the Scorecard check below. Every PR also runs a set of automated dependency and supply-chain checks, most of which are required to merge:
+
+- **DCO sign-off**: see above.
+- **Dependency Review**: blocks newly-added dependencies with a known moderate+ severity vulnerability.
+- **Cargo Audit**: checks Rust crates against RustSec advisories.
+- **OSV-Scanner**: cross-ecosystem CVE scan (Rust, Maven, NuGet, pip).
+- **`audit_vet_rust`**: builds `arena-ffi` as a `cargo auditable` binary and audits the compiled artifact itself against RustSec advisories, then runs cargo-vet (flags new Rust dependencies that haven't been reviewed/exempted) and its trust-watermark regression check.
+- **Bazel `--lockfile_mode=error`**: fails any CI build if resolved dependencies drift from the committed lockfile.
+- **Dependency release age**: blocks dependency versions published less than 3 days ago (`ARENA_MIN_RELEASE_AGE_DAYS`), a guard against freshly-published/compromised releases.
+- **OpenSSF Scorecard**: scores ~18 supply-chain and process checks (branch protection, token permissions, pinned dependencies, SAST, fuzzing, signed releases, etc.); informational, doesn't block the PR.
+- **Container CVE Search**: scans default container images (Postgres, MSSQL, Oracle, Kafka, etc.); opt-in via the `default-container-cve-check` label, non-blocking.
+
+ClusterFuzzLite runs a weekly fuzzing pass against the default branch (not on individual PRs).
+
+Locally, `bazel run //scripts:repin` repins lockfiles, runs cargo-vet, and audits the FFI binary. Run it whenever you change a dependency.
+
+## Agent instructions
 
 - AGENTS.md is the source of truth for AI/editor rules. CLAUDE.md and .cursor/rules/arena-agent.mdc are generated from it; do not edit them by hand.
 - If you edit AGENTS.md, run bazel run //scripts:sync_agent_rules and commit AGENTS.md, CLAUDE.md, and .cursor/rules/arena-agent.mdc together.
 
-Submitting a pull request
+## Submitting a pull request
 
 - Ensure bazel build //... and bazel test //... pass locally before submitting.
 - Describe what changed and why in the PR description.
 - Link any related issue.
+- Add the `pre-release` label if you want the PR to publish a preview build (TestPyPI, Maven snapshot, NuGet snapshot) so you can test it before merge.

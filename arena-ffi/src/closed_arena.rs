@@ -128,3 +128,13 @@ unsafe fn parse_config(ptr: *const c_char) -> Result<crate::matches::MatchConfig
     }
     serde_json::from_str(s).map_err(|e| format!("config failed to parse: {e}"))
 }
+
+/// Bench-only entry point exercising the same `MatchConfig` deserialization
+/// path as `parse_config`, without the FFI/raw-pointer plumbing around it.
+/// Not part of the real FFI surface; only compiled with `bench-support`.
+#[cfg(feature = "bench-support")]
+pub fn parse_config_for_bench(json: &str) -> Result<(), String> {
+    serde_json::from_str::<crate::matches::MatchConfig>(json)
+        .map(|_| ())
+        .map_err(|e| format!("config failed to parse: {e}"))
+}

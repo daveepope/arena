@@ -223,6 +223,18 @@ criteria = "safe-to-deploy"
 version = "0.4.44"
 criteria = "safe-to-deploy"
 
+[[exemptions.clap]]
+version = "4.6.6"
+criteria = "safe-to-run"
+
+[[exemptions.clap_builder]]
+version = "4.6.6"
+criteria = "safe-to-run"
+
+[[exemptions.clap_lex]]
+version = "1.1.0"
+criteria = "safe-to-run"
+
 [[exemptions.cmov]]
 version = "0.5.4"
 criteria = "safe-to-deploy"
@@ -254,6 +266,10 @@ criteria = "safe-to-deploy"
 [[exemptions.crc32fast]]
 version = "1.5.0"
 criteria = "safe-to-deploy"
+
+[[exemptions.criterion]]
+version = "0.8.2"
+criteria = "safe-to-run"
 
 [[exemptions.crossbeam-utils]]
 version = "0.8.21"
@@ -442,6 +458,10 @@ criteria = "safe-to-deploy"
 [[exemptions.h2]]
 version = "0.4.16"
 criteria = "safe-to-deploy"
+
+[[exemptions.half]]
+version = "2.7.1"
+criteria = "safe-to-run"
 
 [[exemptions.hashbrown]]
 version = "0.15.5"
@@ -1206,6 +1226,10 @@ criteria = "safe-to-deploy"
 [[exemptions.vsimd]]
 version = "0.8.0"
 criteria = "safe-to-deploy"
+
+[[exemptions.walkdir]]
+version = "2.5.0"
+criteria = "safe-to-run"
 
 [[exemptions.wasi]]
 version = "0.11.1+wasi-snapshot-preview1"

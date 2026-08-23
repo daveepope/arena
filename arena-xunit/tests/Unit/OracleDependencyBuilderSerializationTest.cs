@@ -1,0 +1,122 @@
+using System;
+using System.Linq;
+using ArenaDotnet.Xunit.Dep;
+using ArenaDotnet.Xunit.Support;
+using Newtonsoft.Json.Linq;
+using Xunit;
+
+namespace ArenaDotnet.Xunit.UnitTest;
+
+public class OracleDependencyBuilderSerializationTest
+{
+    private static string RandomPassword() => "pw-" + Guid.NewGuid();
+
+    [Fact]
+    public void Build_DefaultPort_SerializesCorrectJson()
+    {
+        var dep = new OracleDependencyBuilder("test").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("oracledb", obj["type"]);
+        Assert.Equal(1521, obj["port"]);
+        Assert.NotNull(obj["identifier"]);
+    }
+
+    [Fact]
+    public void Build_CustomPort_SerializesCorrectJson()
+    {
+        var dep = new OracleDependencyBuilder("test").WithPort(1522).Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal(1522, obj["port"]);
+    }
+
+    [Fact]
+    public void Build_Identifier_MatchesPattern()
+    {
+        var dep = new OracleDependencyBuilder("test").Build();
+        Assert.StartsWith("arena-oracle-", dep.Identifier);
+    }
+
+    [Fact]
+    public void Build_WithImageName_SerializesCorrectJson()
+    {
+        var dep = new OracleDependencyBuilder("test").WithImageName("oracle-free").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("oracle-free", obj["image_name"]);
+    }
+
+    [Fact]
+    public void Build_WithImage_SerializesCorrectJson()
+    {
+        var dep = new OracleDependencyBuilder("test").WithImage("21-slim").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("21-slim", obj["image"]);
+    }
+
+    [Fact]
+    public void Build_WithContainerName_SerializesCorrectJson()
+    {
+        var dep = new OracleDependencyBuilder("test").WithContainerName("my-oracle").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("my-oracle", obj["container_name"]);
+    }
+
+    [Fact]
+    public void Build_WithAdminPassword_SerializesCorrectJson()
+    {
+        var adminPassword = RandomPassword();
+        var dep = new OracleDependencyBuilder("test").WithAdminPassword(adminPassword).Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal(adminPassword, obj["admin_password"]);
+    }
+
+    [Fact]
+    public void Build_WithDatabaseFieldsAndStartupScripts_SerializesCorrectJson()
+    {
+        var databasePassword = RandomPassword();
+        var dep = new OracleDependencyBuilder("test")
+            .WithDatabaseName("arena")
+            .WithDatabaseUsername("arena_user")
+            .WithDatabasePassword(databasePassword)
+            .WithStartupSqlScripts(new[] { "seed.sql", "grants.sql" })
+            .Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("arena", obj["database_name"]);
+        Assert.Equal("arena_user", obj["database_username"]);
+        Assert.Equal(databasePassword, obj["database_password"]);
+        var scripts = Assert.IsType<JArray>(obj["startup_sql_scripts"]);
+        Assert.Equal(2, scripts.Count);
+        Assert.Equal("seed.sql", scripts[0]);
+        Assert.Equal("grants.sql", scripts[1]);
+    }
+
+    [Fact]
+    public void Build_FullBuildWithSqlReadinessTimeout_SerializesCorrectJson()
+    {
+        var dep = new OracleDependencyBuilder("test")
+            .WithDatabaseName("weatherdb")
+            .FullBuild()
+            .WithSqlReadinessTimeout(TimeSpan.FromMinutes(4))
+            .Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("full_build", obj["setup_mode"]);
+        Assert.Equal(240000, obj["sql_readiness_timeout_ms"]);
+    }
+
+    [Fact]
+    public void Build_Default_OmitsSetupModeAndSqlReadinessTimeout()
+    {
+        var dep = new OracleDependencyBuilder("test").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Null(obj["setup_mode"]);
+        Assert.Null(obj["sql_readiness_timeout_ms"]);
+    }
+}

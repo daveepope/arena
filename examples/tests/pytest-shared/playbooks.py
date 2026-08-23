@@ -8,6 +8,7 @@ from arena_pytest import (
     ManagedHttpPlaybook,
     ManagedLocalstackPlaybook,
     ManagedMssqlPlaybook,
+    ManagedOraclePlaybook,
     ManagedPostgresPlaybook,
     UnmanagedPlaybook,
     ok_json,
@@ -22,6 +23,7 @@ from arena_config import (
     PLAYBOOK_CALIBRATION_API_FLAKY_PATH,
     PLAYBOOK_EVENTS_PURGE,
     PLAYBOOK_VALIDATION_DB_SCOPED,
+    PLAYBOOK_WEATHER_DB_SCOPED,
 )
 
 
@@ -70,6 +72,14 @@ class ResetValidationDbPlaybook(ManagedMssqlPlaybook):
     def __init__(self, dependency_identifier: str):
         super().__init__(
             identifier=PLAYBOOK_VALIDATION_DB_SCOPED,
+            dependency_identifier=dependency_identifier,
+        )
+
+
+class ResetWeatherDbPlaybook(ManagedOraclePlaybook):
+    def __init__(self, dependency_identifier: str):
+        super().__init__(
+            identifier=PLAYBOOK_WEATHER_DB_SCOPED,
             dependency_identifier=dependency_identifier,
         )
 

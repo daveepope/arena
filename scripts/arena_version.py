@@ -291,6 +291,78 @@ def vet_rust_dependencies(root: Path) -> None:
     subprocess.run(["cargo", "vet"], cwd=root, env=env, check=True)
 
 
+def run_cargo_vet_check_report(root: Path) -> dict:
+    env = os.environ.copy()
+    result = subprocess.run(
+        ["cargo", "vet", "check", "--output-format=json"],
+        cwd=root,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(result.stdout)
+
+
+CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK = 141
+CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK = 358
+
+
+def _check_cargo_vet_watermark(
+    count: int,
+    watermark: int,
+    constant: str,
+    grew_explanation: str,
+    shrank_explanation: str,
+) -> None:
+    if count == watermark:
+        return
+    explanation = grew_explanation if count > watermark else shrank_explanation
+    raise SystemExit(
+        f"cargo-vet watermark mismatch: {constant} expects {watermark}, found {count}.\n"
+        f"{explanation}\n"
+        f"If this is intentional, update {constant} in scripts/arena_version.py to {count}."
+    )
+
+
+def check_cargo_vet_watermarks(report: dict) -> None:
+    audited = len(report.get("vetted_fully", [])) + len(report.get("vetted_partially", []))
+    exempted = len(report.get("vetted_with_exemptions", []))
+
+    _check_cargo_vet_watermark(
+        exempted,
+        CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK,
+        "CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK",
+        grew_explanation=(
+            "This means a dependency is now trusted only through a self-certified exemption "
+            "in supply-chain/config.toml, not a real audit (likely a new or updated "
+            "dependency was added and `cargo vet regenerate exemptions` or "
+            "`cargo vet add-exemption` was run to make `cargo vet check` pass). Run "
+            "`cargo vet suggest` to see what's unaudited, and prefer `cargo vet certify` "
+            "over accepting another exemption."
+        ),
+        shrank_explanation=(
+            "This is an improvement: a dependency that used to rely on a self-certified "
+            "exemption was either removed, or its exemption in supply-chain/config.toml was "
+            "replaced by a real audit in supply-chain/audits.toml."
+        ),
+    )
+    _check_cargo_vet_watermark(
+        audited,
+        CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK,
+        "CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK",
+        grew_explanation=(
+            "This is an improvement: someone ran `cargo vet certify` and "
+            "supply-chain/audits.toml now covers a package that previously relied on an "
+            "exemption."
+        ),
+        shrank_explanation=(
+            "A previously certified audit in supply-chain/audits.toml is gone, or the "
+            "package it covered was removed. Investigate before accepting this."
+        ),
+    )
+
+
 def repin_all_lockfiles(root: Path) -> None:
     bazel = os.environ.get("BAZEL", "bazel")
     env = os.environ.copy()

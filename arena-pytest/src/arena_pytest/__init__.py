@@ -26,6 +26,7 @@ from arena_pytest.playbook import (
     ActiveHttpPlaybook,
     ActiveLocalstackPlaybook,
     ActiveMssqlPlaybook,
+    ActiveOraclePlaybook,
     ActivePlaybook,
     ManagedPlaybook,
     Playbook,
@@ -86,6 +87,11 @@ from arena_pytest.oauth import (
     oauth_issuer_host_is_non_loopback,
     oauth_loopback_tls_pem_pair,
 )
+from arena_pytest.dep.oracle import (
+    ManagedOraclePlaybook,
+    OracleDependency,
+    OracleDependencyBuilder,
+)
 from arena_pytest.dep.postgres import (
     ManagedPostgresPlaybook,
     PostgresDependency,
@@ -127,6 +133,7 @@ __all__ = [
     "ActiveHttpPlaybook",
     "ActiveLocalstackPlaybook",
     "ActiveMssqlPlaybook",
+    "ActiveOraclePlaybook",
     "ActivePlaybook",
     "ManagedHttpPlaybook",
     "ManagedMssqlPlaybook",
@@ -160,6 +167,9 @@ __all__ = [
     "OauthDependencyBuilder",
     "oauth_issuer_host_is_non_loopback",
     "oauth_loopback_tls_pem_pair",
+    "ManagedOraclePlaybook",
+    "OracleDependency",
+    "OracleDependencyBuilder",
     "ManagedPostgresPlaybook",
     "PostgresDependency",
     "PostgresDependencyBuilder",

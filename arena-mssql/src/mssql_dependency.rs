@@ -11,6 +11,8 @@ use futures::channel::oneshot;
 use mssql_container_impl::MssqlImpl;
 use std::time::{Duration, Instant};
 
+const READINESS_TIMEOUT: Duration = Duration::from_secs(30);
+
 pub struct MssqlDependency {
     pub identifier: String,
     mssql_impl: Box<dyn MssqlImpl>,
@@ -145,11 +147,9 @@ impl MssqlDependency {
             .admin_connection_string()
             .expect("admin connection string should be available after mssql starts");
 
-        let timeout = Duration::from_secs(60);
-
         match self
             .readiness_check
-            .is_ready(&self.identifier, conn_str, timeout.as_millis() as u64)
+            .is_ready(&self.identifier, conn_str, READINESS_TIMEOUT.as_millis() as u64)
             .await
         {
             Ok(()) => {}

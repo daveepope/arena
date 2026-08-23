@@ -28,6 +28,7 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
     public static int WebAppChildPort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int PostgresPort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int MssqlPort { get; } = EphemeralTestRuntime.AllocatePort();
+    public static int OraclePort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int CalibrationPort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int LocalstackPort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int TemporalPort { get; } = EphemeralTestRuntime.AllocatePort();
@@ -45,10 +46,14 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
 
     private const string PostgresDbName = "testdb";
     private const string PostgresDbUser = "test";
-    private const string PostgresDbPassword = "test";
+    private static readonly string PostgresDbPassword = "pw_" + EphemeralTestRuntime.RandomToken(12);
     private const string MssqlDbName = "testdb";
     private const string MssqlDbUser = "sa";
-    private const string MssqlDbPassword = "Password123!";
+    private static readonly string MssqlDbPassword = "pw_" + EphemeralTestRuntime.RandomToken(12) + "!Aa1";
+    private const string OracleDbName = "FREEPDB1";
+    private static readonly string OracleDbUser = "weather_user_" + EphemeralTestRuntime.RandomToken(8);
+    private static readonly string OracleDbPassword = "pw_" + EphemeralTestRuntime.RandomToken(12);
+    private static readonly string OracleAdminPassword = "pw_" + EphemeralTestRuntime.RandomToken(12);
 
     private static readonly PostgresDependency Postgres =
         new PostgresDependencyBuilder("test-chained-postgres")
@@ -67,6 +72,18 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
             .WithDatabaseUsername(MssqlDbUser)
             .WithDatabasePassword(MssqlDbPassword)
             .WithStartupSqlScripts(new[] { ResolveSchemaScript("validation_db_schema.sql") })
+            .Build();
+
+    [ArenaDependency]
+    private static readonly OracleDependency Oracle =
+        new OracleDependencyBuilder("test-chained-oracle")
+            .WithPort(OraclePort)
+            .WithDatabaseUsername(OracleDbUser)
+            .WithDatabasePassword(OracleDbPassword)
+            .WithAdminPassword(OracleAdminPassword)
+            .WithStartupSqlScripts(new[] { ResolveSchemaScript("weather_db_schema.sql") })
+            // Oracle container start times are inconsistent across CI runners, so a longer timeout is required.
+            .WithSqlReadinessTimeout(TimeSpan.FromMinutes(2))
             .Build();
 
     [ArenaDependency]
@@ -124,6 +141,10 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
     private static readonly Playbooks.ResetReadingsDbPlaybook ResetReadingsDb =
         new(Postgres.Identifier);
 
+    [ArenaPlaybook(ExecOnDependencyStart = false)]
+    private static readonly Playbooks.ResetWeatherDbPlaybook ResetWeatherDb =
+        new(Oracle.Identifier);
+
     private static readonly ExecutableComponent WebAppChild =
         BuildWebApp("example-api-chained-web-app-child", WebAppChildPort, Array.Empty<IArenaComponent>());
 
@@ -151,6 +172,8 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
             .WithEnvVar("MSSQL_DB_PASSWORD", MssqlDbPassword)
             .WithEnvVar("MSSQL_CONNECTION_STRING",
                 $"Server=tcp:{MssqlHost},{MssqlPort};Database={MssqlDbName};User Id={MssqlDbUser};Password={MssqlDbPassword};TrustServerCertificate=True;")
+            .WithEnvVar("ORACLE_CONNECTION_STRING",
+                $"{OracleDbUser}/{OracleDbPassword}@localhost:{OraclePort}/{OracleDbName}")
             .WithEnvVar("TEMPORAL_HOST", "127.0.0.1")
             .WithEnvVar("TEMPORAL_PORT", TemporalPort.ToString())
             .WithEnvVar("TEMPORAL_TARGET", $"127.0.0.1:{TemporalPort}")

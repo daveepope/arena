@@ -270,4 +270,19 @@ public final class ArenaBindings {
       throw new ArenaBindingError(msg != null ? msg : "postgres_playbook_verify failed: " + st, st);
     }
   }
+
+  public static void oraclePlaybookVerify(Pointer handle, String specJson) {
+    PointerByReference err = new PointerByReference();
+    int raw = lib().arena_oracle_playbook_verify(handle, specJson, err);
+    String msg = takeErr(err);
+    ArenaStatus st;
+    try {
+      st = ArenaStatus.fromInt(raw);
+    } catch (IllegalArgumentException e) {
+      throw new ArenaBindingError(msg != null ? msg : "oracle_playbook_verify unknown status " + raw);
+    }
+    if (st != ArenaStatus.OK) {
+      throw new ArenaBindingError(msg != null ? msg : "oracle_playbook_verify failed: " + st, st);
+    }
+  }
 }

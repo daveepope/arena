@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     postgres_connection_string: str
     calibration_url: str
     mssql_connection_string: str
+    oracle_connection_string: str
     temporal_target: str
     smtp_host: str
     smtp_port: int

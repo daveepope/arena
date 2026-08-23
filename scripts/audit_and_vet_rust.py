@@ -6,7 +6,12 @@ import os
 import sys
 from pathlib import Path
 
-from arena_version import audit_arena_ffi_binary, vet_rust_dependencies
+from arena_version import (
+    audit_arena_ffi_binary,
+    check_cargo_vet_watermarks,
+    run_cargo_vet_check_report,
+    vet_rust_dependencies,
+)
 
 
 def _repo_root() -> Path:
@@ -20,6 +25,7 @@ def main() -> int:
     root = _repo_root()
     audit_arena_ffi_binary(root)
     vet_rust_dependencies(root)
+    check_cargo_vet_watermarks(run_cargo_vet_check_report(root))
     return 0
 
 

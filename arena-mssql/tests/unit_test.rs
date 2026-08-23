@@ -139,7 +139,7 @@ async fn start_stop_happy_path_records_events() {
         last_connection_string.lock().unwrap().as_deref(),
         Some("Server=tcp:127.0.0.1,1433;Database=master;User Id=sa;Password=pw;TrustServerCertificate=True;")
     );
-    assert_eq!(*last_timeout_ms.lock().unwrap(), Some(60_000));
+    assert_eq!(*last_timeout_ms.lock().unwrap(), Some(30_000));
 }
 
 #[tokio::test]

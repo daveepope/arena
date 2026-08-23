@@ -5,6 +5,31 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.1.0]
+
+### Added
+
+- `audit_and_vet_rust` now fails if the count of cargo-vet audited or exempted packages changes, to catch silent supply-chain trust regressions (or acknowledge improvements)
+- arena-junit: Oracle dependency and playbook support (`OracleDependencyBuilder`, `ManagedOraclePlaybook`)
+- `arena-xunit`: Oracle dependency and playbook support (`OracleDependencyBuilder`, `ManagedOraclePlaybook`)
+- `arena-pytest`: Oracle dependency and playbook support (`OracleDependencyBuilder`, `ManagedOraclePlaybook`)
+- FastAPI example app: Oracle-backed weather report endpoints (`POST/GET /weather`), wired into both pytest component test suites
+- Spring Boot and ASP.NET example apps: Oracle-backed weather report endpoints, wired into both junit and xunit component/chained-component test suites
+- Oracle dependency builders (`arena-oracledb`, `arena-junit`, `arena-xunit`, `arena-pytest`) require an explicit `.full_build()` opt-in for a non-default database name, and scale the SQL readiness timeout accordingly, since a custom name forces a slow from-scratch pluggable database build
+- CI: betterleaks secret scan on every PR, push to master, and daily cron
+
+### Fixed
+
+- `fromImage` now resolves registry credentials (`credHelpers`, `credsStore`, `auths`, honoring `DOCKER_CONFIG`) instead of pulling anonymously (#210)
+- `fromImage` skips pulling when a locally cached image already matches the requested platform (#210)
+- Image pull/build failures now return a typed error instead of panicking (#210)
+- Registry credential resolution no longer blocks the async runtime and no longer silently swallows credential-helper failures (#210)
+- Example Postgres/MSSQL test credentials are now randomly generated instead of hardcoded, matching the existing Oracle credential pattern
+
+### Changed
+
+- PR pipeline no longer auto-publishes preview builds (TestPyPI, Maven snapshot, NuGet snapshot) on every push; apply the `pre-release` label to opt in
+
 ## [6.0.2]
 
 ### Security

@@ -40,6 +40,13 @@ py_binary(
     visibility = ["//visibility:public"],
 )
 
+py_binary(
+    name = "setup_local_bazelrc",
+    srcs = ["setup_local_bazelrc.py"],
+    main = "setup_local_bazelrc.py",
+    visibility = ["//visibility:public"],
+)
+
 py_library(
     name = "arena_version_lib",
     srcs = ["arena_version.py"],

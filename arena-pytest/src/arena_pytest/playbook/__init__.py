@@ -13,6 +13,7 @@ from arena_pytest.ffi._ffi import (
     http_playbook_verify as _ffi_http_playbook_verify,
     match_playbook_run,
     mssql_playbook_verify as _ffi_mssql_playbook_verify,
+    oracle_playbook_verify as _ffi_oracle_playbook_verify,
     postgres_playbook_verify as _ffi_postgres_playbook_verify,
 )
 
@@ -151,6 +152,33 @@ class ActivePostgresPlaybook(ActivePlaybook):
         })
         try:
             _ffi_postgres_playbook_verify(self._ffi, self._handle, spec)
+        except ArenaBindingError:
+            self._note_body_failure()
+            raise
+
+
+class ActiveOraclePlaybook(ActivePlaybook):
+    def __init__(
+        self,
+        ffi: ArenaNativeLib,
+        handle: int,
+        dependency_identifier: str,
+    ):
+        super().__init__(ffi, handle)
+        self._dependency_identifier = dependency_identifier
+
+    def verify(self, query: str, expected_value: int) -> None:
+        if not self._handle:
+            raise RuntimeError(
+                "ActiveOraclePlaybook.verify called after the playbook was dropped"
+            )
+        spec = json.dumps({
+            "dependency_identifier": self._dependency_identifier,
+            "query": query,
+            "expected_value": int(expected_value),
+        })
+        try:
+            _ffi_oracle_playbook_verify(self._ffi, self._handle, spec)
         except ArenaBindingError:
             self._note_body_failure()
             raise

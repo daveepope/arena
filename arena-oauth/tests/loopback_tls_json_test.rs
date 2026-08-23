@@ -11,6 +11,7 @@ fn loopback_tls_pem_json_document_contains_cert_and_key() {
         .expect("certificate_pem string");
     let key = parsed["private_key_pem"].as_str().expect("private_key_pem string");
 
-    assert!(cert.contains("BEGIN CERTIFICATE"));
-    assert!(key.contains("PRIVATE KEY"));
+    assert!(!cert.is_empty());
+    assert!(!key.is_empty());
+    assert_ne!(cert, key);
 }

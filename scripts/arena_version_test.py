@@ -8,11 +8,14 @@ from pathlib import Path
 from unittest.mock import patch
 
 from arena_version import (
+    CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK,
+    CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK,
     audit_arena_ffi_binary,
     bump_major_version,
     bump_minor_version,
     bump_patch_version,
     bump_version,
+    check_cargo_vet_watermarks,
     higher_release_version,
     is_synced,
     read_version,
@@ -21,6 +24,7 @@ from arena_version import (
     release_version_increased,
     release_version_only,
     repin_all_lockfiles,
+    run_cargo_vet_check_report,
     sync_workspace_version,
     vet_rust_dependencies,
     workspace_version_in_cargo_bazel_lock,
@@ -278,6 +282,67 @@ class SyncWorkspaceVersionTest(unittest.TestCase):
                 vet_rust_dependencies(root)
                 self.assertEqual(run.call_count, 2)
                 self.assertIn("install", run.call_args_list[0].args[0])
+
+
+def _vet_report(audited: int, exempted: int) -> dict:
+    return {
+        "conclusion": "success",
+        "vetted_fully": [{"name": f"audited{i}", "version": "1.0.0"} for i in range(audited)],
+        "vetted_partially": [],
+        "vetted_with_exemptions": [
+            {"name": f"exempted{i}", "version": "1.0.0"} for i in range(exempted)
+        ],
+    }
+
+
+class RunCargoVetCheckReportTest(unittest.TestCase):
+    def test_run_cargo_vet_check_report_success_returnsParsedJson(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fake_result = subprocess.CompletedProcess(
+                args=["cargo", "vet", "check", "--output-format=json"],
+                returncode=0,
+                stdout='{"conclusion": "success", "vetted_fully": []}',
+            )
+            with patch("arena_version.subprocess.run", return_value=fake_result) as run:
+                report = run_cargo_vet_check_report(root)
+                self.assertEqual(report, {"conclusion": "success", "vetted_fully": []})
+                self.assertEqual(
+                    run.call_args_list[0].args[0],
+                    ["cargo", "vet", "check", "--output-format=json"],
+                )
+
+
+class CheckCargoVetWatermarksTest(unittest.TestCase):
+    def test_check_cargo_vet_watermarks_countsUnchanged_doesNotRaise(self) -> None:
+        report = _vet_report(
+            CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK, CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK
+        )
+        check_cargo_vet_watermarks(report)
+
+    def test_check_cargo_vet_watermarks_auditedCountIncreased_raises(self) -> None:
+        report = _vet_report(
+            CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK + 1,
+            CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK,
+        )
+        with self.assertRaises(SystemExit):
+            check_cargo_vet_watermarks(report)
+
+    def test_check_cargo_vet_watermarks_exemptedCountIncreased_raises(self) -> None:
+        report = _vet_report(
+            CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK,
+            CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK + 1,
+        )
+        with self.assertRaises(SystemExit):
+            check_cargo_vet_watermarks(report)
+
+    def test_check_cargo_vet_watermarks_exemptedCountDecreased_raises(self) -> None:
+        report = _vet_report(
+            CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK,
+            CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK - 1,
+        )
+        with self.assertRaises(SystemExit):
+            check_cargo_vet_watermarks(report)
 
 
 if __name__ == "__main__":

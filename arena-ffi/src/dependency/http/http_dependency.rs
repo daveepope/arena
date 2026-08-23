@@ -3,7 +3,7 @@ use arena_http::HttpDependency;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct HttpDependencyConfig {
+pub struct HttpDependencyConfig {
     pub identifier: String,
     #[serde(default)]
     pub image_name: Option<String>,

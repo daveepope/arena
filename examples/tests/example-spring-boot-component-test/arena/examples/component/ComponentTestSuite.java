@@ -10,6 +10,7 @@ import arena.examples.playbooks.CalibrationApiHappyPathPlaybook;
 import arena.examples.playbooks.EventsPurgePlaybook;
 import arena.examples.playbooks.ResetReadingsDbPlaybook;
 import arena.examples.playbooks.ResetValidationDbPlaybook;
+import arena.examples.playbooks.ResetWeatherDbPlaybook;
 import arena.examples.playbooks.SeedValidationReadingPlaybook;
 import arena.examples.testruntime.EphemeralTestRuntime;
 import arena.junit.Arena;
@@ -27,6 +28,8 @@ import arena.junit.dep.MssqlDependency;
 import arena.junit.dep.MssqlDependencyBuilder;
 import arena.junit.dep.PostgresDependency;
 import arena.junit.dep.PostgresDependencyBuilder;
+import arena.junit.dep.oracledb.OracleDependency;
+import arena.junit.dep.oracledb.OracleDependencyBuilder;
 import arena.junit.dep.smtp.SmtpDependency;
 import arena.junit.dep.smtp.SmtpDependencyBuilder;
 import arena.junit.dep.temporal.TemporalDependency;
@@ -77,7 +80,8 @@ import software.amazon.awssdk.services.sqs.model.GetQueueUrlRequest;
   ReadingsCrudComponentTest.class,
   CalibrationOutageComponentTest.class,
   HttpPlaybookVerificationComponentTest.class,
-  DeviceLifecycleComponentTest.class
+  DeviceLifecycleComponentTest.class,
+  WeatherCrudComponentTest.class
 })
 @Arena
 public final class ComponentTestSuite {
@@ -93,6 +97,7 @@ public final class ComponentTestSuite {
   private static final int WEB_APP_2_PORT = EphemeralTestRuntime.ephemeralTcpPort();
   private static final int POSTGRES_PORT = RT.postgresPort;
   private static final int MSSQL_PORT = RT.mssqlPort;
+  private static final int ORACLE_PORT = RT.oraclePort;
   private static final int CALIBRATION_HOST_PORT = RT.calibrationHostPort;
   private static final int LOCALSTACK_HOST_PORT = RT.localstackHostPort;
   private static final int TEMPORAL_GRPC_PORT = RT.temporalGrpcPort;
@@ -108,6 +113,10 @@ public final class ComponentTestSuite {
   private static final String MSSQL_DB_NAME = "validationDb";
   private static final String MSSQL_DB_USER = "sa";
   private static final String MSSQL_DB_PASS = "yourStrong(!)Password";
+  private static final String ORACLE_DB_NAME = "FREEPDB1";
+  private static final String ORACLE_DB_USER = "weather_user_" + RT.runSuffix.substring(0, 8);
+  private static final String ORACLE_DB_PASS = "pw_" + RT.runSuffix.substring(8, 20);
+  private static final String ORACLE_ADMIN_PASS = "pw_" + RT.runSuffix.substring(20, 32);
   private static final String EVENT_BUS_NAME = "example-api-events";
   private static final String EVENT_SOURCE = "readings.api";
   private static final String QUEUE_NAME = "example-api-events-q";
@@ -160,6 +169,18 @@ public final class ComponentTestSuite {
           .build();
 
   @ArenaDependency(logs = false)
+  static final OracleDependency ORACLE =
+      new OracleDependencyBuilder("example-api-oracle")
+          .withPort(ORACLE_PORT)
+          .withDatabaseUsername(ORACLE_DB_USER)
+          .withDatabasePassword(ORACLE_DB_PASS)
+          .withAdminPassword(ORACLE_ADMIN_PASS)
+          .withStartupSqlScripts(readSchema("weather_db_schema.sql"))
+          // Oracle container start times are inconsistent across CI runners, so a longer timeout is required.
+          .withSqlReadinessTimeout(Duration.ofMinutes(2))
+          .build();
+
+  @ArenaDependency(logs = false)
   static final HttpDependency CALIBRATION =
       new HttpDependencyBuilder("example-api-calibration").withPort(CALIBRATION_HOST_PORT).build();
 
@@ -207,6 +228,10 @@ public final class ComponentTestSuite {
   @ArenaPlaybook(execOnDependencyStart = false)
   static final ResetReadingsDbPlaybook RESET_READINGS_DB =
       new ResetReadingsDbPlaybook(POSTGRES.identifier());
+
+  @ArenaPlaybook(execOnDependencyStart = false)
+  static final ResetWeatherDbPlaybook RESET_WEATHER_DB =
+      new ResetWeatherDbPlaybook(ORACLE.identifier());
 
   @ArenaComponent(logs = true)
   static final ExecutableComponent WEB_APP = buildWebApp("example-api-web-app", WEB_APP_PORT);
@@ -308,6 +333,15 @@ public final class ComponentTestSuite {
                 + ";Password="
                 + MSSQL_DB_PASS
                 + ";TrustServerCertificate=True;")
+        .withEnvVar(
+            "ORACLE_CONNECTION_STRING",
+            ORACLE_DB_USER
+                + "/"
+                + ORACLE_DB_PASS
+                + "@localhost:"
+                + ORACLE_PORT
+                + "/"
+                + ORACLE_DB_NAME)
         .withEnvVar("TEMPORAL_TARGET", TEMPORAL_TARGET)
         .withEnvVar("SMTP_HOST", "127.0.0.1")
         .withEnvVar("SMTP_PORT", String.valueOf(SMTP_HOST_PORT))

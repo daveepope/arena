@@ -446,6 +446,32 @@ java_test(
 )
 
 java_test(
+    name = "arena_junit_oracle_dependency_builder_unit_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/dep/oracledb/OracleDependencyBuilderSerializationTest.java"],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.dep.oracledb.OracleDependencyBuilderSerializationTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+)
+
+java_test(
     name = "arena_junit_kafka_dependency_builder_unit_test",
     size = "small",
     srcs = ["src/test/java/arena/junit/dep/KafkaDependencyBuilderSerializationTest.java"],
@@ -653,6 +679,58 @@ java_test(
 )
 
 java_test(
+    name = "arena_junit_managed_oracle_playbook_unit_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/playbook/oracledb/ManagedOraclePlaybookUnitTest.java"],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.playbook.oracledb.ManagedOraclePlaybookUnitTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+)
+
+java_test(
+    name = "arena_junit_active_oracle_playbook_unit_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/playbook/oracledb/ActiveOraclePlaybookUnitTest.java"],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.playbook.oracledb.ActiveOraclePlaybookUnitTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:net_java_dev_jna_jna",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+)
+
+java_test(
     name = "arena_junit_managed_mssql_playbook_unit_test",
     size = "small",
     srcs = ["src/test/java/arena/junit/playbook/ManagedMssqlPlaybookUnitTest.java"],
@@ -807,6 +885,35 @@ java_test(
         ":arena_junit_lib",
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
     ],
+)
+
+java_test(
+    name = "arena_junit_arena_bindings_unit_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/ffi/ArenaBindingsUnitTest.java"],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.ffi.ArenaBindingsUnitTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:net_java_dev_jna_jna",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:org_slf4j_slf4j_api",
+    ],
+    data = ["//arena-ffi:arena_ffi_shared"],
+    jvm_flags = ["-Djna.nosys=true"],
 )
 
 java_test(

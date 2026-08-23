@@ -17,6 +17,7 @@ from playbooks import (
     CalibrationApiErrorPathPlaybook,
     CalibrationApiFlakyPlaybook,
     ResetValidationDbPlaybook,
+    ResetWeatherDbPlaybook,
     SeedValidationReadingPlaybook,
     SEED_VALIDATION_READING_USER,
     SEED_VALIDATION_READING_VALUE,
@@ -200,6 +201,28 @@ def test_create_device_sends_provisioned_email_over_starttls(api_client: ApiClie
     device_name = f"Mail Probe Device {os.urandom(4).hex()}"
     api_client.create_device(device_name)
     _wait_device_provisioned_email(device_name)
+
+
+@playbook(ResetWeatherDbPlaybook)
+def test_create_weather_report_lists_via_http(api_client: ApiClient):
+    created_id = api_client.create_weather_report(
+        precipitation=1.5, humidity=63.2, pressure=1013.25
+    )
+    reports = api_client.get_weather_reports()
+    found = next((r for r in reports if r["id"] == created_id), None)
+    assert found is not None
+    assert found["precipitation"] == 1.5
+    assert found["humidity"] == 63.2
+    assert found["pressure"] == 1013.25
+
+
+@playbook(ResetWeatherDbPlaybook)
+def test_create_multiple_weather_reports_are_listed(api_client: ApiClient):
+    id1 = api_client.create_weather_report(precipitation=0, humidity=40, pressure=1000)
+    id2 = api_client.create_weather_report(precipitation=2.2, humidity=80, pressure=990.5)
+    ids = {r["id"] for r in api_client.get_weather_reports()}
+    assert id1 in ids
+    assert id2 in ids
 
 
 if __name__ == "__main__":

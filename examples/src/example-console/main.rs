@@ -81,7 +81,8 @@ async fn setup_arena_components(oauth_ca_pem: &str) -> Vec<Component> {
             format!("http://localhost:{}/health", WEB_APP_PORT),
         )
         .build()
-        .await;
+        .await
+        .expect("build example web app container");
 
     vec![Box::new(web_app)]
 }

@@ -57,6 +57,28 @@ class ApiClient:
         r = self._delete(f"/devices/{device_id}")
         r.raise_for_status()
 
+    def create_weather_report(
+        self, precipitation: float, humidity: float, pressure: float
+    ) -> int:
+        r = self.post_weather_report_raw(precipitation, humidity, pressure)
+        r.raise_for_status()
+        return int(r.json()["id"])
+
+    def post_weather_report_raw(
+        self, precipitation: float, humidity: float, pressure: float
+    ) -> requests.Response:
+        body = {
+            "precipitation": precipitation,
+            "humidity": humidity,
+            "pressure": pressure,
+        }
+        return self._post("/weather", body)
+
+    def get_weather_reports(self) -> list:
+        r = self._get("/weather")
+        r.raise_for_status()
+        return r.json()
+
     def _get(self, path: str) -> requests.Response:
         return self._session.get(f"{self._base_url}{path}", timeout=10)
 

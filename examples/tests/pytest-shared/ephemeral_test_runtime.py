@@ -2,7 +2,7 @@ import os
 import socket
 import uuid
 
-PORT_SLOT_COUNT = 12
+PORT_SLOT_COUNT = 13
 
 
 def _allocate_distinct_tcp_ports(count: int) -> list[int]:
@@ -36,6 +36,7 @@ class EphemeralTestRuntime:
             self.calibration_host_port,
             self.postgres_port,
             self.mssql_port,
+            self.oracle_port,
             self.oauth_port,
             self.localstack_host_port,
             self.temporal_grpc_port,

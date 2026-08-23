@@ -43,6 +43,8 @@ interface ArenaNativeLib extends Library {
   int arena_mssql_playbook_verify(Pointer handle, String specJson, PointerByReference errOut);
 
   int arena_postgres_playbook_verify(Pointer handle, String specJson, PointerByReference errOut);
+
+  int arena_oracle_playbook_verify(Pointer handle, String specJson, PointerByReference errOut);
 }
 
 final class ArenaNativeHolder {

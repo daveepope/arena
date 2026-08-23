@@ -7,6 +7,7 @@ import asyncpg
 import boto3
 import httpx
 import jwt
+import oracledb
 from fastapi import FastAPI, Request
 from fastmssql import Connection, PoolConfig, SslConfig
 from jwt import PyJWKClient
@@ -18,8 +19,9 @@ from temporalio.worker import Worker as TemporalWorker
 from example_readings_fastapi_web_app.conn_parse import (
     asyncpg_dsn_from_libpq,
     mssql_fastmssql_connection_string,
+    oracledb_connect_params_from_easy_connect,
 )
-from example_readings_fastapi_web_app.routers import devices, health, readings
+from example_readings_fastapi_web_app.routers import devices, health, readings, weather
 from example_readings_fastapi_web_app.settings import Settings
 from example_readings_fastapi_web_app.workflows.device_activities import (
     enter_error,
@@ -90,6 +92,12 @@ async def lifespan(app: FastAPI):
         ssl_config=SslConfig.development(),
         pool_config=PoolConfig.adaptive(8),
     )
+    oracle_user, oracle_password, oracle_dsn = oracledb_connect_params_from_easy_connect(
+        settings.oracle_connection_string
+    )
+    oracle_pool = oracledb.create_pool_async(
+        user=oracle_user, password=oracle_password, dsn=oracle_dsn, min=1, max=5
+    )
     pool, _, temporal_client = await asyncio.gather(
         asyncpg.create_pool(dsn, min_size=1, max_size=5),
         mssql.connect(),
@@ -127,6 +135,7 @@ async def lifespan(app: FastAPI):
     app.state.pool = pool
     app.state.http = http
     app.state.mssql = mssql
+    app.state.oracle_pool = oracle_pool
     app.state.settings = settings
     app.state.jwk_client = jwk_client
     app.state.oauth_issuer = issuer
@@ -151,6 +160,7 @@ async def lifespan(app: FastAPI):
     await http.aclose()
     await pool.close()
     await mssql.disconnect()
+    await oracle_pool.close()
 
 
 def create_app() -> FastAPI:
@@ -158,6 +168,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(readings.router)
     app.include_router(devices.router)
+    app.include_router(weather.router)
     app.add_middleware(BearerGateMiddleware)
     return app
 

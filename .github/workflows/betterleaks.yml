@@ -1,0 +1,34 @@
+name: Betterleaks secret scan
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: "0 6 * * *"
+
+permissions: read-all
+
+jobs:
+  betterleaks:
+    name: betterleaks
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Scan working tree for secrets
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" \
+            ghcr.io/betterleaks/betterleaks:latest \
+            dir /repo --redact --no-banner --report-format sarif --report-path /repo/betterleaks-report.sarif
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9
+        with:
+          sarif_file: betterleaks-report.sarif

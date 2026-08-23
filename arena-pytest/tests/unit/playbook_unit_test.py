@@ -1,3 +1,4 @@
+import json
 import sys
 import os
 from unittest.mock import MagicMock
@@ -327,6 +328,108 @@ def test_active_playbook_drop_without_body_failure_reraises_binding_error(monkey
     active = ActivePlaybook(MagicMock(), 99)
     with pytest.raises(AssertionError, match="drop expect failed"):
         active.__exit__(None, None, None)
+
+
+def test_active_oracle_playbook_verify_dropped_handle_raises_runtime_error():
+    from arena_pytest.playbook import ActiveOraclePlaybook
+
+    active = ActiveOraclePlaybook(MagicMock(), 0, "dep-id")
+    with pytest.raises(RuntimeError, match="dropped"):
+        active.verify("select 1 from dual", 1)
+
+
+def test_active_oracle_playbook_verify_sends_expected_spec(monkeypatch):
+    from arena_pytest.playbook import ActiveOraclePlaybook
+
+    captured = {}
+
+    def fake_verify(_ffi, handle, spec_json):
+        captured["handle"] = handle
+        captured["spec"] = json.loads(spec_json)
+
+    monkeypatch.setattr(_playbook_pkg(), "_ffi_oracle_playbook_verify", fake_verify)
+    active = ActiveOraclePlaybook(MagicMock(), 11, "dep-id")
+    active.verify("select count(*) from orders", 3)
+
+    assert captured["handle"] == 11
+    assert captured["spec"] == {
+        "dependency_identifier": "dep-id",
+        "query": "select count(*) from orders",
+        "expected_value": 3,
+    }
+
+
+def test_active_oracle_playbook_verify_binding_error_marks_body_failed(monkeypatch):
+    from arena_pytest.ffi._ffi import ArenaBindingError
+    from arena_pytest.playbook import ActiveOraclePlaybook
+
+    monkeypatch.setattr(
+        _playbook_pkg(),
+        "_ffi_oracle_playbook_verify",
+        lambda _ffi, _h, _spec: (_ for _ in ()).throw(ArenaBindingError("mismatch")),
+    )
+    active = ActiveOraclePlaybook(MagicMock(), 11, "dep-id")
+    with pytest.raises(ArenaBindingError):
+        active.verify("select 1 from dual", 1)
+    assert active._body_failed is True
+
+
+def test_active_mssql_playbook_verify_dropped_handle_raises_runtime_error():
+    from arena_pytest.playbook import ActiveMssqlPlaybook
+
+    active = ActiveMssqlPlaybook(MagicMock(), 0, "dep-id")
+    with pytest.raises(RuntimeError, match="dropped"):
+        active.verify("select 1", 1)
+
+
+def test_active_mssql_playbook_verify_sends_expected_spec(monkeypatch):
+    from arena_pytest.playbook import ActiveMssqlPlaybook
+
+    captured = {}
+
+    def fake_verify(_ffi, handle, spec_json):
+        captured["handle"] = handle
+        captured["spec"] = json.loads(spec_json)
+
+    monkeypatch.setattr(_playbook_pkg(), "_ffi_mssql_playbook_verify", fake_verify)
+    active = ActiveMssqlPlaybook(MagicMock(), 5, "dep-id")
+    active.verify("select count(*) from t", 2)
+
+    assert captured["handle"] == 5
+    assert captured["spec"] == {
+        "dependency_identifier": "dep-id",
+        "query": "select count(*) from t",
+        "expected_value": 2,
+    }
+
+
+def test_active_postgres_playbook_verify_dropped_handle_raises_runtime_error():
+    from arena_pytest.playbook import ActivePostgresPlaybook
+
+    active = ActivePostgresPlaybook(MagicMock(), 0, "dep-id")
+    with pytest.raises(RuntimeError, match="dropped"):
+        active.verify("select 1", 1)
+
+
+def test_active_postgres_playbook_verify_sends_expected_spec(monkeypatch):
+    from arena_pytest.playbook import ActivePostgresPlaybook
+
+    captured = {}
+
+    def fake_verify(_ffi, handle, spec_json):
+        captured["handle"] = handle
+        captured["spec"] = json.loads(spec_json)
+
+    monkeypatch.setattr(_playbook_pkg(), "_ffi_postgres_playbook_verify", fake_verify)
+    active = ActivePostgresPlaybook(MagicMock(), 9, "dep-id")
+    active.verify("select count(*) from t", 4)
+
+    assert captured["handle"] == 9
+    assert captured["spec"] == {
+        "dependency_identifier": "dep-id",
+        "query": "select count(*) from t",
+        "expected_value": 4,
+    }
 
 
 def test_http_playbook_builder_scenario_mapping_serializes_expected_fields():

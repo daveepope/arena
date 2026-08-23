@@ -50,15 +50,19 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
     Class<?> testClass = context.getRequiredTestClass();
     Class<?> root = topologyRoot(testClass);
     warnIfExplicitRootMissingSelectClasses(testClass, root);
-    CACHE.compute(
-        root,
-        (key, existing) -> {
-          CachedArena cached = existing != null ? existing : buildAndOpen(root);
-          if (cached.expectedSuiteMembers == null) {
-            cached.refs++;
-          }
-          return cached;
-        });
+    CachedArena cached =
+        CACHE.compute(
+            root,
+            (key, existing) -> {
+              CachedArena current = existing != null ? existing : buildOrCacheFailure(root);
+              if (current.expectedSuiteMembers == null) {
+                current.refs++;
+              }
+              return current;
+            });
+    if (cached.failure != null) {
+      throw cached.failure;
+    }
   }
 
   @Override
@@ -81,9 +85,11 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
           if (!shouldClose) {
             return existing;
           }
-          invokeLifecycleMethod(root, ArenaBeforeClose.class, existing.openArena);
-          existing.openArena.close();
-          SHUTDOWN_ARENAS.remove(root);
+          if (existing.failure == null) {
+            invokeLifecycleMethod(root, ArenaBeforeClose.class, existing.openArena);
+            existing.openArena.close();
+            SHUTDOWN_ARENAS.remove(root);
+          }
           return null;
         });
   }
@@ -288,6 +294,14 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
     return cached.openArena;
   }
 
+  private static CachedArena buildOrCacheFailure(Class<?> root) {
+    try {
+      return buildAndOpen(root);
+    } catch (RuntimeException e) {
+      return new CachedArena(e, expectedSuiteMembers(root));
+    }
+  }
+
   private static CachedArena buildAndOpen(Class<?> root) {
     MatchBuild matchBuild = buildMatchBuilder(root);
     Match match = matchBuild.matchBuilder().build();
@@ -389,12 +403,20 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
 
   private static final class CachedArena {
     final OpenArena openArena;
+    final RuntimeException failure;
     final Integer expectedSuiteMembers;
     int refs;
     int completed;
 
     CachedArena(OpenArena openArena, Integer expectedSuiteMembers) {
       this.openArena = openArena;
+      this.failure = null;
+      this.expectedSuiteMembers = expectedSuiteMembers;
+    }
+
+    CachedArena(RuntimeException failure, Integer expectedSuiteMembers) {
+      this.openArena = null;
+      this.failure = failure;
       this.expectedSuiteMembers = expectedSuiteMembers;
     }
   }

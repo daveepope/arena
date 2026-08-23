@@ -16,7 +16,8 @@ async fn ensure_base_image_pulled() {
         &arena_container::platform::docker_platform(),
         &docker,
     )
-    .await;
+    .await
+    .expect("pull base image");
 }
 
 fn unique_host_dir(name: &str) -> PathBuf {
@@ -55,7 +56,8 @@ async fn start_with_volume_mapping_writes_file_visible_on_host() {
     let mut component = ContainerizedComponent::builder("volume-mapping-probe", CONTAINERFILE)
         .with_volume_mapping(host_dir.to_string_lossy().to_string(), "/mnt/test")
         .build()
-        .await;
+        .await
+        .expect("build containerized component");
 
     component.start().await;
 

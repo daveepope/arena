@@ -11,6 +11,8 @@ use async_trait::async_trait;
 use postgres_container_impl::PostgresImpl;
 use std::time::{Duration, Instant};
 
+const READINESS_TIMEOUT: Duration = Duration::from_secs(30);
+
 pub struct PostgresDependency {
     pub identifier: String,
     postgres_impl: Box<dyn PostgresImpl>,
@@ -120,11 +122,9 @@ impl PostgresDependency {
             .connection_string()
             .expect("connection string should be available after postgres starts");
 
-        let timeout = Duration::from_secs(30);
-
         match self
             .readiness_check
-            .is_ready(&self.identifier, conn_str, timeout.as_millis() as u64)
+            .is_ready(&self.identifier, conn_str, READINESS_TIMEOUT.as_millis() as u64)
             .await
         {
             Ok(()) => {}

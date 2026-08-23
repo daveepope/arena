@@ -45,6 +45,8 @@ builder.Services.AddSingleton<IReadingsService>(sp => new ReadingsService(
     builder.Configuration["MSSQL_CONNECTION_STRING"]!,
     builder.Configuration["CALIBRATION_URL"]!,
     sp.GetRequiredService<IEventBridgePublisher>()));
+builder.Services.AddSingleton<IWeatherService>(_ => new WeatherService(
+    builder.Configuration["ORACLE_CONNECTION_STRING"]!));
 builder.Services.AddSingleton<ISmtpClientService>(_ => new SmtpClientService(
     builder.Configuration["SMTP_HOST"]!,
     int.Parse(builder.Configuration["SMTP_PORT"]!)));

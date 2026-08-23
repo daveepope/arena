@@ -154,6 +154,14 @@ import_library(
 )
 
 import_library(
+    name = "oracle_manageddataaccess_core_lib",
+    library_name = "Oracle.ManagedDataAccess.Core",
+    libs = ["@oracle_manageddataaccess_core//:libs"],
+    refs = ["@oracle_manageddataaccess_core//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
     name = "aws_core_lib",
     library_name = "AWSSDK.Core",
     libs = ["@aws_core//:libs"],
@@ -374,6 +382,12 @@ filegroup(
 )
 
 filegroup(
+    name = "weather_db_schema",
+    srcs = ["resources/weather_db_schema.sql"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
     name = "arena_config",
     srcs = ["resources/arena_config.json"],
     visibility = ["//visibility:public"],
@@ -473,6 +487,7 @@ py_library(
         "@pip_examples//boto3",
         "@pip_examples//fastapi",
         "@pip_examples//httpx",
+        "@pip_examples//oracledb",
         "@pip_examples//pydantic_settings",
         "@pip_examples//pyjwt",
         "@pip_examples//fastmssql",
@@ -602,6 +617,7 @@ py_test(
         "//examples:instrument_reading_db_schema",
         "//examples:arena_config",
         "//examples:validation_db_schema",
+        "//examples:weather_db_schema",
     ],
     deps = [
         ":pytest_shared",
@@ -635,6 +651,7 @@ py_test(
         "//examples:instrument_reading_db_schema",
         "//examples:arena_config",
         "//examples:validation_db_schema",
+        "//examples:weather_db_schema",
     ],
     deps = [
         ":pytest_shared",
@@ -704,6 +721,7 @@ java_library(
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_core",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
         "@arena_java_maven//:com_microsoft_sqlserver_mssql_jdbc",
+        "@arena_java_maven//:com_oracle_database_jdbc_ojdbc11",
         "@arena_java_maven//:jakarta_validation_jakarta_validation_api",
         "@arena_java_maven//:org_postgresql_postgresql",
         "@arena_java_maven//:org_springframework_boot_spring_boot",
@@ -775,6 +793,7 @@ java_test(
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
         ":validation_db_schema",
+        ":weather_db_schema",
     ],
     jvm_flags = ["-Djna.nosys=true"],
     runtime_deps = [
@@ -824,6 +843,7 @@ java_test(
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
         ":validation_db_schema",
+        ":weather_db_schema",
     ],
     jvm_flags = ["-Djna.nosys=true"],
     runtime_deps = [
@@ -927,6 +947,7 @@ csharp_library(
         ":newtonsoft_json_lib",
         ":npgsql_lib",
         ":sqlclient_lib",
+        ":oracle_manageddataaccess_core_lib",
         ":aws_core_lib",
         ":aws_eventbridge_lib",
         ":aws_sqs_lib",
@@ -990,6 +1011,7 @@ csharp_test(
         ":instrument_reading_db_schema",
         ":arena_config",
         ":validation_db_schema",
+        ":weather_db_schema",
         "//arena-xunit:xunit_core_netstandard",
     ],
     deps = [
@@ -1036,6 +1058,7 @@ csharp_test(
         ":instrument_reading_db_schema",
         ":arena_config",
         ":validation_db_schema",
+        ":weather_db_schema",
         "//arena-xunit:xunit_core_netstandard",
     ],
     deps = [

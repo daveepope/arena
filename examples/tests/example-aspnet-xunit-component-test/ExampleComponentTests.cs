@@ -43,4 +43,45 @@ public class ExampleComponentTests : IClassFixture<ExampleFixture>
 
         await api2.StopDeviceAsync(created.Id);
     }
+
+    [Fact]
+    [Playbook(typeof(Playbooks.ResetWeatherDbPlaybook))]
+    public async Task CreateWeatherReportListsViaHttp()
+    {
+        var created = await api.CreateWeatherReportAsync(new CreateWeatherReportRequest
+        {
+            Precipitation = 1.5,
+            Humidity = 63.2,
+            Pressure = 1013.25,
+        });
+
+        var reports = await api.ListWeatherReportsAsync();
+        var found = reports.Find(r => r.Id == created.Id);
+        Assert.NotNull(found);
+        Assert.Equal(1.5, found.Precipitation);
+        Assert.Equal(63.2, found.Humidity);
+        Assert.Equal(1013.25, found.Pressure);
+    }
+
+    [Fact]
+    [Playbook(typeof(Playbooks.ResetWeatherDbPlaybook))]
+    public async Task CreateMultipleWeatherReportsAreListed()
+    {
+        var created1 = await api.CreateWeatherReportAsync(new CreateWeatherReportRequest
+        {
+            Precipitation = 0,
+            Humidity = 40,
+            Pressure = 1000,
+        });
+        var created2 = await api.CreateWeatherReportAsync(new CreateWeatherReportRequest
+        {
+            Precipitation = 2.2,
+            Humidity = 80,
+            Pressure = 990.5,
+        });
+
+        var reports = await api.ListWeatherReportsAsync();
+        Assert.Contains(reports, r => r.Id == created1.Id);
+        Assert.Contains(reports, r => r.Id == created2.Id);
+    }
 }
