@@ -1,7 +1,7 @@
 use crate::oracle_dependency::sqlplus;
 use async_trait::async_trait;
 use std::sync::Arc;
-use testcontainers_modules::testcontainers::core::{ContainerPort, ExecCommand, WaitFor};
+use testcontainers_modules::testcontainers::core::{ContainerPort, ExecCommand};
 use testcontainers_modules::testcontainers::ImageExt;
 use testcontainers_modules::{
     testcontainers, testcontainers::runners::AsyncRunner, testcontainers::GenericImage,
@@ -9,7 +9,6 @@ use testcontainers_modules::{
 use tokio::sync::Mutex as AsyncMutex;
 
 const DEFAULT_CONTAINER_PORT: u16 = 1521;
-const READY_LOG_MESSAGE: &str = "DATABASE IS READY TO USE!";
 pub(crate) const DEFAULT_SERVICE_NAME: &str = "FREEPDB1";
 
 #[async_trait]
@@ -85,9 +84,7 @@ impl OracleImpl for OracleContainerImpl {
 
         let container_port = ContainerPort::from(DEFAULT_CONTAINER_PORT);
 
-        let image = GenericImage::new(image_name, image_tag)
-            .with_exposed_port(container_port)
-            .with_wait_for(WaitFor::message_on_stdout(READY_LOG_MESSAGE));
+        let image = GenericImage::new(image_name, image_tag).with_exposed_port(container_port);
 
         let mut request = image
             .with_container_name(container_name)

@@ -32,6 +32,7 @@ pub struct OracleDependency {
     image_tag: String,
     container_name: Option<String>,
     readiness_check: Box<dyn ReadinessCheck>,
+    sql_readiness_timeout: std::time::Duration,
     managed_tables: Vec<String>,
 }
 
@@ -68,6 +69,7 @@ impl OracleDependency {
             needs_teardown: false,
             children_started: false,
             readiness_check: Box::new(DefaultOracleReadinessCheck::new()),
+            sql_readiness_timeout: READINESS_TIMEOUT,
             managed_tables: Vec::new(),
         }
     }
@@ -130,6 +132,10 @@ impl OracleDependency {
         self.readiness_check = check;
     }
 
+    pub(crate) fn set_sql_readiness_timeout(&mut self, timeout: std::time::Duration) {
+        self.sql_readiness_timeout = timeout;
+    }
+
     async fn run_startup_sql_scripts(&self, scripts: &[String]) {
         tracing::debug!(
             dependency = %self.identifier,
@@ -182,19 +188,40 @@ impl OracleDependency {
             Err(msg) => panic!("{msg}"),
         }
 
-        oracle_container_impl::exec_scalar_query(
-            self.oracle_impl.as_ref(),
-            &self.database_username,
-            &self.database_password,
-            SQL_READINESS_QUERY,
-        )
-        .await
-        .unwrap_or_else(|e| {
-            panic!(
-                "[OracleDependency-{}] sql-level readiness check failed: {e}",
-                self.identifier
+        self.wait_for_sql_ready().await;
+    }
+
+    async fn wait_for_sql_ready(&self) {
+        let start = std::time::Instant::now();
+        let poll_every = std::time::Duration::from_millis(200);
+
+        loop {
+            match oracle_container_impl::exec_scalar_query(
+                self.oracle_impl.as_ref(),
+                &self.database_username,
+                &self.database_password,
+                SQL_READINESS_QUERY,
             )
-        });
+            .await
+            {
+                Ok(_) => return,
+                Err(e) => {
+                    if start.elapsed() >= self.sql_readiness_timeout {
+                        panic!(
+                            "[OracleDependency-{}] sql-level readiness check did not succeed within {:?}: {e}",
+                            self.identifier, self.sql_readiness_timeout
+                        );
+                    }
+
+                    tracing::debug!(
+                        dependency = %self.identifier,
+                        error = %e,
+                        "sql-level readiness probe failed (will retry)"
+                    );
+                    futures_timer::Delay::new(poll_every).await;
+                }
+            }
+        }
     }
 
     async fn snapshot_managed_tables(&mut self) {

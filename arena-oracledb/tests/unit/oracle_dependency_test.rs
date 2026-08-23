@@ -145,11 +145,12 @@ async fn start_called_once_starts_the_container() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "sql-level readiness check failed")]
+#[should_panic(expected = "sql-level readiness check did not succeed")]
 async fn start_sql_readiness_check_failure_panics() {
     let mut dep = OracleDependency::builder("start-sql-readiness-fails")
         .with_impl(FailingSqlReadinessOracleImpl)
         .with_readiness_check(AlwaysReadyCheck)
+        .with_sql_readiness_timeout(std::time::Duration::from_millis(50))
         .build();
 
     dep.start().await;

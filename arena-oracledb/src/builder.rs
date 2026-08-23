@@ -21,6 +21,7 @@ pub struct OracleDependencyBuilder {
     container_name: Option<String>,
     network: Option<String>,
     readiness_check: Option<Box<dyn ReadinessCheck>>,
+    sql_readiness_timeout: Option<std::time::Duration>,
 }
 
 impl OracleDependencyBuilder {
@@ -47,6 +48,7 @@ impl OracleDependencyBuilder {
             container_name: None,
             network: None,
             readiness_check: None,
+            sql_readiness_timeout: None,
         }
     }
 
@@ -128,6 +130,11 @@ impl OracleDependencyBuilder {
         self
     }
 
+    pub fn with_sql_readiness_timeout(mut self, timeout: std::time::Duration) -> Self {
+        self.sql_readiness_timeout = Some(timeout);
+        self
+    }
+
     pub fn with_container_tag(self, image_tag: impl Into<String>) -> Self {
         self.with_image_tag(image_tag)
     }
@@ -178,6 +185,9 @@ impl OracleDependencyBuilder {
 
         if let Some(check) = readiness_check {
             dep.set_readiness_check(check);
+        }
+        if let Some(timeout) = self.sql_readiness_timeout {
+            dep.set_sql_readiness_timeout(timeout);
         }
 
         dep
