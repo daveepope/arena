@@ -771,6 +771,8 @@ jobs:
 
       - name: Build and test
         shell: bash
+        env:
+          MSYS_NO_PATHCONV: "1"
         run: bazel test --config=ci --enable_runfiles --build_tests_only --local_test_jobs=2 --test_env=DOCKER_HOST -- //examples:example-axum-component-test //examples:example-spring-boot-component-test
 
   generate_windows_pip_lock:
