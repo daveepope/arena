@@ -9,6 +9,7 @@ Contributions are welcome and encouraged. This document covers the basics for op
 - Build: `bazel build //...`
 - Test: `bazel test //...`
 - Do not run `pip`, `npm`, `maven`, or `nuget` directly on the host. Use the Bazel targets (e.g. `bazel run //arena-pytest:pip_requirements.update`).
+- Arena's CI uses [BuildBuddy](https://www.buildbuddy.io/) as a remote cache, so builds are cached and CI runs faster where applicable. Core CI workflows always use BuildBuddy. Access to BuildBuddy infrastructure for local development is restricted to approved, vetted, trusted members of the Arena development team.
 
 See the [README](README.md) for an overview of the project and its clients.
 
@@ -22,7 +23,7 @@ Use a prefix that describes the kind of change, followed by a short, hyphenated 
 
 ## Making changes
 
-- Keep pull requests small and focused where applicable. One logical change per PR is easier to review and revert.
+- Keep pull requests and commits small and focused where applicable — one logical change per commit, easier to review and revert. It's fine to bundle multiple commits into one PR/release, but try to keep the number to a minimum.
 - No drive-by refactors or unrelated file changes. If you spot something unrelated worth fixing, open a separate issue or PR.
 - Follow the conventions already established in the module you're touching (naming, layout, test structure). See [AGENTS.md](AGENTS.md) for the full set of project rules.
 - Do not add new markdown or documentation files unless the change calls for it.
