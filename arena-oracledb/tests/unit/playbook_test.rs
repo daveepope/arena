@@ -1,7 +1,18 @@
+use arena::dependency::RunnableDependency;
+use arena::healthcheck::ReadinessCheck;
 use arena_oracledb::{OracleDependency, OracleImpl};
 use async_trait::async_trait;
 use futures::FutureExt;
 use std::sync::{Arc, Mutex};
+
+struct AlwaysReadyCheck;
+
+#[async_trait]
+impl ReadinessCheck for AlwaysReadyCheck {
+    async fn is_ready(&self, _identifier: &str, _target: &str, _timeout_ms: u64) -> Result<(), String> {
+        Ok(())
+    }
+}
 
 struct FakeStartedOracleImpl;
 
@@ -121,6 +132,12 @@ impl OracleImpl for ScriptAwareOracleImpl {
     async fn run_sqlplus(&self, _username: &str, _password: &str, script: &str) -> Result<String, String> {
         self.inner.calls.lock().expect("calls lock").push(script.to_string());
 
+        if script.contains("SELECT 1 FROM DUAL") {
+            return Ok("1\n".to_string());
+        }
+        if script.contains("SELECT 1 + 1 FROM dual") {
+            return Ok("2\n".to_string());
+        }
         if script.contains("USER_TABLES") {
             return Ok("WEIRD TABLE\n".to_string());
         }
@@ -132,6 +149,18 @@ impl OracleImpl for ScriptAwareOracleImpl {
         }
 
         Ok(String::new())
+    }
+}
+
+impl ScriptAwareOracleImpl {
+    fn call_count_containing(&self, needle: &str) -> usize {
+        self.inner
+            .calls
+            .lock()
+            .expect("calls lock")
+            .iter()
+            .filter(|script| script.contains(needle))
+            .count()
     }
 }
 
@@ -159,4 +188,37 @@ async fn run_table_name_with_space_is_quoted_in_generated_sql() {
     assert!(fake.any_call_contains("DELETE FROM \"WEIRD TABLE\";"));
     assert!(fake.any_call_contains("ALTER TABLE \"WEIRD TABLE\" DISABLE CONSTRAINT \"FK_WEIRD_OWNER\";"));
     assert!(fake.any_call_contains("ALTER TABLE \"WEIRD TABLE\" ENABLE CONSTRAINT \"FK_WEIRD_OWNER\";"));
+}
+
+#[tokio::test]
+async fn run_with_prepopulated_managed_tables_skips_rediscovery() {
+    let fake = ScriptAwareOracleImpl::new(false);
+    let mut dep = OracleDependency::builder("prepopulated-tables")
+        .with_impl(fake.clone())
+        .with_readiness_check(AlwaysReadyCheck)
+        .build();
+
+    dep.start().await;
+    let user_tables_calls_after_start = fake.call_count_containing("USER_TABLES");
+    assert_eq!(user_tables_calls_after_start, 1);
+
+    let _active = dep.playbook().run().await;
+
+    assert_eq!(
+        fake.call_count_containing("USER_TABLES"),
+        user_tables_calls_after_start,
+        "playbook run should reuse the managed_tables snapshot instead of re-querying USER_TABLES"
+    );
+    assert!(fake.any_call_contains("DELETE FROM \"WEIRD TABLE\";"));
+}
+
+#[tokio::test]
+async fn verify_returns_parsed_scalar_from_query() {
+    let fake = ScriptAwareOracleImpl::new(false);
+    let dep = OracleDependency::builder("verify-scalar").with_impl(fake.clone()).build();
+
+    let active = dep.playbook().run().await;
+
+    assert_eq!(active.verify("SELECT 1 + 1 FROM dual;").await, 2);
+    assert_eq!(active.identifier(), "oracle-playbook:verify-scalar");
 }

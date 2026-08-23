@@ -1,6 +1,7 @@
 import uuid
 
-from arena_pytest.dep.oracle import OracleDependencyBuilder
+from arena_pytest.dep.oracle import ManagedOraclePlaybook, OracleDependencyBuilder
+from arena_pytest.playbook import ActiveOraclePlaybook
 
 
 def _random_password() -> str:
@@ -48,3 +49,88 @@ def test_build_with_overrides_serializes_configured_fields():
     assert config["admin_password"] == admin_password
     assert config["container_name"] == "oracle-box"
     assert config["startup_sql_scripts"] == ["init.sql"]
+
+
+def test_with_startup_sql_scripts_alone_sets_scripts_list():
+    config = (
+        OracleDependencyBuilder("oracle")
+        .with_startup_sql_scripts(["seed.sql", "grants.sql"])
+        .build()
+        ._for_ffi()
+    )
+    assert config["startup_sql_scripts"] == ["seed.sql", "grants.sql"]
+
+
+def test_build_minimal_name_omits_startup_sql_scripts():
+    config = OracleDependencyBuilder("oracle").build()._for_ffi()
+    assert "startup_sql_scripts" not in config
+
+
+def test_with_child_dependencies_nests_child_config_under_parent():
+    child = OracleDependencyBuilder("child").with_port(11522).build()
+    config = (
+        OracleDependencyBuilder("parent")
+        .with_child_dependencies([child])
+        .build()
+        ._for_ffi()
+    )
+    assert len(config["children"]) == 1
+    assert config["children"][0]["type"] == "oracle"
+    assert config["children"][0]["port"] == 11522
+    assert config["children"][0]["identifier"] == child.identifier
+
+
+def test_build_with_no_children_omits_children_key():
+    config = OracleDependencyBuilder("oracle").build()._for_ffi()
+    assert "children" not in config
+
+
+def test_builder_for_ffi_with_child_dependencies_nests_child_config():
+    child = OracleDependencyBuilder("child").build()
+    config = OracleDependencyBuilder("parent").with_child_dependencies([child])._for_ffi()
+    assert len(config["children"]) == 1
+    assert config["children"][0]["identifier"] == child.identifier
+
+
+def test_builder_for_ffi_with_no_children_omits_children_key():
+    config = OracleDependencyBuilder("oracle")._for_ffi()
+    assert "children" not in config
+
+
+def test_dependency_identifier_returns_configured_identifier():
+    dependency = OracleDependencyBuilder("oracle").build()
+    assert dependency.identifier == dependency._config["identifier"]
+
+
+def test_managed_oracle_playbook_identifier_returns_configured_identifier():
+    pb = ManagedOraclePlaybook(identifier="pb-1", dependency_identifier="dep-1")
+    assert pb.identifier() == "pb-1"
+    assert pb.dependency_identifier == "dep-1"
+
+
+def test_managed_oracle_playbook_for_ffi_serializes_kind_and_identifiers():
+    pb = ManagedOraclePlaybook(identifier="pb-1", dependency_identifier="dep-1")
+    assert pb._for_ffi() == {
+        "identifier": "pb-1",
+        "kind": "oracle",
+        "dependency_identifier": "dep-1",
+    }
+
+
+def test_managed_oracle_playbook_run_returns_active_oracle_playbook(monkeypatch):
+    import arena_pytest.dep.oracle as oracle_module
+
+    monkeypatch.setattr(
+        oracle_module, "match_playbook_run", lambda ffi, handle, identifier: 42
+    )
+    pb = ManagedOraclePlaybook(identifier="pb-1", dependency_identifier="dep-1")
+
+    class _FakeOpenArena:
+        _ffi = object()
+        _handle = 7
+
+    active = pb.run(_FakeOpenArena())
+
+    assert isinstance(active, ActiveOraclePlaybook)
+    assert active.handle() == 42
+    assert active._dependency_identifier == "dep-1"

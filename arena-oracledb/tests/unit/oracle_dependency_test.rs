@@ -1,4 +1,4 @@
-use arena::dependency::RunnableDependency;
+use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_oracledb::{OracleDependency, OracleImpl};
 use async_trait::async_trait;
@@ -307,4 +307,117 @@ fn children_empty_by_default() {
     let dep = OracleDependency::builder("no-children").build();
 
     assert!(dep.children().is_empty());
+}
+
+#[derive(Clone, Default)]
+struct RecordingChildDependency {
+    log: Arc<Mutex<Vec<&'static str>>>,
+}
+
+#[async_trait]
+impl RunnableDependency for RecordingChildDependency {
+    fn identifier(&self) -> &str {
+        "oracle-child"
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
+    async fn start(&mut self) {
+        self.log.lock().expect("log lock").push("child-start");
+    }
+
+    async fn stop(&mut self) {
+        self.log.lock().expect("log lock").push("child-stop");
+    }
+
+    fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
+    fn children(&self) -> &[Dependency] {
+        &[]
+    }
+    fn children_mut(&mut self) -> &mut [Dependency] {
+        &mut []
+    }
+
+    async fn soft_reset(&self) {}
+    async fn hard_reset(&mut self) {}
+}
+
+#[test]
+fn add_child_reflects_in_children_and_children_mut() {
+    let mut dep = OracleDependency::builder("add-child").build();
+
+    dep.add_child(Box::new(RecordingChildDependency::default()));
+
+    assert_eq!(dep.children().len(), 1);
+    assert_eq!(dep.children_mut().len(), 1);
+}
+
+#[tokio::test]
+async fn start_with_children_starts_children_before_container() {
+    let recorder = RecordingOracleImpl::default();
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let mut dep = OracleDependency::builder("start-with-children")
+        .with_impl(recorder.clone())
+        .with_readiness_check(AlwaysReadyCheck)
+        .build();
+    dep.add_child(Box::new(RecordingChildDependency { log: log.clone() }));
+
+    dep.start().await;
+
+    assert_eq!(log.lock().expect("log lock").as_slice(), &["child-start"]);
+    assert_eq!(recorder.start_call_count(), 1);
+}
+
+#[tokio::test]
+async fn stop_running_with_children_stops_children_in_reverse_order() {
+    let recorder = RecordingOracleImpl::default();
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let mut dep = OracleDependency::builder("stop-with-children")
+        .with_impl(recorder.clone())
+        .with_readiness_check(AlwaysReadyCheck)
+        .build();
+    dep.add_child(Box::new(RecordingChildDependency { log: log.clone() }));
+
+    dep.start().await;
+    log.lock().expect("log lock").clear();
+    dep.stop().await;
+
+    assert_eq!(log.lock().expect("log lock").as_slice(), &["child-stop"]);
+    assert_eq!(recorder.stop_call_count(), 1);
+}
+
+#[tokio::test]
+async fn execute_runs_sql_as_database_user() {
+    let recorder = RecordingOracleImpl::default();
+    let mut dep = OracleDependency::builder("execute-as-user")
+        .with_impl(recorder.clone())
+        .with_readiness_check(AlwaysReadyCheck)
+        .with_database_username("app_owner")
+        .build();
+    dep.start().await;
+
+    dep.execute("CREATE TABLE widgets (id NUMBER);").await;
+
+    assert!(recorder.any_sqlplus_call_contains("CREATE TABLE widgets"));
+    assert!(recorder.sqlplus_calls_as_user("app_owner") >= 1);
+}
+
+#[tokio::test]
+async fn query_scalar_returns_parsed_value() {
+    let recorder = RecordingOracleImpl::default();
+    let mut dep = OracleDependency::builder("query-scalar")
+        .with_impl(recorder.clone())
+        .with_readiness_check(AlwaysReadyCheck)
+        .build();
+    dep.start().await;
+
+    let value = dep.query_scalar("SELECT 1 FROM DUAL").await;
+
+    assert_eq!(value, 1);
 }

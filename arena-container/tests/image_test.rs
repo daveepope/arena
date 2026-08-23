@@ -143,6 +143,18 @@ fn image_matches_platform_mismatched_variant_returns_false() {
 }
 
 #[test]
+fn image_matches_platform_no_variant_requested_and_inspect_variant_present_returns_true() {
+    let inspect = setup_inspect(Some("linux"), Some("arm"), Some("v7"));
+    assert!(image_matches_platform(&inspect, "linux/arm"));
+}
+
+#[test]
+fn image_matches_platform_no_variant_requested_and_inspect_variant_absent_returns_true() {
+    let inspect = setup_inspect(Some("linux"), Some("amd64"), None);
+    assert!(image_matches_platform(&inspect, "linux/amd64"));
+}
+
+#[test]
 fn registry_host_dotted_private_registry_returns_host() {
     assert_eq!(
         registry_host("123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo:latest"),
@@ -281,6 +293,37 @@ async fn resolve_registry_credentials_ecr_style_cred_helper_returns_credentials(
     assert_eq!(credentials.username.as_deref(), Some("AWS"));
     assert_eq!(credentials.password.as_deref(), Some("ecr-fake-token"));
     assert_eq!(credentials.serveraddress.as_deref(), Some(host));
+}
+
+#[tokio::test]
+async fn resolve_registry_credentials_malformed_config_returns_none() {
+    let _guard = DOCKER_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = std::env::temp_dir().join(format!(
+        "arena-container-docker-config-malformed-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&dir).expect("create temp DOCKER_CONFIG dir");
+    std::fs::write(dir.join("config.json"), "not valid json").expect("write config.json");
+
+    let prior = std::env::var("DOCKER_CONFIG").ok();
+    unsafe {
+        std::env::set_var("DOCKER_CONFIG", &dir);
+    }
+
+    let credentials = resolve_registry_credentials("registry.example.com/my-repo:latest").await;
+
+    unsafe {
+        match &prior {
+            Some(value) => std::env::set_var("DOCKER_CONFIG", value),
+            None => std::env::remove_var("DOCKER_CONFIG"),
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+
+    assert!(
+        credentials.is_none(),
+        "malformed config should fall back to anonymous pull"
+    );
 }
 
 #[test]
