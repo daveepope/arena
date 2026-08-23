@@ -8,6 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="ArenaDotnet.Xunit" Version="$(BenchArtifactVersion)" />
-    <PackageReference Include="Npgsql" Version="8.0.5" />
+    <PackageReference Include="Npgsql" Version="8.0.4" />
   </ItemGroup>
 </Project>
