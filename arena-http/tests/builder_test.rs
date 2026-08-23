@@ -1,6 +1,15 @@
 use arena::dependency::RunnableDependency;
 use arena_http::{HttpDependency, HttpImpl};
 use async_trait::async_trait;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+fn test_password() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time before unix epoch")
+        .as_nanos();
+    format!("pw-{nanos}")
+}
 
 struct FakeHttpImpl {
     base_url: Option<String>,
@@ -76,8 +85,8 @@ async fn https_full_keystore_config_starts_successfully() {
         .https()
         .listener_container_port(8443)
         .keystore_path("/keystore.jks")
-        .keystore_password("pw")
-        .key_password("kpw")
+        .keystore_password(test_password())
+        .key_password(test_password())
         .keystore_type("JKS")
         .http_listener_disabled(false)
         .done()
@@ -97,8 +106,8 @@ fn build_without_impl_builds_container_cli_config() {
         .listener_container_port(8443)
         .host_port(9443)
         .keystore_path("/keystore.jks")
-        .keystore_password("pw")
-        .key_password("kpw")
+        .keystore_password(test_password())
+        .key_password(test_password())
         .keystore_type("JKS")
         .http_listener_disabled(true)
         .done()
@@ -133,7 +142,7 @@ fn https_keystore_password_without_path_panics() {
     let _dep = HttpDependency::builder("http-https-bad-keystore-pw")
         .with_port(0)
         .https()
-        .keystore_password("pw")
+        .keystore_password(test_password())
         .done()
         .build();
 }

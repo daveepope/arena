@@ -23,4 +23,8 @@ venv/
 
 /fuzz/target/
 
+/tools/benches/maven/target/
+/tools/benches/dotnet/bin/
+/tools/benches/dotnet/obj/
+
 /.claude/worktrees/

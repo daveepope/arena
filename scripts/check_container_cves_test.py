@@ -405,7 +405,7 @@ class ScanAllImagesTest(unittest.TestCase):
 
         def fake_run(command, capture_output, text):
             image_ref = command[-1]
-            payload = _EMPTY_RESULT if image_ref.startswith("mcr.microsoft.com") else vuln_payload
+            payload = _EMPTY_RESULT if "mssql" in image_ref else vuln_payload
             return _fake_run_result(payload)
 
         with patch("check_container_cves.subprocess.run", side_effect=fake_run):
@@ -420,7 +420,7 @@ class ScanAllImagesTest(unittest.TestCase):
 
         def fake_run(command, capture_output, text):
             image_ref = command[-1]
-            if image_ref.startswith("mcr.microsoft.com"):
+            if "mssql" in image_ref:
                 return _fake_run_result({}, returncode=1, stderr=stderr)
             return _fake_run_result(_EMPTY_RESULT)
 
