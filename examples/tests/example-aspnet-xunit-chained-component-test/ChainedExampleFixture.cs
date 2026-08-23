@@ -82,7 +82,6 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
             .WithDatabasePassword(OracleDbPassword)
             .WithAdminPassword(OracleAdminPassword)
             .WithStartupSqlScripts(new[] { ResolveSchemaScript("weather_db_schema.sql") })
-            .WithSqlReadinessTimeout(TimeSpan.FromMinutes(2))
             .Build();
 
     [ArenaDependency]
