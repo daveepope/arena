@@ -910,7 +910,10 @@ java_test(
         ":arena_junit_lib",
         "@arena_java_maven//:net_java_dev_jna_jna",
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:org_slf4j_slf4j_api",
     ],
+    data = ["//arena-ffi:arena_ffi_shared"],
+    jvm_flags = ["-Djna.nosys=true"],
 )
 
 java_test(
