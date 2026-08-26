@@ -36,6 +36,17 @@ fn two_calls_produce_different_suffixes() {
 }
 
 #[test]
+fn builds_module_name_suffix_when_slug_is_a_word_the_size_of_a_suffix() {
+    let a = build("arena-oracledb", "example-api-oracle");
+    let b = build("arena-oracledb", "example-api-oracle");
+    assert!(a.starts_with("arena-oracledb-example-api-oracle-"));
+    assert_ne!(
+        resolve_container_name(&a, None),
+        resolve_container_name(&b, None)
+    );
+}
+
+#[test]
 fn is_idempotent_when_identifier_already_built() {
     let once = build("arena-http", "calibration");
     let twice = build("arena-http", &once);

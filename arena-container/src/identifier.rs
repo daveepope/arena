@@ -14,7 +14,7 @@ pub fn build(module: &str, name: &str) -> String {
     if slug.is_empty() {
         format!("{module}-{suffix}")
     } else {
-        format!("{module}-{slug}-{suffix}")
+        format!("{module}-{slug}--{suffix}")
     }
 }
 
@@ -70,11 +70,11 @@ fn to_base36(mut n: u64) -> String {
 }
 
 fn has_suffix(name: &str) -> bool {
-    let Some(last) = name.rsplit('-').next() else {
+    let Some((_, suffix)) = name.rsplit_once("--") else {
         return false;
     };
-    last.len() == SUFFIX_LEN
-        && last
+    suffix.len() == SUFFIX_LEN
+        && suffix
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
 }

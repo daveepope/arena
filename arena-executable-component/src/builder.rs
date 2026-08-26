@@ -1,4 +1,4 @@
-use crate::executable_component::ExecutableComponent;
+use crate::executable_component::{CpuProfileConfig, ExecutableComponent};
 use crate::platform::resolve_executable_extension;
 use arena::healthcheck::ReadinessCheck;
 use arena::Component;
@@ -11,6 +11,7 @@ pub enum BuildTool {
     Dotnet,
     Make,
     CMake,
+    Python,
     Custom { command: String, args: Vec<String> },
 }
 
@@ -23,6 +24,9 @@ pub struct ExecutableComponentBuilder {
     env_vars: Vec<(String, String)>,
     runtime_args: Vec<(String, String)>,
     readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
+    cpu_profile_output: Option<PathBuf>,
+    cpu_profile_auto_open: bool,
+    cpu_profile_hotspots: bool,
 }
 
 const DEFAULT_READINESS_TIMEOUT_MS: u64 = 10_000;
@@ -41,6 +45,9 @@ impl ExecutableComponentBuilder {
             env_vars: Vec::new(),
             runtime_args: Vec::new(),
             readiness_checks: Vec::new(),
+            cpu_profile_output: None,
+            cpu_profile_auto_open: false,
+            cpu_profile_hotspots: false,
         }
     }
 
@@ -95,6 +102,21 @@ impl ExecutableComponentBuilder {
         self
     }
 
+    pub fn with_cpu_profile(mut self, output_path: impl Into<PathBuf>) -> Self {
+        self.cpu_profile_output = Some(output_path.into());
+        self
+    }
+
+    pub fn with_cpu_profile_auto_open(mut self) -> Self {
+        self.cpu_profile_auto_open = true;
+        self
+    }
+
+    pub fn with_hotspots(mut self) -> Self {
+        self.cpu_profile_hotspots = true;
+        self
+    }
+
     pub fn build(self) -> ExecutableComponent {
         if let (Some(ref source_path), Some(ref build_tool)) = (&self.source_path, &self.build_tool)
         {
@@ -127,11 +149,13 @@ impl ExecutableComponentBuilder {
                     ))
             };
 
-            let output = Self::execute_build(build_tool, &source_dir);
+            if !matches!(build_tool, BuildTool::Python) {
+                let output = Self::execute_build(build_tool, &source_dir);
 
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                panic!("build failed: {}", stderr);
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    panic!("build failed: {}", stderr);
+                }
             }
 
             tracing::debug!(
@@ -162,12 +186,51 @@ impl ExecutableComponentBuilder {
             resolve_executable_extension(resolved)
         });
 
+        let cpu_profile_auto_open = self.cpu_profile_auto_open;
+        let cpu_profile_hotspots = self.cpu_profile_hotspots;
+        let cpu_profile = self.cpu_profile_output.map(|output_path| {
+            let backend = match &self.build_tool {
+                Some(BuildTool::Cargo) => arena_profile::CpuProfilerBackend::Perf,
+                Some(BuildTool::Maven) | Some(BuildTool::Gradle) => {
+                    arena_profile::CpuProfilerBackend::AsyncProfiler
+                }
+                Some(BuildTool::Python) => arena_profile::CpuProfilerBackend::PySpy,
+                Some(BuildTool::Dotnet) => panic!(
+                    "{}: .with_cpu_profile() is not supported for BuildTool::Dotnet",
+                    self.identifier
+                ),
+                Some(BuildTool::Make) => panic!(
+                    "{}: .with_cpu_profile() is not supported for BuildTool::Make",
+                    self.identifier
+                ),
+                Some(BuildTool::CMake) => panic!(
+                    "{}: .with_cpu_profile() is not supported for BuildTool::CMake",
+                    self.identifier
+                ),
+                Some(BuildTool::Custom { command, .. }) => panic!(
+                    "{}: .with_cpu_profile() is not supported for BuildTool::Custom(\"{}\")",
+                    self.identifier, command
+                ),
+                None => panic!(
+                    "{}: .with_cpu_profile() requires a build_tool of Cargo, Maven, Gradle, or Python",
+                    self.identifier
+                ),
+            };
+            CpuProfileConfig {
+                backend,
+                output_path,
+                auto_open: cpu_profile_auto_open,
+                include_hotspots: cpu_profile_hotspots,
+            }
+        });
+
         let mut component = ExecutableComponent::new(self.identifier);
         component.children = self.children;
         component.executable_path = executable_path;
         component.env_vars = self.env_vars;
         component.runtime_args = self.runtime_args;
         component.readiness_checks = self.readiness_checks;
+        component.cpu_profile = cpu_profile;
         component
     }
 
@@ -207,6 +270,135 @@ impl ExecutableComponentBuilder {
                 .current_dir(source_dir)
                 .output()
                 .expect(&format!("failed to run custom build command: {}", command)),
+            BuildTool::Python => unreachable!("build() skips execute_build for BuildTool::Python"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_cargo_with_cpu_profile_selects_perf_backend() {
+        let component = ExecutableComponentBuilder::new("builder-test")
+            .with_build_tool(BuildTool::Cargo)
+            .with_executable_path("/bin/true")
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .build();
+
+        let cfg = component.cpu_profile.expect("cpu profile configured");
+        assert_eq!(cfg.backend, arena_profile::CpuProfilerBackend::Perf);
+        assert!(!cfg.auto_open);
+        assert!(!cfg.include_hotspots);
+    }
+
+    #[test]
+    fn build_maven_or_gradle_with_cpu_profile_selects_async_profiler_backend() {
+        for build_tool in [BuildTool::Maven, BuildTool::Gradle] {
+            let component = ExecutableComponentBuilder::new("builder-test")
+                .with_build_tool(build_tool)
+                .with_executable_path("/bin/true")
+                .with_cpu_profile("/tmp/does-not-matter.html")
+                .build();
+
+            let cfg = component.cpu_profile.expect("cpu profile configured");
+            assert_eq!(cfg.backend, arena_profile::CpuProfilerBackend::AsyncProfiler);
+        }
+    }
+
+    #[test]
+    fn build_python_with_cpu_profile_selects_pyspy_backend() {
+        let component = ExecutableComponentBuilder::new("builder-test")
+            .with_build_tool(BuildTool::Python)
+            .with_executable_path("/bin/true")
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .with_cpu_profile_auto_open()
+            .build();
+
+        let cfg = component.cpu_profile.expect("cpu profile configured");
+        assert_eq!(cfg.backend, arena_profile::CpuProfilerBackend::PySpy);
+        assert!(cfg.auto_open);
+    }
+
+    #[test]
+    fn build_with_hotspots_enables_include_hotspots() {
+        let component = ExecutableComponentBuilder::new("builder-test")
+            .with_build_tool(BuildTool::Cargo)
+            .with_executable_path("/bin/true")
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .with_hotspots()
+            .build();
+
+        let cfg = component.cpu_profile.expect("cpu profile configured");
+        assert!(cfg.include_hotspots);
+    }
+
+    #[test]
+    #[should_panic(expected = "is not supported for BuildTool::Dotnet")]
+    fn build_dotnet_with_cpu_profile_panics() {
+        ExecutableComponentBuilder::new("builder-test")
+            .with_build_tool(BuildTool::Dotnet)
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "is not supported for BuildTool::Make")]
+    fn build_make_with_cpu_profile_panics() {
+        ExecutableComponentBuilder::new("builder-test")
+            .with_build_tool(BuildTool::Make)
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "is not supported for BuildTool::CMake")]
+    fn build_cmake_with_cpu_profile_panics() {
+        ExecutableComponentBuilder::new("builder-test")
+            .with_build_tool(BuildTool::CMake)
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "is not supported for BuildTool::Custom")]
+    fn build_custom_with_cpu_profile_panics() {
+        ExecutableComponentBuilder::new("builder-test")
+            .with_build_tool(BuildTool::Custom {
+                command: "make-it-so".to_string(),
+                args: vec![],
+            })
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .build();
+    }
+
+    #[test]
+    #[should_panic(expected = "requires a build_tool of Cargo, Maven, Gradle, or Python")]
+    fn build_no_build_tool_with_cpu_profile_panics() {
+        ExecutableComponentBuilder::new("builder-test")
+            .with_cpu_profile("/tmp/does-not-matter.html")
+            .build();
+    }
+
+    #[test]
+    fn build_absolute_executable_path_kept_as_is() {
+        let component = ExecutableComponentBuilder::new("builder-test")
+            .with_executable_path("/bin/true")
+            .build();
+
+        assert_eq!(component.executable_path, Some(PathBuf::from("/bin/true")));
+    }
+
+    #[test]
+    fn build_relative_executable_path_not_found_falls_back_to_current_dir_join() {
+        let relative = PathBuf::from("arena-executable-component-nonexistent-binary");
+
+        let component = ExecutableComponentBuilder::new("builder-test")
+            .with_executable_path(relative.clone())
+            .build();
+
+        let expected = std::env::current_dir().unwrap().join(&relative);
+        assert_eq!(component.executable_path, Some(expected));
     }
 }

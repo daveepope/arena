@@ -32,6 +32,7 @@ import requests
 
 from arena_pytest import (
     ArenaLogLevel,
+    BuildTool,
     ClosedArena,
     EventRuleSpec,
     EventRuleTarget,
@@ -133,6 +134,10 @@ def _find_resource_file(filename: str) -> str:
     )
     p = os.path.join(root, "resources", filename)
     return p if os.path.isfile(p) else ""
+
+
+def _cpu_profile_output_path() -> str:
+    return os.path.join(tempfile.gettempdir(), f"arena-fastapi-example-cpu-profile-{os.getpid()}.html")
 
 
 def _find_fastapi_executable() -> str:
@@ -334,6 +339,8 @@ def closed_arena() -> ClosedArena:
     fastapi_component = (
         ExecutableComponentBuilder(COMPONENT_NAME_EXECUTABLE)
         .with_executable_path(exe)
+        .with_build_tool(BuildTool.PYTHON)
+        .with_hotspots()
         .with_env_var("WEB_APP_PORT", str(WEB_APP_PORT))
         .with_env_var("POSTGRES_CONNECTION_STRING", pg_cs)
         .with_env_var("CALIBRATION_URL", f"http://127.0.0.1:{CALIBRATION_HOST_PORT}")

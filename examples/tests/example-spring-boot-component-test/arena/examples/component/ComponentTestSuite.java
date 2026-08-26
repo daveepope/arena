@@ -34,6 +34,7 @@ import arena.junit.dep.smtp.SmtpDependency;
 import arena.junit.dep.smtp.SmtpDependencyBuilder;
 import arena.junit.dep.temporal.TemporalDependency;
 import arena.junit.dep.temporal.TemporalDependencyBuilder;
+import arena.junit.exec.BuildTool;
 import arena.junit.exec.ExecutableComponent;
 import arena.junit.exec.ExecutableComponentBuilder;
 import arena.junit.ffi.ArenaLogLevel;
@@ -308,8 +309,21 @@ public final class ComponentTestSuite {
       throw new IllegalStateException("failed to locate web app launcher runfile", e);
     }
     assertTrue(!appLauncher.isEmpty(), "web app launcher must be present under Bazel runfiles");
+    String cpuProfileOutputPath =
+        Path.of(
+                System.getProperty("java.io.tmpdir"),
+                "arena-spring-boot-example-cpu-profile-"
+                    + name
+                    + "-"
+                    + ProcessHandle.current().pid()
+                    + ".html")
+            .toString();
     return new ExecutableComponentBuilder(name)
         .withExecutablePath(appLauncher)
+        .withBuildTool(BuildTool.MAVEN)
+        .withCpuProfile(cpuProfileOutputPath)
+        .withCpuProfileAutoOpen()
+        .withHotspots()
         .withEnvVar("WEB_APP_PORT", String.valueOf(port))
         .withEnvVar(
             "POSTGRES_CONNECTION_STRING",

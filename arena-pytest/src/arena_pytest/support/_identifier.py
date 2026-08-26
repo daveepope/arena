@@ -46,12 +46,12 @@ def _new_suffix() -> str:
 
 
 def _has_suffix(name: str) -> bool:
-    if "-" not in name:
+    if "--" not in name:
         return False
-    last = name.rsplit("-", 1)[-1]
-    if len(last) != _SUFFIX_LEN:
+    suffix = name.rsplit("--", 1)[-1]
+    if len(suffix) != _SUFFIX_LEN:
         return False
-    return all(c in _ALPHABET for c in last)
+    return all(c in _ALPHABET for c in suffix)
 
 
 def build(module: str, name: str) -> str:
@@ -61,4 +61,4 @@ def build(module: str, name: str) -> str:
     suffix = _new_suffix()
     if not slug:
         return f"{module}-{suffix}"
-    return f"{module}-{slug}-{suffix}"
+    return f"{module}-{slug}--{suffix}"

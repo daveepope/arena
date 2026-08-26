@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [master]
     types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch: {}
   schedule:
     - cron: '17 6 * * *'
   push:

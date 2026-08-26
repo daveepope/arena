@@ -1,12 +1,12 @@
 module(
     name = "arena",
-    version = "6.1.0",
+    version = "6.2.0",
 )
 
 arena_version_ext = use_extension("//tools:arena_version.bzl", "arena_version")
 use_repo(arena_version_ext, "arena_version")
 
-bazel_dep(name = "rules_python", version = "0.34.0")
+bazel_dep(name = "rules_python", version = "1.4.1")
 bazel_dep(name = "rules_rust", version = "0.71.0")
 single_version_override(
     module_name = "rules_rust",
@@ -20,7 +20,7 @@ single_version_override(
 )
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "rules_java", version = "9.0.0")
-bazel_dep(name = "rules_jvm_external", version = "6.6")
+bazel_dep(name = "rules_jvm_external", version = "6.7")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 bazel_dep(name = "rules_dotnet", version = "0.20.0")
 bazel_dep(name = "rules_pkg", version = "1.0.1")
@@ -534,4 +534,40 @@ nuget_archive(
     id = "NexusRpc",
     sources = ["https://api.nuget.org/v3/index.json"],
     version = "0.3.0",
+)
+# py-spy is a binary-only crate (no library target), so it cannot be a normal
+# workspace Cargo.toml dependency of arena-profile; crate.from_specs vendors
+# and builds its binary from source independently of the Cargo.lock graph.
+crate.spec(package = "py-spy", version = "=0.4.2")
+crate.annotation(
+    crate = "py-spy",
+    repositories = ["profiling_tools"],
+    gen_all_binaries = True,
+)
+crate.from_specs(name = "profiling_tools")
+use_repo(crate, "profiling_tools")
+
+# async-profiler ships prebuilt release tarballs (not a Cargo crate), vendored
+# here with a checksum-pinned download so no host install is required. The
+# archive has no Bazel BUILD file of its own, so one is supplied inline
+# exposing the asprof launcher and its native agent library.
+_ASYNC_PROFILER_VERSION = "4.5"
+_ASYNC_PROFILER_BUILD_FILE_CONTENT = """
+exports_files(["bin/asprof", "lib/libasyncProfiler.so"])
+"""
+
+http_archive(
+    name = "async_profiler_linux_x64",
+    url = "https://github.com/async-profiler/async-profiler/releases/download/v{v}/async-profiler-{v}-linux-x64.tar.gz".format(v = _ASYNC_PROFILER_VERSION),
+    sha256 = "89546fbb9ee0fc5496c7edd4099b0709489bc78b0d8057ccbb4b801f6b032b62",
+    strip_prefix = "async-profiler-{}-linux-x64".format(_ASYNC_PROFILER_VERSION),
+    build_file_content = _ASYNC_PROFILER_BUILD_FILE_CONTENT,
+)
+
+http_archive(
+    name = "async_profiler_linux_arm64",
+    url = "https://github.com/async-profiler/async-profiler/releases/download/v{v}/async-profiler-{v}-linux-arm64.tar.gz".format(v = _ASYNC_PROFILER_VERSION),
+    sha256 = "64c41d1465d60097439c50d7e924b4946f1f62b1cbd21ce5b034fad09c0d6979",
+    strip_prefix = "async-profiler-{}-linux-arm64".format(_ASYNC_PROFILER_VERSION),
+    build_file_content = _ASYNC_PROFILER_BUILD_FILE_CONTENT,
 )
