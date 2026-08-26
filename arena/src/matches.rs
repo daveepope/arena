@@ -14,6 +14,21 @@ async fn stop_dependencies(deps: &mut [Dependency]) {
     }
 }
 
+fn find_dependency_mut<'a>(
+    deps: &'a mut [Dependency],
+    identifier: &str,
+) -> Option<&'a mut dyn RunnableDependency> {
+    for dep in deps.iter_mut() {
+        if dep.identifier() == identifier {
+            return Some(dep.as_mut());
+        }
+        if let Some(found) = find_dependency_mut(dep.children_mut(), identifier) {
+            return Some(found);
+        }
+    }
+    None
+}
+
 async fn stop_components(comps: &mut [Component]) {
     for comp in comps.iter_mut().rev() {
         comp.stop().await;
@@ -398,19 +413,11 @@ impl MatchTrait for Match {
     }
 
     fn dependency(&self, identifier: &str) -> Option<&(dyn RunnableDependency + '_)> {
-        self.dependencies
-            .iter()
-            .map(|d| d.as_ref())
-            .find(|d| d.identifier() == identifier)
+        super::dependency::find_dependency(&self.dependencies, identifier)
     }
 
     fn dependency_mut(&mut self, identifier: &str) -> Option<&mut (dyn RunnableDependency + '_)> {
-        for dep in &mut self.dependencies {
-            if dep.identifier() == identifier {
-                return Some(dep.as_mut());
-            }
-        }
-        None
+        find_dependency_mut(&mut self.dependencies, identifier)
     }
 
     async fn run_playbook(&self, identifier: &str) -> Option<Box<dyn ActivePlaybook>> {

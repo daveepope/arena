@@ -13,15 +13,14 @@ internal static class ArenaPaths
             return envVar;
 
         var assemblyDir = Path.GetDirectoryName(typeof(ArenaPaths).Assembly.Location);
-        if (!string.IsNullOrEmpty(assemblyDir))
-        {
-            foreach (var name in PlatformLibraryNames())
-            {
-                var candidate = Path.Combine(assemblyDir, name);
-                if (File.Exists(candidate))
-                    return candidate;
-            }
-        }
+
+        var coLocated = ResolveCoLocated(assemblyDir);
+        if (!string.IsNullOrEmpty(coLocated))
+            return coLocated;
+
+        var viaDepsFile = ResolveViaDepsFile(assemblyDir);
+        if (!string.IsNullOrEmpty(viaDepsFile))
+            return viaDepsFile;
 
         var runfilesRoot = Environment.GetEnvironmentVariable("RUNFILES_DIR");
         if (!string.IsNullOrEmpty(runfilesRoot))
@@ -41,7 +40,54 @@ internal static class ArenaPaths
         return null;
     }
 
-    private static string[] PlatformLibraryNames()
+    internal static string? ResolveCoLocated(string? assemblyDir)
+    {
+        if (string.IsNullOrEmpty(assemblyDir) || !Directory.Exists(assemblyDir))
+            return null;
+
+        foreach (var name in PlatformLibraryNames())
+        {
+            var candidate = Path.Combine(assemblyDir, name);
+            if (File.Exists(candidate))
+                return candidate;
+        }
+        return null;
+    }
+
+    internal static string? ResolveViaDepsFile(string? assemblyDir)
+    {
+        var resolverType = Type.GetType(
+            "System.Runtime.Loader.AssemblyDependencyResolver, System.Runtime.Loader", throwOnError: false);
+        var resolveMethod = resolverType?.GetMethod("ResolveUnmanagedDllToPath", new[] { typeof(string) });
+        if (resolverType is null || resolveMethod is null)
+            return null;
+
+        if (string.IsNullOrEmpty(assemblyDir) || !Directory.Exists(assemblyDir))
+            return null;
+
+        foreach (var depsFile in Directory.EnumerateFiles(assemblyDir, "*.deps.json"))
+        {
+            try
+            {
+                var mainAssemblyPath = depsFile.Substring(0, depsFile.Length - ".deps.json".Length) + ".dll";
+                var resolver = Activator.CreateInstance(resolverType, mainAssemblyPath);
+                foreach (var name in UnmanagedLibraryNames())
+                {
+                    var resolved = resolveMethod.Invoke(resolver, new object[] { name }) as string;
+                    if (!string.IsNullOrEmpty(resolved) && File.Exists(resolved))
+                        return resolved;
+                }
+            }
+            catch (Exception)
+            {
+            }
+        }
+        return null;
+    }
+
+    private static string[] UnmanagedLibraryNames() => new[] { "arena_ffi_shared", "arena_ffi" };
+
+    internal static string[] PlatformLibraryNames()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             return new[] { "libarena_ffi_shared.dylib", "libarena_ffi.dylib" };

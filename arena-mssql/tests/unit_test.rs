@@ -1,4 +1,4 @@
-use arena::dependency::RunnableDependency;
+use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_mssql::{MssqlDependency, MssqlImpl, DEFAULT_CONNECT_TIMEOUT};
 use async_trait::async_trait;
@@ -139,7 +139,7 @@ async fn start_stop_happy_path_records_events() {
         last_connection_string.lock().unwrap().as_deref(),
         Some("Server=tcp:127.0.0.1,1433;Database=master;User Id=sa;Password=pw;TrustServerCertificate=True;")
     );
-    assert_eq!(*last_timeout_ms.lock().unwrap(), Some(60_000));
+    assert_eq!(*last_timeout_ms.lock().unwrap(), Some(30_000));
 }
 
 #[tokio::test]
@@ -202,4 +202,97 @@ async fn builder_without_connect_timeout_disables_bounding() {
         .without_connect_timeout()
         .build();
     assert_eq!(dep.connect_timeout(), None);
+}
+
+struct NoopChildDependency;
+
+#[async_trait]
+impl RunnableDependency for NoopChildDependency {
+    fn identifier(&self) -> &str {
+        "mssql-child"
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
+    async fn start(&mut self) {}
+
+    async fn stop(&mut self) {}
+
+    fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
+    fn children(&self) -> &[Dependency] {
+        &[]
+    }
+    fn children_mut(&mut self) -> &mut [Dependency] {
+        &mut []
+    }
+
+    async fn soft_reset(&self) {}
+
+    async fn hard_reset(&mut self) {}
+}
+
+#[test]
+fn identifier_as_any_and_children_reflect_dependency_state() {
+    let mut dep = MssqlDependency::builder("mssql-accessors")
+        .with_database_name("master")
+        .with_impl(FakeMssqlImpl {
+            conn_str: None,
+            admin_conn_str: None,
+            events: Arc::new(Mutex::new(Vec::new())),
+        })
+        .build();
+
+    assert!(dep.identifier().contains("mssql-accessors"));
+    assert!(dep.as_any().downcast_ref::<MssqlDependency>().is_some());
+    assert!(dep.as_any_mut().downcast_mut::<MssqlDependency>().is_some());
+    assert!(dep.children().is_empty());
+    assert_eq!(dep.database_name(), "master");
+    assert!(dep.managed_tables().is_empty());
+    assert_eq!(dep.connection_string(), None);
+
+    dep.add_child(Box::new(NoopChildDependency));
+
+    assert_eq!(dep.children().len(), 1);
+    assert_eq!(dep.children_mut().len(), 1);
+}
+
+struct AlwaysOkReadinessCheck;
+
+#[async_trait]
+impl ReadinessCheck for AlwaysOkReadinessCheck {
+    async fn is_ready(
+        &self,
+        _identifier: &str,
+        _connection_string: &str,
+        _timeout_ms: u64,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn playbook_after_start_uses_connection_string() {
+    let mut dep = MssqlDependency::builder("mssql-playbook")
+        .with_database_name("master")
+        .with_impl(FakeMssqlImpl {
+            conn_str: None,
+            admin_conn_str: None,
+            events: Arc::new(Mutex::new(Vec::new())),
+        })
+        .with_readiness_check(AlwaysOkReadinessCheck)
+        .build();
+
+    dep.start().await;
+    assert_eq!(
+        dep.connection_string(),
+        Some("Server=tcp:127.0.0.1,1433;Database=fake;User Id=sa;Password=pw;TrustServerCertificate=True;")
+    );
+    let _playbook = dep.playbook();
+    dep.stop().await;
 }

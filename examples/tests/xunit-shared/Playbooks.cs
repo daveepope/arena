@@ -48,6 +48,22 @@ public static class Playbooks
         }
     }
 
+    public sealed class ResetReadingsDbPlaybook : ManagedPostgresPlaybook
+    {
+        public ResetReadingsDbPlaybook(string dependencyIdentifier)
+            : base("test-readings-db-scoped", dependencyIdentifier)
+        {
+        }
+    }
+
+    public sealed class ResetWeatherDbPlaybook : ManagedOraclePlaybook
+    {
+        public ResetWeatherDbPlaybook(string dependencyIdentifier)
+            : base("test-weather-db-scoped", dependencyIdentifier)
+        {
+        }
+    }
+
     public sealed class EventsPurgePlaybook : ManagedLocalstackPlaybook
     {
         public EventsPurgePlaybook(string dependencyIdentifier)

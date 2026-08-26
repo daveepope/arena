@@ -16,6 +16,8 @@ use crate::arena::{
 };
 use crate::http::{consume_reading_created_event, create_reading, get_readings, post_reading_raw};
 
+const CONSUME_READING_CREATED_EVENT_TIMEOUT_MS: u64 = 5000;
+
 async fn kafka_bootstrap(arena: &OpenArena) -> String {
     arena
         .dependency(KAFKA_ID.get().expect("kafka id initialized"))
@@ -30,21 +32,17 @@ where
     F: FnOnce() -> Fut,
     Fut: std::future::Future<Output = i32>,
 {
-    let (warmed_tx, warmed_rx) = std::sync::mpsc::channel();
-    let (id_tx, id_rx) = std::sync::mpsc::channel();
+    let (warmed_tx, warmed_rx) = tokio::sync::oneshot::channel();
+    let (id_tx, id_rx) = tokio::sync::oneshot::channel();
     let bootstrap = bootstrap.to_string();
-    let consume_handle = tokio::task::spawn_blocking(move || {
-        consume_reading_created_event(
-            bootstrap,
-            "readings".to_string(),
-            warmed_tx,
-            id_rx,
-            Duration::from_secs(15),
-        )
-    });
-    warmed_rx
-        .recv()
-        .expect("kafka consumer warmup");
+    let consume_handle = tokio::spawn(consume_reading_created_event(
+        bootstrap,
+        "readings".to_string(),
+        warmed_tx,
+        id_rx,
+        Duration::from_millis(CONSUME_READING_CREATED_EVENT_TIMEOUT_MS),
+    ));
+    warmed_rx.await.expect("kafka consumer warmup");
     let created_id = create().await;
     id_tx
         .send(created_id as i64)

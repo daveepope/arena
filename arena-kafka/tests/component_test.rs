@@ -1,14 +1,15 @@
 use arena::dependency::RunnableDependency;
+use arena_kafka::kafka_dependency::client::{connect_client, partition_client_for};
 use arena_kafka::{KafkaDependency, KafkaFlavor, TopicCreator};
 use futures::FutureExt;
-use rdkafka::admin::{AdminClient, AdminOptions};
-use rdkafka::config::ClientConfig;
-use rdkafka::consumer::{BaseConsumer, Consumer};
-use rdkafka::message::Message;
-use rdkafka::producer::{BaseProducer, BaseRecord, Producer};
+use rskafka::client::partition::{Compression, PartitionClient};
+use rskafka::client::Client;
+use rskafka::record::Record;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-const RDKAFKA_LOG_LEVEL_SILENT: &str = "0";
+const FETCH_MAX_WAIT_MS: i32 = 50;
+const CONSUME_TIMEOUT_MS: u64 = 2000;
+const DELETE_TOPIC_TIMEOUT_MS: i32 = 500;
 
 fn init_test_logging() {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
@@ -19,79 +20,42 @@ fn init_test_logging() {
         .try_init();
 }
 
-fn new_admin(
-    bootstrap: &str,
-) -> Result<AdminClient<rdkafka::client::DefaultClientContext>, String> {
-    ClientConfig::new()
-        .set("bootstrap.servers", bootstrap)
-        .set("log_level", RDKAFKA_LOG_LEVEL_SILENT)
-        .create()
-        .map_err(|e| format!("create kafka admin client failed: {e}"))
-}
-
-fn new_producer(bootstrap: &str) -> Result<BaseProducer, String> {
-    ClientConfig::new()
-        .set("bootstrap.servers", bootstrap)
-        .set("log_level", RDKAFKA_LOG_LEVEL_SILENT)
-        .set("message.timeout.ms", "2000")
-        .create()
-        .map_err(|e| format!("create kafka producer failed: {e}"))
-}
-
-fn new_consumer(bootstrap: &str, group_id: &str) -> Result<BaseConsumer, String> {
-    ClientConfig::new()
-        .set("bootstrap.servers", bootstrap)
-        .set("log_level", RDKAFKA_LOG_LEVEL_SILENT)
-        .set("group.id", group_id)
-        .set("enable.auto.commit", "false")
-        .set("auto.offset.reset", "earliest")
-        .create()
-        .map_err(|e| format!("create kafka consumer failed: {e}"))
-}
-
-fn spawn_poll_until_payload_observed(
-    consumer: BaseConsumer,
+async fn poll_until_payload_observed(
+    partition: PartitionClient,
     expected_payload: String,
     timeout: Duration,
-) -> tokio::task::JoinHandle<Result<(), String>> {
-    tokio::task::spawn_blocking(move || {
-        let expected_bytes = expected_payload.into_bytes();
-        let deadline = std::time::Instant::now() + timeout;
-        while std::time::Instant::now() < deadline {
-            match consumer.poll(Duration::from_millis(10)) {
-                None => {
-                    std::thread::sleep(Duration::from_millis(10));
-                }
-                Some(Err(e)) => return Err(format!("consume failed: {e}")),
-                Some(Ok(msg)) => {
-                    if let Some(bytes) = msg.payload() {
-                        if bytes == expected_bytes.as_slice() {
-                            return Ok(());
-                        }
-                    }
-                }
-            }
-        }
-        Err("did not observe produced message before timeout".to_string())
-    })
+) -> Result<(), String> {
+    let expected_bytes = expected_payload.into_bytes();
+    let deadline = tokio::time::Instant::now() + timeout;
+
+    let found = arena_kafka::kafka_dependency::client::consume_until(
+        &partition,
+        FETCH_MAX_WAIT_MS,
+        deadline,
+        |r| Ok((r.record.value.as_deref() == Some(expected_bytes.as_slice())).then_some(())),
+    )
+    .await?;
+
+    found.ok_or_else(|| "did not observe produced message before timeout".to_string())
 }
 
-fn produce_payload_once(producer: &BaseProducer, topic: &str, payload: &str) -> Result<(), String> {
-    let record = BaseRecord::to(topic)
-        .key("component-test")
-        .payload(payload.as_bytes());
-    producer
-        .send(record)
-        .map_err(|(e, _msg)| format!("produce failed: {e}"))?;
-    producer
-        .flush(Duration::from_secs(2))
-        .map_err(|e| format!("produce flush failed: {e}"))
+async fn produce_payload_once(partition: &PartitionClient, payload: &str) -> Result<(), String> {
+    let record = Record {
+        key: Some(b"component-test".to_vec()),
+        value: Some(payload.as_bytes().to_vec()),
+        headers: Default::default(),
+        timestamp: chrono::Utc::now(),
+    };
+    partition
+        .produce(vec![record], Compression::NoCompression)
+        .await
+        .map_err(|e| format!("produce failed: {e}"))?;
+    Ok(())
 }
 
 struct TestContext {
     kafka: KafkaDependency,
-    bootstrap: String,
-    admin: AdminClient<rdkafka::client::DefaultClientContext>,
+    client: Client,
     topic: String,
 }
 
@@ -124,7 +88,7 @@ impl TestContext {
             "dependency bootstrap known",
         );
 
-        let admin = match new_admin(&bootstrap) {
+        let client = match connect_client(&bootstrap).await {
             Ok(v) => v,
             Err(e) => {
                 kafka.stop().await;
@@ -141,33 +105,31 @@ impl TestContext {
 
         Ok(Self {
             kafka,
-            bootstrap,
-            admin,
+            client,
             topic,
         })
     }
 
-    fn create_topic(&self) -> Result<(), String> {
-        TopicCreator::create_topic(&self.bootstrap, &self.topic)
+    async fn create_topic(&self) -> Result<(), String> {
+        TopicCreator::create_topic(&self.client, &self.topic).await
     }
 
     async fn delete_topic_best_effort(&self) {
-        let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(2)));
-        let _ = self
-            .admin
-            .delete_topics(&[self.topic.as_str()], &opts)
-            .await;
+        if let Ok(controller) = self.client.controller_client() {
+            let _ = controller
+                .delete_topic(&self.topic, DELETE_TOPIC_TIMEOUT_MS)
+                .await;
+        }
     }
 
     async fn stop(mut self) {
-        drop(self.admin);
         self.kafka.stop().await;
     }
 }
 
 async fn assert_pub_sub_roundtrip(ctx: &TestContext) -> Result<(), String> {
     let sw = std::time::Instant::now();
-    ctx.create_topic()?;
+    ctx.create_topic().await?;
     tracing::info!(
         suite = "crate_component",
         crate_under_test = "arena_kafka",
@@ -181,10 +143,9 @@ async fn assert_pub_sub_roundtrip(ctx: &TestContext) -> Result<(), String> {
         .unwrap_or_default()
         .as_millis();
     let payload = format!("hello-from-component-test-{ts}");
-    let group_id = format!("arena-component-test-{ts}");
 
     let sw = std::time::Instant::now();
-    let consumer = new_consumer(&ctx.bootstrap, &group_id)?;
+    let consume_partition = partition_client_for(&ctx.client, &ctx.topic).await?;
     tracing::info!(
         suite = "crate_component",
         crate_under_test = "arena_kafka",
@@ -193,35 +154,14 @@ async fn assert_pub_sub_roundtrip(ctx: &TestContext) -> Result<(), String> {
         "timing checkpoint",
     );
 
-    let sw = std::time::Instant::now();
-    consumer
-        .subscribe(&[&ctx.topic])
-        .map_err(|e| format!("subscribe failed: {e}"))?;
-    tracing::info!(
-        suite = "crate_component",
-        crate_under_test = "arena_kafka",
-        step = "subscribe",
-        elapsed = ?sw.elapsed(),
-        "timing checkpoint",
-    );
+    let poll_handle = tokio::spawn(poll_until_payload_observed(
+        consume_partition,
+        payload.clone(),
+        Duration::from_millis(CONSUME_TIMEOUT_MS),
+    ));
 
     let sw = std::time::Instant::now();
-    for _ in 0..30 {
-        consumer.poll(Duration::from_millis(100));
-    }
-    tracing::info!(
-        suite = "crate_component",
-        crate_under_test = "arena_kafka",
-        step = "consumer_warmup",
-        elapsed = ?sw.elapsed(),
-        "timing checkpoint",
-    );
-
-    let poll_handle =
-        spawn_poll_until_payload_observed(consumer, payload.clone(), Duration::from_secs(5));
-
-    let sw = std::time::Instant::now();
-    let producer = new_producer(&ctx.bootstrap)?;
+    let produce_partition = partition_client_for(&ctx.client, &ctx.topic).await?;
     tracing::info!(
         suite = "crate_component",
         crate_under_test = "arena_kafka",
@@ -230,14 +170,8 @@ async fn assert_pub_sub_roundtrip(ctx: &TestContext) -> Result<(), String> {
         "timing checkpoint",
     );
 
-    let topic = ctx.topic.clone();
-    let payload_for_produce = payload.clone();
     let sw = std::time::Instant::now();
-    tokio::task::spawn_blocking(move || {
-        produce_payload_once(&producer, topic.as_str(), payload_for_produce.as_str())
-    })
-    .await
-    .map_err(|e| format!("produce task join failed: {e}"))??;
+    produce_payload_once(&produce_partition, &payload).await?;
     tracing::info!(
         suite = "crate_component",
         crate_under_test = "arena_kafka",

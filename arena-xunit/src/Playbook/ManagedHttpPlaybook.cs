@@ -13,6 +13,8 @@ public abstract class ManagedHttpPlaybook : ManagedPlaybook
         Mappings = mappings;
     }
 
+    internal override bool ActivatesBeforeTest => true;
+
     internal override string Kind => "http";
 
     internal override object BuildRegistrationConfig(bool execOnDependencyStart)

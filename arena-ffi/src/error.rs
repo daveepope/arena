@@ -11,7 +11,7 @@ pub enum ArenaStatus {
     NotFound = 4,
 }
 
-pub(crate) unsafe fn write_error(err_out: *mut *mut c_char, message: impl Into<String>) {
+pub unsafe fn write_error(err_out: *mut *mut c_char, message: impl Into<String>) {
     if err_out.is_null() {
         return;
     }
@@ -22,7 +22,7 @@ pub(crate) unsafe fn write_error(err_out: *mut *mut c_char, message: impl Into<S
     unsafe { *err_out = cstring.into_raw() };
 }
 
-pub(crate) unsafe fn clear_error(err_out: *mut *mut c_char) {
+pub unsafe fn clear_error(err_out: *mut *mut c_char) {
     if err_out.is_null() {
         return;
     }

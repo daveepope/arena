@@ -1,9 +1,12 @@
 package arena.junit.dep;
+import arena.junit.match.ArenaRunnableDependency;
 import arena.junit.support.ArenaIdentifiers;
 import arena.junit.support.ArenaJson;
+import arena.junit.support.ChildrenFfi;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class MssqlDependencyBuilder {
@@ -11,6 +14,7 @@ public final class MssqlDependencyBuilder {
       ArenaJson.object()
           .put("type", "mssql")
           .put("identifier", ArenaIdentifiers.build("arena-mssql", ""));
+  private final List<ArenaRunnableDependency> children = new ArrayList<>();
 
   public MssqlDependencyBuilder(String name) {
     config.put("identifier", ArenaIdentifiers.build("arena-mssql", name));
@@ -65,7 +69,16 @@ public final class MssqlDependencyBuilder {
     return this;
   }
 
+  public MssqlDependencyBuilder addChildDependency(ArenaRunnableDependency child) {
+    this.children.add(child);
+    return this;
+  }
+
   public MssqlDependency build() {
-    return new MssqlDependency(config.deepCopy());
+    ObjectNode cfg = config.deepCopy();
+    if (!children.isEmpty()) {
+      cfg.set("children", ChildrenFfi.buildDependencies(children));
+    }
+    return new MssqlDependency(cfg);
   }
 }

@@ -143,7 +143,11 @@ def test_playbook_class_scope_with_markers_runs_activate_and_drop(monkeypatch):
         "_activate_classes",
         lambda arena, matches, classes: [ActivePlaybook(object(), 1)],
     )
-    monkeypatch.setattr(arena_mod, "_drop_actives", lambda actives: dropped.append(len(actives)))
+    monkeypatch.setattr(
+        arena_mod,
+        "_finish_playbook_scope",
+        lambda arena, matches, actives, managed: dropped.append(len(actives)),
+    )
 
     request = MagicMock()
     request.cls = object()
@@ -182,7 +186,11 @@ def test_playbook_module_scope_with_markers_runs_activate_and_drop(monkeypatch):
         "_activate_classes",
         lambda arena, matches, classes: [ActivePlaybook(object(), 1)],
     )
-    monkeypatch.setattr(arena_mod, "_drop_actives", lambda actives: dropped.append(len(actives)))
+    monkeypatch.setattr(
+        arena_mod,
+        "_finish_playbook_scope",
+        lambda arena, matches, actives, managed: dropped.append(len(actives)),
+    )
 
     request = MagicMock()
     request.module = object()

@@ -1,4 +1,5 @@
 use arena_oauth::{ensure_scopes, validate_scopes, AccessTokenClaims, TokenError};
+use std::error::Error;
 
 fn sample_claims(scope: Option<&str>) -> AccessTokenClaims {
     AccessTokenClaims {
@@ -53,4 +54,40 @@ fn ensure_scopes_err_when_granted_does_not_include_required() {
 fn ensure_scopes_ok_when_granted_superset() {
     let claims = sample_claims(Some("openid profile email"));
     ensure_scopes(&claims, &["openid", "profile"]).unwrap();
+}
+
+#[test]
+fn token_error_display_formats_each_variant() {
+    let missing_scope = TokenError::MissingScope;
+    assert_eq!(missing_scope.to_string(), "missing scope claim");
+
+    let not_running = TokenError::NotRunning;
+    assert_eq!(not_running.to_string(), "oauth dependency is not running");
+
+    let insufficient = TokenError::InsufficientScope {
+        required: vec!["admin".to_string()],
+        granted: vec!["openid".to_string()],
+    };
+    let rendered = insufficient.to_string();
+    assert!(rendered.contains("insufficient scope"));
+    assert!(rendered.contains("admin"));
+    assert!(rendered.contains("openid"));
+}
+
+#[test]
+fn token_error_source_present_only_for_jwt_variant() {
+    assert!(TokenError::NotRunning.source().is_none());
+    assert!(TokenError::MissingScope.source().is_none());
+    assert!(TokenError::InsufficientScope {
+        required: vec![],
+        granted: vec![],
+    }
+    .source()
+    .is_none());
+}
+
+#[test]
+fn token_error_debug_reflects_variant_name() {
+    let debug = format!("{:?}", TokenError::NotRunning);
+    assert_eq!(debug, "NotRunning");
 }

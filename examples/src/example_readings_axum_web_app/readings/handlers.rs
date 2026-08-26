@@ -5,7 +5,8 @@ use arena_oauth::AccessTokenClaims;
 use axum::extract::{Extension, State};
 use axum::http::StatusCode;
 use axum::Json;
-use rdkafka::producer::{BaseRecord, Producer};
+use rskafka::client::partition::Compression;
+use rskafka::record::Record;
 use tokio::sync::Mutex;
 
 use crate::example_readings_axum_web_app::state::AppState;
@@ -14,6 +15,8 @@ use super::requests::CreateReadingRequest;
 use super::responses::{
     CalibrationResponse, CreateReadingResponse, ReadingCreatedEvent, ReadingRow,
 };
+
+const KAFKA_PUBLISH_TIMEOUT_MS: u64 = 500;
 
 pub async fn list_readings(
     State(st): State<AppState>,
@@ -141,20 +144,23 @@ pub async fn create_reading(
     .map_err(internal_error)?;
 
     let key = id.to_string();
-    let producer = st.kafka.clone();
-    let topic = st.kafka_topic.to_string();
-    let payload_for_send = payload.clone();
-    let key_for_send = key.clone();
-    tokio::task::spawn_blocking(move || {
-        let record = BaseRecord::to(topic.as_str())
-            .key(key_for_send.as_str())
-            .payload(payload_for_send.as_bytes());
-        if let Err((e, _msg)) = producer.send(record) {
-            tracing::debug!(error = %e, phase = "kafka_publish", "kafka publish failed");
-            return;
-        }
-        if let Err(e) = producer.flush(Duration::from_secs(2)) {
-            tracing::debug!(error = %e, phase = "kafka_flush", "kafka flush failed");
+    let partition = st.kafka.clone();
+    let record = Record {
+        key: Some(key.into_bytes()),
+        value: Some(payload.into_bytes()),
+        headers: Default::default(),
+        timestamp: chrono::Utc::now(),
+    };
+    tokio::spawn(async move {
+        match tokio::time::timeout(
+            Duration::from_millis(KAFKA_PUBLISH_TIMEOUT_MS),
+            partition.produce(vec![record], Compression::NoCompression),
+        )
+        .await
+        {
+            Err(_elapsed) => tracing::debug!(phase = "kafka_publish", "kafka publish timed out"),
+            Ok(Err(e)) => tracing::debug!(error = %e, phase = "kafka_publish", "kafka publish failed"),
+            Ok(Ok(_offsets)) => {}
         }
     });
 

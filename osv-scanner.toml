@@ -1,3 +1,19 @@
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0104"
 reason = "rustls-webpki DoS panic parsing a malformed CRL BIT STRING, only reachable when RevocationOptions/CRL checking is explicitly enabled. Pulled in transitively via tiberius's rustls feature (old tokio-rustls 0.24 / rustls 0.21 chain, unpatched upstream on that branch). tiberius never enables CRL/revocation checking, so the vulnerable code path is unreachable."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2023-0071"
+reason = "rsa 0.9.10 Marvin Attack timing side-channel (arena-oauth, jsonwebtoken). No fixed release exists upstream. Usage is local RSA keypair generation and JWT signing/verification against ephemeral test credentials, not decryption of attacker-supplied ciphertext over an untrusted network."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0134"
+reason = "rustls-pemfile 1.0.4 unmaintained warning, pulled in via tiberius 0.12.3 (arena-mssql). No fixed release exists upstream for this tiberius chain."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0098"
+reason = "rustls-webpki 0.101.7 name-constraint parsing bug, pulled in via tiberius 0.12.3 (arena-mssql). tiberius has no released or unreleased fix; the only workaround is switching tiberius's TLS backend from rustls to native-tls, which trades this for a hard runtime dependency on system OpenSSL. Arena's MSSQL connections are to ephemeral, self-hosted containers on a local/Docker network, not exposed to an untrusted network path."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0099"
+reason = "rustls-webpki 0.101.7 CRL-parsing bug, pulled in via tiberius 0.12.3 (arena-mssql). Same tiberius chain as RUSTSEC-2026-0098; no fixed release exists upstream."

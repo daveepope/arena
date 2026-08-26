@@ -9,6 +9,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public final class ApiClient {
 
@@ -114,6 +115,35 @@ public final class ApiClient {
       }
     }
     throw new AssertionError("reading id not listed: " + id);
+  }
+
+  public long createWeatherReport(double precipitation, double humidity, double pressure)
+      throws Exception {
+    HttpResponse<String> response = postWeatherReportRaw(precipitation, humidity, pressure);
+    requireOk(response, "POST /weather");
+    return mapper.readTree(response.body()).path("id").asLong();
+  }
+
+  public HttpResponse<String> postWeatherReportRaw(
+      double precipitation, double humidity, double pressure) throws Exception {
+    String body =
+        mapper.writeValueAsString(
+            Map.of("precipitation", precipitation, "humidity", humidity, "pressure", pressure));
+    return post("/weather", body);
+  }
+
+  public List<JsonNode> getWeatherReports() throws Exception {
+    HttpResponse<String> response = get("/weather");
+    requireOk(response, "GET /weather");
+    JsonNode rows = mapper.readTree(response.body());
+    if (!rows.isArray()) {
+      throw new AssertionError("expected weather array: " + response.body());
+    }
+    List<JsonNode> out = new ArrayList<>();
+    for (JsonNode row : rows) {
+      out.add(row);
+    }
+    return out;
   }
 
   private int readCreatedReadingId(HttpResponse<String> response) throws Exception {

@@ -98,7 +98,7 @@ public sealed class ClosedArena
 
     private sealed class ConsoleLogger : ILogger
     {
-        public IDisposable? BeginScope<TState>(TState state) => null;
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel level) => true;
         public void Log<TState>(LogLevel level, EventId eventId, TState state,
             Exception? exception, Func<TState, Exception?, string> formatter)

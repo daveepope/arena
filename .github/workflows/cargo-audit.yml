@@ -1,0 +1,32 @@
+name: Cargo Audit
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "Cargo.lock"
+      - ".cargo/audit.toml"
+  push:
+    branches: [master]
+    paths:
+      - "Cargo.lock"
+      - ".cargo/audit.toml"
+  schedule:
+    - cron: "0 6 * * *"
+
+permissions: read-all
+
+jobs:
+  audit:
+    name: cargo audit
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      checks: write
+      issues: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

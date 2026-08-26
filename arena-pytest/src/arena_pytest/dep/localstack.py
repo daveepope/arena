@@ -5,7 +5,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
 from arena_pytest.ffi._ffi import match_playbook_run
-from arena_pytest.playbook import ActiveLocalstackPlaybook, Playbook
+from arena_pytest.ffi._ffi_children import children_for_ffi
+from arena_pytest.playbook import ActiveLocalstackPlaybook, ManagedPlaybook
 from arena_pytest.support._identifier import build as _build_identifier
 
 if TYPE_CHECKING:
@@ -90,6 +91,7 @@ class LocalstackDependencyBuilder:
             "event_buses": [],
             "event_rules": [],
         }
+        self._children: List[Any] = []
 
     def with_port(self, port: int) -> "LocalstackDependencyBuilder":
         self._config["port"] = int(port)
@@ -156,16 +158,25 @@ class LocalstackDependencyBuilder:
         })
         return self
 
+    def with_child_dependencies(self, children: List[Any]) -> "LocalstackDependencyBuilder":
+        self._children.extend(children)
+        return self
+
     def build(self) -> "LocalstackDependency":
-        return LocalstackDependency(dict(self._config))
+        return LocalstackDependency(dict(self._config), children=list(self._children))
 
     def _for_ffi(self) -> Dict[str, Any]:
-        return dict(self._config)
+        d = dict(self._config)
+        children = children_for_ffi(self._children)
+        if children:
+            d["children"] = children
+        return d
 
 
 class LocalstackDependency:
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], children: Optional[List[Any]] = None):
         self._config = config
+        self._children = children or []
 
     @property
     def identifier(self) -> str:
@@ -207,10 +218,14 @@ class LocalstackDependency:
         return f"arn:aws:lambda:{region}:{account_id}:function:{function_name}"
 
     def _for_ffi(self) -> Dict[str, Any]:
-        return self._config
+        d = dict(self._config)
+        children = children_for_ffi(self._children)
+        if children:
+            d["children"] = children
+        return d
 
 
-class ManagedLocalstackPlaybook(Playbook):
+class ManagedLocalstackPlaybook(ManagedPlaybook):
     def __init__(
         self,
         *,

@@ -1,4 +1,4 @@
-use arena::dependency::Dependency;
+use arena::dependency::{find_dependency, Dependency};
 use arena::playbook::{ActivePlaybook, Playbook as PlaybookTrait};
 use async_trait::async_trait;
 
@@ -29,9 +29,7 @@ impl PlaybookTrait for ManagedLocalstackPlaybook {
     }
 
     async fn run(&self, dependencies: &[Dependency]) -> Box<dyn ActivePlaybook> {
-        let localstack = dependencies
-            .iter()
-            .find(|d| d.identifier() == self.dependency_identifier)
+        let localstack = find_dependency(dependencies, &self.dependency_identifier)
             .and_then(|d| d.as_any().downcast_ref::<LocalstackDependency>())
             .unwrap_or_else(|| {
                 panic!(

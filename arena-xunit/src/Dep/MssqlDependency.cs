@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using ArenaDotnet.Xunit.Support;
+using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Dep;
 
@@ -9,7 +10,7 @@ public enum MssqlEncryption
     On
 }
 
-public sealed class MssqlDependency : IArenaMatchPiece
+public sealed class MssqlDependency : IArenaDependency
 {
     public string Type => "mssql";
     public string Identifier { get; }
@@ -18,7 +19,13 @@ public sealed class MssqlDependency : IArenaMatchPiece
     public string? DatabaseName { get; }
     public string? DatabaseUsername { get; }
     public string? DatabasePassword { get; }
+    public string? ImageName { get; }
+    public string? Image { get; }
+    public string? ContainerName { get; }
     public IReadOnlyList<string> StartupSqlScripts { get; }
+    public List<JToken>? Children => ChildrenWireFormat.Build(_children);
+
+    private readonly IReadOnlyList<IArenaDependency> _children;
 
     internal MssqlDependency(
         string identifier,
@@ -27,7 +34,11 @@ public sealed class MssqlDependency : IArenaMatchPiece
         string? databaseName,
         string? databaseUsername,
         string? databasePassword,
-        IReadOnlyList<string> startupSqlScripts)
+        string? imageName,
+        string? image,
+        string? containerName,
+        IReadOnlyList<string> startupSqlScripts,
+        IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -35,7 +46,11 @@ public sealed class MssqlDependency : IArenaMatchPiece
         DatabaseName = databaseName;
         DatabaseUsername = databaseUsername;
         DatabasePassword = databasePassword;
+        ImageName = imageName;
+        Image = image;
+        ContainerName = containerName;
         StartupSqlScripts = startupSqlScripts;
+        _children = children;
     }
 
     public string ForFfi()
@@ -52,7 +67,11 @@ public sealed class MssqlDependencyBuilder
     private string? _databaseName;
     private string? _databaseUsername;
     private string? _databasePassword;
+    private string? _imageName;
+    private string? _image;
+    private string? _containerName;
     private readonly List<string> _startupSqlScripts = new();
+    private readonly List<IArenaDependency> _children = new();
 
     public MssqlDependencyBuilder(string name)
     {
@@ -89,15 +108,39 @@ public sealed class MssqlDependencyBuilder
         return this;
     }
 
+    public MssqlDependencyBuilder WithImageName(string imageName)
+    {
+        _imageName = imageName;
+        return this;
+    }
+
+    public MssqlDependencyBuilder WithImage(string image)
+    {
+        _image = image;
+        return this;
+    }
+
+    public MssqlDependencyBuilder WithContainerName(string containerName)
+    {
+        _containerName = containerName;
+        return this;
+    }
+
     public MssqlDependencyBuilder WithStartupSqlScripts(IEnumerable<string> scripts)
     {
         _startupSqlScripts.AddRange(scripts);
         return this;
     }
 
+    public MssqlDependencyBuilder AddChildDependency(IArenaDependency child)
+    {
+        _children.Add(child);
+        return this;
+    }
+
     public MssqlDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-mssql", _name);
-        return new MssqlDependency(identifier, _port, _encryption, _databaseName, _databaseUsername, _databasePassword, _startupSqlScripts);
+        return new MssqlDependency(identifier, _port, _encryption, _databaseName, _databaseUsername, _databasePassword, _imageName, _image, _containerName, _startupSqlScripts, _children);
     }
 }

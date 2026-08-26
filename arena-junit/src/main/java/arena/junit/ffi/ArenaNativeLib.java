@@ -3,6 +3,7 @@ import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.PointerByReference;
+import java.util.Map;
 
 interface ArenaNativeLib extends Library {
   void arena_set_log_level(int level);
@@ -42,15 +43,21 @@ interface ArenaNativeLib extends Library {
   int arena_mssql_playbook_verify(Pointer handle, String specJson, PointerByReference errOut);
 
   int arena_postgres_playbook_verify(Pointer handle, String specJson, PointerByReference errOut);
+
+  int arena_oracle_playbook_verify(Pointer handle, String specJson, PointerByReference errOut);
 }
 
 final class ArenaNativeHolder {
   static final ArenaNativeLib LIB;
 
   static {
+    // The native side (Rust) requires UTF-8; without this, JNA falls back to the
+    // JVM's platform-default encoding for String<->native marshaling, which is
+    // UTF-8 on Linux/macOS but commonly a Windows codepage (e.g. Cp1252) on Windows.
+    Map<String, Object> options = Map.of(Library.OPTION_STRING_ENCODING, "UTF-8");
     String path = ArenaPaths.resolveArenaSharedLibrary();
     if (path != null && !path.isEmpty()) {
-      LIB = Native.load(path, ArenaNativeLib.class);
+      LIB = Native.load(path, ArenaNativeLib.class, options);
     } else {
       LIB = ArenaPaths.loadFromClasspath(ArenaNativeLib.class);
     }

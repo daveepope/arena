@@ -3,3 +3,5 @@ pytest-asyncio>=1.0.0
 requests>=2.33.0
 kafka-python-ng>=2.0.0
 urllib3>=2.7.0
+idna>=3.15
+pygments>=2.20.0

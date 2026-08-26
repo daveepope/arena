@@ -19,7 +19,7 @@ public class MatchBuilderTest
     [Fact]
     public void Build_WithNullName_Throws()
     {
-        Assert.Throws<System.ArgumentNullException>(() => new MatchBuilder(null));
+        Assert.Throws<System.ArgumentNullException>(() => new MatchBuilder(null!));
     }
 
     [Fact]
@@ -75,5 +75,56 @@ public class MatchBuilderTest
         var json = match.ForFfi();
         var obj = JObject.Parse(json);
         Assert.Equal("my-network", obj["network"]);
+    }
+
+    [Fact]
+    public void RegisterPlaybook_UnmanagedPlaybook_AddsToPlaybooks()
+    {
+        var playbook = new UnmanagedPlaybookTest.TestUnmanagedPlaybook("seed-id");
+        var match = new MatchBuilder("my-match")
+            .RegisterPlaybook(playbook, false)
+            .Build();
+        Assert.Single(match.Playbooks);
+    }
+
+    [Fact]
+    public void RegisterPlaybook_UnmanagedPlaybookOmittedFromFfi_ExcludesFromPlaybooksArray()
+    {
+        var playbook = new UnmanagedPlaybookTest.TestUnmanagedPlaybook("seed-id");
+        var match = new MatchBuilder("my-match")
+            .RegisterPlaybook(playbook, false)
+            .Build();
+        var json = match.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.True(obj["playbooks"] == null || !obj["playbooks"]!.Any());
+    }
+
+    [Fact]
+    public void RegisterPlaybook_UnmanagedPlaybookWithExecOnDependencyStart_Throws()
+    {
+        var playbook = new UnmanagedPlaybookTest.TestUnmanagedPlaybook("seed-id");
+        Assert.Throws<System.ArgumentException>(
+            () => new MatchBuilder("my-match").RegisterPlaybook(playbook, true));
+    }
+
+    [Fact]
+    public void RegisterPlaybook_BarePlaybookInterface_Throws()
+    {
+        var playbook = new BarePlaybook();
+        Assert.Throws<System.ArgumentException>(
+            () => new MatchBuilder("my-match").RegisterPlaybook(playbook, false));
+    }
+
+    [Fact]
+    public void RegisterPlaybook_NullPlaybook_ThrowsArgumentNullException()
+    {
+        Assert.Throws<System.ArgumentNullException>(
+            () => new MatchBuilder("my-match").RegisterPlaybook(null!, false));
+    }
+
+    private class BarePlaybook : Playbook.IPlaybook
+    {
+        public string Identifier => "bare-id";
+        public ActivePlaybook Run(OpenArena arena) => throw new System.NotImplementedException();
     }
 }

@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using ArenaDotnet.Xunit.Support;
+using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Dep;
 
-public sealed class PostgresDependency : IArenaMatchPiece
+public sealed class PostgresDependency : IArenaDependency
 {
     public string Type => "postgres";
     public string Identifier { get; }
@@ -11,7 +12,13 @@ public sealed class PostgresDependency : IArenaMatchPiece
     public string? DatabaseName { get; }
     public string? DatabaseUsername { get; }
     public string? DatabasePassword { get; }
+    public string? ImageName { get; }
+    public string? Image { get; }
+    public string? ContainerName { get; }
     public IReadOnlyList<string> StartupSqlScripts { get; }
+    public List<JToken>? Children => ChildrenWireFormat.Build(_children);
+
+    private readonly IReadOnlyList<IArenaDependency> _children;
 
     internal PostgresDependency(
         string identifier,
@@ -19,14 +26,22 @@ public sealed class PostgresDependency : IArenaMatchPiece
         string? databaseName,
         string? databaseUsername,
         string? databasePassword,
-        IReadOnlyList<string> startupSqlScripts)
+        string? imageName,
+        string? image,
+        string? containerName,
+        IReadOnlyList<string> startupSqlScripts,
+        IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
         DatabaseName = databaseName;
         DatabaseUsername = databaseUsername;
         DatabasePassword = databasePassword;
+        ImageName = imageName;
+        Image = image;
+        ContainerName = containerName;
         StartupSqlScripts = startupSqlScripts;
+        _children = children;
     }
 
     public string ForFfi()
@@ -42,7 +57,11 @@ public sealed class PostgresDependencyBuilder
     private string? _databaseName;
     private string? _databaseUsername;
     private string? _databasePassword;
+    private string? _imageName;
+    private string? _image;
+    private string? _containerName;
     private readonly List<string> _startupSqlScripts = new();
+    private readonly List<IArenaDependency> _children = new();
 
     public PostgresDependencyBuilder(string name)
     {
@@ -73,15 +92,39 @@ public sealed class PostgresDependencyBuilder
         return this;
     }
 
+    public PostgresDependencyBuilder WithImageName(string imageName)
+    {
+        _imageName = imageName;
+        return this;
+    }
+
+    public PostgresDependencyBuilder WithImage(string image)
+    {
+        _image = image;
+        return this;
+    }
+
+    public PostgresDependencyBuilder WithContainerName(string containerName)
+    {
+        _containerName = containerName;
+        return this;
+    }
+
     public PostgresDependencyBuilder WithStartupSqlScripts(IEnumerable<string> scripts)
     {
         _startupSqlScripts.AddRange(scripts);
         return this;
     }
 
+    public PostgresDependencyBuilder AddChildDependency(IArenaDependency child)
+    {
+        _children.Add(child);
+        return this;
+    }
+
     public PostgresDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-postgres", _name);
-        return new PostgresDependency(identifier, _port, _databaseName, _databaseUsername, _databasePassword, _startupSqlScripts);
+        return new PostgresDependency(identifier, _port, _databaseName, _databaseUsername, _databasePassword, _imageName, _image, _containerName, _startupSqlScripts, _children);
     }
 }

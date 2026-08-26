@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import arena.junit.ArenaExtension;
 import arena.junit.OpenArena;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableDependency;
 import arena.junit.match.Match;
 import arena.junit.match.MatchBuilder;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -17,7 +17,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.jna.Pointer;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -240,9 +242,246 @@ final class PlaybookInvocationExtensionUnitTest {
     @SuppressWarnings("unchecked")
     List<ActivePlaybook> opened = (List<ActivePlaybook>) actives.invoke(scope);
     assertEquals(1, opened.size());
-    Method close = scope.getClass().getDeclaredMethod("close");
-    close.setAccessible(true);
-    close.invoke(scope);
+    Method finish = scope.getClass().getDeclaredMethod("finish");
+    finish.setAccessible(true);
+    finish.invoke(scope);
+  }
+
+  @Test
+  void openScope_managedPlaybook_defersRunToFinish() throws Exception {
+    List<String> calls = new ArrayList<>();
+    ManagedStubPlaybook managed = new ManagedStubPlaybook("cleanup", calls, false);
+    OpenArena arena = openArenaWithPlaybooks(managed);
+
+    Object scope = invokeOpenScope(arena, ManagedStubPlaybook.class);
+    assertEquals(List.of(), calls);
+    assertEquals(0, activesOf(scope).size());
+
+    invokeFinish(scope);
+    assertEquals(List.of("cleanup"), calls);
+  }
+
+  @Test
+  void openScope_unmanagedPlaybook_runsBeforeFinish() throws Exception {
+    List<String> calls = new ArrayList<>();
+    UnitStubPlaybook seed = new UnitStubPlaybook();
+    OpenArena arena = openArenaWithPlaybooks(seed);
+
+    Object scope = invokeOpenScope(arena, UnitStubPlaybook.class);
+    assertEquals(1, activesOf(scope).size());
+
+    invokeFinish(scope);
+  }
+
+  @Test
+  void openScope_mixedStack_runsUnmanagedBeforeAndManagedAfter() throws Exception {
+    List<String> calls = new ArrayList<>();
+    ManagedOrderStubPlaybook managed = new ManagedOrderStubPlaybook("managed", calls, false);
+    UnmanagedOrderStubPlaybook unmanaged = new UnmanagedOrderStubPlaybook("unmanaged", calls);
+    Match match =
+        new MatchBuilder("mixed-match")
+            .registerPlaybook(managed, false)
+            .registerPlaybook(unmanaged, false)
+            .build();
+    OpenArena arena = newOpenArena(List.of(match));
+
+    Object scope = invokeOpenScope(arena, ManagedOrderStubPlaybook.class, UnmanagedOrderStubPlaybook.class);
+    assertEquals(List.of("unmanaged"), calls);
+
+    invokeFinish(scope);
+    assertEquals(List.of("unmanaged", "managed"), calls);
+  }
+
+  @Test
+  void openScope_managedPlaybookOverridingActivatesBeforeTest_runsBeforeFinish() throws Exception {
+    List<String> calls = new ArrayList<>();
+    ManagedStubPlaybook preconfigured = new ManagedStubPlaybook("preconfigured", calls, true);
+    OpenArena arena = openArenaWithPlaybooks(preconfigured);
+
+    Object scope = invokeOpenScope(arena, ManagedStubPlaybook.class);
+    assertEquals(List.of("preconfigured"), calls);
+    assertEquals(1, activesOf(scope).size());
+
+    invokeFinish(scope);
+    assertEquals(List.of("preconfigured"), calls);
+  }
+
+  @Test
+  void finish_oneManagedPlaybookFails_stillRunsRemainingManagedPlaybooks() throws Exception {
+    List<String> calls = new ArrayList<>();
+    FailingManagedStubPlaybook failing = new FailingManagedStubPlaybook("failing", calls);
+    ManagedStubPlaybook cleanup = new ManagedStubPlaybook("cleanup", calls, false);
+    Match match =
+        new MatchBuilder("resilience-match")
+            .registerPlaybook(failing, false)
+            .registerPlaybook(cleanup, false)
+            .build();
+    OpenArena arena = newOpenArena(List.of(match));
+
+    Object scope = invokeOpenScope(arena, FailingManagedStubPlaybook.class, ManagedStubPlaybook.class);
+
+    RuntimeException error = assertThrows(RuntimeException.class, () -> invokeFinish(scope));
+    assertTrue(error.getMessage().contains("boom"));
+    assertEquals(List.of("failing", "cleanup"), calls);
+  }
+
+  private static Object invokeOpenScope(OpenArena arena, Class<? extends Playbook>... classes)
+      throws Exception {
+    Method openScope =
+        PlaybookInvocationExtension.class.getDeclaredMethod(
+            "openScope", OpenArena.class, Class[].class);
+    openScope.setAccessible(true);
+    return openScope.invoke(null, arena, classes);
+  }
+
+  private static void invokeFinish(Object scope) throws Exception {
+    Method finish = scope.getClass().getDeclaredMethod("finish");
+    finish.setAccessible(true);
+    try {
+      finish.invoke(scope);
+    } catch (InvocationTargetException e) {
+      if (e.getCause() instanceof RuntimeException re) {
+        throw re;
+      }
+      throw e;
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<ActivePlaybook> activesOf(Object scope) throws Exception {
+    Method actives = scope.getClass().getDeclaredMethod("actives");
+    actives.setAccessible(true);
+    return (List<ActivePlaybook>) actives.invoke(scope);
+  }
+
+  private static OpenArena openArenaWithPlaybooks(Playbook playbook) throws Exception {
+    Match match = new MatchBuilder("multi-match").registerPlaybook(playbook, false).build();
+    return newOpenArena(List.of(match));
+  }
+
+  private static OpenArena newOpenArena(List<Match> matches) throws Exception {
+    Constructor<OpenArena> constructor =
+        OpenArena.class.getDeclaredConstructor(Pointer.class, long.class, List.class);
+    constructor.setAccessible(true);
+    return constructor.newInstance(new Pointer(1), 0L, matches);
+  }
+
+  static final class ManagedStubPlaybook implements ManagedPlaybook, PlaybookRegistration {
+    private final String identifier;
+    private final List<String> calls;
+    private final boolean activatesBeforeTest;
+
+    ManagedStubPlaybook(String identifier, List<String> calls, boolean activatesBeforeTest) {
+      this.identifier = identifier;
+      this.calls = calls;
+      this.activatesBeforeTest = activatesBeforeTest;
+    }
+
+    @Override
+    public String identifier() {
+      return identifier;
+    }
+
+    @Override
+    public boolean activatesBeforeTest() {
+      return activatesBeforeTest;
+    }
+
+    @Override
+    public ActivePlaybook run(OpenArena arena) {
+      calls.add(identifier);
+      return new StubQuietActivePlaybook();
+    }
+
+    @Override
+    public ObjectNode forRegisteredFfi() {
+      return JsonNodeFactory.instance.objectNode().put("kind", "http").put("identifier", identifier);
+    }
+  }
+
+  static final class ManagedOrderStubPlaybook implements ManagedPlaybook, PlaybookRegistration {
+    private final String identifier;
+    private final List<String> calls;
+    private final boolean activatesBeforeTest;
+
+    ManagedOrderStubPlaybook(String identifier, List<String> calls, boolean activatesBeforeTest) {
+      this.identifier = identifier;
+      this.calls = calls;
+      this.activatesBeforeTest = activatesBeforeTest;
+    }
+
+    @Override
+    public String identifier() {
+      return identifier;
+    }
+
+    @Override
+    public boolean activatesBeforeTest() {
+      return activatesBeforeTest;
+    }
+
+    @Override
+    public ActivePlaybook run(OpenArena arena) {
+      calls.add(identifier);
+      return new StubQuietActivePlaybook();
+    }
+
+    @Override
+    public ObjectNode forRegisteredFfi() {
+      return JsonNodeFactory.instance.objectNode().put("kind", "http").put("identifier", identifier);
+    }
+  }
+
+  static final class UnmanagedOrderStubPlaybook implements UnmanagedPlaybook, PlaybookRegistration {
+    private final String identifier;
+    private final List<String> calls;
+
+    UnmanagedOrderStubPlaybook(String identifier, List<String> calls) {
+      this.identifier = identifier;
+      this.calls = calls;
+    }
+
+    @Override
+    public String identifier() {
+      return identifier;
+    }
+
+    @Override
+    public ActivePlaybook run(OpenArena arena) {
+      calls.add(identifier);
+      return new StubQuietActivePlaybook();
+    }
+
+    @Override
+    public ObjectNode forRegisteredFfi() {
+      return JsonNodeFactory.instance.objectNode().put("kind", "http").put("identifier", identifier);
+    }
+  }
+
+  static final class FailingManagedStubPlaybook implements ManagedPlaybook, PlaybookRegistration {
+    private final String identifier;
+    private final List<String> calls;
+
+    FailingManagedStubPlaybook(String identifier, List<String> calls) {
+      this.identifier = identifier;
+      this.calls = calls;
+    }
+
+    @Override
+    public String identifier() {
+      return identifier;
+    }
+
+    @Override
+    public ActivePlaybook run(OpenArena arena) {
+      calls.add(identifier);
+      throw new RuntimeException("boom");
+    }
+
+    @Override
+    public ObjectNode forRegisteredFfi() {
+      return JsonNodeFactory.instance.objectNode().put("kind", "http").put("identifier", identifier);
+    }
   }
 
   private static ExtensionContext classContext(Class<?> testClass) {
@@ -278,7 +517,7 @@ final class PlaybookInvocationExtensionUnitTest {
     return constructor.newInstance(new Pointer(1), 0L, List.of(match));
   }
 
-  static final class TopologyMarker implements ArenaMatchPiece {
+  static final class TopologyMarker implements ArenaRunnableDependency {
     @Override
     public ObjectNode forFfi() {
       return JsonNodeFactory.instance.objectNode();
@@ -311,7 +550,7 @@ final class PlaybookInvocationExtensionUnitTest {
     void scopedTest() {}
   }
 
-  static final class UnregisteredPlaybook implements Playbook, PlaybookRegistration {
+  static final class UnregisteredPlaybook implements UnmanagedPlaybook, PlaybookRegistration {
     @Override
     public String identifier() {
       return "missing";
@@ -328,7 +567,7 @@ final class PlaybookInvocationExtensionUnitTest {
     }
   }
 
-  static final class UnitStubPlaybook implements Playbook, PlaybookRegistration {
+  static final class UnitStubPlaybook implements UnmanagedPlaybook, PlaybookRegistration {
     @Override
     public String identifier() {
       return "unit-stub";
@@ -347,9 +586,10 @@ final class PlaybookInvocationExtensionUnitTest {
 
   private static void seedOpenArena(Class<?> hostClass, OpenArena openArena) throws Exception {
     Class<?> cachedArenaClass = Class.forName("arena.junit.ArenaExtension$CachedArena");
-    Constructor<?> cachedArenaConstructor = cachedArenaClass.getDeclaredConstructor(OpenArena.class);
+    Constructor<?> cachedArenaConstructor =
+        cachedArenaClass.getDeclaredConstructor(OpenArena.class, Integer.class);
     cachedArenaConstructor.setAccessible(true);
-    Object cachedArena = cachedArenaConstructor.newInstance(openArena);
+    Object cachedArena = cachedArenaConstructor.newInstance(openArena, null);
     Field refsField = cachedArenaClass.getDeclaredField("refs");
     refsField.setAccessible(true);
     refsField.setInt(cachedArena, 1);
@@ -417,9 +657,10 @@ final class PlaybookInvocationExtensionUnitTest {
   private static Object newPlaybookScope(List<ActivePlaybook> actives) throws Exception {
     Class<?> scopeClass =
         Class.forName("arena.junit.playbook.PlaybookInvocationExtension$PlaybookScope");
-    Constructor<?> constructor = scopeClass.getDeclaredConstructor(List.class);
+    Constructor<?> constructor =
+        scopeClass.getDeclaredConstructor(OpenArena.class, List.class, List.class);
     constructor.setAccessible(true);
-    return constructor.newInstance(actives);
+    return constructor.newInstance(null, actives, List.of());
   }
 
   private static String methodScopeKey() throws Exception {
@@ -445,6 +686,13 @@ final class PlaybookInvocationExtensionUnitTest {
   private static final class StubNonHttpActivePlaybook extends ActivePlaybook {
     StubNonHttpActivePlaybook() {
       super(new Pointer(2));
+    }
+  }
+
+  private static final class StubQuietActivePlaybook extends ActivePlaybook {
+    StubQuietActivePlaybook() {
+      super(new Pointer(3));
+      noteBodyFailure();
     }
   }
 

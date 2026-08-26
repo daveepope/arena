@@ -1,7 +1,8 @@
 package arena.junit;
 
 import arena.junit.ffi.ArenaLogLevel;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableComponent;
+import arena.junit.match.ArenaRunnableDependency;
 import arena.junit.match.Match;
 import arena.junit.match.MatchBuilder;
 import arena.junit.playbook.Playbook;
@@ -11,7 +12,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -22,13 +25,21 @@ import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolutionException;
 import org.junit.jupiter.api.extension.ParameterResolver;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback, ParameterResolver {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ArenaExtension.class);
   private static final ConcurrentHashMap<Class<?>, CachedArena> CACHE = new ConcurrentHashMap<>();
   private static final ConcurrentHashMap<Class<?>, OpenArena> SHUTDOWN_ARENAS =
       new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<Class<?>, Class<?>> TOPOLOGY_ROOT_CACHE =
+      new ConcurrentHashMap<>();
+  private static final Set<Class<?>> WARNED_MISSING_SELECT_CLASSES =
+      ConcurrentHashMap.newKeySet();
   private static final AtomicBoolean SHUTDOWN_HOOK_REGISTERED = new AtomicBoolean(false);
+  private static final Class<? extends Annotation> SELECT_CLASSES_ANNOTATION_TYPE =
+      resolveSelectClassesAnnotationType();
 
   public static OpenArena openArenaFor(Class<?> testClass) {
     return openArenaForRoot(topologyRoot(testClass));
@@ -36,14 +47,22 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
 
   @Override
   public void beforeAll(ExtensionContext context) {
-    Class<?> root = topologyRoot(context.getRequiredTestClass());
-    CACHE.compute(
-        root,
-        (key, existing) -> {
-          CachedArena cached = existing != null ? existing : buildAndOpen(root);
-          cached.refs++;
-          return cached;
-        });
+    Class<?> testClass = context.getRequiredTestClass();
+    Class<?> root = topologyRoot(testClass);
+    warnIfExplicitRootMissingSelectClasses(testClass, root);
+    CachedArena cached =
+        CACHE.compute(
+            root,
+            (key, existing) -> {
+              CachedArena current = existing != null ? existing : buildOrCacheFailure(root);
+              if (current.expectedSuiteMembers == null) {
+                current.refs++;
+              }
+              return current;
+            });
+    if (cached.failure != null) {
+      throw cached.failure;
+    }
   }
 
   @Override
@@ -55,15 +74,40 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
           if (existing == null) {
             return null;
           }
-          existing.refs--;
-          if (existing.refs > 0) {
+          boolean shouldClose;
+          if (existing.expectedSuiteMembers != null) {
+            existing.completed++;
+            shouldClose = existing.completed >= existing.expectedSuiteMembers;
+          } else {
+            existing.refs--;
+            shouldClose = existing.refs <= 0;
+          }
+          if (!shouldClose) {
             return existing;
           }
-          invokeLifecycleMethod(root, ArenaBeforeClose.class, existing.openArena);
-          existing.openArena.close();
-          SHUTDOWN_ARENAS.remove(root);
+          if (existing.failure == null) {
+            invokeLifecycleMethod(root, ArenaBeforeClose.class, existing.openArena);
+            existing.openArena.close();
+            SHUTDOWN_ARENAS.remove(root);
+          }
           return null;
         });
+  }
+
+  private static void warnIfExplicitRootMissingSelectClasses(Class<?> testClass, Class<?> root) {
+    Class<?> explicit = explicitRoot(testClass);
+    if (explicit == null || selectClassesValue(root) != null) {
+      return;
+    }
+    if (WARNED_MISSING_SELECT_CLASSES.add(root)) {
+      LOG.warn(
+          "@Arena({}.class) on {} has no @Suite @SelectClasses; cross-class close timing "
+              + "falls back to reference counting, which does not correctly share an arena "
+              + "across classes run sequentially (wrap the shared members in a real "
+              + "@Suite/@SelectClasses to get deterministic sharing)",
+          explicit.getSimpleName(),
+          testClass.getName());
+    }
   }
 
   @Override
@@ -88,8 +132,14 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
   }
 
   private static Class<?> topologyRoot(Class<?> testClass) {
+    return TOPOLOGY_ROOT_CACHE.computeIfAbsent(testClass, ArenaExtension::resolveTopologyRoot);
+  }
+
+  private static Class<?> resolveTopologyRoot(Class<?> testClass) {
+    Class<?> explicit = explicitRoot(testClass);
+    Class<?> searchStart = explicit != null ? explicit : testClass;
     Class<?> root = null;
-    for (Class<?> current = testClass;
+    for (Class<?> current = searchStart;
         current != null && current != Object.class;
         current = current.getSuperclass()) {
       if (declaresArenaFields(current)) {
@@ -100,10 +150,24 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
       throw new IllegalStateException(
           "@Arena requires at least one @ArenaDependency, @ArenaComponent, or @ArenaPlaybook "
               + "field on "
-              + testClass.getName()
-              + " or a superclass");
+              + searchStart.getName()
+              + (explicit != null
+                  ? " (referenced by @Arena(" + explicit.getSimpleName() + ".class) on " + testClass.getName() + ")"
+                  : " or a superclass"));
     }
     return root;
+  }
+
+  private static Class<?> explicitRoot(Class<?> testClass) {
+    for (Class<?> current = testClass;
+        current != null && current != Object.class;
+        current = current.getSuperclass()) {
+      Arena annotation = current.getDeclaredAnnotation(Arena.class);
+      if (annotation != null && annotation.value() != Void.class) {
+        return annotation.value();
+      }
+    }
+    return null;
   }
 
   private static MatchBuild buildMatchBuilder(Class<?> root) {
@@ -112,13 +176,13 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
     List<String> componentIds = new ArrayList<>();
     for (Field field : root.getDeclaredFields()) {
       if (field.isAnnotationPresent(ArenaDependency.class)) {
-        ArenaMatchPiece piece = (ArenaMatchPiece) readStatic(field, root);
+        ArenaRunnableDependency piece = (ArenaRunnableDependency) readStatic(field, root);
         matchBuilder.addDependency(piece);
         if (field.getAnnotation(ArenaDependency.class).logs()) {
           dependencyIds.add(piece.forFfi().get("identifier").asText());
         }
       } else if (field.isAnnotationPresent(ArenaComponent.class)) {
-        ArenaMatchPiece piece = (ArenaMatchPiece) readStatic(field, root);
+        ArenaRunnableComponent piece = (ArenaRunnableComponent) readStatic(field, root);
         matchBuilder.addComponent(piece);
         if (field.getAnnotation(ArenaComponent.class).logs()) {
           componentIds.add(piece.forFfi().get("identifier").asText());
@@ -230,6 +294,14 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
     return cached.openArena;
   }
 
+  private static CachedArena buildOrCacheFailure(Class<?> root) {
+    try {
+      return buildAndOpen(root);
+    } catch (RuntimeException e) {
+      return new CachedArena(e, expectedSuiteMembers(root));
+    }
+  }
+
   private static CachedArena buildAndOpen(Class<?> root) {
     MatchBuild matchBuild = buildMatchBuilder(root);
     Match match = matchBuild.matchBuilder().build();
@@ -243,7 +315,44 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
     registerShutdownHookOnce();
     SHUTDOWN_ARENAS.put(root, openArena);
     invokeLifecycleMethod(root, ArenaAfterOpen.class, openArena);
-    return new CachedArena(openArena);
+    return new CachedArena(openArena, expectedSuiteMembers(root));
+  }
+
+  private static Class<? extends Annotation> resolveSelectClassesAnnotationType() {
+    try {
+      return Class.forName("org.junit.platform.suite.api.SelectClasses").asSubclass(Annotation.class);
+    } catch (ClassNotFoundException e) {
+      return null;
+    }
+  }
+
+  private static Class<?>[] selectClassesValue(Class<?> root) {
+    if (SELECT_CLASSES_ANNOTATION_TYPE == null) {
+      return null;
+    }
+    Annotation selectClasses = root.getAnnotation(SELECT_CLASSES_ANNOTATION_TYPE);
+    if (selectClasses == null) {
+      return null;
+    }
+    try {
+      return (Class<?>[]) SELECT_CLASSES_ANNOTATION_TYPE.getMethod("value").invoke(selectClasses);
+    } catch (ReflectiveOperationException e) {
+      return null;
+    }
+  }
+
+  private static Integer expectedSuiteMembers(Class<?> root) {
+    Class<?>[] candidates = selectClassesValue(root);
+    if (candidates == null) {
+      return null;
+    }
+    Set<Class<?>> members = new HashSet<>();
+    for (Class<?> candidate : candidates) {
+      if (root.equals(explicitRoot(candidate))) {
+        members.add(candidate);
+      }
+    }
+    return members.isEmpty() ? null : members.size();
   }
 
   private static void invokeLifecycleMethod(
@@ -294,10 +403,21 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
 
   private static final class CachedArena {
     final OpenArena openArena;
+    final RuntimeException failure;
+    final Integer expectedSuiteMembers;
     int refs;
+    int completed;
 
-    CachedArena(OpenArena openArena) {
+    CachedArena(OpenArena openArena, Integer expectedSuiteMembers) {
       this.openArena = openArena;
+      this.failure = null;
+      this.expectedSuiteMembers = expectedSuiteMembers;
+    }
+
+    CachedArena(RuntimeException failure, Integer expectedSuiteMembers) {
+      this.openArena = null;
+      this.failure = failure;
+      this.expectedSuiteMembers = expectedSuiteMembers;
     }
   }
 }

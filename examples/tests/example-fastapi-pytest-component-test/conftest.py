@@ -7,6 +7,8 @@ import sys
 import tempfile
 import time
 import uuid
+from datetime import timedelta
+
 _TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)
@@ -41,6 +43,7 @@ from arena_pytest import (
     MatchBuilder,
     MssqlDependencyBuilder,
     OauthDependencyBuilder,
+    OracleDependencyBuilder,
     PostgresDependencyBuilder,
     SmtpDependencyBuilder,
     SqsQueueTarget,
@@ -54,18 +57,25 @@ from arena_config import (
     DEP_NAME_CALIBRATION_HTTP,
     DEP_NAME_MSSQL,
     DEP_NAME_OAUTH,
+    DEP_NAME_ORACLE,
     DEP_NAME_POSTGRES,
     DEP_NAME_SMTP,
     DEP_NAME_TEMPORAL,
     EXEC_WEB_APP_PORT,
     LOCALSTACK_HOST_PORT,
     MATCH_NAME,
+    MSSQL_CONNECTION_STRING_LOCAL,
     MSSQL_DB_NAME,
     MSSQL_DB_PASS,
     MSSQL_DB_USER,
     MSSQL_PORT,
     OAUTH_ISSUER,
     OAUTH_PORT,
+    ORACLE_ADMIN_PASS,
+    ORACLE_CONNECTION_STRING_LOCAL,
+    ORACLE_DB_PASS,
+    ORACLE_DB_USER,
+    ORACLE_PORT,
     POSTGRES_DB_NAME,
     POSTGRES_DB_PASS,
     POSTGRES_DB_USER,
@@ -85,6 +95,8 @@ from playbooks import (
     CalibrationApiFlakyPlaybook,
     EventsPurgePlaybook,
     ResetValidationDbPlaybook,
+    ResetWeatherDbPlaybook,
+    SeedValidationReadingPlaybook,
 )
 WEB_APP_PORT = EXEC_WEB_APP_PORT
 EVENT_BUS_NAME = "example-api-events"
@@ -216,8 +228,12 @@ def closed_arena() -> ClosedArena:
     mssql_schema_path = _find_resource_file("validation_db_schema.sql")
     if not mssql_schema_path:
         pytest.fail("validation_db_schema.sql not found")
+    oracle_schema_path = _find_resource_file("weather_db_schema.sql")
+    if not oracle_schema_path:
+        pytest.fail("weather_db_schema.sql not found")
     startup_sql = [open(schema_path, encoding="utf-8").read()]
     mssql_startup_sql = [open(mssql_schema_path, encoding="utf-8").read()]
+    oracle_startup_sql = [open(oracle_schema_path, encoding="utf-8").read()]
 
     oauth = (
         OauthDependencyBuilder(DEP_NAME_OAUTH)
@@ -246,6 +262,18 @@ def closed_arena() -> ClosedArena:
         .with_database_username(MSSQL_DB_USER)
         .with_database_password(MSSQL_DB_PASS)
         .with_startup_sql_scripts(mssql_startup_sql)
+        .build()
+    )
+
+    oracle = (
+        OracleDependencyBuilder(DEP_NAME_ORACLE)
+        .with_port(ORACLE_PORT)
+        .with_database_username(ORACLE_DB_USER)
+        .with_database_password(ORACLE_DB_PASS)
+        .with_admin_password(ORACLE_ADMIN_PASS)
+        .with_startup_sql_scripts(oracle_startup_sql)
+        # Oracle container start times are inconsistent across CI runners, so a longer timeout is required.
+        .with_sql_readiness_timeout(timedelta(minutes=2))
         .build()
     )
 
@@ -300,10 +328,8 @@ def closed_arena() -> ClosedArena:
             "example-readings-fastapi-web-app not found (build //examples:example-readings-fastapi-web-app)"
         )
 
-    mssql_cs = (
-        f"Server=tcp:localhost,{MSSQL_PORT};Database={MSSQL_DB_NAME};"
-        f"User Id={MSSQL_DB_USER};Password={MSSQL_DB_PASS};TrustServerCertificate=True;"
-    )
+    mssql_cs = MSSQL_CONNECTION_STRING_LOCAL
+    oracle_cs = ORACLE_CONNECTION_STRING_LOCAL
     pg_cs = (
         f"host=localhost port={POSTGRES_PORT} user={POSTGRES_DB_USER} "
         f"password={POSTGRES_DB_PASS} dbname={POSTGRES_DB_NAME}"
@@ -319,6 +345,7 @@ def closed_arena() -> ClosedArena:
         .with_env_var("POSTGRES_CONNECTION_STRING", pg_cs)
         .with_env_var("CALIBRATION_URL", f"http://127.0.0.1:{CALIBRATION_HOST_PORT}")
         .with_env_var("MSSQL_CONNECTION_STRING", mssql_cs)
+        .with_env_var("ORACLE_CONNECTION_STRING", oracle_cs)
         .with_env_var("TEMPORAL_TARGET", f"127.0.0.1:{TEMPORAL_GRPC_PORT}")
         .with_env_var("SMTP_HOST", "127.0.0.1")
         .with_env_var("SMTP_PORT", str(SMTP_HOST_PORT))
@@ -342,6 +369,7 @@ def closed_arena() -> ClosedArena:
         .add_dependency(oauth)
         .add_dependency(postgres)
         .add_dependency(mssql)
+        .add_dependency(oracle)
         .add_dependency(calibration)
         .add_dependency(localstack)
         .add_dependency(temporal)
@@ -358,6 +386,8 @@ def closed_arena() -> ClosedArena:
             exec_on_dependency_start=True,
         )
         .register_playbook(ResetValidationDbPlaybook(mssql.identifier))
+        .register_playbook(SeedValidationReadingPlaybook(mssql_cs))
+        .register_playbook(ResetWeatherDbPlaybook(oracle.identifier))
         .build()
     )
 
@@ -371,6 +401,7 @@ def closed_arena() -> ClosedArena:
             oauth.identifier,
             postgres.identifier,
             mssql.identifier,
+            oracle.identifier,
             calibration.identifier,
             localstack.identifier,
             temporal.identifier,
@@ -382,6 +413,11 @@ def closed_arena() -> ClosedArena:
 @pytest.fixture(scope="session")
 def base_url() -> str:
     return f"http://127.0.0.1:{WEB_APP_PORT}"
+
+
+@pytest.fixture(scope="session")
+def mssql_connection_string() -> str:
+    return MSSQL_CONNECTION_STRING_LOCAL
 
 
 @pytest.fixture(scope="session")

@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -110,8 +112,39 @@ def bump_patch_version(version: str) -> str:
     return f"{major}.{minor}.{patch + 1}"
 
 
+def bump_minor_version(version: str) -> str:
+    major, minor, _patch = parse_release_version(version)
+    return f"{major}.{minor + 1}.0"
+
+
+def bump_major_version(version: str) -> str:
+    major, _minor, _patch = parse_release_version(version)
+    return f"{major + 1}.0.0"
+
+
+_BUMP_KIND_FNS = {
+    "major": bump_major_version,
+    "minor": bump_minor_version,
+    "patch": bump_patch_version,
+}
+
+
+def bump_version(version: str, kind: str) -> str:
+    try:
+        fn = _BUMP_KIND_FNS[kind]
+    except KeyError:
+        raise ValueError(
+            f"unknown bump kind {kind!r}; expected one of {sorted(_BUMP_KIND_FNS)}"
+        ) from None
+    return fn(version)
+
+
 def release_version_increased(base: str, head: str) -> bool:
     return parse_release_version(head) > parse_release_version(base)
+
+
+def higher_release_version(a: str, b: str) -> str:
+    return a if parse_release_version(a) >= parse_release_version(b) else b
 
 
 def _git_show_at_ref(root: Path, ref: str, path: str) -> str | None:
@@ -193,15 +226,157 @@ def release_lockfiles_need_repin(root: Path, target: str) -> bool:
     return locked != target
 
 
-def repin_release_lockfiles(root: Path) -> None:
+def _cargo_cdylib_name(crate_name: str) -> str:
+    if sys.platform == "win32":
+        return f"{crate_name}.dll"
+    if sys.platform == "darwin":
+        return f"lib{crate_name}.dylib"
+    return f"lib{crate_name}.so"
+
+
+def regenerate_windows_pip_locks(root: Path) -> None:
+    if sys.platform != "win32":
+        print(
+            "skipping requirements_windows.txt regeneration: not running on native "
+            "Windows (WSL/Linux/macOS produce incorrect Windows wheel hashes). Run "
+            "this from native Windows, or dispatch the 'Generate Windows pip lock "
+            "files' GitHub Actions workflow."
+        )
+        return
+    bazel = os.environ.get("BAZEL", "bazel")
+    env = os.environ.copy()
+    for target in ["//arena-pytest:pip_requirements.update", "//examples:pip_requirements.update"]:
+        subprocess.run([bazel, "run", target], cwd=root, env=env, check=True)
+
+
+CARGO_AUDITABLE_VERSION = "0.7.5"
+CARGO_AUDIT_VERSION = "0.22.2"
+CARGO_VET_VERSION = "0.10.2"
+
+
+def audit_arena_ffi_binary(root: Path) -> None:
+    env = os.environ.copy()
+    if shutil.which("cargo-auditable") is None or shutil.which("cargo-audit") is None:
+        subprocess.run(
+            [
+                "cargo",
+                "install",
+                f"cargo-auditable@{CARGO_AUDITABLE_VERSION}",
+                f"cargo-audit@{CARGO_AUDIT_VERSION}",
+                "--locked",
+            ],
+            cwd=root,
+            env=env,
+            check=True,
+        )
+    subprocess.run(
+        ["cargo", "auditable", "build", "--release", "--lib", "-p", "arena-ffi"],
+        cwd=root,
+        env=env,
+        check=True,
+    )
+    binary = root / "target" / "release" / _cargo_cdylib_name("arena_ffi")
+    subprocess.run(["cargo", "audit", "bin", str(binary)], cwd=root, env=env, check=True)
+
+
+def vet_rust_dependencies(root: Path) -> None:
+    env = os.environ.copy()
+    if shutil.which("cargo-vet") is None:
+        subprocess.run(
+            ["cargo", "install", f"cargo-vet@{CARGO_VET_VERSION}", "--locked"],
+            cwd=root,
+            env=env,
+            check=True,
+        )
+    subprocess.run(["cargo", "vet"], cwd=root, env=env, check=True)
+
+
+def run_cargo_vet_check_report(root: Path) -> dict:
+    env = os.environ.copy()
+    result = subprocess.run(
+        ["cargo", "vet", "check", "--output-format=json"],
+        cwd=root,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(result.stdout)
+
+
+CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK = 141
+CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK = 358
+
+
+def _check_cargo_vet_watermark(
+    count: int,
+    watermark: int,
+    constant: str,
+    grew_explanation: str,
+    shrank_explanation: str,
+) -> None:
+    if count == watermark:
+        return
+    explanation = grew_explanation if count > watermark else shrank_explanation
+    raise SystemExit(
+        f"cargo-vet watermark mismatch: {constant} expects {watermark}, found {count}.\n"
+        f"{explanation}\n"
+        f"If this is intentional, update {constant} in scripts/arena_version.py to {count}."
+    )
+
+
+def check_cargo_vet_watermarks(report: dict) -> None:
+    audited = len(report.get("vetted_fully", [])) + len(report.get("vetted_partially", []))
+    exempted = len(report.get("vetted_with_exemptions", []))
+
+    _check_cargo_vet_watermark(
+        exempted,
+        CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK,
+        "CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK",
+        grew_explanation=(
+            "This means a dependency is now trusted only through a self-certified exemption "
+            "in supply-chain/config.toml, not a real audit (likely a new or updated "
+            "dependency was added and `cargo vet regenerate exemptions` or "
+            "`cargo vet add-exemption` was run to make `cargo vet check` pass). Run "
+            "`cargo vet suggest` to see what's unaudited, and prefer `cargo vet certify` "
+            "over accepting another exemption."
+        ),
+        shrank_explanation=(
+            "This is an improvement: a dependency that used to rely on a self-certified "
+            "exemption was either removed, or its exemption in supply-chain/config.toml was "
+            "replaced by a real audit in supply-chain/audits.toml."
+        ),
+    )
+    _check_cargo_vet_watermark(
+        audited,
+        CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK,
+        "CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK",
+        grew_explanation=(
+            "This is an improvement: someone ran `cargo vet certify` and "
+            "supply-chain/audits.toml now covers a package that previously relied on an "
+            "exemption."
+        ),
+        shrank_explanation=(
+            "A previously certified audit in supply-chain/audits.toml is gone, or the "
+            "package it covered was removed. Investigate before accepting this."
+        ),
+    )
+
+
+def repin_all_lockfiles(root: Path) -> None:
     bazel = os.environ.get("BAZEL", "bazel")
     env = os.environ.copy()
     env["CARGO_BAZEL_REPIN"] = "1"
-    build_args = [bazel, "build", "//..."]
-    mod_args = [bazel, "mod", "deps", "--lockfile_mode=update"]
     bazel_config = os.environ.get("ARENA_BAZEL_CONFIG", "").strip()
-    if bazel_config:
-        build_args.append(f"--config={bazel_config}")
-        mod_args.append(f"--config={bazel_config}")
-    subprocess.run(build_args, cwd=root, env=env, check=True)
-    subprocess.run(mod_args, cwd=root, env=env, check=True)
+
+    commands = [
+        [bazel, "build", "//..."],
+        [bazel, "mod", "deps", "--lockfile_mode=update"],
+        [bazel, "run", "@arena_java_maven//:pin"],
+        [bazel, "run", "//arena-pytest:pip_requirements.update"],
+        [bazel, "run", "//examples:pip_requirements.update"],
+    ]
+    for args in commands:
+        if bazel_config:
+            args.append(f"--config={bazel_config}")
+        subprocess.run(args, cwd=root, env=env, check=True)

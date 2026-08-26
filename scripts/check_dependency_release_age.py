@@ -10,6 +10,7 @@ import sys
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Callable
 
@@ -131,6 +132,12 @@ def parse_module_bazel(text: str) -> set[tuple[str, str, str]]:
     pairs: set[tuple[str, str, str]] = set()
     for match in re.finditer(r'bazel_dep\(name = "([^"]+)", version = "([^"]+)"\)', text):
         pairs.add(("bcr", match.group(1), match.group(2)))
+    for match in re.finditer(r"nuget_archive\(([^)]*)\)", text, re.DOTALL):
+        body = match.group(1)
+        id_match = re.search(r'id\s*=\s*"([^"]+)"', body)
+        version_match = re.search(r'version\s*=\s*"([^"]+)"', body)
+        if id_match and version_match:
+            pairs.add(("nuget", id_match.group(1), version_match.group(1)))
     for match in re.finditer(r'"([^:"]+):([^:"]+):([^"]+)"', text):
         group, artifact, version = match.group(1), match.group(2), match.group(3)
         if ":" in version:
@@ -182,6 +189,24 @@ def _http_json(url: str) -> dict | None:
         return None
 
 
+def _http_last_modified(url: str) -> datetime | None:
+    request = urllib.request.Request(url, method="HEAD", headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            raw = response.headers.get("Last-Modified")
+    except (urllib.error.URLError, TimeoutError):
+        return None
+    if not raw:
+        return None
+    try:
+        parsed = parsedate_to_datetime(raw)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def _parse_timestamp(raw: str) -> datetime | None:
     normalized = raw.strip()
     if normalized.endswith("Z"):
@@ -221,20 +246,12 @@ def _pypi_published_at(name: str, version: str) -> datetime | None:
 
 def _maven_published_at(coordinates: str, version: str) -> datetime | None:
     group, artifact = coordinates.split(":", 1)
-    query = (
-        "https://search.maven.org/solrsearch/select?"
-        f"q=g:%22{group}%22+AND+a:%22{artifact}%22+AND+v:%22{version}%22&rows=1&wt=json"
+    group_path = group.replace(".", "/")
+    pom_url = (
+        f"https://repo1.maven.org/maven2/{group_path}/{artifact}/{version}/"
+        f"{artifact}-{version}.pom"
     )
-    payload = _http_json(query)
-    if not payload:
-        return None
-    docs = (payload.get("response") or {}).get("docs") or []
-    if not docs:
-        return None
-    timestamp_ms = docs[0].get("timestamp")
-    if timestamp_ms is None:
-        return None
-    return datetime.fromtimestamp(timestamp_ms / 1000.0, tz=timezone.utc)
+    return _http_last_modified(pom_url)
 
 
 def _bcr_published_at(module: str, version: str) -> datetime | None:
@@ -243,13 +260,40 @@ def _bcr_published_at(module: str, version: str) -> datetime | None:
         f"modules/{module}/metadata.json"
     )
     payload = _http_json(metadata_url)
+    if payload:
+        timestamps = payload.get("version_release_timestamps") or {}
+        raw = timestamps.get(version)
+        if raw:
+            return _parse_timestamp(raw)
+
+    commits_url = (
+        "https://api.github.com/repos/bazelbuild/bazel-central-registry/commits"
+        f"?path=modules/{module}/{version}/source.json&per_page=1"
+    )
+    commits = _http_json(commits_url)
+    if not commits:
+        return None
+    commit_date = ((commits[0] or {}).get("commit") or {}).get("committer", {}).get("date")
+    if not commit_date:
+        return None
+    return _parse_timestamp(commit_date)
+
+
+def _nuget_published_at(package_id: str, version: str) -> datetime | None:
+    registration_url = (
+        "https://api.nuget.org/v3/registration5-semver1/"
+        f"{package_id.lower()}/{version.lower()}.json"
+    )
+    payload = _http_json(registration_url)
     if not payload:
         return None
-    timestamps = payload.get("version_release_timestamps") or {}
-    raw = timestamps.get(version)
-    if raw:
-        return _parse_timestamp(raw)
-    return None
+    published = payload.get("published")
+    if not published:
+        catalog_entry = payload.get("catalogEntry") or {}
+        published = catalog_entry.get("published")
+    if not published:
+        return None
+    return _parse_timestamp(published)
 
 
 def _published_at(kind: str, name: str, version: str) -> datetime | None:
@@ -261,6 +305,8 @@ def _published_at(kind: str, name: str, version: str) -> datetime | None:
         return _maven_published_at(name, version)
     if kind == "bcr":
         return _bcr_published_at(name, version)
+    if kind == "nuget":
+        return _nuget_published_at(name, version)
     return None
 
 
@@ -295,9 +341,6 @@ def check_release_ages(
         published_at = _published_at(kind, name, version)
         label = f"{kind} {name} {version}"
         if published_at is None:
-            if kind in ("bcr", "maven"):
-                skipped.append(label)
-                continue
             failures.append(f"{label}: could not determine publish time")
             continue
         age = now - published_at

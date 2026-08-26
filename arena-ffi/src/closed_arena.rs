@@ -63,10 +63,15 @@ pub extern "C" fn arena_open(
             return std::ptr::null_mut();
         }
     };
-    let parsed = match unsafe { parse_config(config) } {
-        Ok(c) => c,
-        Err(e) => {
+    let parsed = match catch_unwind(AssertUnwindSafe(|| unsafe { parse_config(config) })) {
+        Ok(Ok(c)) => c,
+        Ok(Err(e)) => {
             unsafe { write_error(err_out, format!("arena_open: {e}")) };
+            return std::ptr::null_mut();
+        }
+        Err(payload) => {
+            let msg = panic_message(&payload);
+            unsafe { write_error(err_out, format!("panic in arena_open: {msg}")) };
             return std::ptr::null_mut();
         }
     };
@@ -122,4 +127,14 @@ unsafe fn parse_config(ptr: *const c_char) -> Result<crate::matches::MatchConfig
         return Ok(crate::matches::MatchConfig::default());
     }
     serde_json::from_str(s).map_err(|e| format!("config failed to parse: {e}"))
+}
+
+/// Bench-only entry point exercising the same `MatchConfig` deserialization
+/// path as `parse_config`, without the FFI/raw-pointer plumbing around it.
+/// Not part of the real FFI surface; only compiled with `bench-support`.
+#[cfg(feature = "bench-support")]
+pub fn parse_config_for_bench(json: &str) -> Result<(), String> {
+    serde_json::from_str::<crate::matches::MatchConfig>(json)
+        .map(|_| ())
+        .map_err(|e| format!("config failed to parse: {e}"))
 }

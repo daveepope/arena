@@ -1,14 +1,19 @@
 package arena.examples.readings.springboot;
 
+import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -17,9 +22,10 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtDecoders;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.client.RestTemplate;
 
 @Configuration
 @EnableWebSecurity
@@ -39,13 +45,26 @@ public class JwtResourceServerConfiguration {
     } else {
       throw new IllegalStateException("OAUTH_TLS_CA_FILE or OAUTH_TLS_CA_PEM required");
     }
-    SSLContext prior = SSLContext.getDefault();
-    SSLContext.setDefault(ssl);
-    try {
-      return JwtDecoders.fromIssuerLocation(issuerRaw);
-    } finally {
-      SSLContext.setDefault(prior);
+    String issuer = issuerRaw.trim();
+    if (issuer.endsWith("/")) {
+      issuer = issuer.substring(0, issuer.length() - 1);
     }
+    String jwkSetUri = issuer + "/.well-known/jwks.json";
+    RestTemplate restTemplate = new RestTemplate(trustedRequestFactory(ssl));
+    return NimbusJwtDecoder.withJwkSetUri(jwkSetUri).restOperations(restTemplate).build();
+  }
+
+  private static ClientHttpRequestFactory trustedRequestFactory(SSLContext ssl) {
+    return new SimpleClientHttpRequestFactory() {
+      @Override
+      protected void prepareConnection(HttpURLConnection connection, String httpMethod)
+          throws IOException {
+        if (connection instanceof HttpsURLConnection https) {
+          https.setSSLSocketFactory(ssl.getSocketFactory());
+        }
+        super.prepareConnection(connection, httpMethod);
+      }
+    };
   }
 
   @Bean

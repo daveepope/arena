@@ -16,9 +16,13 @@ public final class ConnParse {
   private static final Pattern MSSQL_PWD =
       Pattern.compile("Password=([^;]+)", Pattern.CASE_INSENSITIVE);
 
+  private static final Pattern ORACLE_EASY_CONNECT = Pattern.compile("^([^/]+)/(.+)@([^@]+)$");
+
   public record PostgresConn(String jdbcUrl, String user, String password) {}
 
   public record MssqlConn(String jdbcUrl, String user, String password) {}
+
+  public record OracleConn(String jdbcUrl, String user, String password) {}
 
   private ConnParse() {}
 
@@ -64,5 +68,16 @@ public final class ConnParse {
             + database
             + ";encrypt=true;trustServerCertificate=true";
     return new MssqlConn(jdbcUrl, user, password);
+  }
+
+  public static OracleConn oracleConnFromEasyConnect(String easyConnect) {
+    Matcher m = ORACLE_EASY_CONNECT.matcher(easyConnect);
+    if (!m.matches()) {
+      throw new IllegalArgumentException("oracle connection string incomplete");
+    }
+    String user = m.group(1);
+    String password = m.group(2);
+    String dsn = m.group(3);
+    return new OracleConn("jdbc:oracle:thin:@" + dsn, user, password);
   }
 }

@@ -86,6 +86,13 @@ internal static class ArenaBindings
             throw TakeErr(errOut, "arena_postgres_playbook_verify failed");
     }
 
+    internal static void OraclePlaybookVerify(IntPtr handle, string specJson)
+    {
+        var result = ArenaNativeLib.arena_oracle_playbook_verify(handle, specJson, out var errOut);
+        if (result != 0)
+            throw TakeErr(errOut, "arena_oracle_playbook_verify failed");
+    }
+
     internal static string OauthLoopbackTlsPemJson()
     {
         var ptr = ArenaNativeLib.arena_oauth_loopback_tls_pem_json(out var errOut);

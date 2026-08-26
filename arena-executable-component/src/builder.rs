@@ -1,4 +1,5 @@
 use crate::executable_component::{CpuProfileConfig, ExecutableComponent};
+use crate::platform::resolve_executable_extension;
 use arena::healthcheck::ReadinessCheck;
 use arena::Component;
 use std::path::PathBuf;
@@ -165,7 +166,7 @@ impl ExecutableComponentBuilder {
         }
 
         let executable_path = self.executable_path.map(|path| {
-            if path.is_absolute() {
+            let resolved = if path.is_absolute() {
                 path
             } else {
                 let current_dir = std::env::current_dir().expect("get current directory");
@@ -181,7 +182,8 @@ impl ExecutableComponentBuilder {
                         }
                     })
                     .unwrap_or_else(|| current_dir.join(&path))
-            }
+            };
+            resolve_executable_extension(resolved)
         });
 
         let cpu_profile_auto_open = self.cpu_profile_auto_open;

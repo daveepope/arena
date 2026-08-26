@@ -12,6 +12,7 @@
     "postgres": "example-api-postgres",
     "kafka": "example-api-kafka",
     "mssql": "example-api-mssql",
+    "oracle": "example-api-oracle",
     "calibration_http": "example-api-calibration",
     "temporal": "example-api-temporal",
     "smtp": "example-api-smtp"
@@ -31,6 +32,7 @@
     "calibration_api_error_path": "example-api-calibration-api-error-path",
     "calibration_api_flaky_path": "example-api-calibration-api-flaky-path",
     "validation_db_scoped": "example-api-validation-db-scoped",
+    "weather_db_scoped": "example-api-weather-db-scoped",
     "events_purge": "example-api-events-purge"
   },
   "ports": {
@@ -40,16 +42,16 @@
     "calibration_host": 3011,
     "postgres_host": 5560,
     "mssql_host": 1438,
+    "oracle_host": 1522,
     "smtp_host": 3012,
     "smtp_ui_host": 3013
   },
   "database": {
     "postgres_name": "readings_db",
     "postgres_user": "readings_user",
-    "postgres_password": "readings_password",
     "mssql_name": "validationDb",
     "mssql_user": "sa",
-    "mssql_password": "yourStrong(!)Password"
+    "oracle_name": "FREEPDB1"
   },
   "kafka_topic": "readings",
   "calibration_validate_path": "/api/v1/validate"

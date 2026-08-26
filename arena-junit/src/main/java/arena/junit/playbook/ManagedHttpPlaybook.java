@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
-public class ManagedHttpPlaybook implements Playbook, PlaybookRegistration {
+public class ManagedHttpPlaybook implements ManagedPlaybook, PlaybookRegistration {
 
   /**
    * @deprecated {@value ArenaDeprecation#HTTP_PLAYBOOK_BUILDER}
@@ -177,6 +177,11 @@ public class ManagedHttpPlaybook implements Playbook, PlaybookRegistration {
   @Override
   public String identifier() {
     return identifier;
+  }
+
+  @Override
+  public boolean activatesBeforeTest() {
+    return true;
   }
 
   public String dependencyIdentifier() {

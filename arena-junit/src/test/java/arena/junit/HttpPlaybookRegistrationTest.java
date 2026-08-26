@@ -1,6 +1,7 @@
 package arena.junit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import arena.junit.playbook.ActiveHttpPlaybookBuilder;
@@ -24,6 +25,11 @@ final class HttpPlaybookRegistrationTest {
               .post("/api/v1/validate")
               .willReturn(HttpResponse.okJson(Map.of("valid", true))));
     }
+  }
+
+  @Test
+  void activatesBeforeTest_always_returnsTrue() {
+    assertTrue(new ValidationPlaybook().activatesBeforeTest());
   }
 
   @Test
@@ -85,6 +91,65 @@ final class HttpPlaybookRegistrationTest {
     ObjectNode row = builder.mappingsForFfi().getFirst();
     assertEquals(500, row.path("response").path("status").asInt());
     assertEquals("at_least", row.path("expect").path("kind").asText());
+  }
+
+  @Test
+  void legacyWithMapping_expectCalledBranch_serializesExactlyKind() {
+    ActiveHttpPlaybookBuilder builder = new ActiveHttpPlaybookBuilder("dep-http");
+    builder.withMapping("GET", "/api/x", 200, null, null, 2, null, false);
+    ObjectNode row = builder.mappingsForFfi().getFirst();
+    assertEquals("exactly", row.path("expect").path("kind").asText());
+    assertEquals(2, row.path("expect").path("count").asLong());
+  }
+
+  @Test
+  void legacyWithMapping_expectNeverCalledBranch_serializesNeverKind() {
+    ActiveHttpPlaybookBuilder builder = new ActiveHttpPlaybookBuilder("dep-http");
+    builder.withMapping("DELETE", "/api/x", 204, null, null, null, null, true);
+    ObjectNode row = builder.mappingsForFfi().getFirst();
+    assertEquals("never", row.path("expect").path("kind").asText());
+    assertEquals("DELETE", row.path("method").asText());
+  }
+
+  @Test
+  void legacyWithMapping_putMethodAndPriority_setsMethodAndPriority() {
+    ActiveHttpPlaybookBuilder builder = new ActiveHttpPlaybookBuilder("dep-http");
+    builder.withMapping("PUT", "/api/x", 200, null, 3, null, null, false);
+    ObjectNode row = builder.mappingsForFfi().getFirst();
+    assertEquals("PUT", row.path("method").asText());
+    assertEquals(3, row.path("priority").asInt());
+  }
+
+  @Test
+  void legacyWithMapping_moreThanOneExpectOption_throwsIllegalArgumentException() {
+    ActiveHttpPlaybookBuilder builder = new ActiveHttpPlaybookBuilder("dep-http");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> builder.withMapping("GET", "/api/x", 200, null, null, 1, 1, false));
+  }
+
+  @Test
+  void legacyWithMapping_unsupportedMethod_throwsIllegalArgumentException() {
+    ActiveHttpPlaybookBuilder builder = new ActiveHttpPlaybookBuilder("dep-http");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> builder.withMapping("PATCH", "/api/x", 200, null, null, null, null, false));
+  }
+
+  @Test
+  void legacyWithMapping_statusOnlyOverload_buildsResponseWithoutJsonBody() {
+    ActiveHttpPlaybookBuilder builder = new ActiveHttpPlaybookBuilder("dep-http");
+    builder.withMapping("GET", "/api/x", 204);
+    ObjectNode row = builder.mappingsForFfi().getFirst();
+    assertEquals(204, row.path("response").path("status").asInt());
+  }
+
+  @Test
+  void legacyWithMapping_statusAndJsonBodyOverload_buildsResponseWithJsonBody() {
+    ActiveHttpPlaybookBuilder builder = new ActiveHttpPlaybookBuilder("dep-http");
+    builder.withMapping("POST", "/api/x", 201, Map.of("created", true));
+    ObjectNode row = builder.mappingsForFfi().getFirst();
+    assertTrue(row.path("response").path("json_body").path("created").asBoolean());
   }
 
   @Test

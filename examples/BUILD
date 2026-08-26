@@ -170,6 +170,14 @@ import_library(
 )
 
 import_library(
+    name = "oracle_manageddataaccess_core_lib",
+    library_name = "Oracle.ManagedDataAccess.Core",
+    libs = ["@oracle_manageddataaccess_core//:libs"],
+    refs = ["@oracle_manageddataaccess_core//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
     name = "aws_core_lib",
     library_name = "AWSSDK.Core",
     libs = ["@aws_core//:libs"],
@@ -198,6 +206,14 @@ import_library(
     library_name = "Polly",
     libs = ["@polly//:libs"],
     refs = ["@polly//:refs"],
+    tags = ["manual"],
+)
+
+import_library(
+    name = "polly_core_lib",
+    library_name = "Polly.Core",
+    libs = ["@polly_core//:libs"],
+    refs = ["@polly_core//:refs"],
     tags = ["manual"],
 )
 
@@ -382,6 +398,12 @@ filegroup(
 )
 
 filegroup(
+    name = "weather_db_schema",
+    srcs = ["resources/weather_db_schema.sql"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
     name = "arena_config",
     srcs = ["resources/arena_config.json"],
     visibility = ["//visibility:public"],
@@ -414,6 +436,7 @@ java_library(
     deps = [
         "//arena-junit:arena_junit_lib",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:net_java_dev_jna_jna",
     ],
 )
 
@@ -429,6 +452,7 @@ exports_files(
     [
         "requirements.txt",
         "requirements_lock.txt",
+        "requirements_windows.txt",
     ],
     visibility = ["//visibility:public"],
 )
@@ -437,7 +461,8 @@ compile_pip_requirements(
     name = "pip_requirements",
     src = "requirements.txt",
     requirements_txt = "requirements_lock.txt",
-    generate_hashes = False,
+    requirements_windows = "requirements_windows.txt",
+    generate_hashes = True,
 )
 
 py_library(
@@ -461,6 +486,7 @@ py_library(
         ":arena_config_py",
         "//arena-pytest:arena_pytest_lib",
         "@pip//requests",
+        "@pip_examples//fastmssql",
     ],
     visibility = ["//visibility:public"],
 )
@@ -477,6 +503,7 @@ py_library(
         "@pip_examples//boto3",
         "@pip_examples//fastapi",
         "@pip_examples//httpx",
+        "@pip_examples//oracledb",
         "@pip_examples//pydantic_settings",
         "@pip_examples//pyjwt",
         "@pip_examples//fastmssql",
@@ -606,6 +633,7 @@ py_test(
         "//examples:instrument_reading_db_schema",
         "//examples:arena_config",
         "//examples:validation_db_schema",
+        "//examples:weather_db_schema",
     ],
     deps = [
         ":pytest_shared",
@@ -614,6 +642,40 @@ py_test(
         "@pip//pytest_asyncio",
         "@pip//requests",
         "@pip_examples//boto3",
+        "@pip_examples//fastmssql",
+    ],
+    tags = [
+        "component_test",
+        "example_component",
+    ],
+    python_version = "PY3",
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "pytest_fastapi_chained_component_test",
+    size = "medium",
+    srcs = glob(["tests/example-fastapi-pytest-chained-component-test/**/*.py"]),
+    main = "tests/example-fastapi-pytest-chained-component-test/fastapi_chained_component_test.py",
+    imports = [
+        "tests/example-fastapi-pytest-chained-component-test",
+        "tests/pytest-shared",
+    ],
+    data = [
+        "//arena-ffi:arena_ffi_shared",
+        "//examples:example-readings-fastapi-web-app",
+        "//examples:instrument_reading_db_schema",
+        "//examples:arena_config",
+        "//examples:validation_db_schema",
+        "//examples:weather_db_schema",
+    ],
+    deps = [
+        ":pytest_shared",
+        "//arena-pytest:arena_pytest_lib",
+        "@pip//pytest",
+        "@pip//pytest_asyncio",
+        "@pip//requests",
+        "@pip_examples//fastmssql",
     ],
     tags = [
         "component_test",
@@ -675,6 +737,7 @@ java_library(
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_core",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
         "@arena_java_maven//:com_microsoft_sqlserver_mssql_jdbc",
+        "@arena_java_maven//:com_oracle_database_jdbc_ojdbc11",
         "@arena_java_maven//:jakarta_validation_jakarta_validation_api",
         "@arena_java_maven//:org_postgresql_postgresql",
         "@arena_java_maven//:org_springframework_boot_spring_boot",
@@ -738,15 +801,15 @@ java_test(
     use_testrunner = False,
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
-        "--include-engine=junit-jupiter",
-        "--select-package=arena.examples.component",
+        "--include-engine=junit-platform-suite",
+        "--select-class=arena.examples.component.ComponentTestSuite",
     ],
     data = [
         ":example-readings-spring-boot-web-app",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
-        ":arena_config",
         ":validation_db_schema",
+        ":weather_db_schema",
     ] + select({
         ":linux_x86_64": ["@async_profiler_linux_x64//:lib/libasyncProfiler.so"],
         ":linux_aarch64": ["@async_profiler_linux_arm64//:lib/libasyncProfiler.so"],
@@ -758,6 +821,58 @@ java_test(
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
         "@arena_java_maven//:org_junit_platform_junit_platform_console",
         "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+        "@arena_java_maven//:org_junit_platform_junit_platform_suite_engine",
+    ],
+    deps = [
+        ":ephemeral_test_runtime_java",
+        ":junit_shared",
+        "//arena-junit:arena_junit_lib",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:com_microsoft_sqlserver_mssql_jdbc",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:org_junit_platform_junit_platform_suite_api",
+        "@arena_java_maven//:org_slf4j_slf4j_api",
+        "@arena_java_maven//:org_springframework_boot_spring_boot_starter_logging",
+        "@arena_java_maven//:software_amazon_awssdk_auth",
+        "@arena_java_maven//:software_amazon_awssdk_regions",
+        "@arena_java_maven//:software_amazon_awssdk_sqs",
+        "@arena_java_maven//:software_amazon_awssdk_url_connection_client",
+    ],
+)
+
+java_test(
+    name = "example-spring-boot-chained-component-test",
+    size = "medium",
+    srcs = glob(["tests/example-spring-boot-chained-component-test/**/*.java"]),
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    tags = [
+        "component_test",
+        "example_component",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-platform-suite",
+        "--select-class=arena.examples.component.ChainedComponentTestSuite",
+    ],
+    data = [
+        ":example-readings-spring-boot-web-app",
+        "//arena-ffi:arena_ffi_shared",
+        ":instrument_reading_db_schema",
+        ":validation_db_schema",
+        ":weather_db_schema",
+    ],
+    jvm_flags = ["-Djna.nosys=true"],
+    runtime_deps = [
+        ":example_spring_boot_component_test_logging_resources",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+        "@arena_java_maven//:org_junit_platform_junit_platform_suite_engine",
+        "@arena_java_maven//:org_springframework_boot_spring_boot_starter_logging",
     ],
     deps = [
         ":ephemeral_test_runtime_java",
@@ -765,12 +880,8 @@ java_test(
         "//arena-junit:arena_junit_lib",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:org_junit_platform_junit_platform_suite_api",
         "@arena_java_maven//:org_slf4j_slf4j_api",
-        "@arena_java_maven//:org_springframework_boot_spring_boot_starter_logging",
-        "@arena_java_maven//:software_amazon_awssdk_auth",
-        "@arena_java_maven//:software_amazon_awssdk_regions",
-        "@arena_java_maven//:software_amazon_awssdk_sqs",
-        "@arena_java_maven//:software_amazon_awssdk_url_connection_client",
     ],
 )
 
@@ -789,14 +900,13 @@ java_test(
     use_testrunner = False,
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
-        "--include-engine=junit-jupiter",
-        "--select-package=arena.examples.component",
+        "--include-engine=junit-platform-suite",
+        "--select-class=arena.examples.component.ComponentTestSuite",
     ],
     data = [
         ":example-readings-axum-web-app",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
-        ":arena_config",
         ":validation_db_schema",
     ],
     jvm_flags = ["-Djna.nosys=true"],
@@ -804,14 +914,17 @@ java_test(
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
         "@arena_java_maven//:org_junit_platform_junit_platform_console",
         "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+        "@arena_java_maven//:org_junit_platform_junit_platform_suite_engine",
     ],
     deps = [
         ":ephemeral_test_runtime_java",
         ":junit_shared",
         "//arena-junit:arena_junit_lib",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:com_microsoft_sqlserver_mssql_jdbc",
         "@arena_java_maven//:org_apache_kafka_kafka_clients",
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:org_junit_platform_junit_platform_suite_api",
         "@arena_java_maven//:org_slf4j_slf4j_api",
     ],
 )
@@ -828,6 +941,7 @@ csharp_library(
         ":aws_sqs_lib",
         ":aws_core_lib",
         ":polly_lib",
+        ":polly_core_lib",
     ],
     visibility = ["//visibility:public"],
 )
@@ -842,6 +956,7 @@ csharp_library(
 csharp_library(
     name = "example_readings_aspnet_web_app_lib",
     target_frameworks = ["net8.0"],
+    nullable = "enable",
     srcs = glob(
         ["src/example_readings_aspnet_web_app/**/*.cs"],
         exclude = ["src/example_readings_aspnet_web_app/Program.cs"],
@@ -852,6 +967,7 @@ csharp_library(
         ":newtonsoft_json_lib",
         ":npgsql_lib",
         ":sqlclient_lib",
+        ":oracle_manageddataaccess_core_lib",
         ":aws_core_lib",
         ":aws_eventbridge_lib",
         ":aws_sqs_lib",
@@ -877,6 +993,8 @@ csharp_library(
         ":temporalio_lib",
         ":google_protobuf_lib",
         ":nexus_rpc_lib",
+        ":polly_lib",
+        ":polly_core_lib",
     ],
     visibility = ["//visibility:public"],
 )
@@ -885,6 +1003,7 @@ csharp_binary(
     name = "example-readings-aspnet-web-app",
     target_frameworks = ["net8.0"],
     project_sdk = "web",
+    nullable = "enable",
     srcs = ["src/example_readings_aspnet_web_app/Program.cs"],
     appsetting_files = ["src/example_readings_aspnet_web_app/appsettings.json"],
     data = ["@temporalio//:runtimes/linux-x64/native/libtemporalio_sdk_core_c_bridge.so"],
@@ -912,6 +1031,54 @@ csharp_test(
         ":instrument_reading_db_schema",
         ":arena_config",
         ":validation_db_schema",
+        ":weather_db_schema",
+        "//arena-xunit:xunit_core_netstandard",
+    ],
+    deps = [
+        ":xunit_shared",
+        ":xunit_assert_lib",
+        ":xunit_abstractions_lib",
+        ":xunit_extensibility_lib",
+        ":xunit_extensibility_core_lib",
+        ":xunit_runner_utility_lib",
+        ":xunit_runner_reporters_lib",
+        ":example_readings_aspnet_web_app_lib",
+        "//arena-xunit:arena_xunit_lib",
+        ":aws_sqs_lib",
+        ":aws_core_lib",
+        ":polly_lib",
+        ":ms_logging_abstractions_lib",
+        ":ms_logging_lib",
+        ":ms_logging_console_lib",
+        ":ms_logging_options_lib",
+        ":ms_logging_options_configuration_extensions_lib",
+        ":ms_logging_configuration_lib",
+        ":ms_extensions_configuration_lib",
+        ":ms_extensions_configuration_abstractions_lib",
+        ":ms_extensions_configuration_binder_lib",
+        ":ms_extensions_dependency_injection_abstractions_lib",
+        ":ms_extensions_primitives_lib",
+        "//tools/dotnet_xunit_runner:xunit_console_runner",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+csharp_test(
+    name = "example-aspnet-xunit-chained-component-test",
+    size = "medium",
+    tags = [
+        "component_test",
+        "example_component",
+    ],
+    target_frameworks = ["net8.0"],
+    srcs = glob(["tests/example-aspnet-xunit-chained-component-test/**/*.cs"]),
+    data = [
+        ":example-readings-aspnet-web-app",
+        "//arena-ffi:arena_ffi_shared",
+        ":instrument_reading_db_schema",
+        ":arena_config",
+        ":validation_db_schema",
+        ":weather_db_schema",
         "//arena-xunit:xunit_core_netstandard",
     ],
     deps = [
@@ -949,10 +1116,13 @@ test_suite(
     tests = [
         ":pytest_axum_component_test",
         ":pytest_fastapi_component_test",
+        ":pytest_fastapi_chained_component_test",
         ":example-axum-component-test",
         ":example-axum-junit-component-test",
         ":example-spring-boot-component-test",
+        ":example-spring-boot-chained-component-test",
         ":example-aspnet-xunit-component-test",
+        ":example-aspnet-xunit-chained-component-test",
     ],
     visibility = ["//visibility:public"],
 )

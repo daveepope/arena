@@ -1,8 +1,10 @@
+using System.Collections.Generic;
 using ArenaDotnet.Xunit.Support;
+using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Dep;
 
-public sealed class TemporalDependency : IArenaMatchPiece
+public sealed class TemporalDependency : IArenaDependency
 {
     public string Type => "temporal";
     public string Identifier { get; }
@@ -11,8 +13,11 @@ public sealed class TemporalDependency : IArenaMatchPiece
     public string? Image { get; }
     public string? ImageName { get; }
     public string? ContainerName { get; }
+    public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
-    internal TemporalDependency(string identifier, int port, int uiPort, string? image, string? imageName, string? containerName)
+    private readonly IReadOnlyList<IArenaDependency> _children;
+
+    internal TemporalDependency(string identifier, int port, int uiPort, string? image, string? imageName, string? containerName, IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -20,6 +25,7 @@ public sealed class TemporalDependency : IArenaMatchPiece
         Image = string.IsNullOrEmpty(image) ? null : image;
         ImageName = string.IsNullOrEmpty(imageName) ? null : imageName;
         ContainerName = string.IsNullOrEmpty(containerName) ? null : containerName;
+        _children = children;
     }
 
     public string ForFfi()
@@ -36,6 +42,7 @@ public sealed class TemporalDependencyBuilder
     private string? _image;
     private string? _imageName;
     private string? _containerName;
+    private readonly List<IArenaDependency> _children = new();
 
     public TemporalDependencyBuilder(string name)
     {
@@ -72,9 +79,15 @@ public sealed class TemporalDependencyBuilder
         return this;
     }
 
+    public TemporalDependencyBuilder AddChildDependency(IArenaDependency child)
+    {
+        _children.Add(child);
+        return this;
+    }
+
     public TemporalDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-temporal", _name);
-        return new TemporalDependency(identifier, _port, _uiPort, _image, _imageName, _containerName);
+        return new TemporalDependency(identifier, _port, _uiPort, _image, _imageName, _containerName, _children);
     }
 }

@@ -86,7 +86,7 @@ public class JwtAuthMiddleware
                 var scopeClaim = result.Claims.FirstOrDefault(c => c.Key == "scope");
                 if (scopeClaim.Value != null)
                 {
-                    var scopeStr = scopeClaim.Value.ToString();
+                    var scopeStr = scopeClaim.Value.ToString() ?? string.Empty;
                     var actual = scopeStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                     foreach (var r in required)
                     {

@@ -1,0 +1,74 @@
+name: DCO Sign-off
+
+on:
+  issue_comment:
+    types: [created]
+  # pull_request_target (not pull_request) so forked PRs still get a write-capable token to set
+  # the status. Safe only because this workflow never checks out or runs any code from the PR
+  # head; it only calls the GitHub API using the trusted workflow file from the base branch.
+  # Do not add an actions/checkout step here.
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions: read-all
+
+jobs:
+  check-sign-off:
+    if: github.event_name == 'pull_request_target' || github.event.issue.pull_request != null
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - name: Check PR comments for DCO sign-off
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            const REQUIRED_PHRASE = "i have read the dco and i sign off on this pr";
+            const normalize = (text) =>
+              text.trim().toLowerCase().replace(/^[`"']+/, "").replace(/[`"'.!]+$/, "");
+
+            let pull_number;
+            let sha;
+            let author;
+            if (context.eventName === "pull_request_target") {
+              pull_number = context.payload.pull_request.number;
+              sha = context.payload.pull_request.head.sha;
+              author = context.payload.pull_request.user.login;
+            } else {
+              // Only the PR author's own comments can affect sign-off, so a comment from
+              // anyone else is a no-op: skip before spending any API calls on it.
+              author = context.payload.issue.user.login;
+              if (context.payload.comment.user.login !== author) {
+                return;
+              }
+              pull_number = context.issue.number;
+              const pr = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number,
+              });
+              sha = pr.data.head.sha;
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pull_number,
+            });
+            const signed = comments.some(
+              (comment) => comment.user.login === author && normalize(comment.body) === REQUIRED_PHRASE
+            );
+
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha,
+              state: signed ? "success" : "failure",
+              context: "DCO sign-off",
+              description: signed
+                ? "DCO sign-off received"
+                : 'Comment "I have read the DCO and I sign off on this PR" is required',
+              target_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/blob/master/DCO.md`,
+            });

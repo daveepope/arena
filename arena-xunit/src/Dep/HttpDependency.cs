@@ -1,8 +1,10 @@
+using System.Collections.Generic;
 using ArenaDotnet.Xunit.Support;
+using Newtonsoft.Json.Linq;
 
 namespace ArenaDotnet.Xunit.Dep;
 
-public sealed class HttpDependency : IArenaMatchPiece
+public sealed class HttpDependency : IArenaDependency
 {
     public string Type => "http";
     public string Identifier { get; }
@@ -11,8 +13,11 @@ public sealed class HttpDependency : IArenaMatchPiece
     public string? ContainerName { get; }
     public string? ImageName { get; }
     public string? ImageTag { get; }
+    public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
-    internal HttpDependency(string identifier, int port, string? listenIp, string? containerName, string? imageName, string? imageTag)
+    private readonly IReadOnlyList<IArenaDependency> _children;
+
+    internal HttpDependency(string identifier, int port, string? listenIp, string? containerName, string? imageName, string? imageTag, IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -20,6 +25,7 @@ public sealed class HttpDependency : IArenaMatchPiece
         ContainerName = containerName;
         ImageName = imageName;
         ImageTag = imageTag;
+        _children = children;
     }
 
     public string ForFfi()
@@ -36,6 +42,7 @@ public sealed class HttpDependencyBuilder
     private string? _containerName;
     private string? _imageName;
     private string? _imageTag;
+    private readonly List<IArenaDependency> _children = new();
 
     public HttpDependencyBuilder(string name)
     {
@@ -72,9 +79,15 @@ public sealed class HttpDependencyBuilder
         return this;
     }
 
+    public HttpDependencyBuilder AddChildDependency(IArenaDependency child)
+    {
+        _children.Add(child);
+        return this;
+    }
+
     public HttpDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-http", _name);
-        return new HttpDependency(identifier, _port, _listenIp, _containerName, _imageName, _imageTag);
+        return new HttpDependency(identifier, _port, _listenIp, _containerName, _imageName, _imageTag, _children);
     }
 }

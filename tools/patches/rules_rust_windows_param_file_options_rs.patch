@@ -1,0 +1,94 @@
+--- a/util/process_wrapper/options.rs
++++ b/util/process_wrapper/options.rs
+@@ -51,6 +51,20 @@
+     pub(crate) rustc_output_format: Option<rustc::ErrorFormat>,
+ }
+ 
++fn expand_leading_param_file(args: Vec<String>) -> Result<Vec<String>, OptionError> {
++    match args.get(1).and_then(|a| a.strip_prefix('@')) {
++        Some(param_file) => {
++            let param_file = param_file.to_string();
++            let file_args = read_file_to_array(&param_file).map_err(OptionError::Generic)?;
++            let mut expanded = vec![args[0].clone()];
++            expanded.extend(file_args);
++            expanded.extend(args.into_iter().skip(2));
++            Ok(expanded)
++        }
++        None => Ok(args),
++    }
++}
++
+ pub(crate) fn options() -> Result<Options, OptionError> {
+     // Process argument list until -- is encountered.
+     // Everything after is sent to the child process.
+@@ -134,7 +148,7 @@
+     );
+ 
+     let mut child_args = match flags
+-        .parse(env::args().collect())
++        .parse(expand_leading_param_file(env::args().collect())?)
+         .map_err(OptionError::FlagError)?
+     {
+         ParseOutcome::Help(help) => {
+@@ -275,6 +289,10 @@
+         require_explicit_unstable_features.is_some_and(|s| s == "true");
+ 
+     // Append all the arguments fetched from files to those provided via command line.
++    let original_rustc_param_file = child_args
++        .get(1)
++        .and_then(|a| a.strip_prefix('@'))
++        .map(str::to_owned);
+     child_args.append(&mut file_arguments);
+     let child_args = prepare_args(
+         child_args,
+@@ -289,10 +307,11 @@
+             "at least one argument after -- is required (the child process path)".to_owned(),
+         )
+     })?;
++    let args = collapse_into_param_file(args, original_rustc_param_file.as_deref())?;
+ 
+     Ok(Options {
+         executable: exec_path.to_owned(),
+-        child_arguments: args.to_vec(),
++        child_arguments: args,
+         child_environment: vars,
+         touch_file,
+         copy_output,
+@@ -304,6 +323,37 @@
+     })
+ }
+ 
++fn collapse_into_param_file(args: &[String], key: Option<&str>) -> Result<Vec<String>, OptionError> {
++    if args.len() <= 1 {
++        return Ok(args.to_vec());
++    }
++    let param_file = format!("{}.final_args", key.unwrap_or("process_wrapper_rustc_args"));
++    let format_err = |err: io::Error| {
++        OptionError::Generic(format!(
++            "{} writing path: {:?}, current directory: {:?}",
++            err,
++            param_file,
++            std::env::current_dir()
++        ))
++    };
++    let mut flattened: Vec<String> = Vec::new();
++    for arg in args {
++        match arg.strip_prefix('@') {
++            Some(nested) => {
++                flattened.extend(read_file_to_array(nested).map_err(OptionError::Generic)?);
++            }
++            None => flattened.push(arg.clone()),
++        }
++    }
++    let mut writer = io::BufWriter::new(File::create(&param_file).map_err(format_err)?);
++    for line in &flattened {
++        writeln!(writer, "{line}").map_err(format_err)?;
++    }
++    writer.flush().map_err(format_err)?;
++    drop(writer);
++    Ok(vec![format!("@{param_file}")])
++}
++
+ fn args_from_file(paths: Vec<String>) -> Result<Vec<String>, OptionError> {
+     let mut args = vec![];
+     for path in paths.iter() {

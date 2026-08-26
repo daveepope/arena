@@ -1,4 +1,4 @@
-use arena::dependency::RunnableDependency;
+use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_temporal::{TemporalDependency, TemporalImpl};
 use async_trait::async_trait;
@@ -175,6 +175,12 @@ async fn add_child_before_start_starts_and_stops_child() {
         async fn hard_reset(&mut self) {}
 
         fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
+    fn children(&self) -> &[Dependency] {
+        &[]
+    }
+    fn children_mut(&mut self) -> &mut [Dependency] {
+        &mut []
+    }
     }
 
     let events = Arc::new(Mutex::new(Vec::<Event>::new()));

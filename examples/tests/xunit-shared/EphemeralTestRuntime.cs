@@ -28,6 +28,8 @@ public static class EphemeralTestRuntime
 
     public static string NetworkName => $"arena-example-api-network-{Suffix}";
 
+    public static string RandomToken(int length) => Guid.NewGuid().ToString("N")[..length];
+
     private static int FindOpenPort()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);

@@ -28,9 +28,9 @@ internal static class ArenaNativeLib
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_dispatcher_default_logging_target_publish_level_fn(int level);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void arena_dispatcher_dependency_allow_json_set_fn(string jsonUtf8Nullable);
+    private delegate void arena_dispatcher_dependency_allow_json_set_fn(string? jsonUtf8Nullable);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void arena_dispatcher_component_allow_json_set_fn(string jsonUtf8Nullable);
+    private delegate void arena_dispatcher_component_allow_json_set_fn(string? jsonUtf8Nullable);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void arena_free_string_fn(IntPtr ptr);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -47,6 +47,8 @@ internal static class ArenaNativeLib
     private delegate int arena_mssql_playbook_verify_fn(IntPtr handle, string specJson, out IntPtr errOut);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_postgres_playbook_verify_fn(IntPtr handle, string specJson, out IntPtr errOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate int arena_oracle_playbook_verify_fn(IntPtr handle, string specJson, out IntPtr errOut);
 
     private static arena_open_fn? _arena_open;
     private static arena_close_fn? _arena_close;
@@ -67,6 +69,7 @@ internal static class ArenaNativeLib
     private static arena_http_playbook_verify_fn? _arena_http_playbook_verify;
     private static arena_mssql_playbook_verify_fn? _arena_mssql_playbook_verify;
     private static arena_postgres_playbook_verify_fn? _arena_postgres_playbook_verify;
+    private static arena_oracle_playbook_verify_fn? _arena_oracle_playbook_verify;
 
     static ArenaNativeLib()
     {
@@ -84,7 +87,7 @@ internal static class ArenaNativeLib
                 return;
 
             var path = ArenaPaths.ResolveArenaSharedLibrary();
-            if (string.IsNullOrEmpty(path))
+            if (path is null || path.Length == 0)
             {
                 throw new ArenaBindingError(
                     $"arena shared library not found (set ARENA_FFI_LIB or use Bazel runfiles)");
@@ -119,6 +122,7 @@ internal static class ArenaNativeLib
             LoadFunction(out _arena_http_playbook_verify, "arena_http_playbook_verify");
             LoadFunction(out _arena_mssql_playbook_verify, "arena_mssql_playbook_verify");
             LoadFunction(out _arena_postgres_playbook_verify, "arena_postgres_playbook_verify");
+            LoadFunction(out _arena_oracle_playbook_verify, "arena_oracle_playbook_verify");
 
             _initialized = true;
         }
@@ -218,10 +222,10 @@ internal static class ArenaNativeLib
     internal static int arena_dispatcher_default_logging_target_publish_level(int level) =>
         _arena_dispatcher_default_logging_target_publish_level!.Invoke(level);
 
-    internal static void arena_dispatcher_dependency_allow_json_set(string jsonUtf8Nullable) =>
+    internal static void arena_dispatcher_dependency_allow_json_set(string? jsonUtf8Nullable) =>
         _arena_dispatcher_dependency_allow_json_set!.Invoke(jsonUtf8Nullable);
 
-    internal static void arena_dispatcher_component_allow_json_set(string jsonUtf8Nullable) =>
+    internal static void arena_dispatcher_component_allow_json_set(string? jsonUtf8Nullable) =>
         _arena_dispatcher_component_allow_json_set!.Invoke(jsonUtf8Nullable);
 
     internal static void arena_free_string(IntPtr ptr) =>
@@ -247,4 +251,7 @@ internal static class ArenaNativeLib
 
     internal static int arena_postgres_playbook_verify(IntPtr handle, string specJson, out IntPtr errOut) =>
         _arena_postgres_playbook_verify!.Invoke(handle, specJson, out errOut);
+
+    internal static int arena_oracle_playbook_verify(IntPtr handle, string specJson, out IntPtr errOut) =>
+        _arena_oracle_playbook_verify!.Invoke(handle, specJson, out errOut);
 }

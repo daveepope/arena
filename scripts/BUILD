@@ -40,6 +40,13 @@ py_binary(
     visibility = ["//visibility:public"],
 )
 
+py_binary(
+    name = "setup_local_bazelrc",
+    srcs = ["setup_local_bazelrc.py"],
+    main = "setup_local_bazelrc.py",
+    visibility = ["//visibility:public"],
+)
+
 py_library(
     name = "arena_version_lib",
     srcs = ["arena_version.py"],
@@ -57,10 +64,88 @@ py_binary(
 )
 
 py_binary(
-    name = "bump_patch_version",
-    srcs = ["bump_patch_version.py"],
-    main = "bump_patch_version.py",
+    name = "bump_version",
+    srcs = ["bump_version.py"],
+    main = "bump_version.py",
     deps = [":arena_version_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "repin",
+    srcs = ["repin.py"],
+    main = "repin.py",
+    deps = [":arena_version_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "audit_and_vet_rust",
+    srcs = ["audit_and_vet_rust.py"],
+    main = "audit_and_vet_rust.py",
+    deps = [":arena_version_lib"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "generate_rust_sbom",
+    srcs = ["generate_rust_sbom.py"],
+    main = "generate_rust_sbom.py",
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "generate_rust_sbom_test",
+    size = "small",
+    srcs = [
+        "generate_rust_sbom.py",
+        "generate_rust_sbom_test.py",
+    ],
+    main = "generate_rust_sbom_test.py",
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "generate_maven_sbom",
+    srcs = ["generate_maven_sbom.py"],
+    main = "generate_maven_sbom.py",
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "generate_maven_sbom_test",
+    size = "small",
+    srcs = [
+        "generate_maven_sbom.py",
+        "generate_maven_sbom_test.py",
+    ],
+    main = "generate_maven_sbom_test.py",
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "generate_nuget_sbom",
+    srcs = ["generate_nuget_sbom.py"],
+    main = "generate_nuget_sbom.py",
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "generate_nuget_sbom_test",
+    size = "small",
+    srcs = [
+        "generate_nuget_sbom.py",
+        "generate_nuget_sbom_test.py",
+    ],
+    main = "generate_nuget_sbom_test.py",
     imports = ["."],
     visibility = ["//visibility:public"],
 )
@@ -98,13 +183,13 @@ py_test(
 )
 
 py_test(
-    name = "bump_patch_version_test",
+    name = "bump_version_test",
     size = "small",
     srcs = [
-        "bump_patch_version.py",
-        "bump_patch_version_test.py",
+        "bump_version.py",
+        "bump_version_test.py",
     ],
-    main = "bump_patch_version_test.py",
+    main = "bump_version_test.py",
     deps = [":arena_version_lib"],
     imports = ["."],
     visibility = ["//visibility:public"],
@@ -115,6 +200,12 @@ py_test(
     size = "small",
     srcs = ["version_sync_test.py"],
     main = "version_sync_test.py",
+    data = [
+        "//:Cargo.toml",
+        "//:MODULE.bazel",
+        "//:VERSION",
+        "//arena-pytest:pyproject.toml",
+    ],
     deps = [":arena_version_lib"],
     imports = ["."],
     visibility = ["//visibility:public"],
@@ -208,6 +299,7 @@ py_test(
         "container_defaults.py",
     ],
     main = "check_container_defaults_test.py",
+    data = ["//:container_defaults.toml"],
     deps = [":container_defaults_lib"],
     imports = ["."],
     visibility = ["//visibility:public"],

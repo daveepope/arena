@@ -8,6 +8,8 @@ use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
 pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
+const CONNECT_RETRY_ATTEMPTS: u32 = 3;
+const CONNECT_RETRY_BACKOFF_BASE: Duration = Duration::from_millis(250);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MssqlEncryption {
@@ -88,7 +90,8 @@ impl MssqlImpl for MssqlContainerImpl {
             .with_mapped_port(port, ContainerPort::from(DEFAULT_CONTAINER_PORT))
             .with_name(image_name)
             .with_tag(image_tag)
-            .with_container_name(container_name);
+            .with_container_name(container_name)
+            .with_platform(arena_container::platform::docker_platform());
 
         if let Some(ref network) = self.network {
             arena_container::network::ensure_network_exists(network).await;
@@ -177,13 +180,36 @@ pub async fn connect_with_timeout(
     let config = Config::from_ado_string(connection_string)
         .map_err(|e| format!("parse ADO connection string: {e}"))?;
 
-    let fut = connect_with_config(config);
-    match timeout {
-        Some(budget) => tokio::time::timeout(budget, fut)
-            .await
-            .map_err(|_| format!("mssql connect exceeded {budget:?}"))?,
-        None => fut.await,
+    let Some(budget) = timeout else {
+        return connect_with_config(config).await;
+    };
+
+    connect_with_retry(config, budget, CONNECT_RETRY_ATTEMPTS).await
+}
+
+async fn connect_with_retry(
+    config: Config,
+    budget: Duration,
+    attempts: u32,
+) -> Result<Client<Compat<TcpStream>>, String> {
+    let mut last_err = String::new();
+
+    for attempt in 0..attempts {
+        let outcome = tokio::time::timeout(budget, connect_with_config(config.clone())).await;
+        last_err = match outcome {
+            Ok(Ok(client)) => return Ok(client),
+            Ok(Err(err)) => err,
+            Err(_) => format!("mssql connect exceeded {budget:?}"),
+        };
+
+        if attempt + 1 < attempts {
+            tokio::time::sleep(CONNECT_RETRY_BACKOFF_BASE * 2u32.pow(attempt)).await;
+        }
     }
+
+    Err(format!(
+        "mssql connect failed after {attempts} attempts: {last_err}"
+    ))
 }
 
 pub(crate) async fn connect_with_config(

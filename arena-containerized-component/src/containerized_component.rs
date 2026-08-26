@@ -25,6 +25,7 @@ pub struct ContainerizedComponent {
     pub(crate) port_mappings: Vec<(u16, u16)>,
     pub(crate) readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
     pub(crate) host_mappings: Vec<String>,
+    pub(crate) volume_mappings: Vec<(String, String)>,
     pub(crate) runtime_client: Docker,
     pub(crate) container_id: Option<String>,
     pub(crate) stopped: bool,
@@ -36,6 +37,13 @@ impl ContainerizedComponent {
         containerfile: impl Into<String>,
     ) -> ContainerizedComponentBuilder {
         ContainerizedComponentBuilder::new(identifier, containerfile)
+    }
+
+    pub fn from_image(
+        identifier: impl Into<String>,
+        image: impl Into<String>,
+    ) -> ContainerizedComponentBuilder {
+        ContainerizedComponentBuilder::new_from_image(identifier, image)
     }
 
     async fn create_and_start_container(&mut self) {
@@ -85,6 +93,15 @@ impl ContainerizedComponent {
 
         if !self.host_mappings.is_empty() {
             host_config.extra_hosts = Some(self.host_mappings.clone());
+        }
+
+        if !self.volume_mappings.is_empty() {
+            host_config.binds = Some(
+                self.volume_mappings
+                    .iter()
+                    .map(|(host_path, container_path)| format!("{host_path}:{container_path}"))
+                    .collect(),
+            );
         }
 
         let mut networking_config: Option<NetworkingConfig> = None;

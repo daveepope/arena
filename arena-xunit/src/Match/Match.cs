@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using ArenaDotnet.Xunit.Support;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -8,13 +9,13 @@ namespace ArenaDotnet.Xunit;
 public sealed class Match
 {
     public string Name { get; }
-    public IReadOnlyList<IArenaMatchPiece> Dependencies { get; }
-    public IReadOnlyList<IArenaMatchPiece> Components { get; }
+    public IReadOnlyList<IArenaDependency> Dependencies { get; }
+    public IReadOnlyList<IArenaComponent> Components { get; }
     public string? Network { get; }
     public IReadOnlyList<RegisteredPlaybook> Playbooks { get; }
 
-    internal Match(string name, IReadOnlyList<IArenaMatchPiece> dependencies,
-        IReadOnlyList<IArenaMatchPiece> components, string? network,
+    internal Match(string name, IReadOnlyList<IArenaDependency> dependencies,
+        IReadOnlyList<IArenaComponent> components, string? network,
         IReadOnlyList<RegisteredPlaybook> playbooks)
     {
         Name = name;
@@ -30,9 +31,9 @@ public sealed class Match
         {
             MatchName = Name,
             Network = Network,
-            Dependencies = Dependencies.Select(d => JToken.Parse(d.ForFfi())).ToList(),
-            Components = Components.Select(c => JToken.Parse(c.ForFfi())).ToList(),
-            Playbooks = Playbooks.Select(p => p.ToConfig()).ToList(),
+            Dependencies = ChildrenWireFormat.Build(Dependencies) ?? new List<JToken>(),
+            Components = ChildrenWireFormat.Build(Components) ?? new List<JToken>(),
+            Playbooks = Playbooks.Select(p => p.ToConfig()).Where(c => c != null).ToList()!,
         };
         return ArenaDotnet.Xunit.Support.ArenaJson.Serialize(obj);
     }

@@ -24,11 +24,13 @@ public class ArenaCollectionFixtureTest
 
     private class NullAttributeFieldFixture : ArenaCollectionFixture
     {
+#pragma warning disable CS0414
         [ArenaDependency]
         private static readonly HttpDependency? NullDependency = null;
+#pragma warning restore CS0414
     }
 
-    private sealed class StubMatchPiece : IArenaMatchPiece
+    private sealed class StubMatchPiece : IArenaDependency, IArenaComponent
     {
         public string Identifier { get; }
         public StubMatchPiece(string identifier) => Identifier = identifier;
@@ -49,7 +51,7 @@ public class ArenaCollectionFixtureTest
     private sealed class RecordingLogger : ILogger
     {
         public bool Logged { get; private set; }
-        public IDisposable? BeginScope<TState>(TState state) => null;
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
             Exception? exception, Func<TState, Exception?, string> formatter)

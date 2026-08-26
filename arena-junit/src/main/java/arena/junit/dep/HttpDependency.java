@@ -1,10 +1,10 @@
 package arena.junit.dep;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableDependency;
 import arena.junit.playbook.HttpPlaybookBuilder;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public final class HttpDependency implements ArenaMatchPiece {
+public final class HttpDependency implements ArenaRunnableDependency {
   private final ObjectNode config;
 
   HttpDependency(ObjectNode config) {

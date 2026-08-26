@@ -43,6 +43,7 @@ public class PlaybookBuilderSerializationTest
         Assert.NotNull(responses);
         Assert.Single(responses);
         var response = responses[0];
+        Assert.NotNull(response);
         var status = response.GetType().GetProperty("Status")?.GetValue(response);
         Assert.Equal(200, status);
     }

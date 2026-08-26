@@ -1,8 +1,10 @@
 package arena.junit.exec;
+import arena.junit.match.ArenaRunnableComponent;
 import arena.junit.readiness.ReadinessCheck;
 import arena.junit.readiness.ReadinessChecksFfi;
 import arena.junit.support.ArenaIdentifiers;
 import arena.junit.support.ArenaJson;
+import arena.junit.support.ChildrenFfi;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -12,17 +14,34 @@ import java.util.List;
 public final class ContainerizedComponentBuilder {
   private final ObjectNode config;
   private final List<ReadinessChecksFfi.ReadinessEntry> readiness = new ArrayList<>();
+  private final List<ArenaRunnableComponent> children = new ArrayList<>();
 
-  public ContainerizedComponentBuilder(String name, String containerfile) {
+  private ContainerizedComponentBuilder(String name) {
     config =
         ArenaJson.object()
             .put("type", "container")
-            .put("identifier", ArenaIdentifiers.build("arena-containerized-component", name))
-            .put("containerfile", containerfile);
+            .put("identifier", ArenaIdentifiers.build("arena-containerized-component", name));
     config.set("env_vars", ArenaJson.object());
     config.set("runtime_args", ArenaJson.array());
     config.set("port_mappings", ArenaJson.array());
     config.set("host_mappings", ArenaJson.array());
+    config.set("volume_mappings", ArenaJson.array());
+  }
+
+  public ContainerizedComponentBuilder(String name, String containerfile) {
+    this(name);
+    config.put("containerfile", containerfile);
+  }
+
+  public static ContainerizedComponentBuilder fromImage(String name, String image) {
+    ContainerizedComponentBuilder builder = new ContainerizedComponentBuilder(name);
+    builder.config.put("image", image);
+    return builder;
+  }
+
+  public ContainerizedComponentBuilder withPlatform(String platform) {
+    config.put("platform", platform);
+    return this;
   }
 
   public ContainerizedComponentBuilder withBuildContext(String path) {
@@ -54,6 +73,15 @@ public final class ContainerizedComponentBuilder {
     return this;
   }
 
+  public ContainerizedComponentBuilder withVolumeMapping(String hostPath, String containerPath) {
+    ArrayNode arr = (ArrayNode) config.get("volume_mappings");
+    ObjectNode m = ArenaJson.object();
+    m.put("host_path", hostPath);
+    m.put("container_path", containerPath);
+    arr.add(m);
+    return this;
+  }
+
   public ContainerizedComponentBuilder withEnvVar(String key, String value) {
     ((ObjectNode) config.get("env_vars")).put(key, value);
     return this;
@@ -78,7 +106,12 @@ public final class ContainerizedComponentBuilder {
     return this;
   }
 
+  public ContainerizedComponentBuilder addChildComponent(ArenaRunnableComponent child) {
+    this.children.add(child);
+    return this;
+  }
+
   public ContainerizedComponent build() {
-    return new ContainerizedComponent(config.deepCopy(), readiness);
+    return new ContainerizedComponent(config.deepCopy(), readiness, children);
   }
 }

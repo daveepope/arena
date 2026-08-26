@@ -1,3 +1,4 @@
+import json
 import sys
 import os
 from unittest.mock import MagicMock
@@ -45,16 +46,16 @@ def test_playbook_marker_two_args_raises_usage_error():
 
 
 def test_playbook_marker_stacked_marks_collect_both_classes():
-    from arena_pytest.playbook import Playbook, _own_marker_classes, playbook
+    from arena_pytest.playbook import UnmanagedPlaybook, _own_marker_classes, playbook
 
-    class Alpha(Playbook):
+    class Alpha(UnmanagedPlaybook):
         def identifier(self):
             return "alpha"
 
         def run(self, arena):
             raise NotImplementedError
 
-    class Beta(Playbook):
+    class Beta(UnmanagedPlaybook):
         def identifier(self):
             return "beta"
 
@@ -68,6 +69,237 @@ def test_playbook_marker_stacked_marks_collect_both_classes():
     item = type("_Item", (), {"own_markers": list(sample.pytestmark)})()
     classes = _own_marker_classes(item)
     assert classes == [Alpha, Beta]
+
+
+def test_playbook_marker_bare_playbook_subclass_raises_usage_error():
+    from arena_pytest.playbook import Playbook, _resolve_playbook_classes_from_marker
+
+    class Bare(Playbook):
+        def identifier(self):
+            return "bare"
+
+        def run(self, arena):
+            raise NotImplementedError
+
+    class _Mark:
+        args = (Bare,)
+
+    with pytest.raises(pytest.UsageError, match="ManagedPlaybook or UnmanagedPlaybook"):
+        _resolve_playbook_classes_from_marker(_Mark())
+
+
+class _FakeMatch:
+    def __init__(self, registrations):
+        self._registrations = registrations
+
+    def _registration_for(self, klass):
+        return self._registrations.get(klass)
+
+
+def test_activate_managed_playbook_defers_run_to_teardown():
+    from arena_pytest.playbook import (
+        ActivePlaybook,
+        ManagedPlaybook,
+        _activate_classes,
+        _partition_classes,
+        _run_managed_classes,
+    )
+
+    calls = []
+
+    class Cleanup(ManagedPlaybook):
+        def identifier(self):
+            return "cleanup"
+
+        def run(self, arena):
+            calls.append("managed")
+            return ActivePlaybook(MagicMock(), 0)
+
+    pb = Cleanup()
+    match = _FakeMatch({Cleanup: (pb, False)})
+    unmanaged, managed = _partition_classes([Cleanup])
+    assert unmanaged == []
+    assert managed == [Cleanup]
+
+    actives = _activate_classes(MagicMock(), [match], unmanaged)
+    assert actives == []
+    assert calls == []
+
+    _run_managed_classes(MagicMock(), [match], managed)
+    assert calls == ["managed"]
+
+
+def test_finish_playbook_scope_drops_actives_and_runs_managed_classes():
+    from arena_pytest.playbook import (
+        ActivePlaybook,
+        ManagedPlaybook,
+        UnmanagedPlaybook,
+        _finish_playbook_scope,
+    )
+
+    order = []
+
+    class Seed(UnmanagedPlaybook):
+        def identifier(self):
+            return "seed"
+
+        def run(self, arena):
+            raise NotImplementedError
+
+    class Cleanup(ManagedPlaybook):
+        def identifier(self):
+            return "cleanup"
+
+        def run(self, arena):
+            order.append("managed")
+            return ActivePlaybook(MagicMock(), 0)
+
+    active = ActivePlaybook(MagicMock(), 0)
+    original_exit = active.__exit__
+    active.__exit__ = lambda *a: (order.append("unmanaged-dropped"), original_exit(*a))[1]
+
+    cleanup = Cleanup()
+    match = _FakeMatch({Cleanup: (cleanup, False)})
+
+    _finish_playbook_scope(MagicMock(), [match], [active], [Cleanup])
+
+    assert order == ["unmanaged-dropped", "managed"]
+
+
+def test_run_managed_classes_one_failure_still_runs_remaining_classes():
+    from arena_pytest.playbook import ActivePlaybook, ManagedPlaybook, _run_managed_classes
+
+    calls = []
+
+    class Failing(ManagedPlaybook):
+        def identifier(self):
+            return "failing"
+
+        def run(self, arena):
+            calls.append("failing")
+            raise RuntimeError("boom")
+
+    class Cleanup(ManagedPlaybook):
+        def identifier(self):
+            return "cleanup"
+
+        def run(self, arena):
+            calls.append("cleanup")
+            return ActivePlaybook(MagicMock(), 0)
+
+    failing = Failing()
+    cleanup = Cleanup()
+    match = _FakeMatch({Failing: (failing, False), Cleanup: (cleanup, False)})
+
+    with pytest.raises(RuntimeError, match="boom"):
+        _run_managed_classes(MagicMock(), [match], [Failing, Cleanup])
+
+    assert calls == ["failing", "cleanup"]
+
+
+def test_activate_unmanaged_playbook_runs_at_setup():
+    from arena_pytest.playbook import (
+        ActivePlaybook,
+        UnmanagedPlaybook,
+        _activate_classes,
+        _partition_classes,
+    )
+
+    calls = []
+
+    class Seed(UnmanagedPlaybook):
+        def identifier(self):
+            return "seed"
+
+        def run(self, arena):
+            calls.append("unmanaged")
+            return ActivePlaybook(MagicMock(), 0)
+
+    pb = Seed()
+    match = _FakeMatch({Seed: (pb, False)})
+    unmanaged, managed = _partition_classes([Seed])
+    assert managed == []
+    assert unmanaged == [Seed]
+
+    actives = _activate_classes(MagicMock(), [match], unmanaged)
+    assert calls == ["unmanaged"]
+    assert len(actives) == 1
+
+
+def test_partition_classes_managed_subclass_with_activates_before_test_flag_runs_at_setup():
+    from arena_pytest.playbook import ActivePlaybook, ManagedPlaybook, _partition_classes
+
+    class PreconfiguredHttp(ManagedPlaybook):
+        _activates_before_test = True
+
+        def identifier(self):
+            return "preconfigured-http"
+
+        def run(self, arena):
+            return ActivePlaybook(MagicMock(), 0)
+
+    unmanaged, managed = _partition_classes([PreconfiguredHttp])
+    assert unmanaged == [PreconfiguredHttp]
+    assert managed == []
+
+
+def test_run_managed_classes_exec_on_dependency_start_registered_playbook_raises_usage_error():
+    from arena_pytest.playbook import ActivePlaybook, ManagedPlaybook, _run_managed_classes
+
+    class Cleanup(ManagedPlaybook):
+        def identifier(self):
+            return "cleanup"
+
+        def run(self, arena):
+            return ActivePlaybook(MagicMock(), 0)
+
+    pb = Cleanup()
+    match = _FakeMatch({Cleanup: (pb, True)})
+
+    with pytest.raises(pytest.UsageError, match="exec_on_dependency_start=True"):
+        _run_managed_classes(MagicMock(), [match], [Cleanup])
+
+
+def test_activate_mixed_stack_runs_unmanaged_before_and_managed_after():
+    from arena_pytest.playbook import (
+        ActivePlaybook,
+        ManagedPlaybook,
+        UnmanagedPlaybook,
+        _activate_classes,
+        _drop_actives,
+        _partition_classes,
+        _run_managed_classes,
+    )
+
+    order = []
+
+    class Seed(UnmanagedPlaybook):
+        def identifier(self):
+            return "seed"
+
+        def run(self, arena):
+            order.append("unmanaged")
+            return ActivePlaybook(MagicMock(), 0)
+
+    class Cleanup(ManagedPlaybook):
+        def identifier(self):
+            return "cleanup"
+
+        def run(self, arena):
+            order.append("managed")
+            return ActivePlaybook(MagicMock(), 0)
+
+    seed = Seed()
+    cleanup = Cleanup()
+    match = _FakeMatch({Seed: (seed, False), Cleanup: (cleanup, False)})
+
+    unmanaged, managed = _partition_classes([Cleanup, Seed])
+
+    actives = _activate_classes(MagicMock(), [match], unmanaged)
+    _drop_actives(actives)
+    _run_managed_classes(MagicMock(), [match], managed)
+
+    assert order == ["unmanaged", "managed"]
 
 
 def test_active_playbook_drop_after_body_failure_swallows_binding_error(monkeypatch):
@@ -96,6 +328,108 @@ def test_active_playbook_drop_without_body_failure_reraises_binding_error(monkey
     active = ActivePlaybook(MagicMock(), 99)
     with pytest.raises(AssertionError, match="drop expect failed"):
         active.__exit__(None, None, None)
+
+
+def test_active_oracle_playbook_verify_dropped_handle_raises_runtime_error():
+    from arena_pytest.playbook import ActiveOraclePlaybook
+
+    active = ActiveOraclePlaybook(MagicMock(), 0, "dep-id")
+    with pytest.raises(RuntimeError, match="dropped"):
+        active.verify("select 1 from dual", 1)
+
+
+def test_active_oracle_playbook_verify_sends_expected_spec(monkeypatch):
+    from arena_pytest.playbook import ActiveOraclePlaybook
+
+    captured = {}
+
+    def fake_verify(_ffi, handle, spec_json):
+        captured["handle"] = handle
+        captured["spec"] = json.loads(spec_json)
+
+    monkeypatch.setattr(_playbook_pkg(), "_ffi_oracle_playbook_verify", fake_verify)
+    active = ActiveOraclePlaybook(MagicMock(), 11, "dep-id")
+    active.verify("select count(*) from orders", 3)
+
+    assert captured["handle"] == 11
+    assert captured["spec"] == {
+        "dependency_identifier": "dep-id",
+        "query": "select count(*) from orders",
+        "expected_value": 3,
+    }
+
+
+def test_active_oracle_playbook_verify_binding_error_marks_body_failed(monkeypatch):
+    from arena_pytest.ffi._ffi import ArenaBindingError
+    from arena_pytest.playbook import ActiveOraclePlaybook
+
+    monkeypatch.setattr(
+        _playbook_pkg(),
+        "_ffi_oracle_playbook_verify",
+        lambda _ffi, _h, _spec: (_ for _ in ()).throw(ArenaBindingError("mismatch")),
+    )
+    active = ActiveOraclePlaybook(MagicMock(), 11, "dep-id")
+    with pytest.raises(ArenaBindingError):
+        active.verify("select 1 from dual", 1)
+    assert active._body_failed is True
+
+
+def test_active_mssql_playbook_verify_dropped_handle_raises_runtime_error():
+    from arena_pytest.playbook import ActiveMssqlPlaybook
+
+    active = ActiveMssqlPlaybook(MagicMock(), 0, "dep-id")
+    with pytest.raises(RuntimeError, match="dropped"):
+        active.verify("select 1", 1)
+
+
+def test_active_mssql_playbook_verify_sends_expected_spec(monkeypatch):
+    from arena_pytest.playbook import ActiveMssqlPlaybook
+
+    captured = {}
+
+    def fake_verify(_ffi, handle, spec_json):
+        captured["handle"] = handle
+        captured["spec"] = json.loads(spec_json)
+
+    monkeypatch.setattr(_playbook_pkg(), "_ffi_mssql_playbook_verify", fake_verify)
+    active = ActiveMssqlPlaybook(MagicMock(), 5, "dep-id")
+    active.verify("select count(*) from t", 2)
+
+    assert captured["handle"] == 5
+    assert captured["spec"] == {
+        "dependency_identifier": "dep-id",
+        "query": "select count(*) from t",
+        "expected_value": 2,
+    }
+
+
+def test_active_postgres_playbook_verify_dropped_handle_raises_runtime_error():
+    from arena_pytest.playbook import ActivePostgresPlaybook
+
+    active = ActivePostgresPlaybook(MagicMock(), 0, "dep-id")
+    with pytest.raises(RuntimeError, match="dropped"):
+        active.verify("select 1", 1)
+
+
+def test_active_postgres_playbook_verify_sends_expected_spec(monkeypatch):
+    from arena_pytest.playbook import ActivePostgresPlaybook
+
+    captured = {}
+
+    def fake_verify(_ffi, handle, spec_json):
+        captured["handle"] = handle
+        captured["spec"] = json.loads(spec_json)
+
+    monkeypatch.setattr(_playbook_pkg(), "_ffi_postgres_playbook_verify", fake_verify)
+    active = ActivePostgresPlaybook(MagicMock(), 9, "dep-id")
+    active.verify("select count(*) from t", 4)
+
+    assert captured["handle"] == 9
+    assert captured["spec"] == {
+        "dependency_identifier": "dep-id",
+        "query": "select count(*) from t",
+        "expected_value": 4,
+    }
 
 
 def test_http_playbook_builder_scenario_mapping_serializes_expected_fields():

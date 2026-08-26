@@ -3,7 +3,7 @@ mod healthcheck;
 
 use crate::builder::TemporalDependencyBuilder;
 use crate::temporal_dependency::healthcheck::DefaultTemporalReadinessCheck;
-use arena::dependency::RunnableDependency;
+use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
 use futures_timer::Delay;
@@ -239,6 +239,14 @@ impl RunnableDependency for TemporalDependency {
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
         self.dependencies.get_or_insert_with(Vec::new).push(dep);
+    }
+
+    fn children(&self) -> &[Dependency] {
+        self.dependencies.as_deref().unwrap_or(&[])
+    }
+
+    fn children_mut(&mut self) -> &mut [Dependency] {
+        self.dependencies.as_deref_mut().unwrap_or(&mut [])
     }
 
     async fn soft_reset(&self) {

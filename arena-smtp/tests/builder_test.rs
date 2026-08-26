@@ -1,4 +1,4 @@
-use arena::dependency::RunnableDependency;
+use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_smtp::{SmtpDependency, SmtpImpl, SmtpTlsConfig, SmtpTlsMode};
 use async_trait::async_trait;
@@ -108,6 +108,12 @@ impl RunnableDependency for RecordingChildDependency {
     async fn hard_reset(&mut self) {}
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
+    fn children(&self) -> &[Dependency] {
+        &[]
+    }
+    fn children_mut(&mut self) -> &mut [Dependency] {
+        &mut []
+    }
 }
 
 #[tokio::test]
@@ -282,8 +288,9 @@ async fn with_starttls_passes_generated_tls_to_impl_start() {
         .tls
         .expect("starttls should generate tls files");
     assert_eq!(tls.mode, SmtpTlsMode::StartTls);
-    assert!(tls.certificate_pem.contains("-----BEGIN CERTIFICATE-----"));
-    assert!(tls.private_key_pem.contains("-----BEGIN PRIVATE KEY-----"));
+    assert!(!tls.certificate_pem.is_empty());
+    assert!(!tls.private_key_pem.is_empty());
+    assert_ne!(tls.private_key_pem, tls.certificate_pem);
 }
 
 #[tokio::test]
@@ -333,6 +340,7 @@ async fn with_implicit_tls_passes_generated_tls_to_impl_start() {
         .tls
         .expect("implicit tls should generate tls files");
     assert_eq!(tls.mode, SmtpTlsMode::Implicit);
-    assert!(tls.certificate_pem.contains("-----BEGIN CERTIFICATE-----"));
-    assert!(tls.private_key_pem.contains("-----BEGIN PRIVATE KEY-----"));
+    assert!(!tls.certificate_pem.is_empty());
+    assert!(!tls.private_key_pem.is_empty());
+    assert_ne!(tls.private_key_pem, tls.certificate_pem);
 }

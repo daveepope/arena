@@ -5,15 +5,13 @@ import java.util.List;
 import java.util.Map;
 
 public final class CalibrationApiHappyPathPlaybook extends ManagedHttpPlaybook {
+  private static final String IDENTIFIER = "example-api-calibration-api-happy-path";
+  private static final String VALIDATE_PATH = "/api/v1/validate";
+
   public CalibrationApiHappyPathPlaybook(String dependencyIdentifier) {
     super(
-        PlaybookConfig.CALIBRATION_API_HAPPY_PATH,
+        IDENTIFIER,
         dependencyIdentifier,
-        List.of(
-            mapping(
-                "POST",
-                PlaybookConfig.CALIBRATION_VALIDATE_PATH,
-                200,
-                Map.of("valid", true))));
+        List.of(mapping("POST", VALIDATE_PATH, 200, Map.of("valid", true))));
   }
 }

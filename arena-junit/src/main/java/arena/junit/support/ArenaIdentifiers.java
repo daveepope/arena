@@ -52,16 +52,16 @@ public final class ArenaIdentifiers {
   }
 
   private static boolean hasSuffix(String name) {
-    int dash = name.lastIndexOf('-');
-    if (dash < 0) {
+    int marker = name.lastIndexOf("--");
+    if (marker < 0) {
       return false;
     }
-    String last = name.substring(dash + 1);
-    if (last.length() != SUFFIX_LEN) {
+    String suffix = name.substring(marker + 2);
+    if (suffix.length() != SUFFIX_LEN) {
       return false;
     }
-    for (int i = 0; i < last.length(); i++) {
-      if (ALPHABET.indexOf(last.charAt(i)) < 0) {
+    for (int i = 0; i < suffix.length(); i++) {
+      if (ALPHABET.indexOf(suffix.charAt(i)) < 0) {
         return false;
       }
     }
@@ -77,6 +77,6 @@ public final class ArenaIdentifiers {
     if (slug.isEmpty()) {
       return module + "-" + suffix;
     }
-    return module + "-" + slug + "-" + suffix;
+    return module + "-" + slug + "--" + suffix;
   }
 }

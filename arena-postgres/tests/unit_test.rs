@@ -1,4 +1,4 @@
-use arena::dependency::RunnableDependency;
+use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_postgres::{PostgresDependency, PostgresImpl};
 use async_trait::async_trait;
@@ -152,4 +152,89 @@ async fn start_readiness_err_panics_after_impl_start() {
         events.lock().unwrap().as_slice(),
         &[Event::PostgresStart]
     );
+}
+
+struct NoopChildDependency;
+
+#[async_trait]
+impl RunnableDependency for NoopChildDependency {
+    fn identifier(&self) -> &str {
+        "postgres-child"
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
+    async fn start(&mut self) {}
+
+    async fn stop(&mut self) {}
+
+    fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
+    fn children(&self) -> &[Dependency] {
+        &[]
+    }
+    fn children_mut(&mut self) -> &mut [Dependency] {
+        &mut []
+    }
+
+    async fn soft_reset(&self) {}
+
+    async fn hard_reset(&mut self) {}
+}
+
+#[test]
+fn identifier_as_any_and_children_reflect_dependency_state() {
+    let mut dep = PostgresDependency::builder("postgres-accessors")
+        .with_impl(FakePostgresImpl {
+            conn_str: None,
+            events: Arc::new(Mutex::new(Vec::new())),
+        })
+        .build();
+
+    assert!(dep.identifier().contains("postgres-accessors"));
+    assert!(dep.as_any().downcast_ref::<PostgresDependency>().is_some());
+    assert!(dep.as_any_mut().downcast_mut::<PostgresDependency>().is_some());
+    assert!(dep.children().is_empty());
+    assert!(dep.managed_tables().is_empty());
+    assert_eq!(dep.connection_string(), None);
+
+    dep.add_child(Box::new(NoopChildDependency));
+
+    assert_eq!(dep.children().len(), 1);
+    assert_eq!(dep.children_mut().len(), 1);
+}
+
+struct AlwaysOkReadinessCheck;
+
+#[async_trait]
+impl ReadinessCheck for AlwaysOkReadinessCheck {
+    async fn is_ready(
+        &self,
+        _identifier: &str,
+        _connection_string: &str,
+        _timeout_ms: u64,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn playbook_after_start_uses_connection_string() {
+    let mut dep = PostgresDependency::builder("postgres-playbook")
+        .with_impl(FakePostgresImpl {
+            conn_str: None,
+            events: Arc::new(Mutex::new(Vec::new())),
+        })
+        .with_readiness_check(AlwaysOkReadinessCheck)
+        .build();
+
+    dep.start().await;
+    assert_eq!(dep.connection_string(), Some("postgres://127.0.0.1:5432/fake"));
+    let _playbook = dep.playbook();
+    dep.stop().await;
 }

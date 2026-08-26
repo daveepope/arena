@@ -5,7 +5,8 @@ import warnings
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Union
 
 from arena_pytest.ffi._ffi import http_playbook_open, match_playbook_run
-from arena_pytest.playbook import ActiveHttpPlaybook, Playbook
+from arena_pytest.ffi._ffi_children import children_for_ffi
+from arena_pytest.playbook import ActiveHttpPlaybook, ManagedPlaybook
 from arena_pytest.support._identifier import build as _build_identifier
 
 if TYPE_CHECKING:
@@ -145,6 +146,7 @@ class HttpDependencyBuilder:
             "type": "http",
             "identifier": _build_identifier("arena-http", name),
         }
+        self._children: List[Any] = []
 
     def with_port(self, port: int) -> "HttpDependencyBuilder":
         self._config["port"] = port
@@ -162,16 +164,25 @@ class HttpDependencyBuilder:
         self._config["image_tag"] = image_tag
         return self
 
+    def with_child_dependencies(self, children: List[Any]) -> "HttpDependencyBuilder":
+        self._children.extend(children)
+        return self
+
     def build(self) -> "HttpDependency":
-        return HttpDependency(dict(self._config))
+        return HttpDependency(dict(self._config), children=list(self._children))
 
     def _for_ffi(self) -> Dict[str, Any]:
-        return dict(self._config)
+        d = dict(self._config)
+        children = children_for_ffi(self._children)
+        if children:
+            d["children"] = children
+        return d
 
 
 class HttpDependency:
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], children: Optional[List[Any]] = None):
         self._config = config
+        self._children = children or []
 
     @property
     def identifier(self) -> str:
@@ -181,7 +192,11 @@ class HttpDependency:
         return HttpPlaybookBuilder(self.identifier)
 
     def _for_ffi(self) -> Dict[str, Any]:
-        return self._config
+        d = dict(self._config)
+        children = children_for_ffi(self._children)
+        if children:
+            d["children"] = children
+        return d
 
 
 class HttpPlaybookBuilder:
@@ -363,7 +378,9 @@ class HttpSequenceBuilder:
         return self.open(arena)
 
 
-class ManagedHttpPlaybook(Playbook):
+class ManagedHttpPlaybook(ManagedPlaybook):
+    _activates_before_test = True
+
     def __init__(
         self,
         *,

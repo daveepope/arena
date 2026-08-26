@@ -33,6 +33,24 @@ rust_test(
 )
 
 rust_test(
+    name = "unit_test",
+    srcs = ["tests/unit_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_oauth",
+        "//arena",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
     name = "component_test",
     srcs = ["tests/component_test.rs"],
     size = "medium",
@@ -54,6 +72,60 @@ rust_test(
 rust_test(
     name = "token_test",
     srcs = ["tests/token_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_oauth",
+        "//arena",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "builder_test",
+    srcs = ["tests/builder_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_oauth",
+        "//arena",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "oauth_ffi_test",
+    srcs = ["tests/oauth_ffi_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_oauth",
+        "//arena",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "loopback_tls_json_test",
+    srcs = ["tests/loopback_tls_json_test.rs"],
     size = "small",
     edition = "2021",
     deps = all_crate_deps(

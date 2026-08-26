@@ -17,6 +17,11 @@ from playbooks import (
     CalibrationApiErrorPathPlaybook,
     CalibrationApiFlakyPlaybook,
     ResetValidationDbPlaybook,
+    ResetWeatherDbPlaybook,
+    SeedValidationReadingPlaybook,
+    SEED_VALIDATION_READING_USER,
+    SEED_VALIDATION_READING_VALUE,
+    connect_validation_db,
 )
 from arena_config import CALIBRATION_VALIDATE_PATH, SMTP_UI_PORT
 from api_http import ApiClient
@@ -133,6 +138,29 @@ def test_post_reading_succeeds_after_calibration_flaky_sequence(
     assert any(r["id"] == created_id for r in api_client.get_readings())
 
 
+@playbook(ResetValidationDbPlaybook)
+@playbook(SeedValidationReadingPlaybook)
+def test_seed_validation_reading_playbook_row_visible_before_test_body(
+    mssql_connection_string: str,
+):
+    import asyncio
+
+    async def _fetch():
+        conn = await connect_validation_db(mssql_connection_string)
+        try:
+            stream = await conn.query(
+                "SELECT value FROM dbo.validation_results WHERE user_name = @P1",
+                [SEED_VALIDATION_READING_USER],
+            )
+            return stream.all()
+        finally:
+            await conn.disconnect()
+
+    rows = asyncio.run(_fetch())
+    assert len(rows) == 1
+    assert rows[0]["value"] == SEED_VALIDATION_READING_VALUE
+
+
 @playbook(CalibrationApiErrorPathPlaybook)
 def test_http_playbook_verify_at_least_succeeds_with_traffic(
     api_client: ApiClient,
@@ -173,6 +201,28 @@ def test_create_device_sends_provisioned_email_over_starttls(api_client: ApiClie
     device_name = f"Mail Probe Device {os.urandom(4).hex()}"
     api_client.create_device(device_name)
     _wait_device_provisioned_email(device_name)
+
+
+@playbook(ResetWeatherDbPlaybook)
+def test_create_weather_report_lists_via_http(api_client: ApiClient):
+    created_id = api_client.create_weather_report(
+        precipitation=1.5, humidity=63.2, pressure=1013.25
+    )
+    reports = api_client.get_weather_reports()
+    found = next((r for r in reports if r["id"] == created_id), None)
+    assert found is not None
+    assert found["precipitation"] == 1.5
+    assert found["humidity"] == 63.2
+    assert found["pressure"] == 1013.25
+
+
+@playbook(ResetWeatherDbPlaybook)
+def test_create_multiple_weather_reports_are_listed(api_client: ApiClient):
+    id1 = api_client.create_weather_report(precipitation=0, humidity=40, pressure=1000)
+    id2 = api_client.create_weather_report(precipitation=2.2, humidity=80, pressure=990.5)
+    ids = {r["id"] for r in api_client.get_weather_reports()}
+    assert id1 in ids
+    assert id2 in ids
 
 
 if __name__ == "__main__":

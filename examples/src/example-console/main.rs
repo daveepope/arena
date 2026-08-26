@@ -4,14 +4,12 @@ use arena::{ClosedArena, Component, Dependency, Match, MatchTrait};
 use arena_containerized_component::containerized_component::ContainerizedComponent;
 use arena_examples::http_healthcheck::HttpReadinessCheck;
 use arena_executable_component::executable_component::ExecutableComponent;
-use arena_kafka::{KafkaDependency, KafkaFlavor, KAFKA_INTERNAL_DOCKER_PORT};
+use arena_kafka::kafka_dependency::client::{connect_client, partition_client_for};
+use arena_kafka::{KafkaDependency, KafkaFlavor, TopicCreator, KAFKA_INTERNAL_DOCKER_PORT};
 use arena_mssql::MssqlDependency;
 use arena_oauth::OauthDependency;
 use arena_postgres::PostgresDependency;
-use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
-use rdkafka::config::ClientConfig;
-use rdkafka::consumer::{BaseConsumer, Consumer};
-use rdkafka::message::Message;
+use rskafka::client::partition::OffsetAt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -35,6 +33,13 @@ const NETWORK_NAME: &str = "arena-example-network";
 const POSTGRES_CONTAINER_NAME: &str = "arena-example-postgres";
 const KAFKA_CONTAINER_NAME: &str = "arena-example-kafka";
 const MSSQL_CONTAINER_NAME: &str = "arena-example-mssql";
+
+const KAFKA_CREATE_TOPIC_RETRY_WINDOW_MS: u64 = 2000;
+const KAFKA_CREATE_TOPIC_RETRY_INTERVAL_MS: u64 = 250;
+const KAFKA_CONSUME_FETCH_MIN_BYTES: i32 = 1;
+const KAFKA_CONSUME_FETCH_MAX_BYTES: i32 = 1_000_000;
+const KAFKA_CONSUME_FETCH_MAX_WAIT_MS: i32 = 250;
+const KAFKA_CONSUMER_SHUTDOWN_TIMEOUT_MS: u64 = 500;
 
 async fn setup_arena_components(oauth_ca_pem: &str) -> Vec<Component> {
     let containerfile = include_str!("../example_readings_axum_web_app/web_server/Dockerfile");
@@ -76,7 +81,8 @@ async fn setup_arena_components(oauth_ca_pem: &str) -> Vec<Component> {
             format!("http://localhost:{}/health", WEB_APP_PORT),
         )
         .build()
-        .await;
+        .await
+        .expect("build example web app container");
 
     vec![Box::new(web_app)]
 }
@@ -179,50 +185,28 @@ fn setup_arena_dependencies() -> (Vec<Dependency>, String, String) {
 }
 
 async fn create_kafka_topic(bootstrap: &str, topic: &str) {
-    create_topic_with_retry(bootstrap, topic, Duration::from_secs(10)).await;
+    create_topic_with_retry(
+        bootstrap,
+        topic,
+        Duration::from_millis(KAFKA_CREATE_TOPIC_RETRY_WINDOW_MS),
+    )
+    .await;
 }
 
 async fn create_topic_with_retry(bootstrap: &str, topic: &str, timeout: Duration) {
     let start = Instant::now();
-    let poll_every = Duration::from_millis(250);
+    let poll_every = Duration::from_millis(KAFKA_CREATE_TOPIC_RETRY_INTERVAL_MS);
 
     loop {
         if start.elapsed() >= timeout {
             panic!("kafka topic create timed out (topic={topic})");
         }
 
-        let admin: AdminClient<_> = ClientConfig::new()
-            .set("bootstrap.servers", bootstrap)
-            .create()
-            .expect("create kafka admin client");
-
-        let new_topic = NewTopic::new(topic, 1, TopicReplication::Fixed(1));
-        let opts = AdminOptions::new().operation_timeout(Some(Duration::from_secs(2)));
-
-        let ok = match admin.create_topics([&new_topic], &opts).await {
-            Ok(results) => {
-                let mut ok = true;
-                for r in results {
-                    if let Err((_t, e)) = r {
-                        if e.to_string().to_lowercase().contains("already exists") {
-                            ok = true;
-                            break;
-                        }
-                        ok = false;
-                        tracing::debug!(error = %e, phase = "kafka_topic_create", "topic create rejected");
-                        break;
-                    }
-                }
-                ok
-            }
+        match TopicCreator::create_topic_on(bootstrap, topic).await {
+            Ok(()) => return,
             Err(err) => {
-                tracing::debug!(error = %err, phase = "kafka_topic_create_admin", "admin create topics failed");
-                false
+                tracing::debug!(error = %err, phase = "kafka_topic_create", "topic create failed (will retry)");
             }
-        };
-
-        if ok {
-            return;
         }
 
         tokio::time::sleep(poll_every).await;
@@ -231,41 +215,66 @@ async fn create_topic_with_retry(bootstrap: &str, topic: &str, timeout: Duration
 
 struct KafkaConsumerHandle {
     shutdown_signal: Arc<AtomicBool>,
+    task: tokio::task::JoinHandle<()>,
 }
 
-impl Drop for KafkaConsumerHandle {
-    fn drop(&mut self) {
-        tracing::debug!(phase = "kafka_consumer_shutdown", "dropping kafka consumer handle");
+impl KafkaConsumerHandle {
+    async fn shutdown(self) {
+        tracing::debug!(phase = "kafka_consumer_shutdown", "signaling kafka consumer shutdown");
         self.shutdown_signal.store(true, Ordering::Relaxed);
-        std::thread::sleep(Duration::from_millis(100));
+        if tokio::time::timeout(
+            Duration::from_millis(KAFKA_CONSUMER_SHUTDOWN_TIMEOUT_MS),
+            self.task,
+        )
+        .await
+        .is_err()
+        {
+            tracing::debug!(phase = "kafka_consumer_shutdown", "consumer task did not stop in time");
+        }
     }
 }
 
-fn create_output_kafka_consumer(kafka_bootstrap: &str, topic: &str) -> KafkaConsumerHandle {
-    let consumer: BaseConsumer = ClientConfig::new()
-        .set("bootstrap.servers", kafka_bootstrap)
-        .set("group.id", "example-console")
-        .set("enable.partition.eof", "false")
-        .set("auto.offset.reset", "earliest")
-        .create()
-        .expect("create kafka consumer");
-
-    consumer.subscribe(&[topic]).expect("subscribe");
+async fn create_output_kafka_consumer(kafka_bootstrap: &str, topic: &str) -> KafkaConsumerHandle {
+    let client = connect_client(kafka_bootstrap)
+        .await
+        .expect("create kafka client");
+    let partition = partition_client_for(&client, topic)
+        .await
+        .expect("create kafka partition client");
 
     let topic = topic.to_string();
     let should_shutdown = Arc::new(AtomicBool::new(false));
     let should_shutdown_clone = should_shutdown.clone();
 
-    tokio::spawn(async move {
-        tokio::task::spawn_blocking(move || {
-            while !should_shutdown_clone.load(Ordering::Relaxed) {
-                match consumer.poll(Duration::from_millis(250)) {
-                    None => {}
-                    Some(Err(err)) => {
-                        tracing::debug!(error = %err, phase = "kafka_consume_poll", "consumer poll returned error");
-                    }
-                    Some(Ok(msg)) => {
-                        let payload = msg.payload_view::<str>().and_then(|r| r.ok()).unwrap_or("");
+    let task = tokio::spawn(async move {
+        let mut next_offset = match partition.get_offset(OffsetAt::Earliest).await {
+            Ok(v) => v,
+            Err(err) => {
+                tracing::debug!(error = %err, phase = "kafka_consume_offset", "get kafka earliest offset failed");
+                return;
+            }
+        };
+
+        while !should_shutdown_clone.load(Ordering::Relaxed) {
+            match partition
+                .fetch_records(
+                    next_offset,
+                    KAFKA_CONSUME_FETCH_MIN_BYTES..KAFKA_CONSUME_FETCH_MAX_BYTES,
+                    KAFKA_CONSUME_FETCH_MAX_WAIT_MS,
+                )
+                .await
+            {
+                Err(err) => {
+                    tracing::debug!(error = %err, phase = "kafka_consume_poll", "consumer poll returned error");
+                }
+                Ok((records, _high_watermark)) => {
+                    for r in &records {
+                        let payload = r
+                            .record
+                            .value
+                            .as_deref()
+                            .map(String::from_utf8_lossy)
+                            .unwrap_or_default();
                         tracing::debug!(
                             topic = %topic,
                             payload = %payload,
@@ -273,16 +282,18 @@ fn create_output_kafka_consumer(kafka_bootstrap: &str, topic: &str) -> KafkaCons
                             "consumer received message",
                         );
                     }
+                    if let Some(last) = records.last() {
+                        next_offset = last.offset + 1;
+                    }
                 }
             }
-            tracing::debug!(phase = "kafka_consumer_stopped", "kafka consumer shutting down");
-        })
-        .await
-        .ok();
+        }
+        tracing::debug!(phase = "kafka_consumer_stopped", "kafka consumer shutting down");
     });
 
     KafkaConsumerHandle {
         shutdown_signal: should_shutdown,
+        task,
     }
 }
 
@@ -311,9 +322,10 @@ async fn main() {
         .to_string();
 
     create_kafka_topic(&kafka_bootstrap, KAFKA_TOPIC).await;
-    let _consumer_handle = create_output_kafka_consumer(&kafka_bootstrap, KAFKA_TOPIC);
+    let consumer_handle = create_output_kafka_consumer(&kafka_bootstrap, KAFKA_TOPIC).await;
 
     tokio::signal::ctrl_c().await.unwrap();
 
+    consumer_handle.shutdown().await;
     drop(open_arena);
 }

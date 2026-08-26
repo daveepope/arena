@@ -1,4 +1,4 @@
-pub(crate) mod http_dependency;
+pub mod http_dependency;
 pub mod mapping;
 pub mod playbook;
 

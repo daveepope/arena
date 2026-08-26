@@ -22,7 +22,7 @@ public static class OauthLoopbackTls
         var obj = JObject.Parse(raw);
         var cert = obj["certificate_pem"]?.Value<string>();
         var key = obj["private_key_pem"]?.Value<string>();
-        if (string.IsNullOrEmpty(cert) || string.IsNullOrEmpty(key))
+        if (cert is null || cert.Length == 0 || key is null || key.Length == 0)
         {
             throw new ArenaBindingError(
                 "arena_oauth_loopback_tls_pem_json: missing certificate_pem or private_key_pem");

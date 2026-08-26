@@ -35,8 +35,9 @@ public class LocalstackDependencyBuilderSerializationTest
         var dep = new LocalstackDependencyBuilder("test").WithService("sqs").Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["services"]);
-        Assert.Equal("sqs", obj["services"][0]);
+        var services = obj["services"];
+        Assert.NotNull(services);
+        Assert.Equal("sqs", services[0]);
     }
 
     [Fact]
@@ -45,8 +46,9 @@ public class LocalstackDependencyBuilderSerializationTest
         var dep = new LocalstackDependencyBuilder("test").WithServices("sqs", "s3").Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["services"]);
-        Assert.Equal(2, obj["services"].Count());
+        var services = obj["services"];
+        Assert.NotNull(services);
+        Assert.Equal(2, services.Count());
     }
 
     [Fact]
@@ -55,9 +57,11 @@ public class LocalstackDependencyBuilderSerializationTest
         var dep = new LocalstackDependencyBuilder("test").WithQueue("myqueue").Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["queues"]);
-        Assert.Equal("myqueue", obj["queues"][0]["name"]);
-        Assert.Equal(false, obj["queues"][0]["fifo"]);
+        var queues = obj["queues"];
+        Assert.NotNull(queues);
+        var queue = Assert.Single(queues);
+        Assert.Equal("myqueue", queue["name"]);
+        Assert.Equal(false, queue["fifo"]);
     }
 
     [Fact]
@@ -66,9 +70,11 @@ public class LocalstackDependencyBuilderSerializationTest
         var dep = new LocalstackDependencyBuilder("test").WithFifoQueue("myqueue.fifo").Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["queues"]);
-        Assert.Equal("myqueue.fifo", obj["queues"][0]["name"]);
-        Assert.Equal(true, obj["queues"][0]["fifo"]);
+        var queues = obj["queues"];
+        Assert.NotNull(queues);
+        var queue = Assert.Single(queues);
+        Assert.Equal("myqueue.fifo", queue["name"]);
+        Assert.Equal(true, queue["fifo"]);
     }
 
     [Fact]
@@ -77,17 +83,28 @@ public class LocalstackDependencyBuilderSerializationTest
         var dep = new LocalstackDependencyBuilder("test").WithEventBus("my-bus").Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["event_buses"]);
-        Assert.Equal("my-bus", obj["event_buses"][0]["name"]);
+        var eventBuses = obj["event_buses"];
+        Assert.NotNull(eventBuses);
+        var eventBus = Assert.Single(eventBuses);
+        Assert.Equal("my-bus", eventBus["name"]);
     }
 
     [Fact]
-    public void Build_WithImage_SerializesCorrectJson()
+    public void Build_WithImageName_SerializesCorrectJson()
     {
-        var dep = new LocalstackDependencyBuilder("test").WithImage("custom:tag").Build();
+        var dep = new LocalstackDependencyBuilder("test").WithImageName("localstack/localstack-pro").Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Equal("custom:tag", obj["image"]);
+        Assert.Equal("localstack/localstack-pro", obj["image_name"]);
+    }
+
+    [Fact]
+    public void Build_WithImageTag_SerializesCorrectJson()
+    {
+        var dep = new LocalstackDependencyBuilder("test").WithImageTag("3.8").Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("3.8", obj["image_tag"]);
     }
 
     [Fact]
@@ -126,9 +143,54 @@ public class LocalstackDependencyBuilderSerializationTest
         var dep = new LocalstackDependencyBuilder("test").WithEventRule(rule).Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.NotNull(obj["event_rules"]);
-        Assert.Equal("rule1", obj["event_rules"][0]["name"]);
-        Assert.Equal("sqs_queue", obj["event_rules"][0]["targets"][0]["kind"]);
+        var eventRules = obj["event_rules"];
+        Assert.NotNull(eventRules);
+        var eventRule = Assert.Single(eventRules);
+        Assert.Equal("rule1", eventRule["name"]);
+        var targets = eventRule["targets"];
+        Assert.NotNull(targets);
+        var eventTarget = Assert.Single(targets);
+        Assert.Equal("sqs_queue", eventTarget["kind"]);
+    }
+
+    [Fact]
+    public void Build_WithLambda_SerializesCorrectJson()
+    {
+        var spec = new LambdaSpec(
+            "my-fn",
+            "python3.12",
+            "handler.main",
+            ".",
+            new[] { new System.Collections.Generic.KeyValuePair<string, string>("KEY", "VALUE") });
+        var dep = new LocalstackDependencyBuilder("test").WithLambda(spec).Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        var lambdas = obj["lambdas"];
+        Assert.NotNull(lambdas);
+        var lambda = Assert.Single(lambdas);
+        Assert.Equal("my-fn", lambda["name"]);
+        Assert.Equal("python3.12", lambda["runtime"]);
+        Assert.Equal("handler.main", lambda["handler"]);
+        Assert.True(System.IO.Path.IsPathRooted((string)lambda["source_dir"]!));
+        var environment = lambda["environment"];
+        Assert.NotNull(environment);
+        var pair = Assert.Single(environment);
+        Assert.Equal("KEY", pair[0]);
+        Assert.Equal("VALUE", pair[1]);
+    }
+
+    [Fact]
+    public void Build_WithLambdaHomeRelativeSourceDir_ExpandsToUserProfile()
+    {
+        var spec = new LambdaSpec("my-fn", "python3.12", "handler.main", "~/my-lambda-src");
+        var dep = new LocalstackDependencyBuilder("test").WithLambda(spec).Build();
+        var json = dep.ForFfi();
+        var obj = JObject.Parse(json);
+        var lambda = Assert.Single(obj["lambdas"]!);
+        var sourceDir = (string)lambda["source_dir"]!;
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        Assert.StartsWith(home, sourceDir);
+        Assert.DoesNotContain("~", sourceDir);
     }
 
     [Fact]
@@ -145,7 +207,13 @@ public class LocalstackDependencyBuilderSerializationTest
         var dep = new LocalstackDependencyBuilder("test").WithEventRule(rule).Build();
         var json = dep.ForFfi();
         var obj = JObject.Parse(json);
-        Assert.Equal("lambda", obj["event_rules"][0]["targets"][0]["kind"]);
-        Assert.Equal("func1", obj["event_rules"][0]["targets"][0]["function_name"]);
+        var eventRules = obj["event_rules"];
+        Assert.NotNull(eventRules);
+        var eventRule = Assert.Single(eventRules);
+        var targets = eventRule["targets"];
+        Assert.NotNull(targets);
+        var eventTarget = Assert.Single(targets);
+        Assert.Equal("lambda", eventTarget["kind"]);
+        Assert.Equal("func1", eventTarget["function_name"]);
     }
 }

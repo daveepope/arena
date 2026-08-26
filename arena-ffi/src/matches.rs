@@ -1,35 +1,40 @@
 use arena::{Component, Dependency, Match, MatchTrait};
 use arena_oauth::{build_oauth_dependency_from_config, OauthFfiDependencyConfig};
+use futures::future::{BoxFuture, FutureExt};
 use serde::Deserialize;
 
-use crate::containerized_component;
-use crate::executable_component;
+use crate::component::containerized::containerized_component;
+use crate::component::executable::executable_component;
 use crate::dependency::http::http_dependency;
+use crate::dependency::kafka::kafka_dependency;
 use crate::dependency::localstack::localstack_dependency;
 use crate::dependency::mssql::mssql_dependency;
+use crate::dependency::oracle::oracle_dependency;
+use crate::dependency::postgres::postgres_dependency;
 use crate::dependency::smtp::smtp_dependency;
 use crate::dependency::temporal::temporal_dependency;
-use crate::kafka_dependency;
 use crate::managed_playbook;
-use crate::postgres_dependency;
 
 const DEFAULT_MATCH_NAME: &str = "arena-match";
 
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub(crate) struct MatchConfig {
+pub struct MatchConfig {
     pub network: Option<String>,
     pub match_name: Option<String>,
-    pub dependencies: Option<Vec<DependencyConfig>>,
-    pub components: Option<Vec<ComponentConfig>>,
+    pub dependencies: Option<Vec<DependencyNode>>,
+    pub components: Option<Vec<ComponentNode>>,
     pub playbooks: Option<Vec<managed_playbook::ManagedPlaybookConfig>>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub(crate) enum DependencyConfig {
+#[allow(private_interfaces)]
+pub enum DependencyConfig {
     Postgres(postgres_dependency::PostgresDependencyConfig),
     Mssql(mssql_dependency::MssqlDependencyConfig),
+    #[serde(rename = "oracledb")]
+    Oracle(oracle_dependency::OracleDependencyConfig),
     Kafka(kafka_dependency::KafkaDependencyConfig),
     Http(http_dependency::HttpDependencyConfig),
     Localstack(localstack_dependency::LocalstackDependencyConfig),
@@ -39,14 +44,31 @@ pub(crate) enum DependencyConfig {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct DependencyNode {
+    #[serde(flatten)]
+    pub config: DependencyConfig,
+    #[serde(default)]
+    pub children: Vec<DependencyNode>,
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub(crate) enum ComponentConfig {
+#[allow(private_interfaces)]
+pub enum ComponentConfig {
     Exec(executable_component::ExecutableComponentConfig),
     #[serde(rename = "container")]
     Containerized(containerized_component::ContainerizedComponentConfig),
 }
 
-pub(crate) async fn build_match_async(config: &MatchConfig) -> Result<Box<dyn MatchTrait>, String> {
+#[derive(Debug, Deserialize)]
+pub struct ComponentNode {
+    #[serde(flatten)]
+    pub config: ComponentConfig,
+    #[serde(default)]
+    pub children: Vec<ComponentNode>,
+}
+
+pub async fn build_match_async(config: &MatchConfig) -> Result<Box<dyn MatchTrait>, String> {
     let network = config.network.as_deref();
     let match_name = config.match_name.as_deref().unwrap_or(DEFAULT_MATCH_NAME);
 
@@ -62,164 +84,88 @@ pub(crate) async fn build_match_async(config: &MatchConfig) -> Result<Box<dyn Ma
     Ok(Box::new(a_match))
 }
 
-fn build_dependencies(config: &MatchConfig, network: Option<&str>) -> Result<Vec<Dependency>, String> {
+pub fn build_dependencies(config: &MatchConfig, network: Option<&str>) -> Result<Vec<Dependency>, String> {
     config
         .dependencies
         .as_deref()
         .unwrap_or(&[])
         .iter()
-        .map(|d| match d {
-            DependencyConfig::Postgres(p) => postgres_dependency::build(p, network),
-            DependencyConfig::Mssql(m) => mssql_dependency::build(m, network),
-            DependencyConfig::Kafka(k) => kafka_dependency::build(k, network),
-            DependencyConfig::Http(h) => http_dependency::build(h, network),
-            DependencyConfig::Localstack(l) => localstack_dependency::build(l, network),
-            DependencyConfig::Oauth(o) => build_oauth_dependency_from_config(o, network),
-            DependencyConfig::Temporal(t) => temporal_dependency::build(t, network),
-            DependencyConfig::Smtp(s) => smtp_dependency::build(s, network),
-        })
+        .map(|node| build_dependency_node(node, network))
         .collect()
 }
 
-async fn build_components_async(config: &MatchConfig) -> Result<Vec<Component>, String> {
-    let comps = config.components.as_deref().unwrap_or(&[]);
-    let mut out = Vec::with_capacity(comps.len());
-    for c in comps {
-        let comp: Component = match c {
-            ComponentConfig::Exec(e) => executable_component::build(e)?,
-            ComponentConfig::Containerized(ct) => containerized_component::build(ct).await?,
-        };
-        out.push(comp);
+pub const MAX_CHILDREN_DEPTH: usize = 32;
+
+fn build_dependency_node(node: &DependencyNode, network: Option<&str>) -> Result<Dependency, String> {
+    build_dependency_node_at_depth(node, network, 0)
+}
+
+fn build_dependency_node_at_depth(
+    node: &DependencyNode,
+    network: Option<&str>,
+    depth: usize,
+) -> Result<Dependency, String> {
+    if depth >= MAX_CHILDREN_DEPTH {
+        return Err(format!(
+            "dependency children nesting exceeds max depth of {MAX_CHILDREN_DEPTH}"
+        ));
+    }
+    let mut dependency = build_dependency(&node.config, network)?;
+    for child in &node.children {
+        dependency.add_child(build_dependency_node_at_depth(child, network, depth + 1)?);
+    }
+    Ok(dependency)
+}
+
+fn build_dependency(config: &DependencyConfig, network: Option<&str>) -> Result<Dependency, String> {
+    match config {
+        DependencyConfig::Postgres(p) => postgres_dependency::build(p, network),
+        DependencyConfig::Mssql(m) => mssql_dependency::build(m, network),
+        DependencyConfig::Oracle(o) => oracle_dependency::build(o, network),
+        DependencyConfig::Kafka(k) => kafka_dependency::build(k, network),
+        DependencyConfig::Http(h) => http_dependency::build(h, network),
+        DependencyConfig::Localstack(l) => localstack_dependency::build(l, network),
+        DependencyConfig::Oauth(o) => build_oauth_dependency_from_config(o, network),
+        DependencyConfig::Temporal(t) => temporal_dependency::build(t, network),
+        DependencyConfig::Smtp(s) => smtp_dependency::build(s, network),
+    }
+}
+
+pub async fn build_components_async(config: &MatchConfig) -> Result<Vec<Component>, String> {
+    let nodes = config.components.as_deref().unwrap_or(&[]);
+    let mut out = Vec::with_capacity(nodes.len());
+    for node in nodes {
+        out.push(build_component_node(node).await?);
     }
     Ok(out)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+fn build_component_node(node: &ComponentNode) -> BoxFuture<'_, Result<Component, String>> {
+    build_component_node_at_depth(node, 0)
+}
 
-    fn all_dependency_variants_config() -> MatchConfig {
-        serde_json::from_str(
-            r#"{
-                "dependencies": [
-                    {"type": "postgres", "identifier": "pg"},
-                    {"type": "mssql", "identifier": "mssql"},
-                    {"type": "kafka", "identifier": "kafka"},
-                    {"type": "http", "identifier": "http"},
-                    {"type": "localstack", "identifier": "localstack"},
-                    {"type": "oauth", "identifier": "oauth"},
-                    {"type": "temporal", "identifier": "temporal"},
-                    {"type": "smtp", "identifier": "smtp"}
-                ]
-            }"#,
-        )
-        .expect("valid match config")
-    }
-
-    fn exec_component_config() -> MatchConfig {
-        serde_json::from_str(
-            r#"{
-                "components": [
-                    {"type": "exec", "identifier": "exec", "executable_path": "/bin/true"}
-                ]
-            }"#,
-        )
-        .expect("valid match config")
-    }
-
-    fn exec_component_with_cpu_profile_config(build_tool: Option<&str>) -> MatchConfig {
-        let build_tool_field = match build_tool {
-            Some(tool) => format!(r#""build_tool": "{tool}","#),
-            None => String::new(),
-        };
-        serde_json::from_str(&format!(
-            r#"{{
-                "components": [
-                    {{
-                        "type": "exec",
-                        "identifier": "exec",
-                        "executable_path": "/bin/true",
-                        {build_tool_field}
-                        "cpu_profile_output": "/tmp/does-not-matter.html",
-                        "cpu_profile_auto_open": false,
-                        "cpu_profile_hotspots": true
-                    }}
-                ]
-            }}"#
-        ))
-        .expect("valid match config")
-    }
-
-    fn full_match_config_with_playbook() -> MatchConfig {
-        serde_json::from_str(
-            r#"{
-                "match_name": "custom-match",
-                "network": "arena-net",
-                "dependencies": [{"type": "http", "identifier": "http"}],
-                "components": [{"type": "exec", "identifier": "exec", "executable_path": "/bin/true"}],
-                "playbooks": [{
-                    "identifier": "pb",
-                    "kind": "http",
-                    "dependency_identifier": "http",
-                    "mappings": []
-                }]
-            }"#,
-        )
-        .expect("valid match config")
-    }
-
-    #[test]
-    fn build_dependencies_all_variants_dispatches_to_each_builder() {
-        let config = all_dependency_variants_config();
-        let dependencies = build_dependencies(&config, None).expect("all variants build");
-        assert_eq!(dependencies.len(), 8);
-    }
-
-    #[test]
-    fn build_components_async_exec_variant_dispatches_to_builder() {
-        let config = exec_component_config();
-        let components = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(build_components_async(&config))
-            .expect("exec variant builds");
-        assert_eq!(components.len(), 1);
-    }
-
-    #[test]
-    fn build_components_async_exec_with_cpu_profile_and_supported_build_tool_succeeds() {
-        let config = exec_component_with_cpu_profile_config(Some("python"));
-        let result = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(build_components_async(&config));
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn build_components_async_exec_with_cpu_profile_and_no_build_tool_returns_err() {
-        let config = exec_component_with_cpu_profile_config(None);
-        let result = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(build_components_async(&config));
-        assert!(matches!(result, Err(e) if e.contains("cpu_profile_output requires build_tool")));
-    }
-
-    #[test]
-    fn build_components_async_exec_with_cpu_profile_and_unsupported_build_tool_returns_err() {
-        let config = exec_component_with_cpu_profile_config(Some("dotnet"));
-        let result = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(build_components_async(&config));
-        assert!(matches!(result, Err(e) if e.contains("cpu_profile_output requires build_tool")));
-    }
-
-    #[test]
-    fn build_match_async_full_config_registers_playbook_with_overrides() {
-        let config = full_match_config_with_playbook();
-        let result = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(build_match_async(&config));
-        if let Err(e) = result {
-            panic!("expected match to build: {e}");
+fn build_component_node_at_depth(
+    node: &ComponentNode,
+    depth: usize,
+) -> BoxFuture<'_, Result<Component, String>> {
+    async move {
+        if depth >= MAX_CHILDREN_DEPTH {
+            return Err(format!(
+                "component children nesting exceeds max depth of {MAX_CHILDREN_DEPTH}"
+            ));
         }
+        let mut component = build_component(&node.config).await?;
+        for child in &node.children {
+            component.add_child(build_component_node_at_depth(child, depth + 1).await?);
+        }
+        Ok(component)
+    }
+    .boxed()
+}
+
+async fn build_component(config: &ComponentConfig) -> Result<Component, String> {
+    match config {
+        ComponentConfig::Exec(e) => executable_component::build(e),
+        ComponentConfig::Containerized(ct) => containerized_component::build(ct).await,
     }
 }

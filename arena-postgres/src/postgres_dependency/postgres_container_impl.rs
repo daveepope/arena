@@ -74,7 +74,8 @@ impl PostgresImpl for PostgresContainerImpl {
             .with_health_check(healthcheck)
             .with_name(image_name)
             .with_tag(image_tag)
-            .with_container_name(container_name);
+            .with_container_name(container_name)
+            .with_platform(arena_container::platform::docker_platform());
 
         if let Some(ref network) = self.network {
             arena_container::network::ensure_network_exists(network).await;

@@ -135,6 +135,7 @@ def _find_web_app_binary() -> str:
             p = os.path.join(runfiles_dir, base, "examples", "example-readings-axum-web-app")
             if os.path.isfile(p):
                 return p
+        return os.path.join(runfiles_dir, "_main", "examples", "example-readings-axum-web-app")
     repo_root = os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     )

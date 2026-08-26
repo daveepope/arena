@@ -18,7 +18,7 @@ runfiles; without them dotnet-coverage can't map instrumented IL back to
 source lines. A rules_dotnet upgrade could rename or remove these.
 """
 
-load("@rules_dotnet//dotnet:defs.bzl", "csharp_binary")
+load("@rules_dotnet//dotnet:defs.bzl", "csharp_binary", "csharp_test")
 load("@rules_dotnet//dotnet/private:common.bzl", "to_rlocation_path")
 load("@rules_dotnet//dotnet/private:providers.bzl", "DotnetBinaryInfo")
 load(":instrument_files.bzl", "include_files_args")
@@ -94,7 +94,17 @@ _dotnet_coverage_test = rule(
 )
 
 def dotnet_coverage_test(name, instrument_files, **kwargs):
-    """`csharp_test` replacement that produces real data under `bazel coverage`."""
+    """`csharp_test` replacement that produces real data under `bazel coverage`.
+
+    On Windows the coverage wrapper's shell-script launcher has no native
+    equivalent, and coverage is already collected on Ubuntu, so this produces
+    a plain `csharp_test` there instead, marked `target_compatible_with` the
+    complementary platform of the coverage-wrapped test so `bazel test //...`
+    picks up exactly one of the two per platform without needing them to
+    share a single label (neither `alias` nor `test_suite` can conditionally
+    stand in for a test target: `alias` isn't recognized by `bazel test`'s
+    target-pattern expansion, and `test_suite.tests` doesn't support `select`).
+    """
     test_kwargs = {}
     for attr_name in _TEST_ONLY_ATTRS:
         if attr_name in kwargs:
@@ -107,8 +117,23 @@ def dotnet_coverage_test(name, instrument_files, **kwargs):
     )
 
     _dotnet_coverage_test(
-        name = name,
+        name = name + "_coverage",
         binary = ":%s_bin" % name,
         instrument_files = instrument_files,
+        target_compatible_with = select({
+            "@platforms//os:windows": ["@platforms//:incompatible"],
+            "//conditions:default": [],
+        }),
         **test_kwargs
+    )
+
+    plain_kwargs = dict(kwargs)
+    plain_kwargs.update(test_kwargs)
+    csharp_test(
+        name = name + "_plain",
+        target_compatible_with = select({
+            "@platforms//os:windows": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }),
+        **plain_kwargs
     )

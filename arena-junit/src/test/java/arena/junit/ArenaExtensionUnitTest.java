@@ -1,18 +1,22 @@
 package arena.junit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import arena.junit.ffi.ArenaLogLevel;
-import arena.junit.match.ArenaMatchPiece;
+import arena.junit.match.ArenaRunnableComponent;
+import arena.junit.match.ArenaRunnableDependency;
 import arena.junit.match.Match;
 import arena.junit.match.MatchBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -20,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -29,6 +34,8 @@ import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolutionException;
 import org.junit.jupiter.api.extension.TestInstances;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.platform.suite.api.SelectClasses;
+import org.junit.platform.suite.api.Suite;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,14 +43,14 @@ final class ArenaExtensionUnitTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  static final class StubMatchPiece implements ArenaMatchPiece {
+  static final class StubMatchPiece implements ArenaRunnableDependency, ArenaRunnableComponent {
     @Override
     public ObjectNode forFfi() {
       return MAPPER.createObjectNode();
     }
   }
 
-  static final class IdentifiedMatchPiece implements ArenaMatchPiece {
+  static final class IdentifiedMatchPiece implements ArenaRunnableDependency, ArenaRunnableComponent {
     private final String identifier;
 
     IdentifiedMatchPiece(String identifier) {
@@ -54,6 +61,21 @@ final class ArenaExtensionUnitTest {
     public ObjectNode forFfi() {
       return MAPPER.createObjectNode().put("identifier", identifier);
     }
+  }
+
+  static final class CountingFailureMatchPiece implements ArenaRunnableDependency {
+    static int forFfiCalls;
+
+    @Override
+    public ObjectNode forFfi() {
+      forFfiCalls++;
+      return MAPPER.createObjectNode();
+    }
+  }
+
+  static final class BeforeAllFailureCachingTopology {
+    @ArenaDependency static final CountingFailureMatchPiece dependency =
+        new CountingFailureMatchPiece();
   }
 
   static final class NoArenaFieldsTopology {}
@@ -111,6 +133,72 @@ final class ArenaExtensionUnitTest {
   }
 
   static final class NoLoggerFieldTopology {
+    @ArenaDependency static final StubMatchPiece dependency = new StubMatchPiece();
+  }
+
+  @Arena
+  static final class SelfReferencingArenaTopology {
+    @ArenaDependency static final StubMatchPiece dependency = new StubMatchPiece();
+  }
+
+  static final class ExplicitRootDependencyTopology {
+    @ArenaDependency static final StubMatchPiece dependency = new StubMatchPiece();
+  }
+
+  @Arena(ExplicitRootDependencyTopology.class)
+  static final class ExplicitRootConsumerTopology {}
+
+  @Arena(ExplicitRootDependencyTopology.class)
+  abstract static class ExplicitRootAnnotatedBase {}
+
+  static final class ExplicitRootInheritingConsumerTopology extends ExplicitRootAnnotatedBase {}
+
+  static final class EmptyExplicitTargetTopology {}
+
+  @Arena(EmptyExplicitTargetTopology.class)
+  static final class ExplicitTargetMissingFieldsConsumerTopology {}
+
+  @Arena(SelectClassesRootTopology.class)
+  static final class SelectClassesMatchingMemberA {}
+
+  @Arena(SelectClassesRootTopology.class)
+  static final class SelectClassesMatchingMemberB {}
+
+  static final class UnrelatedSelectClassesMember {}
+
+  @Suite
+  @SelectClasses({SelectClassesMatchingMemberA.class, SelectClassesMatchingMemberB.class})
+  static final class SelectClassesRootTopology {
+    @ArenaDependency static final StubMatchPiece dependency = new StubMatchPiece();
+  }
+
+  @Suite
+  @SelectClasses(UnrelatedSelectClassesMember.class)
+  static final class SelectClassesRootWithNoMatchingMembersTopology {
+    @ArenaDependency static final StubMatchPiece dependency = new StubMatchPiece();
+  }
+
+  static final class BeforeAllSuiteMemberTopology {
+    @ArenaDependency static final StubMatchPiece dependency = new StubMatchPiece();
+  }
+
+  static final class BeforeAllRefCountedTopology {
+    @ArenaDependency static final StubMatchPiece dependency = new StubMatchPiece();
+  }
+
+  static final class AfterAllSuiteMemberCompleteTopology {
+    @ArenaDependency static final StubMatchPiece dependency = new StubMatchPiece();
+  }
+
+  static final class AfterAllSuiteMemberPendingTopology {
+    @ArenaDependency static final StubMatchPiece dependency = new StubMatchPiece();
+  }
+
+  static final class AfterAllRefCountedTopology {
+    @ArenaDependency static final StubMatchPiece dependency = new StubMatchPiece();
+  }
+
+  static final class AfterAllFailedCacheEntryTopology {
     @ArenaDependency static final StubMatchPiece dependency = new StubMatchPiece();
   }
 
@@ -193,6 +281,275 @@ final class ArenaExtensionUnitTest {
     ClosedArena closedArena = buildClosedArena(NoLoggerFieldTopology.class);
     assertEquals(ArenaLogLevel.INFO, readField(closedArena, "logLevel"));
     assertNull(readField(closedArena, "slf4jLogger"));
+  }
+
+  @Test
+  void explicitRoot_noArenaAnnotation_returnsNull() throws Exception {
+    assertNull(invokeExplicitRoot(NoArenaFieldsTopology.class));
+  }
+
+  @Test
+  void explicitRoot_arenaAnnotationDefaultValue_returnsNull() throws Exception {
+    assertNull(invokeExplicitRoot(SelfReferencingArenaTopology.class));
+  }
+
+  @Test
+  void explicitRoot_arenaAnnotationWithExplicitValue_returnsAnnotatedClass() throws Exception {
+    assertEquals(
+        ExplicitRootDependencyTopology.class, invokeExplicitRoot(ExplicitRootConsumerTopology.class));
+  }
+
+  @Test
+  void explicitRoot_annotationDeclaredOnSuperclass_returnsAnnotatedClass() throws Exception {
+    assertEquals(
+        ExplicitRootDependencyTopology.class,
+        invokeExplicitRoot(ExplicitRootInheritingConsumerTopology.class));
+  }
+
+  @Test
+  void topologyRoot_explicitValuePresent_resolvesToExplicitTarget() throws Exception {
+    assertEquals(
+        ExplicitRootDependencyTopology.class, invokeTopologyRoot(ExplicitRootConsumerTopology.class));
+  }
+
+  @Test
+  void beforeAll_explicitRootReferencesClassWithNoArenaFields_messageNamesBothClasses() {
+    ArenaExtension extension = new ArenaExtension();
+    IllegalStateException error =
+        assertThrows(
+            IllegalStateException.class,
+            () -> extension.beforeAll(contextFor(ExplicitTargetMissingFieldsConsumerTopology.class)));
+    assertTrue(error.getMessage().contains(EmptyExplicitTargetTopology.class.getName()));
+    assertTrue(
+        error
+            .getMessage()
+            .contains(
+                "referenced by @Arena("
+                    + EmptyExplicitTargetTopology.class.getSimpleName()
+                    + ".class) on "
+                    + ExplicitTargetMissingFieldsConsumerTopology.class.getName()));
+  }
+
+  @Test
+  void selectClassesValue_noSelectClassesAnnotation_returnsNull() throws Exception {
+    assertNull(invokeSelectClassesValue(NoLoggerFieldTopology.class));
+  }
+
+  @Test
+  void selectClassesValue_selectClassesAnnotationPresent_returnsDeclaredClasses() throws Exception {
+    Class<?>[] value = invokeSelectClassesValue(SelectClassesRootTopology.class);
+    assertNotNull(value);
+    assertEquals(2, value.length);
+  }
+
+  @Test
+  void expectedSuiteMembers_noSelectClassesAnnotation_returnsNull() throws Exception {
+    assertNull(invokeExpectedSuiteMembers(NoLoggerFieldTopology.class));
+  }
+
+  @Test
+  void expectedSuiteMembers_selectedClassesReferenceRootExplicitly_returnsMemberCount() throws Exception {
+    assertEquals(2, invokeExpectedSuiteMembers(SelectClassesRootTopology.class));
+  }
+
+  @Test
+  void expectedSuiteMembers_selectedClassesDoNotReferenceRoot_returnsNull() throws Exception {
+    assertNull(invokeExpectedSuiteMembers(SelectClassesRootWithNoMatchingMembersTopology.class));
+  }
+
+  @Test
+  void warnIfExplicitRootMissingSelectClasses_noExplicitRoot_doesNotWarn() throws Exception {
+    invokeWarnIfExplicitRootMissingSelectClasses(NoArenaFieldsTopology.class, NoArenaFieldsTopology.class);
+    assertFalse(warnedMissingSelectClasses().contains(NoArenaFieldsTopology.class));
+  }
+
+  @Test
+  void warnIfExplicitRootMissingSelectClasses_rootHasSelectClasses_doesNotWarn() throws Exception {
+    invokeWarnIfExplicitRootMissingSelectClasses(
+        SelectClassesMatchingMemberA.class, SelectClassesRootTopology.class);
+    assertFalse(warnedMissingSelectClasses().contains(SelectClassesRootTopology.class));
+  }
+
+  @Test
+  void warnIfExplicitRootMissingSelectClasses_explicitRootWithoutSelectClasses_addsRootToWarnedSet()
+      throws Exception {
+    invokeWarnIfExplicitRootMissingSelectClasses(
+        ExplicitRootConsumerTopology.class, ExplicitRootDependencyTopology.class);
+    assertTrue(warnedMissingSelectClasses().contains(ExplicitRootDependencyTopology.class));
+
+    // repeated call for the same root must not error even though the warned set no longer accepts it
+    invokeWarnIfExplicitRootMissingSelectClasses(
+        ExplicitRootConsumerTopology.class, ExplicitRootDependencyTopology.class);
+    assertTrue(warnedMissingSelectClasses().contains(ExplicitRootDependencyTopology.class));
+  }
+
+  @Test
+  void beforeAll_cachedArenaWithExpectedSuiteMembers_doesNotIncrementRefs() throws Exception {
+    Class<?> root = BeforeAllSuiteMemberTopology.class;
+    Object cached = newCachedArena(new OpenArena(null, 0L, List.of()), 2);
+    cache().put(root, cached);
+    try {
+      new ArenaExtension().beforeAll(contextFor(root));
+      assertEquals(0, getIntField(cached, "refs"));
+    } finally {
+      cache().remove(root);
+    }
+  }
+
+  @Test
+  void beforeAll_cachedArenaWithoutExpectedSuiteMembers_incrementsRefs() throws Exception {
+    Class<?> root = BeforeAllRefCountedTopology.class;
+    Object cached = newCachedArena(new OpenArena(null, 0L, List.of()), null);
+    cache().put(root, cached);
+    try {
+      new ArenaExtension().beforeAll(contextFor(root));
+      assertEquals(1, getIntField(cached, "refs"));
+    } finally {
+      cache().remove(root);
+    }
+  }
+
+  @Test
+  void beforeAll_dependencyOpenFails_cachesFailureAndDoesNotReopenOnRepeatedCalls() throws Exception {
+    Class<?> root = BeforeAllFailureCachingTopology.class;
+    CountingFailureMatchPiece.forFfiCalls = 0;
+    ArenaExtension extension = new ArenaExtension();
+    try {
+      Throwable first =
+          assertThrows(IllegalStateException.class, () -> extension.beforeAll(contextFor(root)));
+      Throwable second =
+          assertThrows(IllegalStateException.class, () -> extension.beforeAll(contextFor(root)));
+      assertSame(first, second);
+      assertEquals(1, CountingFailureMatchPiece.forFfiCalls);
+    } finally {
+      cache().remove(root);
+    }
+  }
+
+  @Test
+  void afterAll_suiteCompletedCountReachesExpectedMembers_closesAndRemovesCacheEntry() throws Exception {
+    Class<?> root = AfterAllSuiteMemberCompleteTopology.class;
+    Object cached = newCachedArena(new OpenArena(null, 0L, List.of()), 2);
+    setIntField(cached, "completed", 1);
+    cache().put(root, cached);
+    new ArenaExtension().afterAll(contextFor(root));
+    assertFalse(cache().containsKey(root));
+  }
+
+  @Test
+  void afterAll_suiteCompletedCountBelowExpectedMembers_keepsCacheEntryOpen() throws Exception {
+    Class<?> root = AfterAllSuiteMemberPendingTopology.class;
+    Object cached = newCachedArena(new OpenArena(null, 0L, List.of()), 2);
+    cache().put(root, cached);
+    try {
+      new ArenaExtension().afterAll(contextFor(root));
+      assertTrue(cache().containsKey(root));
+      assertEquals(1, getIntField(cached, "completed"));
+    } finally {
+      cache().remove(root);
+    }
+  }
+
+  @Test
+  void afterAll_refCountFallbackReachesZero_closesAndRemovesCacheEntry() throws Exception {
+    Class<?> root = AfterAllRefCountedTopology.class;
+    Object cached = newCachedArena(new OpenArena(null, 0L, List.of()), null);
+    setIntField(cached, "refs", 1);
+    cache().put(root, cached);
+    new ArenaExtension().afterAll(contextFor(root));
+    assertFalse(cache().containsKey(root));
+  }
+
+  @Test
+  void afterAll_cachedFailureRefCountReachesZero_removesCacheEntryWithoutClosing() throws Exception {
+    Class<?> root = AfterAllFailedCacheEntryTopology.class;
+    Object cached = newFailedCachedArena(new IllegalStateException("open failed"), null);
+    setIntField(cached, "refs", 1);
+    cache().put(root, cached);
+    new ArenaExtension().afterAll(contextFor(root));
+    assertFalse(cache().containsKey(root));
+  }
+
+  private static Class<?> invokeExplicitRoot(Class<?> testClass) throws Exception {
+    Method m = ArenaExtension.class.getDeclaredMethod("explicitRoot", Class.class);
+    m.setAccessible(true);
+    return (Class<?>) m.invoke(null, testClass);
+  }
+
+  private static Class<?> invokeTopologyRoot(Class<?> testClass) throws Exception {
+    Method m = ArenaExtension.class.getDeclaredMethod("topologyRoot", Class.class);
+    m.setAccessible(true);
+    return (Class<?>) m.invoke(null, testClass);
+  }
+
+  private static Class<?>[] invokeSelectClassesValue(Class<?> root) throws Exception {
+    Method m = ArenaExtension.class.getDeclaredMethod("selectClassesValue", Class.class);
+    m.setAccessible(true);
+    return (Class<?>[]) m.invoke(null, root);
+  }
+
+  private static Integer invokeExpectedSuiteMembers(Class<?> root) throws Exception {
+    Method m = ArenaExtension.class.getDeclaredMethod("expectedSuiteMembers", Class.class);
+    m.setAccessible(true);
+    return (Integer) m.invoke(null, root);
+  }
+
+  private static void invokeWarnIfExplicitRootMissingSelectClasses(Class<?> testClass, Class<?> root)
+      throws Exception {
+    Method m =
+        ArenaExtension.class.getDeclaredMethod(
+            "warnIfExplicitRootMissingSelectClasses", Class.class, Class.class);
+    m.setAccessible(true);
+    m.invoke(null, testClass, root);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Set<Class<?>> warnedMissingSelectClasses() throws Exception {
+    Field f = ArenaExtension.class.getDeclaredField("WARNED_MISSING_SELECT_CLASSES");
+    f.setAccessible(true);
+    return (Set<Class<?>>) f.get(null);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static ConcurrentHashMap<Class<?>, Object> cache() throws Exception {
+    Field f = ArenaExtension.class.getDeclaredField("CACHE");
+    f.setAccessible(true);
+    return (ConcurrentHashMap<Class<?>, Object>) f.get(null);
+  }
+
+  private static Object newCachedArena(OpenArena openArena, Integer expectedSuiteMembers) throws Exception {
+    Constructor<?> ctor = cachedArenaClass().getDeclaredConstructor(OpenArena.class, Integer.class);
+    ctor.setAccessible(true);
+    return ctor.newInstance(openArena, expectedSuiteMembers);
+  }
+
+  private static Object newFailedCachedArena(RuntimeException failure, Integer expectedSuiteMembers)
+      throws Exception {
+    Constructor<?> ctor =
+        cachedArenaClass().getDeclaredConstructor(RuntimeException.class, Integer.class);
+    ctor.setAccessible(true);
+    return ctor.newInstance(failure, expectedSuiteMembers);
+  }
+
+  private static Class<?> cachedArenaClass() {
+    for (Class<?> nested : ArenaExtension.class.getDeclaredClasses()) {
+      if (nested.getSimpleName().equals("CachedArena")) {
+        return nested;
+      }
+    }
+    throw new IllegalStateException("ArenaExtension.CachedArena nested class not found");
+  }
+
+  private static void setIntField(Object instance, String name, int value) throws Exception {
+    Field f = instance.getClass().getDeclaredField(name);
+    f.setAccessible(true);
+    f.setInt(instance, value);
+  }
+
+  private static int getIntField(Object instance, String name) throws Exception {
+    Field f = instance.getClass().getDeclaredField(name);
+    f.setAccessible(true);
+    return f.getInt(instance);
   }
 
   private static Object buildLogIdentifiers(Class<?> root) throws Exception {

@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from arena_pytest.ffi._ffi_children import children_for_ffi
 from arena_pytest.ffi._ffi_readiness import ReadinessCheckEntry, readiness_checks_for_ffi
 from arena_pytest.support._identifier import build as _build_identifier
 from arena_pytest.readiness import HttpReadinessCheck, TcpReadinessCheck
@@ -7,16 +8,32 @@ from arena_pytest.readiness import HttpReadinessCheck, TcpReadinessCheck
 
 class ContainerizedComponentBuilder:
     def __init__(self, name: str, containerfile: str):
+        self._init_config(name)
+        self._config["containerfile"] = containerfile
+
+    def _init_config(self, name: str) -> None:
         self._config: Dict[str, Any] = {
             "type": "container",
             "identifier": _build_identifier("arena-containerized-component", name),
-            "containerfile": containerfile,
             "env_vars": {},
             "runtime_args": [],
             "port_mappings": [],
             "host_mappings": [],
+            "volume_mappings": [],
         }
         self._readiness_checks: List[ReadinessCheckEntry] = []
+        self._children: List[Any] = []
+
+    @classmethod
+    def from_image(cls, name: str, image: str) -> "ContainerizedComponentBuilder":
+        builder = cls.__new__(cls)
+        builder._init_config(name)
+        builder._config["image"] = image
+        return builder
+
+    def with_platform(self, platform: str) -> "ContainerizedComponentBuilder":
+        self._config["platform"] = platform
+        return self
 
     def with_build_context(self, path: str) -> "ContainerizedComponentBuilder":
         self._config["build_context"] = path
@@ -40,6 +57,12 @@ class ContainerizedComponentBuilder:
         self._config["host_mappings"].append(host_mapping)
         return self
 
+    def with_volume_mapping(self, host_path: str, container_path: str) -> "ContainerizedComponentBuilder":
+        self._config["volume_mappings"].append(
+            {"host_path": host_path, "container_path": container_path}
+        )
+        return self
+
     def with_env_var(self, key: str, value: str) -> "ContainerizedComponentBuilder":
         self._config["env_vars"][key] = value
         return self
@@ -57,11 +80,23 @@ class ContainerizedComponentBuilder:
         self._readiness_checks.append((check, target, timeout_ms))
         return self
 
+    def with_child_components(self, children: List[Any]) -> "ContainerizedComponentBuilder":
+        self._children.extend(children)
+        return self
+
     def build(self) -> "ContainerizedComponent":
-        return ContainerizedComponent(dict(self._config), readiness_checks=list(self._readiness_checks))
+        return ContainerizedComponent(
+            dict(self._config),
+            readiness_checks=list(self._readiness_checks),
+            children=list(self._children),
+        )
 
     def _for_ffi(self) -> Dict[str, Any]:
-        return dict(self._config)
+        d = dict(self._config)
+        children = children_for_ffi(self._children)
+        if children:
+            d["children"] = children
+        return d
 
 
 class ContainerizedComponent:
@@ -69,13 +104,18 @@ class ContainerizedComponent:
         self,
         config: Dict[str, Any],
         readiness_checks: Optional[List[ReadinessCheckEntry]] = None,
+        children: Optional[List[Any]] = None,
     ):
         self._config = config
         self._readiness_checks = readiness_checks or []
+        self._children = children or []
 
     def _for_ffi(self) -> Dict[str, Any]:
         d = dict(self._config)
         rc = readiness_checks_for_ffi(self._readiness_checks)
         if rc:
             d["readiness_checks"] = rc
+        children = children_for_ffi(self._children)
+        if children:
+            d["children"] = children
         return d
