@@ -207,7 +207,7 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
 
     public ChainedExampleFixture() : base()
     {
-        var authToken = Signer.Sign(ClaimsWithScope("readings"));
+        var authToken = Signer.Sign(new Provider.Custom(), ClaimsWithScope("readings"));
         ApiClient = new ApiClient($"http://127.0.0.1:{WebAppPort}", authToken);
         ApiClient2 = new ApiClient($"http://127.0.0.1:{WebAppChildPort}", authToken);
     }

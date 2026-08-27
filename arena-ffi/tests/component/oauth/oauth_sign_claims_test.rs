@@ -36,12 +36,13 @@ fn arena_oauth_sign_claims_running_dependency_returns_verifiable_token() {
     let arena_handle = open_arena_with_oauth(identifier);
 
     let identifier_c = CString::new(identifier).unwrap();
+    let provider = CString::new(r#"{"provider":"custom"}"#).unwrap();
     let claims = CString::new(r#"{"sub":"test-subject","iat":0,"exp":9999999999}"#).unwrap();
     let mut sign_err: *mut c_char = std::ptr::null_mut();
     let jwt_ptr = arena_oauth_sign_claims(
         arena_handle,
         identifier_c.as_ptr(),
-        0,
+        provider.as_ptr(),
         claims.as_ptr(),
         &mut sign_err as *mut _,
     );
@@ -57,17 +58,18 @@ fn arena_oauth_sign_claims_running_dependency_returns_verifiable_token() {
 }
 
 #[test]
-fn arena_oauth_sign_claims_issuer_index_out_of_range_returns_error() {
-    let identifier = "oauth-sign-claims-badidx";
+fn arena_oauth_sign_claims_unregistered_provider_returns_error() {
+    let identifier = "oauth-sign-claims-badprv";
     let arena_handle = open_arena_with_oauth(identifier);
 
     let identifier_c = CString::new(identifier).unwrap();
+    let provider = CString::new(r#"{"provider":"okta"}"#).unwrap();
     let claims = CString::new("{}").unwrap();
     let mut sign_err: *mut c_char = std::ptr::null_mut();
     let jwt_ptr = arena_oauth_sign_claims(
         arena_handle,
         identifier_c.as_ptr(),
-        5,
+        provider.as_ptr(),
         claims.as_ptr(),
         &mut sign_err as *mut _,
     );

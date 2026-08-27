@@ -20,12 +20,13 @@ fn arena_oauth_sign_claims_unknown_identifier_returns_error() {
     let arena_handle = open_empty_arena();
 
     let identifier = CString::new("does-not-exist").unwrap();
+    let provider = CString::new(r#"{"provider":"custom"}"#).unwrap();
     let claims = CString::new("{}").unwrap();
     let mut sign_err: *mut c_char = std::ptr::null_mut();
     let jwt_ptr = arena_oauth_sign_claims(
         arena_handle,
         identifier.as_ptr(),
-        0,
+        provider.as_ptr(),
         claims.as_ptr(),
         &mut sign_err as *mut _,
     );
@@ -36,16 +37,38 @@ fn arena_oauth_sign_claims_unknown_identifier_returns_error() {
 }
 
 #[test]
+fn arena_oauth_sign_claims_malformed_provider_json_returns_error() {
+    let arena_handle = open_empty_arena();
+
+    let identifier = CString::new("oauth").unwrap();
+    let provider = CString::new("{not valid json").unwrap();
+    let claims = CString::new("{}").unwrap();
+    let mut sign_err: *mut c_char = std::ptr::null_mut();
+    let jwt_ptr = arena_oauth_sign_claims(
+        arena_handle,
+        identifier.as_ptr(),
+        provider.as_ptr(),
+        claims.as_ptr(),
+        &mut sign_err as *mut _,
+    );
+    assert!(jwt_ptr.is_null());
+    assert!(err_text(sign_err).contains("provider is not valid JSON"));
+
+    arena_close(arena_handle);
+}
+
+#[test]
 fn arena_oauth_sign_claims_malformed_claims_json_returns_error() {
     let arena_handle = open_empty_arena();
 
     let identifier = CString::new("oauth").unwrap();
+    let provider = CString::new(r#"{"provider":"custom"}"#).unwrap();
     let claims = CString::new("{not valid json").unwrap();
     let mut sign_err: *mut c_char = std::ptr::null_mut();
     let jwt_ptr = arena_oauth_sign_claims(
         arena_handle,
         identifier.as_ptr(),
-        0,
+        provider.as_ptr(),
         claims.as_ptr(),
         &mut sign_err as *mut _,
     );

@@ -90,7 +90,8 @@ final class ReadingsCrudComponentTest {
 
   @Test
   void getReadingsWithTokenMissingRequiredScope_isRejected(OauthSigner signer) throws Exception {
-    String token = signer.sign(ComponentTestSuite.claimsWithScope("other-scope"));
+    String token =
+        signer.sign(ComponentTestSuite.oauthProvider(), ComponentTestSuite.claimsWithScope("other-scope"));
     HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     HttpResponse<String> response =
         client.send(

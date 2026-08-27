@@ -188,16 +188,17 @@ fn build_with_issuer_path_and_no_jwks_path_scopes_default_jwks_path_to_issuer() 
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn issuer_with_provider_as_sole_issuer_matches_issuer_at_zero() {
+async fn issuer_with_provider_as_sole_issuer_matches_issuer_for_its_provider() {
     use arena::dependency::RunnableDependency;
+    let provider = Provider::Cognito {
+        pool_id: "us-east-1_abc123".to_string(),
+    };
     let mut dep = OauthDependency::builder("oauth-builder-issuer-matches-issuer-at")
         .with_http()
-        .with_provider(Provider::Cognito {
-            pool_id: "us-east-1_abc123".to_string(),
-        })
+        .with_provider(provider.clone())
         .build();
     dep.start().await;
-    assert_eq!(dep.issuer(), dep.issuer_at(0));
+    assert_eq!(dep.issuer(), dep.issuer_for(&provider));
     assert!(dep
         .issuer()
         .expect("issuer")

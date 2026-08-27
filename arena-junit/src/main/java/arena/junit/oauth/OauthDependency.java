@@ -21,7 +21,7 @@ public final class OauthDependency implements ArenaRunnableDependency {
     return config.get("identifier").asText();
   }
 
-  public String signClaims(OpenArena arena, int issuerIndex, String claimsJson) {
-    return ArenaBindings.oauthSignClaims(arena.handle(), identifier(), issuerIndex, claimsJson);
+  public String signClaims(OpenArena arena, Provider provider, String claimsJson) {
+    return ArenaBindings.oauthSignClaims(arena.handle(), identifier(), provider.toJson(), claimsJson);
   }
 }

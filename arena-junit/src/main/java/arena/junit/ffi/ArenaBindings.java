@@ -1,5 +1,6 @@
 package arena.junit.ffi;
 import com.sun.jna.Pointer;
+import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -171,6 +172,27 @@ public final class ArenaBindings {
     return st;
   }
 
+  public static int findAvailablePort(int rangeStart, int rangeEnd, PortSearchStrategy strategy) {
+    PointerByReference err = new PointerByReference();
+    IntByReference portOut = new IntByReference();
+    int raw =
+        lib().arena_find_available_port(rangeStart, rangeEnd, strategy.code(), portOut, err);
+    String msg = takeErr(err);
+    ArenaStatus st;
+    try {
+      st = ArenaStatus.fromInt(raw);
+    } catch (IllegalArgumentException e) {
+      throw new ArenaBindingError(msg != null ? msg : "find_available_port returned unknown status " + raw);
+    }
+    if (st == ArenaStatus.PANIC) {
+      throw new ArenaPortNotFoundException(msg != null ? msg : "no available port found");
+    }
+    if (st != ArenaStatus.OK) {
+      throw new ArenaBindingError(msg != null ? msg : "find_available_port failed: " + st, st);
+    }
+    return portOut.getValue();
+  }
+
   public static String oauthLoopbackTlsPemJson() {
     ArenaNativeLib lib = lib();
     PointerByReference err = new PointerByReference();
@@ -187,10 +209,10 @@ public final class ArenaBindings {
   }
 
   public static String oauthSignClaims(
-      Pointer arena, String dependencyIdentifier, int issuerIndex, String claimsJson) {
+      Pointer arena, String dependencyIdentifier, String providerJson, String claimsJson) {
     ArenaNativeLib lib = lib();
     PointerByReference err = new PointerByReference();
-    Pointer raw = lib.arena_oauth_sign_claims(arena, dependencyIdentifier, issuerIndex, claimsJson, err);
+    Pointer raw = lib.arena_oauth_sign_claims(arena, dependencyIdentifier, providerJson, claimsJson, err);
     if (raw == null || Pointer.nativeValue(raw) == 0) {
       String msg = takeErr(err);
       throw new ArenaBindingError(msg != null ? msg : "arena_oauth_sign_claims returned null");

@@ -14,21 +14,19 @@ public final class OauthSigner {
 
   private final OpenArena arena;
   private final OauthDependency dependency;
-  private final int issuerIndex;
 
-  OauthSigner(OpenArena arena, OauthDependency dependency, int issuerIndex) {
+  OauthSigner(OpenArena arena, OauthDependency dependency) {
     this.arena = arena;
     this.dependency = dependency;
-    this.issuerIndex = issuerIndex;
   }
 
-  public String sign(String claimsJson) {
-    return dependency.signClaims(arena, issuerIndex, claimsJson);
+  public String sign(Provider provider, String claimsJson) {
+    return dependency.signClaims(arena, provider, claimsJson);
   }
 
   public static OauthSigner forFixture(Class<?> fixtureClass) {
     OauthDependency dependency = readOauthDependency(oauthDependencyFieldFor(fixtureClass));
-    return new OauthSigner(ArenaExtension.openArenaFor(fixtureClass), dependency, 0);
+    return new OauthSigner(ArenaExtension.openArenaFor(fixtureClass), dependency);
   }
 
   private static OauthDependency readOauthDependency(Field field) {

@@ -43,10 +43,10 @@ public sealed class OauthDependency : IArenaDependency
         return ArenaJson.Serialize(this);
     }
 
-    public string SignClaims(OpenArena arena, uint issuerIndex, string claimsJson)
+    public string SignClaims(OpenArena arena, Provider provider, string claimsJson)
     {
         arena.ThrowIfDisposed();
-        return ArenaBindings.OauthSignClaims(arena.Handle, Identifier, issuerIndex, claimsJson);
+        return ArenaBindings.OauthSignClaims(arena.Handle, Identifier, provider.ToJson(), claimsJson);
     }
 }
 

@@ -7,7 +7,7 @@ use crate::oauth_common::{IssuerRegistration, OauthListenAddr};
 use crate::oauth_dependency::{OauthDependency, OauthTlsPlan};
 use crate::provider::Provider;
 
-const DEFAULT_JWKS_PATH: &str = "/.well-known/jwks.json";
+pub(crate) const DEFAULT_JWKS_PATH: &str = "/.well-known/jwks.json";
 
 enum InboundTransport {
     Http,
@@ -20,6 +20,7 @@ pub struct IssuerConfig {
     issuer_path: Option<String>,
     jwks_path: Option<String>,
     rsa_pkcs8_pem: Option<String>,
+    provider: Option<Provider>,
 }
 
 impl IssuerConfig {
@@ -118,9 +119,12 @@ impl OauthDependencyBuilder {
     }
 
     pub fn with_provider(self, provider: Provider) -> Self {
-        let config = IssuerConfig::new()
-            .with_issuer_path(provider.issuer_path())
-            .with_jwks_path(provider.jwks_path());
+        let config = IssuerConfig {
+            issuer_path: Some(provider.issuer_path()),
+            jwks_path: Some(provider.jwks_path()),
+            rsa_pkcs8_pem: None,
+            provider: Some(provider),
+        };
         self.with_issuer(config)
     }
 
@@ -166,6 +170,9 @@ impl OauthDependencyBuilder {
                 }),
             };
             vec![IssuerRegistration {
+                provider: Provider::Custom {
+                    issuer_path: Some(String::new()),
+                },
                 issuer_path: String::new(),
                 jwks_path: DEFAULT_JWKS_PATH.to_string(),
                 keys,
@@ -182,6 +189,9 @@ impl OauthDependencyBuilder {
                 .enumerate()
                 .map(|(i, config)| {
                     let issuer_path = config.issuer_path.unwrap_or_default();
+                    let provider = config.provider.clone().unwrap_or_else(|| Provider::Custom {
+                        issuer_path: Some(issuer_path.clone()),
+                    });
                     if !seen_issuer_paths.insert(issuer_path.clone()) {
                         panic!(
                             "[Oauth-{}] duplicate issuer path registered: {issuer_path:?}",
@@ -211,6 +221,7 @@ impl OauthDependencyBuilder {
                         }),
                     };
                     IssuerRegistration {
+                        provider,
                         issuer_path,
                         jwks_path,
                         keys,

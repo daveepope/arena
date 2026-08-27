@@ -1,13 +1,14 @@
 package arena.examples.testruntime;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
+import arena.junit.ArenaHost;
+import arena.junit.ffi.PortSearchStrategy;
 import java.util.UUID;
 
 public final class EphemeralTestRuntime {
 
   public static final int PORT_SLOT_COUNT = 13;
+  private static final int EPHEMERAL_PORT_RANGE_START = 20300;
+  private static final int EPHEMERAL_PORT_RANGE_END = 20600;
 
   private static final EphemeralTestRuntime INSTANCE = new EphemeralTestRuntime();
 
@@ -67,29 +68,12 @@ public final class EphemeralTestRuntime {
   }
 
   private static int[] allocateDistinctTcpPorts(int count) {
-    ServerSocket[] sockets = new ServerSocket[count];
-    try {
-      for (int i = 0; i < count; i++) {
-        ServerSocket socket = new ServerSocket();
-        socket.bind(new InetSocketAddress("127.0.0.1", 0));
-        sockets[i] = socket;
-      }
-      int[] ports = new int[count];
-      for (int i = 0; i < count; i++) {
-        ports[i] = sockets[i].getLocalPort();
-      }
-      return ports;
-    } catch (IOException e) {
-      throw new ExceptionInInitializerError(e);
-    } finally {
-      for (ServerSocket socket : sockets) {
-        if (socket != null) {
-          try {
-            socket.close();
-          } catch (IOException ignored) {
-          }
-        }
-      }
+    int[] ports = new int[count];
+    for (int i = 0; i < count; i++) {
+      ports[i] =
+          ArenaHost.findAvailablePort(
+              EPHEMERAL_PORT_RANGE_START, EPHEMERAL_PORT_RANGE_END, PortSearchStrategy.RANDOM);
     }
+    return ports;
   }
 }

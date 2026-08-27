@@ -5,6 +5,7 @@ _ARENA_FFI_DEPS = all_crate_deps(normal = True) + [
     "//arena",
     "//arena-containerized-component:arena_containerized_component",
     "//arena-executable-component:arena_executable_component",
+    "//arena-host:arena_host",
     "//arena-http:arena_http",
     "//arena-kafka:arena_kafka",
     "//arena-localstack:arena_localstack",
@@ -448,6 +449,23 @@ rust_test(
 rust_test(
     name = "ffi_loopback_tls_test",
     srcs = ["tests/unit/loopback_tls_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_find_available_port_test",
+    srcs = ["tests/unit/find_available_port_test.rs"],
     size = "small",
     edition = "2021",
     deps = all_crate_deps(

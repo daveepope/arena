@@ -2,6 +2,7 @@ package arena.junit.ffi;
 import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
+import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 import java.util.Map;
 
@@ -28,6 +29,9 @@ interface ArenaNativeLib extends Library {
 
   int arena_hard_reset(Pointer handle, String dependencyIdentifier, PointerByReference errOut);
 
+  int arena_find_available_port(
+      int rangeStart, int rangeEnd, int strategy, IntByReference portOut, PointerByReference errOut);
+
   void arena_free_string(Pointer p);
 
   Pointer arena_oauth_loopback_tls_pem_json(PointerByReference errOut);
@@ -35,7 +39,7 @@ interface ArenaNativeLib extends Library {
   Pointer arena_oauth_sign_claims(
       Pointer handle,
       String dependencyIdentifier,
-      int issuerIndex,
+      String providerJson,
       String claimsJson,
       PointerByReference errOut);
 

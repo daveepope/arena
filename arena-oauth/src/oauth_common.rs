@@ -6,6 +6,7 @@ use serde_json::json;
 
 use crate::discovery::OAuthAuthorizationServerMetadata;
 use crate::keys::RsaKeyPair;
+use crate::provider::Provider;
 use crate::token::AccessTokenClaims;
 
 #[derive(Clone, Copy, Debug)]
@@ -16,6 +17,7 @@ pub(crate) struct OauthListenAddr {
 
 #[derive(Clone)]
 pub(crate) struct IssuerRegistration {
+    pub(crate) provider: Provider,
     pub(crate) issuer_path: String,
     pub(crate) jwks_path: String,
     pub(crate) keys: RsaKeyPair,

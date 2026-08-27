@@ -7,6 +7,7 @@ use crate::builder::OauthDependencyBuilder;
 use arena_cryptography::ephemeral_tls;
 use crate::oauth_common::{IssuerRegistration, OauthListenAddr};
 use crate::oauth_server::OauthServer;
+use crate::provider::Provider;
 use crate::token::{AccessTokenClaims, TokenError};
 
 pub(crate) enum OauthTlsPlan {
@@ -80,7 +81,9 @@ impl OauthDependency {
     }
 
     pub fn issuer(&self) -> Option<String> {
-        self.issuer_at(0)
+        let issuer = self.issuers.first()?;
+        let base = self.base_url()?.trim_end_matches('/');
+        Some(format!("{base}{}", issuer.issuer_path))
     }
 
     pub fn server_tls_certificate_pem(&self) -> Option<&str> {
@@ -92,9 +95,13 @@ impl OauthDependency {
             .oauth_server
             .signing_state()
             .ok_or(TokenError::NotRunning)?;
+        let base = self
+            .base_url()
+            .ok_or(TokenError::NotRunning)?
+            .trim_end_matches('/');
         let mut first_err: Option<TokenError> = None;
-        for (idx, issuer) in state.issuers.iter().enumerate() {
-            let issuer_string = self.issuer_at(idx).ok_or(TokenError::NotRunning)?;
+        for issuer in state.issuers.iter() {
+            let issuer_string = format!("{base}{}", issuer.issuer_path);
             match crate::token::verify_access_token(token, &issuer.keys, &issuer_string) {
                 Ok(claims) => return Ok(claims),
                 Err(e) => {
@@ -119,27 +126,29 @@ impl OauthDependency {
         self.issuers.get(index).map(|i| i.issuer_path.as_str())
     }
 
-    pub fn issuer_at(&self, index: usize) -> Option<String> {
-        let issuer = self.issuers.get(index)?;
+    pub fn issuer_for(&self, provider: &Provider) -> Option<String> {
+        let issuer = self.issuers.iter().find(|i| &i.provider == provider)?;
         let base = self.base_url()?.trim_end_matches('/');
         Some(format!("{base}{}", issuer.issuer_path))
     }
 
-    pub fn signing_key_pem(&self, index: usize) -> Option<String> {
+    pub fn signing_key_pem_for(&self, provider: &Provider) -> Option<String> {
         self.issuers
-            .get(index)
+            .iter()
+            .find(|i| &i.provider == provider)
             .and_then(|issuer| issuer.keys.private_key_pkcs8_pem().ok())
     }
 
     pub fn sign_claims(
         &self,
-        index: usize,
+        provider: &Provider,
         claims: &serde_json::Value,
     ) -> Result<String, String> {
         let issuer = self
             .issuers
-            .get(index)
-            .ok_or_else(|| format!("no issuer registered at index {index}"))?;
+            .iter()
+            .find(|i| &i.provider == provider)
+            .ok_or_else(|| format!("no issuer registered for provider {provider:?}"))?;
         issuer.keys.sign_claims(claims)
     }
 

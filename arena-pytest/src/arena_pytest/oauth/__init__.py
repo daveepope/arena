@@ -1,8 +1,9 @@
 import asyncio
 import ctypes
+import dataclasses
 import json
 import os
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
 import pytest
@@ -23,6 +24,42 @@ oauth_issuer_host_is_non_loopback = bool(_oauth_host) and _oauth_host not in (
     "localhost",
     "::1",
 )
+
+
+@dataclasses.dataclass(frozen=True)
+class Cognito:
+    pool_id: str
+
+    def to_json(self) -> Dict[str, Any]:
+        return {"provider": "cognito", "pool_id": self.pool_id}
+
+
+@dataclasses.dataclass(frozen=True)
+class Okta:
+    def to_json(self) -> Dict[str, Any]:
+        return {"provider": "okta"}
+
+
+@dataclasses.dataclass(frozen=True)
+class EntraId:
+    tenant_id: str
+
+    def to_json(self) -> Dict[str, Any]:
+        return {"provider": "entra_id", "tenant_id": self.tenant_id}
+
+
+@dataclasses.dataclass(frozen=True)
+class Custom:
+    issuer_path: Optional[str] = None
+
+    def to_json(self) -> Dict[str, Any]:
+        entry: Dict[str, Any] = {"provider": "custom"}
+        if self.issuer_path is not None:
+            entry["issuer_path"] = self.issuer_path
+        return entry
+
+
+Provider = Union[Cognito, Okta, EntraId, Custom]
 
 
 class OauthDependencyBuilder:
@@ -116,46 +153,40 @@ class OauthDependency:
         return d
 
     async def sign_claims(
-        self, arena: "OpenArena", issuer_index: int, claims_json: str
+        self, arena: "OpenArena", provider: "Provider", claims_json: str
     ) -> str:
         return await asyncio.to_thread(
             _ffi_oauth_sign_claims,
             arena.ffi(),
             arena.handle(),
             self.identifier,
-            issuer_index,
+            json.dumps(provider.to_json()),
             claims_json,
         )
 
 
 class OauthSigner:
-    def __init__(
-        self, oauth_dependency: "OauthDependency", arena: "OpenArena", issuer_index: int = 0
-    ):
+    def __init__(self, oauth_dependency: "OauthDependency", arena: "OpenArena"):
         self._oauth_dependency = oauth_dependency
         self._arena = arena
-        self._issuer_index = issuer_index
 
-    async def sign(self, claims_json: str) -> str:
-        return await self._oauth_dependency.sign_claims(
-            self._arena, self._issuer_index, claims_json
-        )
+    async def sign(self, provider: "Provider", claims_json: str) -> str:
+        return await self._oauth_dependency.sign_claims(self._arena, provider, claims_json)
 
 
 def _build_oauth_signer(
     oauth_dependency_getter: Callable[[], "OauthDependency"],
-    issuer_index: int,
     arena: "OpenArena",
 ) -> "OauthSigner":
-    return OauthSigner(oauth_dependency_getter(), arena, issuer_index)
+    return OauthSigner(oauth_dependency_getter(), arena)
 
 
 def oauth_signer_fixture(
-    oauth_dependency_getter: Callable[[], "OauthDependency"], issuer_index: int = 0
+    oauth_dependency_getter: Callable[[], "OauthDependency"],
 ) -> Callable[["OpenArena"], "OauthSigner"]:
     @pytest.fixture(scope="session")
     def _oauth_signer(arena: "OpenArena") -> "OauthSigner":
-        return _build_oauth_signer(oauth_dependency_getter, issuer_index, arena)
+        return _build_oauth_signer(oauth_dependency_getter, arena)
 
     return _oauth_signer
 

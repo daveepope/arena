@@ -4,6 +4,7 @@ mod active_playbook;
 mod closed_arena;
 mod dependency_reset;
 pub mod error;
+mod find_available_port;
 mod logging;
 mod loopback_tls;
 mod open_arena;
@@ -24,6 +25,7 @@ pub use closed_arena::{arena_open, OpenArenaHandle};
 pub use closed_arena::parse_config_for_bench;
 pub use dependency_reset::{arena_hard_reset, arena_soft_reset};
 pub use error::ArenaStatus;
+pub use find_available_port::arena_find_available_port;
 pub use logging::{
     arena_add_log_target, arena_dispatcher_default_logging_target_logger_name_utf8,
     arena_dispatcher_default_logging_target_publish_level,

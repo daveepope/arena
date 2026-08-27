@@ -20,6 +20,7 @@ path = "src/example_readings_axum_web_app/web_server/main.rs"
 
 [dependencies]
 arena = { workspace = true }
+arena-host = { workspace = true }
 arena-kafka = { workspace = true }
 arena-postgres = { workspace = true }
 arena-mssql = { workspace = true }

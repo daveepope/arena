@@ -1,41 +1,21 @@
 using System;
-using System.Net;
-using System.Net.Sockets;
+using ArenaDotnet.Xunit;
+using ArenaDotnet.Xunit.Ffi;
 
 namespace ArenaExamples.Test.Shared;
 
 public static class EphemeralTestRuntime
 {
-    private static readonly object Lock = new object();
-    private static int? _nextPort;
+    private const int EphemeralPortRangeStart = 20600;
+    private const int EphemeralPortRangeEnd = 20900;
     private static readonly string Suffix = Guid.NewGuid().ToString("N")[..8];
 
     public static int AllocatePort()
     {
-        lock (Lock)
-        {
-            if (_nextPort.HasValue)
-            {
-                var p = _nextPort.Value;
-                _nextPort = p + 1;
-                return p;
-            }
-            var port = FindOpenPort();
-            _nextPort = port + 1;
-            return port;
-        }
+        return ArenaHost.FindAvailablePort(EphemeralPortRangeStart, EphemeralPortRangeEnd, PortSearchStrategy.Random);
     }
 
     public static string NetworkName => $"arena-example-api-network-{Suffix}";
 
     public static string RandomToken(int length) => Guid.NewGuid().ToString("N")[..length];
-
-    private static int FindOpenPort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
-    }
 }

@@ -11,7 +11,7 @@ if _TESTS_DIR not in sys.path:
 import pytest
 import requests
 
-from arena_pytest import ArenaBindingError, OAUTH_ISSUER, playbook
+from arena_pytest import ArenaBindingError, Custom, OAUTH_ISSUER, playbook
 
 from oauth_claims import claims_with_scope
 from playbooks import (
@@ -229,7 +229,7 @@ def test_create_multiple_weather_reports_are_listed(api_client: ApiClient):
 async def test_get_readings_with_token_missing_required_scope_is_rejected(
     oauth_signer, base_url: str
 ):
-    token = await oauth_signer.sign(claims_with_scope(OAUTH_ISSUER, "other-scope"))
+    token = await oauth_signer.sign(Custom(), claims_with_scope(OAUTH_ISSUER, "other-scope"))
 
     r = requests.get(f"{base_url}/readings", headers={"Authorization": f"Bearer {token}"}, timeout=10)
 

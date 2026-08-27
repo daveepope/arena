@@ -37,6 +37,7 @@ import arena.junit.oauth.OauthDependency;
 import arena.junit.oauth.OauthDependencyBuilder;
 import arena.junit.oauth.OauthLoopbackTls;
 import arena.junit.oauth.OauthSigner;
+import arena.junit.oauth.Provider;
 import arena.junit.playbook.LocalstackModels;
 import arena.junit.readiness.HttpReadinessCheck;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -306,12 +307,16 @@ public final class ChainedComponentTestSuite {
   }
 
   static ApiClient apiClient() throws Exception {
-    String token = OauthSigner.forFixture(ChainedComponentTestSuite.class).sign(claimsWithScope("readings"));
+    String token =
+        OauthSigner.forFixture(ChainedComponentTestSuite.class)
+            .sign(new Provider.Custom(null), claimsWithScope("readings"));
     return new ApiClient("http://127.0.0.1:" + WEB_APP_PORT, token, MAPPER);
   }
 
   static ApiClient apiClient2() throws Exception {
-    String token = OauthSigner.forFixture(ChainedComponentTestSuite.class).sign(claimsWithScope("readings"));
+    String token =
+        OauthSigner.forFixture(ChainedComponentTestSuite.class)
+            .sign(new Provider.Custom(null), claimsWithScope("readings"));
     return new ApiClient("http://127.0.0.1:" + WEB_APP_CHILD_PORT, token, MAPPER);
   }
 }

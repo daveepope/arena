@@ -34,12 +34,19 @@ pub struct TestRuntime {
     pub match_name: String,
 }
 
+const EPHEMERAL_PORT_RANGE: std::ops::RangeInclusive<u16> = 21100..=21199;
+
 fn ephemeral_tcp_port() -> u16 {
-    std::net::TcpListener::bind("127.0.0.1:0")
-        .expect("bind ephemeral tcp port")
-        .local_addr()
-        .expect("local_addr")
-        .port()
+    arena_host::find_available_port::find_available_port(
+        EPHEMERAL_PORT_RANGE,
+        arena_host::find_available_port::PortSearchStrategy::Random,
+    )
+    .unwrap_or_else(|| {
+        panic!(
+            "no available port found in range {}..={}",
+            EPHEMERAL_PORT_RANGE.start(), EPHEMERAL_PORT_RANGE.end()
+        )
+    })
 }
 
 fn run_suffix() -> String {
@@ -102,7 +109,14 @@ pub fn signed_token_with_scope(arena: &OpenArena, scope: &str) -> String {
         "iat": now,
         "exp": now + 300,
     });
-    oauth.sign_claims(0, &claims).expect("sign_claims")
+    oauth
+        .sign_claims(
+            &Provider::Cognito {
+                pool_id: OAUTH_COGNITO_POOL_ID.to_string(),
+            },
+            &claims,
+        )
+        .expect("sign_claims")
 }
 
 pub const POSTGRES_DB_NAME: &str = "readings_db";

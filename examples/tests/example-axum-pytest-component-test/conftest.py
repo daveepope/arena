@@ -72,6 +72,7 @@ from arena_pytest import (
     ArenaLogLevel,
     BuildTool,
     ClosedArena,
+    Custom,
     ExecutableComponentBuilder,
     HttpDependencyBuilder,
     HttpReadinessCheck,
@@ -306,7 +307,7 @@ async def api_client(oauth_signer, base_url) -> ApiClient:
     import requests
 
     session = requests.Session()
-    token = await oauth_signer.sign(claims_with_scope(OAUTH_ISSUER, "readings"))
+    token = await oauth_signer.sign(Custom(), claims_with_scope(OAUTH_ISSUER, "readings"))
     session.headers.update({"Authorization": f"Bearer {token}"})
     return ApiClient(base_url, session)
 

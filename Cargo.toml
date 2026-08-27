@@ -14,6 +14,7 @@ members = [
     "arena-executable-component",
     "arena-container",
     "arena-cryptography",
+    "arena-host",
     "arena-containerized-component",
     "arena-ffi",
     "tools/arena-ffi-bench",
@@ -36,6 +37,7 @@ arena-http = { path = "arena-http" }
 arena-oauth = { path = "arena-oauth" }
 arena-container = { path = "arena-container" }
 arena-cryptography = { path = "arena-cryptography" }
+arena-host = { path = "arena-host" }
 arena-containerized-component = { path = "arena-containerized-component" }
 arena-ffi = { path = "arena-ffi" }
 axum = "0.8.8"

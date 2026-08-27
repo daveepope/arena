@@ -291,8 +291,8 @@ async fn oauth_dependency_issued_token_scope_claims_enforce_ensure_scopes() {
     dep.stop().await;
 }
 
-fn decoding_key_for(dep: &OauthDependency, index: usize) -> jsonwebtoken::DecodingKey {
-    let pem = dep.signing_key_pem(index).expect("signing key pem");
+fn decoding_key_for(dep: &OauthDependency, provider: &Provider) -> jsonwebtoken::DecodingKey {
+    let pem = dep.signing_key_pem_for(provider).expect("signing key pem");
     let private_key = RsaPrivateKey::from_pkcs8_pem(&pem).expect("parse pkcs8 pem");
     let public_pem = private_key
         .to_public_key()
@@ -314,12 +314,14 @@ fn unpublished_key_token(claims: &Value) -> String {
 #[tokio::test(flavor = "multi_thread")]
 async fn oauth_dependency_with_cognito_and_okta_issuers_reproduces_mixed_topology_use_case() {
     init_test_logging();
+    let cognito_provider = Provider::Cognito {
+        pool_id: "us-east-1_abc123".to_string(),
+    };
+    let okta_provider = Provider::Okta;
     let mut dep = OauthDependency::builder("oauth cognito okta mixed")
         .with_http()
-        .with_provider(Provider::Cognito {
-            pool_id: "us-east-1_abc123".to_string(),
-        })
-        .with_provider(Provider::Okta)
+        .with_provider(cognito_provider.clone())
+        .with_provider(okta_provider.clone())
         .build();
     dep.start().await;
 
@@ -357,8 +359,8 @@ async fn oauth_dependency_with_cognito_and_okta_issuers_reproduces_mixed_topolog
         "each issuer must publish a distinct signing key"
     );
 
-    let cognito_issuer = dep.issuer_at(0).expect("cognito issuer");
-    let okta_issuer = dep.issuer_at(1).expect("okta issuer");
+    let cognito_issuer = dep.issuer_for(&cognito_provider).expect("cognito issuer");
+    let okta_issuer = dep.issuer_for(&okta_provider).expect("okta issuer");
     assert_eq!(cognito_issuer, format!("{base}/us-east-1_abc123"));
     assert_eq!(okta_issuer, base);
 
@@ -369,7 +371,7 @@ async fn oauth_dependency_with_cognito_and_okta_issuers_reproduces_mixed_topolog
         "iat": 0,
     });
     let cognito_token = dep
-        .sign_claims(0, &cognito_claims)
+        .sign_claims(&cognito_provider, &cognito_claims)
         .expect("sign cognito token");
     dep.verify_access_token(&cognito_token)
         .expect("dependency verify_access_token succeeds for the default issuer's token");
@@ -380,7 +382,9 @@ async fn oauth_dependency_with_cognito_and_okta_issuers_reproduces_mixed_topolog
         "exp": 9_999_999_999u64,
         "iat": 0,
     });
-    let okta_token = dep.sign_claims(1, &okta_claims).expect("sign okta token");
+    let okta_token = dep
+        .sign_claims(&okta_provider, &okta_claims)
+        .expect("sign okta token");
     dep.verify_access_token(&okta_token).expect(
         "dependency verify_access_token succeeds for a non-default (Okta) issuer's token",
     );
@@ -389,15 +393,19 @@ async fn oauth_dependency_with_cognito_and_okta_issuers_reproduces_mixed_topolog
     cognito_validation.set_issuer(&[cognito_issuer.as_str()]);
     jsonwebtoken::decode::<Value>(
         &cognito_token,
-        &decoding_key_for(&dep, 0),
+        &decoding_key_for(&dep, &cognito_provider),
         &cognito_validation,
     )
     .expect("cognito token verifies against cognito's own key");
 
     let mut okta_validation = jsonwebtoken::Validation::new(Algorithm::RS256);
     okta_validation.set_issuer(&[cognito_issuer.as_str()]);
-    jsonwebtoken::decode::<Value>(&cognito_token, &decoding_key_for(&dep, 1), &okta_validation)
-        .expect_err("cognito token must not verify against okta's key");
+    jsonwebtoken::decode::<Value>(
+        &cognito_token,
+        &decoding_key_for(&dep, &okta_provider),
+        &okta_validation,
+    )
+    .expect_err("cognito token must not verify against okta's key");
 
     let forged_claims = json!({
         "iss": cognito_issuer,
@@ -408,12 +416,16 @@ async fn oauth_dependency_with_cognito_and_okta_issuers_reproduces_mixed_topolog
     let forged_token = unpublished_key_token(&forged_claims);
     jsonwebtoken::decode::<Value>(
         &forged_token,
-        &decoding_key_for(&dep, 0),
+        &decoding_key_for(&dep, &cognito_provider),
         &cognito_validation,
     )
     .expect_err("token signed by an unpublished key must not verify against cognito's key");
-    jsonwebtoken::decode::<Value>(&forged_token, &decoding_key_for(&dep, 1), &okta_validation)
-        .expect_err("token signed by an unpublished key must not verify against okta's key");
+    jsonwebtoken::decode::<Value>(
+        &forged_token,
+        &decoding_key_for(&dep, &okta_provider),
+        &okta_validation,
+    )
+    .expect_err("token signed by an unpublished key must not verify against okta's key");
     dep.verify_access_token(&forged_token)
         .expect_err("dependency verify_access_token must reject a token signed by an unpublished key against every registered issuer");
 
@@ -463,6 +475,7 @@ async fn oauth_dependency_serves_jwks_and_verifiable_tokens_across_all_providers
     struct Case {
         name: &'static str,
         source: IssuerSource,
+        provider: Provider,
         expected_issuer_path: &'static str,
         expected_jwks_path: &'static str,
     }
@@ -473,12 +486,16 @@ async fn oauth_dependency_serves_jwks_and_verifiable_tokens_across_all_providers
             source: IssuerSource::Provider(Provider::Cognito {
                 pool_id: "pool-x".to_string(),
             }),
+            provider: Provider::Cognito {
+                pool_id: "pool-x".to_string(),
+            },
             expected_issuer_path: "/pool-x",
             expected_jwks_path: "/pool-x/.well-known/jwks.json",
         },
         Case {
             name: "okta",
             source: IssuerSource::Provider(Provider::Okta),
+            provider: Provider::Okta,
             expected_issuer_path: "",
             expected_jwks_path: "/v1/keys",
         },
@@ -487,6 +504,9 @@ async fn oauth_dependency_serves_jwks_and_verifiable_tokens_across_all_providers
             source: IssuerSource::Provider(Provider::EntraId {
                 tenant_id: "tenant-x".to_string(),
             }),
+            provider: Provider::EntraId {
+                tenant_id: "tenant-x".to_string(),
+            },
             expected_issuer_path: "/tenant-x/v2.0",
             expected_jwks_path: "/tenant-x/discovery/v2.0/keys",
         },
@@ -497,6 +517,9 @@ async fn oauth_dependency_serves_jwks_and_verifiable_tokens_across_all_providers
                     .with_issuer_path("/custom")
                     .with_jwks_path("/custom/keys"),
             ),
+            provider: Provider::Custom {
+                issuer_path: Some("/custom".to_string()),
+            },
             expected_issuer_path: "/custom",
             expected_jwks_path: "/custom/keys",
         },
@@ -537,8 +560,8 @@ async fn oauth_dependency_serves_jwks_and_verifiable_tokens_across_all_providers
         );
 
         let issuer = dep
-            .issuer_at(0)
-            .unwrap_or_else(|| panic!("{}: issuer_at", case.name));
+            .issuer_for(&case.provider)
+            .unwrap_or_else(|| panic!("{}: issuer_for", case.name));
         assert_eq!(
             issuer,
             format!("{base}{}", case.expected_issuer_path),
@@ -548,7 +571,7 @@ async fn oauth_dependency_serves_jwks_and_verifiable_tokens_across_all_providers
 
         let claims = json!({ "iss": issuer, "sub": "test-subject", "exp": 9_999_999_999u64, "iat": 0 });
         let token = dep
-            .sign_claims(0, &claims)
+            .sign_claims(&case.provider, &claims)
             .unwrap_or_else(|e| panic!("{}: sign_claims: {e}", case.name));
         dep.verify_access_token(&token)
             .unwrap_or_else(|e| panic!("{}: verify_access_token: {e:?}", case.name));

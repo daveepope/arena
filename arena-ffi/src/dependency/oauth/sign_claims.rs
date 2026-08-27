@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::os::raw::c_char;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
-use arena_oauth::OauthDependency;
+use arena_oauth::{OauthDependency, Provider};
 
 use crate::closed_arena::OpenArenaRuntimeState;
 use crate::error::{clear_error, write_error};
@@ -35,13 +35,15 @@ where
 fn sign_claims(
     runtime_state: &OpenArenaRuntimeState,
     identifier: &str,
-    issuer_index: u32,
+    provider_json: &str,
     claims_json: &str,
 ) -> Result<String, String> {
+    let provider: Provider = serde_json::from_str(provider_json)
+        .map_err(|e| format!("arena_oauth_sign_claims: provider is not valid JSON: {e}"))?;
     let claims: serde_json::Value = serde_json::from_str(claims_json)
         .map_err(|e| format!("arena_oauth_sign_claims: claims is not valid JSON: {e}"))?;
     with_oauth_dependency(runtime_state, identifier, |oauth| {
-        oauth.sign_claims(issuer_index as usize, &claims)
+        oauth.sign_claims(&provider, &claims)
     })?
 }
 
@@ -49,7 +51,7 @@ fn sign_claims(
 pub extern "C" fn arena_oauth_sign_claims(
     handle: *mut OpenArenaHandle,
     dependency_identifier: *const c_char,
-    issuer_index: u32,
+    provider_json: *const c_char,
     claims_json: *const c_char,
     err_out: *mut *mut c_char,
 ) -> *mut c_char {
@@ -64,6 +66,15 @@ pub extern "C" fn arena_oauth_sign_claims(
             write_error(
                 err_out,
                 "arena_oauth_sign_claims: dependency_identifier must not be null",
+            )
+        };
+        return std::ptr::null_mut();
+    }
+    if provider_json.is_null() {
+        unsafe {
+            write_error(
+                err_out,
+                "arena_oauth_sign_claims: provider_json must not be null",
             )
         };
         return std::ptr::null_mut();
@@ -90,6 +101,18 @@ pub extern "C" fn arena_oauth_sign_claims(
             return std::ptr::null_mut();
         }
     };
+    let provider_str = match unsafe { c_str_to_string(provider_json) } {
+        Some(v) => v,
+        None => {
+            unsafe {
+                write_error(
+                    err_out,
+                    "arena_oauth_sign_claims: provider_json is not valid UTF-8",
+                )
+            };
+            return std::ptr::null_mut();
+        }
+    };
     let claims_str = match unsafe { c_str_to_string(claims_json) } {
         Some(v) => v,
         None => {
@@ -105,7 +128,7 @@ pub extern "C" fn arena_oauth_sign_claims(
 
     let outcome = catch_unwind(AssertUnwindSafe(|| {
         let runtime_state = unsafe { OpenArenaRuntimeState::as_ref(handle) };
-        sign_claims(runtime_state, &identifier, issuer_index, &claims_str)
+        sign_claims(runtime_state, &identifier, &provider_str, &claims_str)
     }));
 
     match outcome {

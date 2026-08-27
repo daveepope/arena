@@ -1,5 +1,5 @@
 {
-  "checksum": "ee331eec834cbc7b6e1ef6267f89ef7ba61c803f12c0055d5f688dd4b650c3d5",
+  "checksum": "072a2ab27aa6c0aa6814435316fa48b61402483fe7df5d9296908aeb2f4c77a5",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -1050,6 +1050,37 @@
         "version": "6.2.0"
       },
       "license": null,
+      "license_ids": [],
+      "license_file": null
+    },
+    "arena-host 6.2.0": {
+      "name": "arena-host",
+      "version": "6.2.0",
+      "package_url": null,
+      "repository": null,
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "arena_host",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "arena_host",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "edition": "2021",
+        "version": "6.2.0"
+      },
+      "license": "todo",
       "license_ids": [],
       "license_file": null
     },
@@ -33891,6 +33922,7 @@
     "arena-executable-component 6.2.0": "arena-executable-component",
     "arena-ffi 6.2.0": "arena-ffi",
     "arena-ffi-bench 6.2.0": "tools/arena-ffi-bench",
+    "arena-host 6.2.0": "arena-host",
     "arena-http 6.2.0": "arena-http",
     "arena-kafka 6.2.0": "arena-kafka",
     "arena-localstack 6.2.0": "arena-localstack",

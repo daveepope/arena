@@ -432,6 +432,15 @@ def load_ffi() -> Optional[ArenaNativeLib]:
     ]
     lib.arena_hard_reset.restype = ctypes.c_int
 
+    lib.arena_find_available_port.argtypes = [
+        ctypes.c_int32,
+        ctypes.c_int32,
+        ctypes.c_int32,
+        ctypes.POINTER(ctypes.c_int32),
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    lib.arena_find_available_port.restype = ctypes.c_int
+
     lib.arena_set_log_level.argtypes = [ctypes.c_int]
     lib.arena_set_log_level.restype = None
 
@@ -469,7 +478,7 @@ def load_ffi() -> Optional[ArenaNativeLib]:
     lib.arena_oauth_sign_claims.argtypes = [
         ctypes.c_void_p,
         ctypes.c_char_p,
-        ctypes.c_uint32,
+        ctypes.c_char_p,
         ctypes.c_char_p,
         ctypes.POINTER(ctypes.c_void_p),
     ]
@@ -598,7 +607,7 @@ def oauth_sign_claims(
     ffi: ArenaNativeLib,
     handle: int,
     dependency_identifier: str,
-    issuer_index: int,
+    provider_json: str,
     claims_json: str,
 ) -> str:
     if not handle:
@@ -607,7 +616,7 @@ def oauth_sign_claims(
     raw = ffi.lib.arena_oauth_sign_claims(
         handle,
         dependency_identifier.encode("utf-8"),
-        issuer_index,
+        provider_json.encode("utf-8"),
         claims_json.encode("utf-8"),
         ctypes.byref(err),
     )

@@ -32,6 +32,7 @@ import arena.junit.oauth.OauthDependency;
 import arena.junit.oauth.OauthDependencyBuilder;
 import arena.junit.oauth.OauthLoopbackTls;
 import arena.junit.oauth.OauthSigner;
+import arena.junit.oauth.Provider;
 import arena.junit.readiness.HttpReadinessCheck;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -212,7 +213,9 @@ public final class ComponentTestSuite {
   }
 
   static ApiClient apiClient() throws Exception {
-    String token = OauthSigner.forFixture(ComponentTestSuite.class).sign(claimsWithScope("readings"));
+    String token =
+        OauthSigner.forFixture(ComponentTestSuite.class)
+            .sign(new Provider.Custom(null), claimsWithScope("readings"));
     return new ApiClient("http://127.0.0.1:" + WEB_APP_PORT, token, MAPPER);
   }
 

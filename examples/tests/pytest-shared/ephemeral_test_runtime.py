@@ -1,21 +1,20 @@
 import os
-import socket
 import uuid
 
+from arena_pytest.host import PortSearchStrategy, find_available_port
+
 PORT_SLOT_COUNT = 13
+EPHEMERAL_PORT_RANGE_START = 20000
+EPHEMERAL_PORT_RANGE_END = 20300
 
 
 def _allocate_distinct_tcp_ports(count: int) -> list[int]:
-    sockets: list[socket.socket] = []
-    try:
-        for _ in range(count):
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.bind(("127.0.0.1", 0))
-            sockets.append(s)
-        return [s.getsockname()[1] for s in sockets]
-    finally:
-        for s in sockets:
-            s.close()
+    return [
+        find_available_port(
+            EPHEMERAL_PORT_RANGE_START, EPHEMERAL_PORT_RANGE_END, PortSearchStrategy.RANDOM
+        )
+        for _ in range(count)
+    ]
 
 
 def ephemeral_tcp_port() -> int:

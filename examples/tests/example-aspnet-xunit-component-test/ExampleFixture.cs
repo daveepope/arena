@@ -209,10 +209,12 @@ public sealed class ExampleFixture : ArenaCollectionFixture
 
     public ExampleFixture() : base()
     {
-        var authToken = Signer.Sign(ClaimsWithScope("readings"));
+        var authToken = Signer.Sign(OauthProvider(), ClaimsWithScope("readings"));
         ApiClient = new ApiClient($"http://127.0.0.1:{WebAppPort}", authToken);
         ApiClient2 = new ApiClient($"http://127.0.0.1:{WebApp2Port}", authToken);
     }
+
+    public static Provider OauthProvider() => new Provider.Cognito(OauthCognitoPoolId);
 
     public static string ClaimsWithScope(string scope)
     {

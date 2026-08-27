@@ -95,6 +95,10 @@ name = "ffi_loopback_tls_test"
 path = "tests/unit/loopback_tls_test.rs"
 
 [[test]]
+name = "ffi_find_available_port_test"
+path = "tests/unit/find_available_port_test.rs"
+
+[[test]]
 name = "ffi_arena_test"
 path = "tests/unit/arena_test.rs"
 
@@ -117,6 +121,7 @@ arena-http = { workspace = true }
 async-trait = { workspace = true }
 arena-containerized-component = { workspace = true }
 arena-executable-component = { workspace = true }
+arena-host = { workspace = true }
 arena-kafka = { workspace = true }
 arena-localstack = { workspace = true }
 arena-postgres = { workspace = true }

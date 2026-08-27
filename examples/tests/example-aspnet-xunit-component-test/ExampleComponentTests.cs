@@ -103,7 +103,7 @@ public class ExampleComponentTests : IClassFixture<ExampleFixture>
     [Fact]
     public async Task GetReadingsWithTokenMissingRequiredScope_IsRejected()
     {
-        var token = fixture.Signer.Sign(ExampleFixture.ClaimsWithScope("other-scope"));
+        var token = fixture.Signer.Sign(ExampleFixture.OauthProvider(), ExampleFixture.ClaimsWithScope("other-scope"));
         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         var response = await client.GetAsync($"http://127.0.0.1:{ExampleFixture.WebAppPort}/Readings");

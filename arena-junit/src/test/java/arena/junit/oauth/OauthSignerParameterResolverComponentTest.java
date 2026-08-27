@@ -22,7 +22,8 @@ final class OauthSignerParameterResolverComponentTest {
 
   @Test
   void signerParameterIsInjectedAndProducesVerifiableToken(OauthSigner signer) {
-    String jwt = signer.sign("{\"sub\":\"test-user\",\"iat\":0,\"exp\":9999999999}");
+    String jwt =
+        signer.sign(new Provider.Custom(null), "{\"sub\":\"test-user\",\"iat\":0,\"exp\":9999999999}");
     assertEquals(3, jwt.split("\\.").length);
   }
 }

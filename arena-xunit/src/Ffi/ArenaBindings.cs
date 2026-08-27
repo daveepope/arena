@@ -32,6 +32,18 @@ internal static class ArenaBindings
             throw TakeErr(errOut, "arena_hard_reset failed");
     }
 
+    private const int ArenaStatusPanic = 3;
+
+    internal static int FindAvailablePort(int rangeStart, int rangeEnd, PortSearchStrategy strategy)
+    {
+        var status = ArenaNativeLib.arena_find_available_port(rangeStart, rangeEnd, (int)strategy, out var portOut, out var errOut);
+        if (status == ArenaStatusPanic)
+            throw new ArenaPortNotFoundException(TakeErr(errOut, "no available port found").Message);
+        if (status != 0)
+            throw TakeErr(errOut, "arena_find_available_port failed");
+        return portOut;
+    }
+
     internal static void SetDispatcherDependencyAllowJson(string? json)
     {
         ArenaNativeLib.arena_dispatcher_dependency_allow_json_set(json);
@@ -103,9 +115,9 @@ internal static class ArenaBindings
         return json;
     }
 
-    internal static string OauthSignClaims(IntPtr handle, string dependencyIdentifier, uint issuerIndex, string claimsJson)
+    internal static string OauthSignClaims(IntPtr handle, string dependencyIdentifier, string providerJson, string claimsJson)
     {
-        var ptr = ArenaNativeLib.arena_oauth_sign_claims(handle, dependencyIdentifier, issuerIndex, claimsJson, out var errOut);
+        var ptr = ArenaNativeLib.arena_oauth_sign_claims(handle, dependencyIdentifier, providerJson, claimsJson, out var errOut);
         if (ptr == IntPtr.Zero)
             throw TakeErr(errOut, "arena_oauth_sign_claims failed");
         var jwt = ArenaNativeStrings.FromUtf8Ptr(ptr);

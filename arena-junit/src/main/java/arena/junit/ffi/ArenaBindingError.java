@@ -1,5 +1,5 @@
 package arena.junit.ffi;
-public final class ArenaBindingError extends RuntimeException {
+public class ArenaBindingError extends RuntimeException {
   private final ArenaStatus status;
 
   public ArenaBindingError(String message) {

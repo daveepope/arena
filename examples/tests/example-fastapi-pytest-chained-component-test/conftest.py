@@ -31,6 +31,7 @@ from oauth_claims import claims_with_scope
 from arena_pytest import (
     ArenaLogLevel,
     ClosedArena,
+    Custom,
     EventRuleSpec,
     EventRuleTarget,
     ExecutableComponentBuilder,
@@ -372,7 +373,7 @@ oauth_signer = oauth_signer_fixture(lambda: _OAUTH)
 @pytest.fixture(scope="session")
 async def api_client(oauth_signer, base_url) -> ApiClient:
     session = requests.Session()
-    token = await oauth_signer.sign(claims_with_scope(OAUTH_ISSUER, "readings"))
+    token = await oauth_signer.sign(Custom(), claims_with_scope(OAUTH_ISSUER, "readings"))
     session.headers.update({"Authorization": f"Bearer {token}"})
     return ApiClient(base_url, session)
 
@@ -380,7 +381,7 @@ async def api_client(oauth_signer, base_url) -> ApiClient:
 @pytest.fixture(scope="session")
 async def api_client2(oauth_signer, base_url2) -> ApiClient:
     session = requests.Session()
-    token = await oauth_signer.sign(claims_with_scope(OAUTH_ISSUER, "readings"))
+    token = await oauth_signer.sign(Custom(), claims_with_scope(OAUTH_ISSUER, "readings"))
     session.headers.update(
         {"Authorization": f"Bearer {token}"}
     )

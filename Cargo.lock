@@ -126,6 +126,7 @@ dependencies = [
  "arena",
  "arena-containerized-component",
  "arena-executable-component",
+ "arena-host",
  "arena-http",
  "arena-kafka",
  "arena-mssql",
@@ -171,6 +172,7 @@ dependencies = [
  "arena",
  "arena-containerized-component",
  "arena-executable-component",
+ "arena-host",
  "arena-http",
  "arena-kafka",
  "arena-localstack",
@@ -199,11 +201,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "arena-host"
+version = "6.2.0"
+
+[[package]]
 name = "arena-http"
 version = "6.2.0"
 dependencies = [
  "arena",
  "arena-container",
+ "arena-host",
  "async-trait",
  "futures",
  "futures-timer",
@@ -239,6 +246,7 @@ version = "6.2.0"
 dependencies = [
  "arena",
  "arena-container",
+ "arena-host",
  "async-trait",
  "aws-config",
  "aws-credential-types",
@@ -264,6 +272,7 @@ version = "6.2.0"
 dependencies = [
  "arena",
  "arena-container",
+ "arena-host",
  "async-trait",
  "futures",
  "testcontainers-modules",
@@ -305,6 +314,7 @@ version = "6.2.0"
 dependencies = [
  "arena",
  "arena-container",
+ "arena-host",
  "async-trait",
  "futures",
  "futures-timer",
@@ -320,6 +330,7 @@ version = "6.2.0"
 dependencies = [
  "arena",
  "arena-container",
+ "arena-host",
  "async-trait",
  "futures",
  "postgres",
