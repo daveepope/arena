@@ -30,8 +30,8 @@ def test_with_issuer_entra_id_appends_entra_id_provider_entry():
             {"provider": "custom", "jwks_path": "/v1/keys"},
         ),
         (
-            {"rsa_pkcs8_pem": "-----BEGIN PRIVATE KEY-----"},
-            {"provider": "custom", "rsa_pkcs8_pem": "-----BEGIN PRIVATE KEY-----"},
+            {"rsa_pkcs8_pem": "pkcs8-pem-placeholder"},
+            {"provider": "custom", "rsa_pkcs8_pem": "pkcs8-pem-placeholder"},
         ),
     ],
 )

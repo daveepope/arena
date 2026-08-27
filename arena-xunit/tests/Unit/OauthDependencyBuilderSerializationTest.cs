@@ -127,7 +127,7 @@ public class OauthDependencyBuilderSerializationTest
     [Theory]
     [InlineData("/custom", "/custom/keys", null)]
     [InlineData(null, "/v1/keys", null)]
-    [InlineData(null, null, "-----BEGIN PRIVATE KEY-----")]
+    [InlineData(null, null, "pkcs8-pem-placeholder")]
     public void WithIssuer_CustomFields_SerializesOnlySuppliedFields(
         string? issuerPath, string? jwksPath, string? rsaPkcs8Pem)
     {

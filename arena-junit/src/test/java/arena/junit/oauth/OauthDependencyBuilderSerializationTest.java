@@ -122,7 +122,7 @@ final class OauthDependencyBuilderSerializationTest {
     return Stream.of(
         Arguments.of("/custom", "/custom/keys", null),
         Arguments.of(null, "/v1/keys", null),
-        Arguments.of(null, null, "-----BEGIN PRIVATE KEY-----"));
+        Arguments.of(null, null, "pkcs8-pem-placeholder"));
   }
 
   @ParameterizedTest
