@@ -103,6 +103,16 @@ internal static class ArenaBindings
         return json;
     }
 
+    internal static string OauthSignClaims(IntPtr handle, string dependencyIdentifier, uint issuerIndex, string claimsJson)
+    {
+        var ptr = ArenaNativeLib.arena_oauth_sign_claims(handle, dependencyIdentifier, issuerIndex, claimsJson, out var errOut);
+        if (ptr == IntPtr.Zero)
+            throw TakeErr(errOut, "arena_oauth_sign_claims failed");
+        var jwt = ArenaNativeStrings.FromUtf8Ptr(ptr);
+        ArenaNativeLib.arena_free_string(ptr);
+        return jwt;
+    }
+
     private static ArenaBindingError TakeErr(IntPtr errOut, string operation)
     {
         if (errOut != IntPtr.Zero)

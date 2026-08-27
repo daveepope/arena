@@ -32,6 +32,13 @@ interface ArenaNativeLib extends Library {
 
   Pointer arena_oauth_loopback_tls_pem_json(PointerByReference errOut);
 
+  Pointer arena_oauth_sign_claims(
+      Pointer handle,
+      String dependencyIdentifier,
+      int issuerIndex,
+      String claimsJson,
+      PointerByReference errOut);
+
   Pointer arena_match_playbook_run(Pointer arena, String identifier, PointerByReference errOut);
 
   int arena_active_playbook_drop(Pointer handle, PointerByReference errOut);

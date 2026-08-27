@@ -3,13 +3,44 @@ use std::net::{IpAddr, Ipv4Addr};
 use arena::dependency::RunnableDependency;
 
 use crate::keys::RsaKeyPair;
-use crate::oauth_common::OauthListenAddr;
+use crate::oauth_common::{IssuerRegistration, OauthListenAddr};
 use crate::oauth_dependency::{OauthDependency, OauthTlsPlan};
+use crate::provider::Provider;
+
+const DEFAULT_JWKS_PATH: &str = "/.well-known/jwks.json";
 
 enum InboundTransport {
     Http,
     EphemeralTls,
     CustomTls { cert_pem: String, key_pem: String },
+}
+
+#[derive(Default)]
+pub struct IssuerConfig {
+    issuer_path: Option<String>,
+    jwks_path: Option<String>,
+    rsa_pkcs8_pem: Option<String>,
+}
+
+impl IssuerConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_issuer_path(mut self, path: impl Into<String>) -> Self {
+        self.issuer_path = Some(path.into());
+        self
+    }
+
+    pub fn with_jwks_path(mut self, path: impl Into<String>) -> Self {
+        self.jwks_path = Some(path.into());
+        self
+    }
+
+    pub fn with_rsa_pkcs8_pem(mut self, pem: impl Into<String>) -> Self {
+        self.rsa_pkcs8_pem = Some(pem.into());
+        self
+    }
 }
 
 pub struct OauthDependencyBuilder {
@@ -18,6 +49,7 @@ pub struct OauthDependencyBuilder {
     port: Option<u16>,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
     rsa_pkcs8_pem: Option<String>,
+    issuers: Vec<IssuerConfig>,
     scopes_supported: Vec<String>,
     token_ttl_secs: Option<u64>,
     inbound_transport: InboundTransport,
@@ -34,6 +66,7 @@ impl OauthDependencyBuilder {
             port: None,
             dependencies: None,
             rsa_pkcs8_pem: None,
+            issuers: Vec::new(),
             scopes_supported: vec!["openid".into(), "profile".into()],
             token_ttl_secs: None,
             inbound_transport: InboundTransport::EphemeralTls,
@@ -79,6 +112,18 @@ impl OauthDependencyBuilder {
         self
     }
 
+    pub fn with_issuer(mut self, config: IssuerConfig) -> Self {
+        self.issuers.push(config);
+        self
+    }
+
+    pub fn with_provider(self, provider: Provider) -> Self {
+        let config = IssuerConfig::new()
+            .with_issuer_path(provider.issuer_path())
+            .with_jwks_path(provider.jwks_path());
+        self.with_issuer(config)
+    }
+
     pub fn with_scopes_supported(mut self, scopes: Vec<String>) -> Self {
         self.scopes_supported = scopes;
         self
@@ -103,12 +148,77 @@ impl OauthDependencyBuilder {
     }
 
     pub fn build(self) -> OauthDependency {
-        let keys = match self.rsa_pkcs8_pem {
-            Some(pem) => RsaKeyPair::from_pkcs8_pem(&pem, RsaKeyPair::DEFAULT_KID)
-                .unwrap_or_else(|e| panic!("[Oauth-{}] invalid PKCS#8 PEM: {e}", self.identifier)),
-            None => RsaKeyPair::generate()
-                .unwrap_or_else(|e| panic!("[Oauth-{}] RSA generate failed: {e}", self.identifier)),
+        if !self.issuers.is_empty() && self.rsa_pkcs8_pem.is_some() {
+            panic!(
+                "[Oauth-{}] with_rsa_pkcs8_pem and with_issuer/with_provider are mutually exclusive; set the key per issuer",
+                self.identifier
+            );
+        }
+
+        let issuers: Vec<IssuerRegistration> = if self.issuers.is_empty() {
+            let keys = match &self.rsa_pkcs8_pem {
+                Some(pem) => RsaKeyPair::from_pkcs8_pem(pem, RsaKeyPair::DEFAULT_KID)
+                    .unwrap_or_else(|e| {
+                        panic!("[Oauth-{}] invalid PKCS#8 PEM: {e}", self.identifier)
+                    }),
+                None => RsaKeyPair::generate().unwrap_or_else(|e| {
+                    panic!("[Oauth-{}] RSA generate failed: {e}", self.identifier)
+                }),
+            };
+            vec![IssuerRegistration {
+                issuer_path: String::new(),
+                jwks_path: DEFAULT_JWKS_PATH.to_string(),
+                keys,
+            }]
+        } else {
+            let mut seen_jwks_paths: std::collections::HashSet<String> =
+                crate::oauth_https::RESERVED_PATHS
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect();
+            let mut seen_issuer_paths = std::collections::HashSet::new();
+            self.issuers
+                .into_iter()
+                .enumerate()
+                .map(|(i, config)| {
+                    let issuer_path = config.issuer_path.unwrap_or_default();
+                    if !seen_issuer_paths.insert(issuer_path.clone()) {
+                        panic!(
+                            "[Oauth-{}] duplicate issuer path registered: {issuer_path:?}",
+                            self.identifier
+                        );
+                    }
+                    let jwks_path = config.jwks_path.unwrap_or_else(|| {
+                        if issuer_path.is_empty() {
+                            DEFAULT_JWKS_PATH.to_string()
+                        } else {
+                            format!("{issuer_path}{DEFAULT_JWKS_PATH}")
+                        }
+                    });
+                    if !seen_jwks_paths.insert(jwks_path.clone()) {
+                        panic!(
+                            "[Oauth-{}] duplicate JWKS path registered: {jwks_path}",
+                            self.identifier
+                        );
+                    }
+                    let kid = format!("arena-oauth-{}", i + 1);
+                    let keys = match &config.rsa_pkcs8_pem {
+                        Some(pem) => RsaKeyPair::from_pkcs8_pem(pem, kid).unwrap_or_else(|e| {
+                            panic!("[Oauth-{}] invalid PKCS#8 PEM: {e}", self.identifier)
+                        }),
+                        None => RsaKeyPair::generate_with_kid(kid).unwrap_or_else(|e| {
+                            panic!("[Oauth-{}] RSA generate failed: {e}", self.identifier)
+                        }),
+                    };
+                    IssuerRegistration {
+                        issuer_path,
+                        jwks_path,
+                        keys,
+                    }
+                })
+                .collect()
         };
+
         let port = self.port.unwrap_or(0);
         let listen_ip = self.listen_ip.unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST));
         let token_ttl_secs = self.token_ttl_secs.unwrap_or(Self::DEFAULT_TOKEN_TTL_SECS);
@@ -127,7 +237,7 @@ impl OauthDependencyBuilder {
         };
         OauthDependency::new(
             arena_container::identifier::build("arena-oauth", &self.identifier),
-            keys,
+            issuers,
             OauthListenAddr {
                 ip: listen_ip,
                 port,

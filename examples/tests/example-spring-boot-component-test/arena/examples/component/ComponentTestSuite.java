@@ -107,6 +107,8 @@ public final class ComponentTestSuite {
   private static final String TEMPORAL_TARGET = "127.0.0.1:" + TEMPORAL_GRPC_PORT;
   private static final int OAUTH_PORT = RT.oauthPort;
   private static final String OAUTH_ISSUER = RT.oauthIssuer;
+  private static final String OAUTH_COGNITO_POOL_ID = "us-east-1_exampleUsers";
+  private static final String OAUTH_PROVIDER_ISSUER = OAUTH_ISSUER + "/" + OAUTH_COGNITO_POOL_ID;
   private static final String POSTGRES_DB_NAME = "readings_db";
   private static final String POSTGRES_DB_USER = "readings_user";
   private static final String POSTGRES_DB_PASS = "readings_password";
@@ -145,6 +147,7 @@ public final class ComponentTestSuite {
           .withListenIp("0.0.0.0")
           .withServerTlsPem(OAUTH_PEM.certificatePem(), OAUTH_PEM.privateKeyPem())
           .withMetadataBaseUrl(OAUTH_ISSUER)
+          .withIssuerCognito(OAUTH_COGNITO_POOL_ID)
           .build();
 
   @ArenaDependency(logs = false)
@@ -345,7 +348,7 @@ public final class ComponentTestSuite {
         .withEnvVar("TEMPORAL_TARGET", TEMPORAL_TARGET)
         .withEnvVar("SMTP_HOST", "127.0.0.1")
         .withEnvVar("SMTP_PORT", String.valueOf(SMTP_HOST_PORT))
-        .withEnvVar("OAUTH_ISSUER_URL", OAUTH_ISSUER)
+        .withEnvVar("OAUTH_ISSUER_URL", OAUTH_PROVIDER_ISSUER)
         .withEnvVar("OAUTH_TLS_CA_FILE", OAUTH_CA_PATH)
         .withEnvVar("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
         .withEnvVar("AWS_ENDPOINT_URL", LOCALSTACK_ENDPOINT)
@@ -428,6 +431,10 @@ public final class ComponentTestSuite {
 
   static ApiClient apiClient() {
     return new ApiClient("http://127.0.0.1:" + WEB_APP_PORT, accessToken, MAPPER);
+  }
+
+  static String webAppBaseUrl() {
+    return "http://127.0.0.1:" + WEB_APP_PORT;
   }
 
   static ApiClient apiClient2() {

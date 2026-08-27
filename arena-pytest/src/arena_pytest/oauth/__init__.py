@@ -53,6 +53,38 @@ class OauthDependencyBuilder:
         self._children.extend(children)
         return self
 
+    def with_issuer_cognito(self, pool_id: str) -> "OauthDependencyBuilder":
+        self._config.setdefault("issuers", []).append(
+            {"provider": "cognito", "pool_id": pool_id}
+        )
+        return self
+
+    def with_issuer_okta(self) -> "OauthDependencyBuilder":
+        self._config.setdefault("issuers", []).append({"provider": "okta"})
+        return self
+
+    def with_issuer_entra_id(self, tenant_id: str) -> "OauthDependencyBuilder":
+        self._config.setdefault("issuers", []).append(
+            {"provider": "entra_id", "tenant_id": tenant_id}
+        )
+        return self
+
+    def with_issuer(
+        self,
+        issuer_path: Optional[str] = None,
+        jwks_path: Optional[str] = None,
+        rsa_pkcs8_pem: Optional[str] = None,
+    ) -> "OauthDependencyBuilder":
+        entry: Dict[str, Any] = {"provider": "custom"}
+        if issuer_path is not None:
+            entry["issuer_path"] = issuer_path
+        if jwks_path is not None:
+            entry["jwks_path"] = jwks_path
+        if rsa_pkcs8_pem is not None:
+            entry["rsa_pkcs8_pem"] = rsa_pkcs8_pem
+        self._config.setdefault("issuers", []).append(entry)
+        return self
+
     def build(self) -> "OauthDependency":
         cfg = dict(self._config)
         if not str(cfg.get("metadata_base_url") or "").strip():

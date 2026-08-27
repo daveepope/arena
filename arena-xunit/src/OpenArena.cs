@@ -44,6 +44,12 @@ public sealed class OpenArena : IDisposable
         ArenaBindings.HardReset(Handle, dependencyIdentifier);
     }
 
+    public string OauthSignClaims(string dependencyIdentifier, uint issuerIndex, string claimsJson)
+    {
+        ThrowIfDisposed();
+        return ArenaBindings.OauthSignClaims(Handle, dependencyIdentifier, issuerIndex, claimsJson);
+    }
+
     public Playbook.IPlaybook? GetPlaybook(Type playbookType)
     {
         ThrowIfDisposed();

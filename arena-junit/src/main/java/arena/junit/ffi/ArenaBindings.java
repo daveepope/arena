@@ -186,6 +186,22 @@ public final class ArenaBindings {
     }
   }
 
+  public static String oauthSignClaims(
+      Pointer arena, String dependencyIdentifier, int issuerIndex, String claimsJson) {
+    ArenaNativeLib lib = lib();
+    PointerByReference err = new PointerByReference();
+    Pointer raw = lib.arena_oauth_sign_claims(arena, dependencyIdentifier, issuerIndex, claimsJson, err);
+    if (raw == null || Pointer.nativeValue(raw) == 0) {
+      String msg = takeErr(err);
+      throw new ArenaBindingError(msg != null ? msg : "arena_oauth_sign_claims returned null");
+    }
+    try {
+      return raw.getString(0, StandardCharsets.UTF_8.name());
+    } finally {
+      lib.arena_free_string(raw);
+    }
+  }
+
   public static Pointer matchPlaybookRun(Pointer arena, String identifier) {
     ArenaNativeLib lib = lib();
     PointerByReference err = new PointerByReference();

@@ -36,6 +36,8 @@ internal static class ArenaNativeLib
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate IntPtr arena_oauth_loopback_tls_pem_json_fn(out IntPtr errOut);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate IntPtr arena_oauth_sign_claims_fn(IntPtr handle, string dependencyIdentifier, uint issuerIndex, string claimsJson, out IntPtr errOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate IntPtr arena_match_playbook_run_fn(IntPtr arena, string identifier, out IntPtr errOut);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_active_playbook_drop_fn(IntPtr handle, out IntPtr errOut);
@@ -63,6 +65,7 @@ internal static class ArenaNativeLib
     private static arena_dispatcher_component_allow_json_set_fn? _arena_dispatcher_component_allow_json_set;
     private static arena_free_string_fn? _arena_free_string;
     private static arena_oauth_loopback_tls_pem_json_fn? _arena_oauth_loopback_tls_pem_json;
+    private static arena_oauth_sign_claims_fn? _arena_oauth_sign_claims;
     private static arena_match_playbook_run_fn? _arena_match_playbook_run;
     private static arena_active_playbook_drop_fn? _arena_active_playbook_drop;
     private static arena_http_playbook_open_fn? _arena_http_playbook_open;
@@ -116,6 +119,7 @@ internal static class ArenaNativeLib
             LoadFunction(out _arena_dispatcher_component_allow_json_set, "arena_dispatcher_component_allow_json_set");
             LoadFunction(out _arena_free_string, "arena_free_string");
             LoadFunction(out _arena_oauth_loopback_tls_pem_json, "arena_oauth_loopback_tls_pem_json");
+            LoadFunction(out _arena_oauth_sign_claims, "arena_oauth_sign_claims");
             LoadFunction(out _arena_match_playbook_run, "arena_match_playbook_run");
             LoadFunction(out _arena_active_playbook_drop, "arena_active_playbook_drop");
             LoadFunction(out _arena_http_playbook_open, "arena_http_playbook_open");
@@ -233,6 +237,9 @@ internal static class ArenaNativeLib
 
     internal static IntPtr arena_oauth_loopback_tls_pem_json(out IntPtr errOut) =>
         _arena_oauth_loopback_tls_pem_json!.Invoke(out errOut);
+
+    internal static IntPtr arena_oauth_sign_claims(IntPtr handle, string dependencyIdentifier, uint issuerIndex, string claimsJson, out IntPtr errOut) =>
+        _arena_oauth_sign_claims!.Invoke(handle, dependencyIdentifier, issuerIndex, claimsJson, out errOut);
 
     internal static IntPtr arena_match_playbook_run(IntPtr arena, string identifier, out IntPtr errOut) =>
         _arena_match_playbook_run!.Invoke(arena, identifier, out errOut);

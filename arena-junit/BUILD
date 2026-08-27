@@ -539,6 +539,7 @@ java_test(
     ],
     runtime_deps = [
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_params",
         "@arena_java_maven//:org_junit_platform_junit_platform_console",
         "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
     ],
@@ -546,6 +547,7 @@ java_test(
         ":arena_junit_lib",
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_params",
     ],
 )
 

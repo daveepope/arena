@@ -3,6 +3,8 @@ use std::net::{IpAddr, Ipv4Addr};
 use arena::Dependency;
 use serde::Deserialize;
 
+use crate::builder::IssuerConfig;
+use crate::provider::Provider;
 use crate::OauthDependency;
 
 #[derive(Debug, Deserialize, Default, Clone, Copy, PartialEq, Eq)]
@@ -11,6 +13,26 @@ pub enum OauthFfiInboundTransport {
     #[default]
     Tls,
     Http,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(tag = "provider", rename_all = "snake_case")]
+pub enum OauthFfiIssuerConfig {
+    Cognito {
+        pool_id: String,
+    },
+    Okta,
+    EntraId {
+        tenant_id: String,
+    },
+    Custom {
+        #[serde(default)]
+        issuer_path: Option<String>,
+        #[serde(default)]
+        jwks_path: Option<String>,
+        #[serde(default)]
+        rsa_pkcs8_pem: Option<String>,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -28,6 +50,8 @@ pub struct OauthFfiDependencyConfig {
     pub metadata_base_url: Option<String>,
     #[serde(default)]
     pub transport: Option<OauthFfiInboundTransport>,
+    #[serde(default)]
+    pub issuers: Vec<OauthFfiIssuerConfig>,
 }
 
 pub fn build_oauth_dependency_from_config(
@@ -68,6 +92,36 @@ pub fn build_oauth_dependency_from_config(
         if !t.is_empty() {
             builder = builder.with_metadata_base_url(t.to_string());
         }
+    }
+    for issuer in &config.issuers {
+        builder = match issuer {
+            OauthFfiIssuerConfig::Cognito { pool_id } => builder.with_provider(Provider::Cognito {
+                pool_id: pool_id.clone(),
+            }),
+            OauthFfiIssuerConfig::Okta => builder.with_provider(Provider::Okta),
+            OauthFfiIssuerConfig::EntraId { tenant_id } => {
+                builder.with_provider(Provider::EntraId {
+                    tenant_id: tenant_id.clone(),
+                })
+            }
+            OauthFfiIssuerConfig::Custom {
+                issuer_path,
+                jwks_path,
+                rsa_pkcs8_pem,
+            } => {
+                let mut issuer_config = IssuerConfig::new();
+                if let Some(p) = issuer_path {
+                    issuer_config = issuer_config.with_issuer_path(p.clone());
+                }
+                if let Some(p) = jwks_path {
+                    issuer_config = issuer_config.with_jwks_path(p.clone());
+                }
+                if let Some(p) = rsa_pkcs8_pem {
+                    issuer_config = issuer_config.with_rsa_pkcs8_pem(p.clone());
+                }
+                builder.with_issuer(issuer_config)
+            }
+        };
     }
     Ok(Box::new(builder.build()))
 }

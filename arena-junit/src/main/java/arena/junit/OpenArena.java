@@ -77,4 +77,8 @@ public final class OpenArena {
   public ArenaStatus hardReset(String dependencyIdentifier) {
     return ArenaBindings.hardReset(handle, dependencyIdentifier);
   }
+
+  public String oauthSignClaims(String dependencyIdentifier, int issuerIndex, String claimsJson) {
+    return ArenaBindings.oauthSignClaims(handle, dependencyIdentifier, issuerIndex, claimsJson);
+  }
 }

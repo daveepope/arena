@@ -115,6 +115,17 @@ pub async fn consume_reading_created_event(
     found.ok_or_else(|| "did not receive expected ReadingCreatedEvent before timeout".to_string())
 }
 
+pub async fn get_readings_without_token(port: u16) -> u16 {
+    let url = format!("http://127.0.0.1:{}/readings", port);
+    oauth_http_client()
+        .get(&url)
+        .send()
+        .await
+        .expect("GET /readings failed to send")
+        .status()
+        .as_u16()
+}
+
 pub async fn post_reading_raw(
     port: u16,
     user_name: &str,

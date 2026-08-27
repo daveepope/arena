@@ -466,6 +466,15 @@ def load_ffi() -> Optional[ArenaNativeLib]:
     lib.arena_oauth_loopback_tls_pem_json.argtypes = [ctypes.POINTER(ctypes.c_void_p)]
     lib.arena_oauth_loopback_tls_pem_json.restype = ctypes.c_void_p
 
+    lib.arena_oauth_sign_claims.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_char_p,
+        ctypes.c_uint32,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    lib.arena_oauth_sign_claims.restype = ctypes.c_void_p
+
     lib.arena_match_playbook_run.argtypes = [
         ctypes.c_void_p,
         ctypes.c_char_p,
@@ -583,6 +592,32 @@ def soft_reset(ffi: ArenaNativeLib, handle: int, dependency_identifier: str) -> 
 
 def hard_reset(ffi: ArenaNativeLib, handle: int, dependency_identifier: str) -> None:
     _reset(ffi, ffi.lib.arena_hard_reset, handle, dependency_identifier)
+
+
+def oauth_sign_claims(
+    ffi: ArenaNativeLib,
+    handle: int,
+    dependency_identifier: str,
+    issuer_index: int,
+    claims_json: str,
+) -> str:
+    if not handle:
+        raise ArenaBindingError("oauth_sign_claims called on closed arena")
+    err = ctypes.c_void_p()
+    raw = ffi.lib.arena_oauth_sign_claims(
+        handle,
+        dependency_identifier.encode("utf-8"),
+        issuer_index,
+        claims_json.encode("utf-8"),
+        ctypes.byref(err),
+    )
+    if not raw:
+        msg = _take_err(err, ffi) or "arena_oauth_sign_claims returned null"
+        raise ArenaBindingError(msg)
+    try:
+        return ctypes.string_at(raw).decode("utf-8")
+    finally:
+        ffi.lib.arena_free_string(raw)
 
 
 def match_playbook_run(

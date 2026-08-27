@@ -75,6 +75,25 @@ rust_test(
 )
 
 rust_test(
+    name = "ffi_oauth_sign_claims_test",
+    srcs = ["tests/component/oauth/oauth_sign_claims_test.rs"],
+    size = "small",
+    edition = "2021",
+    tags = ["component_test"],
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        "//arena",
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
     name = "ffi_matches_test",
     srcs = ["tests/unit/matches_test.rs"],
     size = "small",

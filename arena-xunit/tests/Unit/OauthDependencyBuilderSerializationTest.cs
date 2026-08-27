@@ -91,4 +91,63 @@ public class OauthDependencyBuilderSerializationTest
         var dep = new OauthDependencyBuilder("test").Build();
         Assert.StartsWith("arena-oauth-", dep.Identifier);
     }
+
+    [Fact]
+    public void WithIssuerCognito_PoolId_AppendsCognitoProviderEntry()
+    {
+        var dep = new OauthDependencyBuilder("test").WithIssuerCognito("us-east-1_abc123").Build();
+        var obj = JObject.Parse(dep.ForFfi());
+        var issuers = (JArray)obj["issuers"]!;
+        Assert.Single(issuers);
+        Assert.Equal("cognito", issuers[0]["provider"]);
+        Assert.Equal("us-east-1_abc123", issuers[0]["pool_id"]);
+    }
+
+    [Fact]
+    public void WithIssuerOkta_AppendsOktaProviderEntry()
+    {
+        var dep = new OauthDependencyBuilder("test").WithIssuerOkta().Build();
+        var obj = JObject.Parse(dep.ForFfi());
+        var issuers = (JArray)obj["issuers"]!;
+        Assert.Single(issuers);
+        Assert.Equal("okta", issuers[0]["provider"]);
+    }
+
+    [Fact]
+    public void WithIssuerEntraId_TenantId_AppendsEntraIdProviderEntry()
+    {
+        var dep = new OauthDependencyBuilder("test").WithIssuerEntraId("my-tenant").Build();
+        var obj = JObject.Parse(dep.ForFfi());
+        var issuers = (JArray)obj["issuers"]!;
+        Assert.Single(issuers);
+        Assert.Equal("entra_id", issuers[0]["provider"]);
+        Assert.Equal("my-tenant", issuers[0]["tenant_id"]);
+    }
+
+    [Theory]
+    [InlineData("/custom", "/custom/keys", null)]
+    [InlineData(null, "/v1/keys", null)]
+    [InlineData(null, null, "-----BEGIN PRIVATE KEY-----")]
+    public void WithIssuer_CustomFields_SerializesOnlySuppliedFields(
+        string? issuerPath, string? jwksPath, string? rsaPkcs8Pem)
+    {
+        var dep = new OauthDependencyBuilder("test").WithIssuer(issuerPath, jwksPath, rsaPkcs8Pem).Build();
+        var obj = JObject.Parse(dep.ForFfi());
+        var entry = (JObject)((JArray)obj["issuers"]!)[0];
+        Assert.Equal("custom", entry["provider"]);
+        Assert.Equal(issuerPath != null, entry.ContainsKey("issuer_path"));
+        Assert.Equal(jwksPath != null, entry.ContainsKey("jwks_path"));
+        Assert.Equal(rsaPkcs8Pem != null, entry.ContainsKey("rsa_pkcs8_pem"));
+    }
+
+    [Fact]
+    public void WithIssuerCalls_MultipleProviders_AccumulateInOrder()
+    {
+        var dep = new OauthDependencyBuilder("test").WithIssuerCognito("pool-a").WithIssuerOkta().Build();
+        var obj = JObject.Parse(dep.ForFfi());
+        var issuers = (JArray)obj["issuers"]!;
+        Assert.Equal(2, issuers.Count);
+        Assert.Equal("cognito", issuers[0]["provider"]);
+        Assert.Equal("okta", issuers[1]["provider"]);
+    }
 }

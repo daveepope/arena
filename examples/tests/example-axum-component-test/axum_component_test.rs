@@ -14,7 +14,10 @@ use crate::arena::{
     axum_component_runtime, exec_web_app_port,
     shared_arena, KAFKA_ID, SCENARIO_LOCK,
 };
-use crate::http::{consume_reading_created_event, create_reading, get_readings, post_reading_raw};
+use crate::http::{
+    consume_reading_created_event, create_reading, get_readings, get_readings_without_token,
+    post_reading_raw,
+};
 
 const CONSUME_READING_CREATED_EVENT_TIMEOUT_MS: u64 = 5000;
 
@@ -87,6 +90,18 @@ fn create_reading_publishes_event_and_lists_via_http() {
             .expect("should find newly created reading");
         assert_eq!(found.user_name, "Readings API User");
         assert_eq!(found.value, 77);
+    });
+}
+
+#[test]
+fn get_readings_without_bearer_token_is_rejected() {
+    axum_component_runtime().block_on(async {
+        let _arena = shared_arena().await;
+        let status = get_readings_without_token(exec_web_app_port()).await;
+        assert_eq!(
+            status, 401,
+            "the resource server must reject a request with no bearer token, proving it actually validates against the Cognito-shaped issuer's JWKS rather than accepting requests unconditionally"
+        );
     });
 }
 

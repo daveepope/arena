@@ -5,6 +5,17 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.2.0]
+
+### Added
+
+- `arena-oauth`: multi-issuer support on `OauthDependency` via `with_issuer`/`with_provider` (#218)
+- `arena-oauth`: `Provider` presets for Cognito, Okta, and Entra ID (#218)
+- `arena-oauth`: `sign_claims`/`signing_key_pem`/`issuer_at`/`issuer_count` on `OauthDependency` (#218)
+- `arena-ffi`: `arena_oauth_sign_claims` (#218)
+- `arena-pytest`, `arena-junit`, `arena-xunit`: `with_issuer_cognito`/`with_issuer_okta`/`with_issuer_entra_id`/`with_issuer`/`sign_claims` bindings (#218)
+- Example apps (Rust, Spring Boot, ASP.NET): Cognito-shaped OAuth provider in test fixtures (#218)
+
 ## [6.1.0]
 
 ### Added

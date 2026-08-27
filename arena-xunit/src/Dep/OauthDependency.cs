@@ -17,11 +17,13 @@ public sealed class OauthDependency : IArenaDependency
     [JsonProperty("server_tls_certificate_pem")] public string? ServerTlsCert { get; }
     [JsonProperty("server_tls_private_key_pem")] public string? ServerTlsKey { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
+    [JsonProperty("issuers")] public List<JObject>? Issuers { get; }
 
     private readonly IReadOnlyList<IArenaDependency> _children;
 
     internal OauthDependency(string identifier, int port, string? listenIp, string? metadataBaseUrl,
-        string? transport, string? serverTlsCert, string? serverTlsKey, IReadOnlyList<IArenaDependency> children)
+        string? transport, string? serverTlsCert, string? serverTlsKey, IReadOnlyList<IArenaDependency> children,
+        List<JObject>? issuers)
     {
         Identifier = identifier;
         Port = port;
@@ -31,6 +33,7 @@ public sealed class OauthDependency : IArenaDependency
         ServerTlsCert = serverTlsCert;
         ServerTlsKey = serverTlsKey;
         _children = children;
+        Issuers = issuers;
     }
 
     public string ForFfi()
@@ -63,6 +66,7 @@ public sealed class OauthDependencyBuilder
     private string? _serverTlsCert;
     private string? _serverTlsKey;
     private readonly List<IArenaDependency> _children = new();
+    private readonly List<JObject> _issuers = new();
 
     public OauthDependencyBuilder(string name)
     {
@@ -107,10 +111,42 @@ public sealed class OauthDependencyBuilder
         return this;
     }
 
+    public OauthDependencyBuilder WithIssuerCognito(string poolId)
+    {
+        _issuers.Add(new JObject { ["provider"] = "cognito", ["pool_id"] = poolId });
+        return this;
+    }
+
+    public OauthDependencyBuilder WithIssuerOkta()
+    {
+        _issuers.Add(new JObject { ["provider"] = "okta" });
+        return this;
+    }
+
+    public OauthDependencyBuilder WithIssuerEntraId(string tenantId)
+    {
+        _issuers.Add(new JObject { ["provider"] = "entra_id", ["tenant_id"] = tenantId });
+        return this;
+    }
+
+    public OauthDependencyBuilder WithIssuer(string? issuerPath = null, string? jwksPath = null, string? rsaPkcs8Pem = null)
+    {
+        var entry = new JObject { ["provider"] = "custom" };
+        if (issuerPath != null)
+            entry["issuer_path"] = issuerPath;
+        if (jwksPath != null)
+            entry["jwks_path"] = jwksPath;
+        if (rsaPkcs8Pem != null)
+            entry["rsa_pkcs8_pem"] = rsaPkcs8Pem;
+        _issuers.Add(entry);
+        return this;
+    }
+
     public OauthDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-oauth", _name);
         var metadataBaseUrl = string.IsNullOrWhiteSpace(_metadataBaseUrl) ? OauthIssuer : _metadataBaseUrl;
-        return new OauthDependency(identifier, _port, _listenIp, metadataBaseUrl, _transport, _serverTlsCert, _serverTlsKey, _children);
+        var issuers = _issuers.Count > 0 ? _issuers : null;
+        return new OauthDependency(identifier, _port, _listenIp, metadataBaseUrl, _transport, _serverTlsCert, _serverTlsKey, _children, issuers);
     }
 }

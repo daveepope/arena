@@ -19,6 +19,10 @@ name = "ffi_containerized_component_test"
 path = "tests/component/containerized/containerized_component_test.rs"
 
 [[test]]
+name = "ffi_oauth_sign_claims_test"
+path = "tests/component/oauth/oauth_sign_claims_test.rs"
+
+[[test]]
 name = "ffi_matches_test"
 path = "tests/unit/matches_test.rs"
 

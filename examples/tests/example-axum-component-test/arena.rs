@@ -4,7 +4,7 @@ use arena_executable_component::executable_component::ExecutableComponent;
 use arena_http::HttpDependency;
 use arena_kafka::{KafkaDependency, KafkaFlavor};
 use arena_mssql::MssqlDependency;
-use arena_oauth::OauthDependency;
+use arena_oauth::{OauthDependency, Provider};
 use arena_postgres::PostgresDependency;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
@@ -19,9 +19,12 @@ pub static OAUTH_ID: OnceLock<String> = OnceLock::new();
 
 static OAUTH_SERVER_TLS_CERT_PEM: OnceLock<String> = OnceLock::new();
 
+pub const OAUTH_COGNITO_POOL_ID: &str = "us-east-1_exampleUsers";
+
 pub struct TestRuntime {
     pub oauth_port: u16,
     pub oauth_issuer: String,
+    pub oauth_provider_issuer: String,
     pub postgres_port: u16,
     pub kafka_port: u16,
     pub calibration_http_port: u16,
@@ -55,8 +58,11 @@ pub fn test_runtime() -> &'static TestRuntime {
     TEST_RUNTIME.get_or_init(|| {
         let oauth_port = ephemeral_tcp_port();
         let run_suffix = run_suffix();
+        let oauth_issuer = format!("https://127.0.0.1:{oauth_port}");
+        let oauth_provider_issuer = format!("{oauth_issuer}/{OAUTH_COGNITO_POOL_ID}");
         TestRuntime {
-            oauth_issuer: format!("https://127.0.0.1:{oauth_port}"),
+            oauth_issuer,
+            oauth_provider_issuer,
             oauth_port,
             postgres_port: ephemeral_tcp_port(),
             kafka_port: ephemeral_tcp_port(),
@@ -140,6 +146,9 @@ pub fn setup_dependencies() -> Vec<Dependency> {
         .with_listen_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
         .with_port(rt.oauth_port)
         .with_metadata_base_url(&rt.oauth_issuer)
+        .with_provider(Provider::Cognito {
+            pool_id: OAUTH_COGNITO_POOL_ID.to_string(),
+        })
         .build();
     OAUTH_SERVER_TLS_CERT_PEM
         .set(
@@ -200,7 +209,7 @@ pub fn setup_exec_component() -> Component {
                 rt.mssql_port, MSSQL_DB_NAME, MSSQL_DB_USER, MSSQL_DB_PASS
             ),
         )
-        .with_runtime_arg("oauth_issuer_url", rt.oauth_issuer.clone())
+        .with_runtime_arg("oauth_issuer_url", rt.oauth_provider_issuer.clone())
         .with_readiness_check_timeout(HttpReadinessCheck::new(), healthcheck_url, 30_000);
 
     if !is_bazel {

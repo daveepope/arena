@@ -36,6 +36,8 @@ public sealed class ExampleFixture : ArenaCollectionFixture
     public static int SmtpPort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int SmtpUiPort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int OauthPort { get; } = EphemeralTestRuntime.AllocatePort();
+    private const string OauthCognitoPoolId = "us-east-1_exampleUsers";
+    public static string OauthProviderIssuer { get; } = $"https://127.0.0.1:{OauthPort}/{OauthCognitoPoolId}";
 
     [ArenaLogger(Level = ArenaLogLevel.Debug)]
     private static readonly ILogger Log =
@@ -116,6 +118,7 @@ public sealed class ExampleFixture : ArenaCollectionFixture
             .WithPort(OauthPort)
             .WithServerTlsPem(OauthPem.CertificatePem, OauthPem.PrivateKeyPem)
             .WithMetadataBaseUrl($"https://127.0.0.1:{OauthPort}")
+            .WithIssuerCognito(OauthCognitoPoolId)
             .Build();
 
     [ArenaDependency]
@@ -194,7 +197,7 @@ public sealed class ExampleFixture : ArenaCollectionFixture
             .WithEnvVar("EVENT_SOURCE", EventSource)
             .WithEnvVar("OAUTH_URL", $"https://127.0.0.1:{OauthPort}")
             .WithEnvVar("OAUTH_ISSUER", $"https://127.0.0.1:{OauthPort}")
-            .WithEnvVar("OAUTH_ISSUER_URL", $"https://127.0.0.1:{OauthPort}")
+            .WithEnvVar("OAUTH_ISSUER_URL", OauthProviderIssuer)
             .WithEnvVar("OAUTH_TLS_CA_FILE", ResolveOauthCaCertFilePath())
             .WithEnvVar("OAUTH_CLIENT_ID", "test-client")
             .WithEnvVar("OAUTH_CLIENT_SECRET", "test-secret")

@@ -9,6 +9,11 @@ import arena.examples.playbooks.SeedValidationReadingPlaybook;
 import arena.junit.Arena;
 import arena.junit.Playbook;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 @Arena(ComponentTestSuite.class)
@@ -59,5 +64,24 @@ final class ReadingsCrudComponentTest {
   @Playbook(SeedValidationReadingPlaybook.class)
   void seedValidationReadingPlaybook_rowVisibleBeforeTestBody() throws Exception {
     assertEquals(1, ComponentTestSuite.seededValidationRowCount());
+  }
+
+  @Test
+  void getReadingsWithoutBearerToken_isRejected() throws Exception {
+    HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    HttpResponse<String> response =
+        client.send(
+            HttpRequest.newBuilder()
+                .uri(URI.create(ComponentTestSuite.webAppBaseUrl() + "/readings"))
+                .GET()
+                .timeout(Duration.ofSeconds(10))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertEquals(
+        401,
+        response.statusCode(),
+        "the resource server must reject a request with no bearer token, proving it actually "
+            + "validates against the Cognito-shaped issuer's JWKS rather than accepting requests "
+            + "unconditionally");
   }
 }
