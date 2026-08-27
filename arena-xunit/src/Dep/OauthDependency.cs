@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using ArenaDotnet.Xunit;
+using ArenaDotnet.Xunit.Ffi;
 using ArenaDotnet.Xunit.Support;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -39,6 +41,12 @@ public sealed class OauthDependency : IArenaDependency
     public string ForFfi()
     {
         return ArenaJson.Serialize(this);
+    }
+
+    public string SignClaims(OpenArena arena, uint issuerIndex, string claimsJson)
+    {
+        arena.ThrowIfDisposed();
+        return ArenaBindings.OauthSignClaims(arena.Handle, Identifier, issuerIndex, claimsJson);
     }
 }
 

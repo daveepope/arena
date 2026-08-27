@@ -12,7 +12,6 @@ from arena_pytest.ffi._ffi import (
     close_arena,
     hard_reset as ffi_hard_reset,
     load_ffi,
-    oauth_sign_claims as ffi_oauth_sign_claims,
     soft_reset as ffi_soft_reset,
 )
 from arena_pytest.playbook import (
@@ -45,6 +44,9 @@ class OpenArena:
     def handle(self) -> int:
         return self._handle
 
+    def ffi(self) -> ArenaNativeLib:
+        return self._ffi
+
     async def close(self) -> None:
         if self._handle:
             await asyncio.to_thread(
@@ -64,18 +66,6 @@ class OpenArena:
     async def hard_reset(self, dependency_identifier: str) -> None:
         await asyncio.to_thread(
             ffi_hard_reset, self._ffi, self._handle, dependency_identifier
-        )
-
-    async def oauth_sign_claims(
-        self, dependency_identifier: str, issuer_index: int, claims_json: str
-    ) -> str:
-        return await asyncio.to_thread(
-            ffi_oauth_sign_claims,
-            self._ffi,
-            self._handle,
-            dependency_identifier,
-            issuer_index,
-            claims_json,
         )
 
 

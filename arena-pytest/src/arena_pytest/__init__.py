@@ -84,8 +84,10 @@ from arena_pytest.oauth import (
     OAUTH_ISSUER,
     OauthDependency,
     OauthDependencyBuilder,
+    OauthSigner,
     oauth_issuer_host_is_non_loopback,
     oauth_loopback_tls_pem_pair,
+    oauth_signer_fixture,
 )
 from arena_pytest.dep.oracle import (
     ManagedOraclePlaybook,
@@ -165,6 +167,8 @@ __all__ = [
     "OAUTH_ISSUER",
     "OauthDependency",
     "OauthDependencyBuilder",
+    "OauthSigner",
+    "oauth_signer_fixture",
     "oauth_issuer_host_is_non_loopback",
     "oauth_loopback_tls_pem_pair",
     "ManagedOraclePlaybook",

@@ -552,6 +552,89 @@ java_test(
 )
 
 java_test(
+    name = "arena_junit_oauth_signer_parameter_resolver_component_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/oauth/OauthSignerParameterResolverComponentTest.java"],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.oauth.OauthSignerParameterResolverComponentTest",
+    ],
+    tags = ["component_test"],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "//examples:ephemeral_test_runtime_java",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+    data = [
+        "//arena-ffi:arena_ffi_shared",
+    ],
+    jvm_flags = ["-Djna.nosys=true"],
+)
+
+java_test(
+    name = "arena_junit_oauth_signer_parameter_resolver_unit_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/oauth/OauthSignerParameterResolverUnitTest.java"],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.oauth.OauthSignerParameterResolverUnitTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+)
+
+java_test(
+    name = "arena_junit_oauth_signer_unit_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/oauth/OauthSignerUnitTest.java"],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.oauth.OauthSignerUnitTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+)
+
+java_test(
     name = "arena_junit_oauth_issuer_hosts_unit_test",
     size = "small",
     srcs = ["src/test/java/arena/junit/oauth/OauthIssuerHostsUnitTest.java"],

@@ -1,11 +1,18 @@
+import asyncio
 import ctypes
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 from urllib.parse import urlparse
 
+import pytest
+
+from arena_pytest.ffi._ffi import oauth_sign_claims as _ffi_oauth_sign_claims
 from arena_pytest.ffi._ffi_children import children_for_ffi
 from arena_pytest.support._identifier import build as _build_identifier
+
+if TYPE_CHECKING:
+    from arena_pytest.arena import OpenArena
 
 DEFAULT_OAUTH_PORT = 9444
 _oauth_env = os.environ.get("ARENA_PYTEST_OAUTH_ISSUER", "").strip().rstrip("/")
@@ -107,6 +114,50 @@ class OauthDependency:
         if children:
             d["children"] = children
         return d
+
+    async def sign_claims(
+        self, arena: "OpenArena", issuer_index: int, claims_json: str
+    ) -> str:
+        return await asyncio.to_thread(
+            _ffi_oauth_sign_claims,
+            arena.ffi(),
+            arena.handle(),
+            self.identifier,
+            issuer_index,
+            claims_json,
+        )
+
+
+class OauthSigner:
+    def __init__(
+        self, oauth_dependency: "OauthDependency", arena: "OpenArena", issuer_index: int = 0
+    ):
+        self._oauth_dependency = oauth_dependency
+        self._arena = arena
+        self._issuer_index = issuer_index
+
+    async def sign(self, claims_json: str) -> str:
+        return await self._oauth_dependency.sign_claims(
+            self._arena, self._issuer_index, claims_json
+        )
+
+
+def _build_oauth_signer(
+    oauth_dependency_getter: Callable[[], "OauthDependency"],
+    issuer_index: int,
+    arena: "OpenArena",
+) -> "OauthSigner":
+    return OauthSigner(oauth_dependency_getter(), arena, issuer_index)
+
+
+def oauth_signer_fixture(
+    oauth_dependency_getter: Callable[[], "OauthDependency"], issuer_index: int = 0
+) -> Callable[["OpenArena"], "OauthSigner"]:
+    @pytest.fixture(scope="session")
+    def _oauth_signer(arena: "OpenArena") -> "OauthSigner":
+        return _build_oauth_signer(oauth_dependency_getter, issuer_index, arena)
+
+    return _oauth_signer
 
 
 def oauth_loopback_tls_pem_pair() -> tuple[str, str]:

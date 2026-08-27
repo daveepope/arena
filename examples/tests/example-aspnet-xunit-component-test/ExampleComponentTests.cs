@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using ArenaExamples.Test.Shared;
 using ArenaDotnet.Xunit;
@@ -16,11 +17,13 @@ public class ExampleComponentTests : IClassFixture<ExampleFixture>
 {
     private static OpenArena Arena { get; set; } = null!;
 
+    private readonly ExampleFixture fixture;
     private readonly ApiClient api;
     private readonly ApiClient api2;
 
     public ExampleComponentTests(ExampleFixture fixture)
     {
+        this.fixture = fixture;
         Arena = fixture.Arena;
         api = fixture.ApiClient;
         api2 = fixture.ApiClient2;
@@ -94,6 +97,18 @@ public class ExampleComponentTests : IClassFixture<ExampleFixture>
         var response = await client.GetAsync($"http://127.0.0.1:{ExampleFixture.WebAppPort}/Readings");
         Assert.Equal(
             HttpStatusCode.Unauthorized,
+            response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetReadingsWithTokenMissingRequiredScope_IsRejected()
+    {
+        var token = fixture.Signer.Sign(ExampleFixture.ClaimsWithScope("other-scope"));
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var response = await client.GetAsync($"http://127.0.0.1:{ExampleFixture.WebAppPort}/Readings");
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
             response.StatusCode);
     }
 }

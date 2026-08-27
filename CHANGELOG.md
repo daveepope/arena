@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena-ffi`: `arena_oauth_sign_claims` (#218)
 - `arena-pytest`, `arena-junit`, `arena-xunit`: `with_issuer_cognito`/`with_issuer_okta`/`with_issuer_entra_id`/`with_issuer`/`sign_claims` bindings (#218)
 - Example apps (Rust, Spring Boot, ASP.NET): Cognito-shaped OAuth provider in test fixtures (#218)
+- `arena-junit`: `OauthSigner`/`@ArenaOauthSigner` for injecting a per-test OAuth signer (#218)
+- `arena-xunit`: `ArenaCollectionFixture.Signer`/`GetDependency<T>()` for injecting a per-fixture OAuth signer (#218)
+- `arena-pytest`: `oauth_signer_fixture` for wiring an `OauthSigner` pytest fixture (#218)
+
+### Fixed
+
+- `arena-junit`: `ArenaExtension` now makes the arena queryable during `@ArenaAfterOpen`, not just after
 
 ## [6.1.0]
 

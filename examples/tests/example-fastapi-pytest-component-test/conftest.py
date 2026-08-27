@@ -48,6 +48,7 @@ from arena_pytest import (
     SqsQueueTarget,
     TemporalDependencyBuilder,
     oauth_loopback_tls_pem_pair,
+    oauth_signer_fixture,
 )
 
 from arena_config import (
@@ -87,6 +88,7 @@ from arena_config import (
 )
 
 from api_http import ApiClient
+from oauth_claims import claims_with_scope
 from playbook_fixtures import active_http_playbook
 from playbooks import (
     CalibrationApiHappyPathPlaybook,
@@ -147,26 +149,8 @@ def _find_fastapi_executable() -> str:
     return ""
 
 
-def _fetch_access_token(ca_path: str, issuer: str) -> str:
-    s = requests.Session()
-    s.verify = ca_path
-    disc = s.get(f"{issuer}/.well-known/oauth-authorization-server", timeout=30)
-    disc.raise_for_status()
-    token_url = disc.json()["token_endpoint"]
-    tok = s.post(
-        token_url,
-        data={
-            "grant_type": "client_credentials",
-            "client_id": "arena-examples",
-            "scope": "readings",
-        },
-        timeout=30,
-    )
-    tok.raise_for_status()
-    return str(tok.json()["access_token"])
-
-
 _OAUTH_CA_FILE = ""
+_OAUTH = None
 
 
 def _wait_sqs_reading_created(
@@ -208,7 +192,7 @@ def _wait_sqs_reading_created(
 
 @pytest.fixture(scope="session")
 def closed_arena() -> ClosedArena:
-    global _OAUTH_CA_FILE
+    global _OAUTH_CA_FILE, _OAUTH
     pytest.importorskip("boto3")
     ca_pem, server_key_pem = oauth_loopback_tls_pem_pair()
 
@@ -238,6 +222,7 @@ def closed_arena() -> ClosedArena:
         .with_metadata_base_url(OAUTH_ISSUER)
         .build()
     )
+    _OAUTH = oauth
 
     postgres = (
         PostgresDependencyBuilder(DEP_NAME_POSTGRES)
@@ -413,15 +398,16 @@ def mssql_connection_string() -> str:
     return MSSQL_CONNECTION_STRING_LOCAL
 
 
+oauth_signer = oauth_signer_fixture(lambda: _OAUTH)
+
+
 @pytest.fixture(scope="session")
-def api_client(arena, base_url) -> ApiClient:
+async def api_client(oauth_signer, base_url) -> ApiClient:
     import requests
 
-    _ = arena
     session = requests.Session()
-    session.headers.update(
-        {"Authorization": f"Bearer {_fetch_access_token(_OAUTH_CA_FILE, OAUTH_ISSUER)}"}
-    )
+    token = await oauth_signer.sign(claims_with_scope(OAUTH_ISSUER, "readings"))
+    session.headers.update({"Authorization": f"Bearer {token}"})
     return ApiClient(base_url, session)
 
 

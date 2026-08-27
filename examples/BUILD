@@ -462,6 +462,7 @@ py_library(
     name = "pytest_shared",
     srcs = [
         "tests/pytest-shared/api_http.py",
+        "tests/pytest-shared/oauth_claims.py",
         "tests/pytest-shared/playbook_fixtures.py",
         "tests/pytest-shared/playbooks.py",
     ],

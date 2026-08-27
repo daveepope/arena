@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net.Http;
-using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using ArenaExamples.Test.Shared;
 using ArenaDotnet.Xunit;
@@ -209,31 +207,22 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
 
     public ChainedExampleFixture() : base()
     {
-        var authToken = GetAuthToken();
+        var authToken = Signer.Sign(ClaimsWithScope("readings"));
         ApiClient = new ApiClient($"http://127.0.0.1:{WebAppPort}", authToken);
         ApiClient2 = new ApiClient($"http://127.0.0.1:{WebAppChildPort}", authToken);
     }
 
-    private static string GetAuthToken()
+    public static string ClaimsWithScope(string scope)
     {
-        var trustedCert = X509Certificate2.CreateFromPem(OauthPem.CertificatePem);
-        var handler = new HttpClientHandler
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        return JsonSerializer.Serialize(new
         {
-            ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
-                cert != null && cert.GetCertHashString() == trustedCert.GetCertHashString(),
-        };
-        using var client = new HttpClient(handler);
-        var content = new Dictionary<string, string>
-        {
-            ["grant_type"] = "client_credentials",
-            ["client_id"] = "test-client",
-            ["client_secret"] = "test-secret"
-        };
-        var response = client.PostAsync($"https://127.0.0.1:{OauthPort}/oauth/token",
-            new FormUrlEncodedContent(content)).Result;
-        response.EnsureSuccessStatusCode();
-        var json = JsonSerializer.Deserialize<JsonElement>(response.Content.ReadAsStringAsync().Result);
-        return json.GetProperty("access_token").GetString()!;
+            iss = $"https://127.0.0.1:{OauthPort}",
+            sub = "arena-examples",
+            scope,
+            iat = now,
+            exp = now + 300,
+        });
     }
 
     private static string ResolveOauthCaCertFilePath()

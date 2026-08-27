@@ -75,10 +75,6 @@ pub fn test_runtime() -> &'static TestRuntime {
     })
 }
 
-pub fn oauth_issuer() -> &'static str {
-    &test_runtime().oauth_issuer
-}
-
 pub fn exec_web_app_port() -> u16 {
     test_runtime().exec_web_app_port
 }
@@ -88,6 +84,25 @@ pub fn oauth_server_tls_cert_pem() -> &'static str {
         .get()
         .map(|s| s.as_str())
         .expect("oauth_server_tls_cert_pem: arena dependencies not initialized")
+}
+
+pub fn signed_token_with_scope(arena: &OpenArena, scope: &str) -> String {
+    let oauth = arena
+        .dependency(OAUTH_ID.get().expect("oauth id initialized"))
+        .and_then(|d| d.as_any().downcast_ref::<OauthDependency>())
+        .expect("oauth dependency should be available");
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time")
+        .as_secs();
+    let claims = serde_json::json!({
+        "iss": test_runtime().oauth_provider_issuer,
+        "sub": "arena-examples",
+        "scope": scope,
+        "iat": now,
+        "exp": now + 300,
+    });
+    oauth.sign_claims(0, &claims).expect("sign_claims")
 }
 
 pub const POSTGRES_DB_NAME: &str = "readings_db";

@@ -11,7 +11,6 @@ import arena.examples.playbooks.ResetValidationDbPlaybook;
 import arena.examples.playbooks.SeedValidationReadingPlaybook;
 import arena.examples.testruntime.EphemeralTestRuntime;
 import arena.junit.Arena;
-import arena.junit.ArenaAfterOpen;
 import arena.junit.ArenaComponent;
 import arena.junit.ArenaDependency;
 import arena.junit.ArenaLogger;
@@ -28,31 +27,20 @@ import arena.junit.dep.PostgresDependencyBuilder;
 import arena.junit.exec.ExecutableComponent;
 import arena.junit.exec.ExecutableComponentBuilder;
 import arena.junit.ffi.ArenaLogLevel;
+import arena.examples.oauth.OauthClaims;
 import arena.junit.oauth.OauthDependency;
 import arena.junit.oauth.OauthDependencyBuilder;
 import arena.junit.oauth.OauthLoopbackTls;
+import arena.junit.oauth.OauthSigner;
 import arena.junit.readiness.HttpReadinessCheck;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.KeyStore;
-import java.security.SecureRandom;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateFactory;
-import java.time.Duration;
-import java.util.Collection;
 import java.util.List;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManagerFactory;
 import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 import org.slf4j.Logger;
@@ -94,8 +82,6 @@ public final class ComponentTestSuite {
 
   private static final String MSSQL_JDBC_URL =
       SeedValidationReadingPlaybook.jdbcUrl(MSSQL_PORT, MSSQL_DB_NAME, MSSQL_DB_USER, MSSQL_DB_PASS);
-
-  private static String accessToken;
 
   @ArenaDependency(logs = true)
   static final OauthDependency OAUTH =
@@ -162,38 +148,6 @@ public final class ComponentTestSuite {
   @ArenaComponent(logs = true)
   static final ExecutableComponent WEB_APP = buildWebApp();
 
-  @ArenaAfterOpen
-  static void fetchAccessToken() throws Exception {
-    HttpClient client =
-        HttpClient.newBuilder()
-            .sslContext(sslContextFromPem(OAUTH_PEM.certificatePem()))
-            .connectTimeout(Duration.ofSeconds(30))
-            .build();
-    HttpResponse<String> disc =
-        client.send(
-            HttpRequest.newBuilder()
-                .uri(URI.create(OAUTH_ISSUER + "/.well-known/oauth-authorization-server"))
-                .GET()
-                .timeout(Duration.ofSeconds(30))
-                .build(),
-            HttpResponse.BodyHandlers.ofString());
-    assertEquals(200, disc.statusCode(), disc.body());
-    String tokenUrl = MAPPER.readTree(disc.body()).get("token_endpoint").asText();
-    String form =
-        "grant_type=client_credentials&client_id=arena-examples&scope=openid%20profile%20readings";
-    HttpResponse<String> tok =
-        client.send(
-            HttpRequest.newBuilder()
-                .uri(URI.create(tokenUrl))
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .POST(HttpRequest.BodyPublishers.ofString(form))
-                .timeout(Duration.ofSeconds(30))
-                .build(),
-            HttpResponse.BodyHandlers.ofString());
-    assertEquals(200, tok.statusCode(), tok.body());
-    accessToken = MAPPER.readTree(tok.body()).get("access_token").asText();
-  }
-
   private static ExecutableComponent buildWebApp() {
     String bin;
     try {
@@ -253,26 +207,13 @@ public final class ComponentTestSuite {
     }
   }
 
-  private static SSLContext sslContextFromPem(String pem) throws Exception {
-    CertificateFactory cf = CertificateFactory.getInstance("X.509");
-    Collection<? extends Certificate> certs =
-        cf.generateCertificates(new ByteArrayInputStream(pem.getBytes(StandardCharsets.UTF_8)));
-    KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
-    ks.load(null);
-    int i = 0;
-    for (Certificate c : certs) {
-      ks.setCertificateEntry("ca" + i++, c);
-    }
-    TrustManagerFactory tmf =
-        TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-    tmf.init(ks);
-    SSLContext ctx = SSLContext.getInstance("TLS");
-    ctx.init(null, tmf.getTrustManagers(), new SecureRandom());
-    return ctx;
+  static String claimsWithScope(String scope) throws Exception {
+    return OauthClaims.withScope(MAPPER, OAUTH_ISSUER, scope);
   }
 
-  static ApiClient apiClient() {
-    return new ApiClient("http://127.0.0.1:" + WEB_APP_PORT, accessToken, MAPPER);
+  static ApiClient apiClient() throws Exception {
+    String token = OauthSigner.forFixture(ComponentTestSuite.class).sign(claimsWithScope("readings"));
+    return new ApiClient("http://127.0.0.1:" + WEB_APP_PORT, token, MAPPER);
   }
 
   static JsonNode waitReadingCreatedOnKafka(KafkaWait.ReadingCreateAction create) throws Exception {

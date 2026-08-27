@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
+using ArenaDotnet.Xunit.Dep;
 using ArenaDotnet.Xunit.Ffi;
 using Microsoft.Extensions.Logging;
 
@@ -11,9 +12,11 @@ namespace ArenaDotnet.Xunit;
 public abstract class ArenaCollectionFixture : IDisposable
 {
     private static readonly ConcurrentDictionary<Type, Lazy<SharedArena>> SharedArenas = new();
+    private static readonly ConcurrentDictionary<(Type Fixture, Type Dependency), IArenaDependency> DependencyCache = new();
 
     private readonly Lazy<SharedArena> _sharedEntry;
     private readonly SharedArena _shared;
+    private readonly Lazy<OauthSigner> _signer;
 
     protected ArenaCollectionFixture()
     {
@@ -28,6 +31,7 @@ public abstract class ArenaCollectionFixture : IDisposable
             {
                 _sharedEntry = lazy;
                 _shared = shared;
+                _signer = new Lazy<OauthSigner>(() => OauthSigner.ForFixture(this), LazyThreadSafetyMode.ExecutionAndPublication);
                 return;
             }
 
@@ -36,6 +40,45 @@ public abstract class ArenaCollectionFixture : IDisposable
     }
 
     public OpenArena Arena => _shared.Arena;
+
+    public OauthSigner Signer => _signer.Value;
+
+    public T GetDependency<T>() where T : class, IArenaDependency
+    {
+        return GetDependency<T>(GetType());
+    }
+
+    internal static T GetDependency<T>(Type fixtureType) where T : class, IArenaDependency
+    {
+        return (T)DependencyCache.GetOrAdd((fixtureType, typeof(T)), key => DiscoverSingleDependency<T>(key.Fixture));
+    }
+
+    private static T DiscoverSingleDependency<T>(Type fixtureType) where T : class, IArenaDependency
+    {
+        T? found = null;
+        for (var current = fixtureType; current != null && current != typeof(object); current = current.BaseType)
+        {
+            foreach (var field in current.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+            {
+                if (field.GetCustomAttribute<ArenaDependencyAttribute>() == null)
+                    continue;
+                if (field.GetValue(null) is not T dependency)
+                    continue;
+                if (found != null)
+                {
+                    throw new InvalidOperationException(
+                        $"expected exactly one static [ArenaDependency] {typeof(T).Name} field on {fixtureType.Name} or a base class, found more than one");
+                }
+                found = dependency;
+            }
+        }
+        if (found == null)
+        {
+            throw new InvalidOperationException(
+                $"expected exactly one static [ArenaDependency] {typeof(T).Name} field on {fixtureType.Name} or a base class, found none");
+        }
+        return found;
+    }
 
     protected virtual Match Configure()
     {

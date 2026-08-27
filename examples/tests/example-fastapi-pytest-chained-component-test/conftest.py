@@ -26,6 +26,8 @@ if not _arena_plugin_already_registered_via_entry_point():
 
 import requests
 
+from oauth_claims import claims_with_scope
+
 from arena_pytest import (
     ArenaLogLevel,
     ClosedArena,
@@ -44,6 +46,7 @@ from arena_pytest import (
     SqsQueueTarget,
     TemporalDependencyBuilder,
     oauth_loopback_tls_pem_pair,
+    oauth_signer_fixture,
 )
 
 from arena_config import (
@@ -133,26 +136,10 @@ def _find_fastapi_executable() -> str:
     return ""
 
 
-def _fetch_access_token(ca_path: str, issuer: str) -> str:
-    s = requests.Session()
-    s.verify = ca_path
-    disc = s.get(f"{issuer}/.well-known/oauth-authorization-server", timeout=30)
-    disc.raise_for_status()
-    token_url = disc.json()["token_endpoint"]
-    tok = s.post(
-        token_url,
-        data={
-            "grant_type": "client_credentials",
-            "client_id": "arena-examples",
-            "scope": "readings",
-        },
-        timeout=30,
-    )
-    tok.raise_for_status()
-    return str(tok.json()["access_token"])
 
 
 _OAUTH_CA_FILE = ""
+_OAUTH = None
 
 
 def _build_web_app(
@@ -197,7 +184,7 @@ def _build_web_app(
 
 @pytest.fixture(scope="session")
 def closed_arena() -> ClosedArena:
-    global _OAUTH_CA_FILE
+    global _OAUTH_CA_FILE, _OAUTH
     ca_pem, server_key_pem = oauth_loopback_tls_pem_pair()
 
     fd, oauth_ca_file = tempfile.mkstemp(prefix="example-api-chained-oauth-", suffix=".pem")
@@ -226,6 +213,7 @@ def closed_arena() -> ClosedArena:
         .with_metadata_base_url(OAUTH_ISSUER)
         .build()
     )
+    _OAUTH = oauth
 
     postgres = (
         PostgresDependencyBuilder("example-api-chained-postgres")
@@ -378,19 +366,22 @@ def base_url2() -> str:
     return f"http://127.0.0.1:{WEB_APP_CHILD_PORT}"
 
 
+oauth_signer = oauth_signer_fixture(lambda: _OAUTH)
+
+
 @pytest.fixture(scope="session")
-def api_client(arena, base_url) -> ApiClient:
+async def api_client(oauth_signer, base_url) -> ApiClient:
     session = requests.Session()
-    session.headers.update(
-        {"Authorization": f"Bearer {_fetch_access_token(_OAUTH_CA_FILE, OAUTH_ISSUER)}"}
-    )
+    token = await oauth_signer.sign(claims_with_scope(OAUTH_ISSUER, "readings"))
+    session.headers.update({"Authorization": f"Bearer {token}"})
     return ApiClient(base_url, session)
 
 
 @pytest.fixture(scope="session")
-def api_client2(arena, base_url2) -> ApiClient:
+async def api_client2(oauth_signer, base_url2) -> ApiClient:
     session = requests.Session()
+    token = await oauth_signer.sign(claims_with_scope(OAUTH_ISSUER, "readings"))
     session.headers.update(
-        {"Authorization": f"Bearer {_fetch_access_token(_OAUTH_CA_FILE, OAUTH_ISSUER)}"}
+        {"Authorization": f"Bearer {token}"}
     )
     return ApiClient(base_url2, session)

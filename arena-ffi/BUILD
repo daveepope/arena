@@ -221,6 +221,49 @@ rust_test(
 )
 
 rust_test(
+    name = "ffi_oauth_sign_claims_validation_test",
+    srcs = [
+        "tests/unit/dependency/oauth/sign_claims_ffi_validation.rs",
+        "tests/unit/ffi_error_text.rs",
+    ],
+    crate_root = "tests/unit/dependency/oauth/sign_claims_ffi_validation.rs",
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_oauth_sign_claims_unit_test",
+    srcs = [
+        "tests/unit/dependency/oauth/sign_claims_test.rs",
+        "tests/unit/ffi_error_text.rs",
+    ],
+    crate_root = "tests/unit/dependency/oauth/sign_claims_test.rs",
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        "//arena",
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
     name = "ffi_oracle_playbook_validation_test",
     srcs = [
         "tests/unit/dependency/oracle/oracle_playbook_ffi_validation.rs",
