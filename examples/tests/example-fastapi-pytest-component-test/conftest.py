@@ -53,6 +53,8 @@ from arena_pytest import (
 )
 
 from arena_config import (
+    CALIBRATION_CONTAINER_NAME,
+    CALIBRATION_HOST_PORT,
     CLOSED_ARENA_NAME,
     COMPONENT_NAME_EXECUTABLE,
     DEP_NAME_CALIBRATION_HTTP,
@@ -66,6 +68,7 @@ from arena_config import (
     LOCALSTACK_HOST_PORT,
     MATCH_NAME,
     MSSQL_CONNECTION_STRING_LOCAL,
+    MSSQL_CONTAINER_NAME,
     MSSQL_DB_NAME,
     MSSQL_DB_PASS,
     MSSQL_DB_USER,
@@ -74,16 +77,19 @@ from arena_config import (
     OAUTH_PORT,
     ORACLE_ADMIN_PASS,
     ORACLE_CONNECTION_STRING_LOCAL,
+    ORACLE_CONTAINER_NAME,
     ORACLE_DB_PASS,
     ORACLE_DB_USER,
     ORACLE_PORT,
+    POSTGRES_CONTAINER_NAME,
     POSTGRES_DB_NAME,
     POSTGRES_DB_PASS,
     POSTGRES_DB_USER,
     POSTGRES_PORT,
-    CALIBRATION_HOST_PORT,
+    SMTP_CONTAINER_NAME,
     SMTP_HOST_PORT,
     SMTP_UI_PORT,
+    TEMPORAL_CONTAINER_NAME,
     TEMPORAL_GRPC_PORT,
     TEMPORAL_UI_PORT,
 )
@@ -227,6 +233,7 @@ def closed_arena() -> ClosedArena:
 
     postgres = (
         PostgresDependencyBuilder(DEP_NAME_POSTGRES)
+        .with_container_name(POSTGRES_CONTAINER_NAME)
         .with_image("14.20-trixie")
         .with_port(POSTGRES_PORT)
         .with_database_name(POSTGRES_DB_NAME)
@@ -238,6 +245,7 @@ def closed_arena() -> ClosedArena:
 
     mssql = (
         MssqlDependencyBuilder(DEP_NAME_MSSQL)
+        .with_container_name(MSSQL_CONTAINER_NAME)
         .with_port(MSSQL_PORT)
         .with_database_name(MSSQL_DB_NAME)
         .with_database_username(MSSQL_DB_USER)
@@ -248,6 +256,7 @@ def closed_arena() -> ClosedArena:
 
     oracle = (
         OracleDependencyBuilder(DEP_NAME_ORACLE)
+        .with_container_name(ORACLE_CONTAINER_NAME)
         .with_port(ORACLE_PORT)
         .with_database_username(ORACLE_DB_USER)
         .with_database_password(ORACLE_DB_PASS)
@@ -260,12 +269,14 @@ def closed_arena() -> ClosedArena:
 
     calibration = (
         HttpDependencyBuilder(DEP_NAME_CALIBRATION_HTTP)
+        .with_container_name(CALIBRATION_CONTAINER_NAME)
         .with_port(CALIBRATION_HOST_PORT)
         .build()
     )
 
     temporal = (
         TemporalDependencyBuilder(DEP_NAME_TEMPORAL)
+        .with_container_name(TEMPORAL_CONTAINER_NAME)
         .with_image("1.8.0")
         .with_port(TEMPORAL_GRPC_PORT)
         .with_ui_port(TEMPORAL_UI_PORT)
@@ -274,6 +285,7 @@ def closed_arena() -> ClosedArena:
 
     smtp = (
         SmtpDependencyBuilder(DEP_NAME_SMTP)
+        .with_container_name(SMTP_CONTAINER_NAME)
         .with_port(SMTP_HOST_PORT)
         .with_ui_port(SMTP_UI_PORT)
         .with_starttls()

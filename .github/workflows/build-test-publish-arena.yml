@@ -235,6 +235,10 @@ jobs:
               - 'MODULE.bazel'
               - 'MODULE.bazel.lock'
 
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
+
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
@@ -390,6 +394,10 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
+
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
@@ -452,6 +460,10 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
+
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
@@ -504,6 +516,10 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
+
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
@@ -917,6 +933,10 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
+
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
@@ -1222,6 +1242,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
+
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
@@ -1303,6 +1327,10 @@ jobs:
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0
+
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
@@ -1480,6 +1508,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
+
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
@@ -1576,6 +1608,10 @@ jobs:
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0
+
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4

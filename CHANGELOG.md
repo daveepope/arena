@@ -21,10 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena-host`: new crate providing `find_available_port`/`PortSearchStrategy` for zero-dependency, process-safe free TCP port discovery (#202)
 - `arena-ffi`: `arena_find_available_port` (#202)
 - `arena-pytest`, `arena-junit`, `arena-xunit`: `find_available_port`/`ArenaHost` bindings, `PortSearchStrategy`, `ArenaPortNotFoundError`/`ArenaPortNotFoundException` (#202)
+- `--config=stream` for streamed test output with a detailed summary
+- mold linker for Rust targets on Linux, installed by CI and required for local builds
+
+### Changed
+
+- `bazel test` now defaults to `--test_output=errors`; use `--config=stream` for streamed output
 
 ### Fixed
 
 - `arena-junit`: `ArenaExtension` now makes the arena queryable during `@ArenaAfterOpen`, not just after
+- `arena-oracledb`: SQL readiness fails immediately when the container has stopped or been removed, instead of retrying it for the full timeout
+- FastAPI example component tests: dependency containers get run-unique names, so parallel targets no longer force-remove each other's containers
+- Example test runtimes (pytest, junit, xunit): ephemeral port ranges partitioned per test target to stop parallel targets drawing colliding host ports (#220)
 
 ## [6.1.0]
 

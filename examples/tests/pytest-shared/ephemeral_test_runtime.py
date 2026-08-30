@@ -7,12 +7,23 @@ PORT_SLOT_COUNT = 13
 EPHEMERAL_PORT_RANGE_START = 20000
 EPHEMERAL_PORT_RANGE_END = 20300
 
+TARGET_PORT_RANGES = {
+    "//examples:pytest_fastapi_component_test": (20000, 20100),
+    "//examples:pytest_fastapi_chained_component_test": (20100, 20200),
+    "//examples:pytest_axum_component_test": (20200, 20300),
+}
+
+
+def port_range_for_target(target: str | None) -> tuple[int, int]:
+    return TARGET_PORT_RANGES.get(
+        target or "", (EPHEMERAL_PORT_RANGE_START, EPHEMERAL_PORT_RANGE_END)
+    )
+
 
 def _allocate_distinct_tcp_ports(count: int) -> list[int]:
+    start, end = port_range_for_target(os.environ.get("TEST_TARGET"))
     return [
-        find_available_port(
-            EPHEMERAL_PORT_RANGE_START, EPHEMERAL_PORT_RANGE_END, PortSearchStrategy.RANDOM
-        )
+        find_available_port(start, end, PortSearchStrategy.RANDOM)
         for _ in range(count)
     ]
 

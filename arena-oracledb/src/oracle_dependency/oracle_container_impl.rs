@@ -37,6 +37,10 @@ pub trait OracleImpl: Send + Sync {
         password: &str,
         script: &str,
     ) -> Result<String, String>;
+
+    async fn is_container_running(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Default)]
@@ -187,6 +191,20 @@ impl OracleImpl for OracleContainerImpl {
         let password = password.to_string();
 
         run_exec_on_blocking_pool(container, cmd, username, password).await
+    }
+
+    async fn is_container_running(&self) -> bool {
+        let container = {
+            let container_guard = self.container.lock().await;
+            container_guard.clone()
+        };
+
+        match container {
+            Some(container) => {
+                arena_container::container::is_container_running(container.id()).await
+            }
+            None => false,
+        }
     }
 }
 

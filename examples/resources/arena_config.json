@@ -25,7 +25,10 @@
     "postgres": "example-api-postgres",
     "kafka": "example-api-kafka",
     "mssql": "example-api-mssql",
-    "calibration": "example-api-calibration"
+    "oracle": "example-api-oracle",
+    "calibration": "example-api-calibration",
+    "temporal": "example-api-temporal",
+    "smtp": "example-api-smtp"
   },
   "playbook_names": {
     "calibration_api_happy_path": "example-api-calibration-api-happy-path",

@@ -2,6 +2,7 @@ package arena.examples.testruntime;
 
 import arena.junit.ArenaHost;
 import arena.junit.ffi.PortSearchStrategy;
+import java.util.Map;
 import java.util.UUID;
 
 public final class EphemeralTestRuntime {
@@ -9,6 +10,12 @@ public final class EphemeralTestRuntime {
   public static final int PORT_SLOT_COUNT = 13;
   private static final int EPHEMERAL_PORT_RANGE_START = 20300;
   private static final int EPHEMERAL_PORT_RANGE_END = 20600;
+
+  private static final Map<String, int[]> TARGET_PORT_RANGES =
+      Map.of(
+          "//examples:example-spring-boot-component-test", new int[] {20300, 20400},
+          "//examples:example-spring-boot-chained-component-test", new int[] {20400, 20500},
+          "//examples:example-axum-junit-component-test", new int[] {20500, 20600});
 
   private static final EphemeralTestRuntime INSTANCE = new EphemeralTestRuntime();
 
@@ -67,12 +74,16 @@ public final class EphemeralTestRuntime {
     return allocateDistinctTcpPorts(1)[0];
   }
 
+  static int[] portRangeForTarget(String target) {
+    int[] range = target == null ? null : TARGET_PORT_RANGES.get(target);
+    return range == null ? new int[] {EPHEMERAL_PORT_RANGE_START, EPHEMERAL_PORT_RANGE_END} : range;
+  }
+
   private static int[] allocateDistinctTcpPorts(int count) {
+    int[] range = portRangeForTarget(System.getenv("TEST_TARGET"));
     int[] ports = new int[count];
     for (int i = 0; i < count; i++) {
-      ports[i] =
-          ArenaHost.findAvailablePort(
-              EPHEMERAL_PORT_RANGE_START, EPHEMERAL_PORT_RANGE_END, PortSearchStrategy.RANDOM);
+      ports[i] = ArenaHost.findAvailablePort(range[0], range[1], PortSearchStrategy.RANDOM);
     }
     return ports;
   }

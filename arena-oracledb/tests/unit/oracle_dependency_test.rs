@@ -144,6 +144,55 @@ async fn start_called_once_starts_the_container() {
     assert_eq!(recorder.start_call_count(), 1);
 }
 
+struct RemovedContainerOracleImpl;
+
+#[async_trait]
+impl OracleImpl for RemovedContainerOracleImpl {
+    #[allow(clippy::too_many_arguments)]
+    async fn start(
+        &self,
+        _port: u16,
+        _database_name: &str,
+        _database_username: &str,
+        _database_password: &str,
+        _admin_password: &str,
+        _image_name: &str,
+        _image_tag: &str,
+        _container_name: &str,
+    ) {
+    }
+
+    async fn stop(&self) {}
+
+    fn connection_string(&self) -> Option<String> {
+        Some("//localhost:1521/FREEPDB1".to_string())
+    }
+
+    fn host_address(&self) -> Option<String> {
+        Some("127.0.0.1:1521".to_string())
+    }
+
+    async fn run_sqlplus(&self, _username: &str, _password: &str, _script: &str) -> Result<String, String> {
+        Err("no such container".to_string())
+    }
+
+    async fn is_container_running(&self) -> bool {
+        false
+    }
+}
+
+#[tokio::test]
+#[should_panic(expected = "container stopped or was removed during sql-level readiness")]
+async fn start_container_removed_during_sql_readiness_panics() {
+    let mut dep = OracleDependency::builder("start-container-removed")
+        .with_impl(RemovedContainerOracleImpl)
+        .with_readiness_check(AlwaysReadyCheck)
+        .with_sql_readiness_timeout(std::time::Duration::from_secs(600))
+        .build();
+
+    dep.start().await;
+}
+
 #[tokio::test]
 #[should_panic(expected = "sql-level readiness check did not succeed")]
 async fn start_sql_readiness_check_failure_panics() {

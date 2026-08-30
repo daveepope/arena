@@ -208,6 +208,14 @@ impl OracleDependency {
             {
                 Ok(_) => return,
                 Err(e) => {
+                    if !self.oracle_impl.is_container_running().await {
+                        panic!(
+                            "[OracleDependency-{}] container stopped or was removed during sql-level readiness after {:?}: {e}",
+                            self.identifier,
+                            start.elapsed()
+                        );
+                    }
+
                     if start.elapsed() >= self.sql_readiness_timeout {
                         panic!(
                             "[OracleDependency-{}] sql-level readiness check did not succeed within {:?}: {e}",

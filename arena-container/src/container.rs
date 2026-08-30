@@ -1,4 +1,4 @@
-use bollard::query_parameters::RemoveContainerOptionsBuilder;
+use bollard::query_parameters::{InspectContainerOptions, RemoveContainerOptionsBuilder};
 use bollard::Docker;
 
 /// Force-removes a Docker container by name.
@@ -22,5 +22,25 @@ pub async fn try_remove_existing_container(name: &str) {
             container = %name,
             "no existing container to remove"
         ),
+    }
+}
+
+pub async fn is_container_running(id_or_name: &str) -> bool {
+    let Some(docker) = Docker::connect_with_defaults().ok() else {
+        return true;
+    };
+
+    match docker
+        .inspect_container(id_or_name, None::<InspectContainerOptions>)
+        .await
+    {
+        Ok(details) => details
+            .state
+            .and_then(|state| state.running)
+            .unwrap_or(false),
+        Err(bollard::errors::Error::DockerResponseServerError {
+            status_code: 404, ..
+        }) => false,
+        Err(_) => true,
     }
 }

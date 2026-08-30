@@ -76,7 +76,7 @@ from arena_config import (
 )
 
 from api_http import ApiClient
-from ephemeral_test_runtime import ephemeral_tcp_port
+from ephemeral_test_runtime import RUNTIME, ephemeral_tcp_port
 from playbooks import (
     CalibrationApiHappyPathPlaybook,
     EventsPurgePlaybook,
@@ -218,6 +218,7 @@ def closed_arena() -> ClosedArena:
 
     postgres = (
         PostgresDependencyBuilder("example-api-chained-postgres")
+        .with_container_name(RUNTIME.container_name("example-api-chained-postgres"))
         .with_image("14.20-trixie")
         .with_port(POSTGRES_PORT)
         .with_database_name(POSTGRES_DB_NAME)
@@ -229,6 +230,7 @@ def closed_arena() -> ClosedArena:
 
     mssql = (
         MssqlDependencyBuilder("example-api-chained-mssql")
+        .with_container_name(RUNTIME.container_name("example-api-chained-mssql"))
         .with_port(MSSQL_PORT)
         .with_database_name(MSSQL_DB_NAME)
         .with_database_username(MSSQL_DB_USER)
@@ -239,6 +241,7 @@ def closed_arena() -> ClosedArena:
 
     oracle = (
         OracleDependencyBuilder("example-api-chained-oracle")
+        .with_container_name(RUNTIME.container_name("example-api-chained-oracle"))
         .with_port(ORACLE_PORT)
         .with_database_username(ORACLE_DB_USER)
         .with_database_password(ORACLE_DB_PASS)
@@ -251,12 +254,14 @@ def closed_arena() -> ClosedArena:
 
     calibration = (
         HttpDependencyBuilder("example-api-chained-calibration")
+        .with_container_name(RUNTIME.container_name("example-api-chained-calibration"))
         .with_port(CALIBRATION_HOST_PORT)
         .build()
     )
 
     temporal = (
         TemporalDependencyBuilder("example-api-chained-temporal")
+        .with_container_name(RUNTIME.container_name("example-api-chained-temporal"))
         .with_image("1.8.0")
         .with_port(TEMPORAL_GRPC_PORT)
         .with_ui_port(TEMPORAL_UI_PORT)
@@ -266,6 +271,7 @@ def closed_arena() -> ClosedArena:
 
     smtp = (
         SmtpDependencyBuilder("example-api-chained-smtp")
+        .with_container_name(RUNTIME.container_name("example-api-chained-smtp"))
         .with_port(SMTP_HOST_PORT)
         .with_ui_port(SMTP_UI_PORT)
         .with_starttls()
