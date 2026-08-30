@@ -12,6 +12,7 @@ path = "src/lib.rs"
 [dependencies]
 arena = { workspace = true }
 arena-container = { workspace = true }
+arena-profiler = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 tracing = { workspace = true }

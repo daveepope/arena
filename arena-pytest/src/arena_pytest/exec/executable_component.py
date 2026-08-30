@@ -14,6 +14,7 @@ class BuildTool(Enum):
     DOTNET = "dotnet"
     MAKE = "make"
     CMAKE = "cmake"
+    PYTHON = "python"
 
     @staticmethod
     def custom(command: str, args: List[str]) -> Dict[str, Any]:

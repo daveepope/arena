@@ -18,6 +18,7 @@ public sealed class BuildTool
     public static BuildTool Dotnet { get; } = new("dotnet");
     public static BuildTool Make { get; } = new("make");
     public static BuildTool CMake { get; } = new("cmake");
+    public static BuildTool Python { get; } = new("python");
 
     public static BuildTool Custom(string command, IEnumerable<string> args) =>
         new(new CustomBuildToolConfig { Command = command, Args = new List<string>(args) });

@@ -64,6 +64,18 @@ public class ExecutableComponentBuilderSerializationTest
     }
 
     [Fact]
+    public void Build_WithPythonBuildTool_SerializesToolValue()
+    {
+        var comp = new ExecutableComponentBuilder("test")
+            .WithExecutablePath("./myapp")
+            .WithBuildTool(BuildTool.Python)
+            .Build();
+        var json = comp.ForFfi();
+        var obj = JObject.Parse(json);
+        Assert.Equal("python", obj["build_tool"]);
+    }
+
+    [Fact]
     public void Build_WithCustomBuildTool_SerializesCommandAndArgs()
     {
         var comp = new ExecutableComponentBuilder("test")

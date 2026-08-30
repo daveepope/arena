@@ -535,3 +535,34 @@ nuget_archive(
     sources = ["https://api.nuget.org/v3/index.json"],
     version = "0.3.0",
 )
+
+crate.spec(package = "py-spy", version = "=0.4.2")
+crate.annotation(
+    crate = "py-spy",
+    repositories = ["profiling_tools"],
+    gen_all_binaries = True,
+)
+crate.from_specs(name = "profiling_tools")
+use_repo(crate, "profiling_tools")
+
+_ASYNC_PROFILER_VERSION = "4.5"
+
+_ASYNC_PROFILER_BUILD_FILE_CONTENT = """
+exports_files(["bin/asprof", "lib/libasyncProfiler.so"])
+"""
+
+http_archive(
+    name = "async_profiler_linux_x64",
+    url = "https://github.com/async-profiler/async-profiler/releases/download/v{v}/async-profiler-{v}-linux-x64.tar.gz".format(v = _ASYNC_PROFILER_VERSION),
+    sha256 = "89546fbb9ee0fc5496c7edd4099b0709489bc78b0d8057ccbb4b801f6b032b62",
+    strip_prefix = "async-profiler-{}-linux-x64".format(_ASYNC_PROFILER_VERSION),
+    build_file_content = _ASYNC_PROFILER_BUILD_FILE_CONTENT,
+)
+
+http_archive(
+    name = "async_profiler_linux_arm64",
+    url = "https://github.com/async-profiler/async-profiler/releases/download/v{v}/async-profiler-{v}-linux-arm64.tar.gz".format(v = _ASYNC_PROFILER_VERSION),
+    sha256 = "64c41d1465d60097439c50d7e924b4946f1f62b1cbd21ce5b034fad09c0d6979",
+    strip_prefix = "async-profiler-{}-linux-arm64".format(_ASYNC_PROFILER_VERSION),
+    build_file_content = _ASYNC_PROFILER_BUILD_FILE_CONTENT,
+)

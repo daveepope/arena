@@ -34,6 +34,7 @@ import arena.junit.dep.smtp.SmtpDependency;
 import arena.junit.dep.smtp.SmtpDependencyBuilder;
 import arena.junit.dep.temporal.TemporalDependency;
 import arena.junit.dep.temporal.TemporalDependencyBuilder;
+import arena.junit.exec.BuildTool;
 import arena.junit.exec.ExecutableComponent;
 import arena.junit.exec.ExecutableComponentBuilder;
 import arena.junit.ffi.ArenaLogLevel;
@@ -230,11 +231,16 @@ public final class ComponentTestSuite {
   static final ResetWeatherDbPlaybook RESET_WEATHER_DB =
       new ResetWeatherDbPlaybook(ORACLE.identifier());
 
-  @ArenaComponent(logs = true)
-  static final ExecutableComponent WEB_APP = buildWebApp("example-api-web-app", WEB_APP_PORT);
+  private static final String CPU_PROFILE_REPORT_ENV_VAR = "ARENA_CPU_PROFILE_REPORT";
+  static final String WEB_APP_CPU_PROFILE_REPORT = cpuProfileReportPath();
 
   @ArenaComponent(logs = true)
-  static final ExecutableComponent WEB_APP_2 = buildWebApp("example-api-web-app-2", WEB_APP_2_PORT);
+  static final ExecutableComponent WEB_APP =
+      buildWebApp("example-api-web-app", WEB_APP_PORT, WEB_APP_CPU_PROFILE_REPORT);
+
+  @ArenaComponent(logs = true)
+  static final ExecutableComponent WEB_APP_2 =
+      buildWebApp("example-api-web-app-2", WEB_APP_2_PORT, null);
 
   @ArenaAfterOpen
   static void afterOpen() throws Exception {
@@ -296,7 +302,16 @@ public final class ComponentTestSuite {
     }
   }
 
-  private static ExecutableComponent buildWebApp(String name, int port) {
+  private static String cpuProfileReportPath() {
+    String configured = System.getenv(CPU_PROFILE_REPORT_ENV_VAR);
+    if (configured != null && !configured.isBlank()) {
+      return configured;
+    }
+    return Path.of(System.getProperty("user.home"), "arena-example-spring-boot-cpu-profile.html")
+        .toString();
+  }
+
+  private static ExecutableComponent buildWebApp(String name, int port, String cpuProfileOutput) {
     String appLauncher;
     try {
       appLauncher = Runfiles.findWebAppLauncher();
@@ -304,7 +319,7 @@ public final class ComponentTestSuite {
       throw new IllegalStateException("failed to locate web app launcher runfile", e);
     }
     assertTrue(!appLauncher.isEmpty(), "web app launcher must be present under Bazel runfiles");
-    return new ExecutableComponentBuilder(name)
+    ExecutableComponentBuilder builder = new ExecutableComponentBuilder(name)
         .withExecutablePath(appLauncher)
         .withEnvVar("WEB_APP_PORT", String.valueOf(port))
         .withEnvVar(
@@ -351,8 +366,16 @@ public final class ComponentTestSuite {
         .withEnvVar("EVENT_BUS_NAME", EVENT_BUS_NAME)
         .withEnvVar("EVENT_SOURCE", EVENT_SOURCE)
         .withReadinessCheck(
-            HttpReadinessCheck.create(), "http://127.0.0.1:" + port + "/health", 30_000L)
-        .build();
+            HttpReadinessCheck.create(), "http://127.0.0.1:" + port + "/health", 30_000L);
+    if (cpuProfileOutput != null) {
+      builder =
+          builder
+              .withBuildTool(BuildTool.MAVEN)
+              .withCpuProfile(cpuProfileOutput)
+              .withHotspots()
+              .withCpuProfileAutoOpen();
+    }
+    return builder.build();
   }
 
   private static List<String> readSchema(String filename) {

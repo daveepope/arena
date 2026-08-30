@@ -16,6 +16,7 @@ members = [
     "arena-cryptography",
     "arena-host",
     "arena-containerized-component",
+    "arena-profiler",
     "arena-ffi",
     "tools/arena-ffi-bench",
     "examples"
@@ -39,6 +40,9 @@ arena-container = { path = "arena-container" }
 arena-cryptography = { path = "arena-cryptography" }
 arena-host = { path = "arena-host" }
 arena-containerized-component = { path = "arena-containerized-component" }
+arena-profiler = { path = "arena-profiler" }
+inferno = "0.12.8"
+runfiles = "0.2.0"
 arena-ffi = { path = "arena-ffi" }
 axum = "0.8.8"
 serde = { version = "1", features = ["derive"] }

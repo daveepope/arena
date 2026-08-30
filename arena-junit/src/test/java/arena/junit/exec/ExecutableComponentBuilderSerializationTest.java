@@ -53,6 +53,40 @@ final class ExecutableComponentBuilderSerializationTest {
   }
 
   @Test
+  void withBuildTool_python_serializesToolValue() {
+    ObjectNode config =
+        new ExecutableComponentBuilder("worker").withBuildTool(BuildTool.PYTHON).build().forFfi();
+    assertEquals("python", config.path("build_tool").asText());
+  }
+
+  @Test
+  void withCpuProfile_serializesOutputPath() {
+    ObjectNode config =
+        new ExecutableComponentBuilder("worker")
+            .withBuildTool(BuildTool.MAVEN)
+            .withCpuProfile("/tmp/profile.html")
+            .build()
+            .forFfi();
+    assertEquals("/tmp/profile.html", config.path("cpu_profile_output").asText());
+    assertTrue(config.path("cpu_profile_auto_open").isMissingNode());
+    assertTrue(config.path("cpu_profile_hotspots").isMissingNode());
+  }
+
+  @Test
+  void withCpuProfileAutoOpenAndHotspots_serializesBothFlags() {
+    ObjectNode config =
+        new ExecutableComponentBuilder("worker")
+            .withBuildTool(BuildTool.MAVEN)
+            .withCpuProfile("/tmp/profile.html")
+            .withCpuProfileAutoOpen()
+            .withHotspots()
+            .build()
+            .forFfi();
+    assertTrue(config.path("cpu_profile_auto_open").asBoolean());
+    assertTrue(config.path("cpu_profile_hotspots").asBoolean());
+  }
+
+  @Test
   void withBuildToolCustom_serializesCommandAndArgs() {
     ObjectNode config =
         new ExecutableComponentBuilder("worker")

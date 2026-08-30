@@ -1,7 +1,8 @@
-use crate::executable_component::ExecutableComponent;
+use crate::executable_component::{CpuProfileConfig, CpuProfilePreparer, ExecutableComponent};
 use crate::platform::resolve_executable_extension;
 use arena::healthcheck::ReadinessCheck;
 use arena::Component;
+use arena_profiler::CpuProfilerBackend;
 use std::path::PathBuf;
 
 pub enum BuildTool {
@@ -11,8 +12,12 @@ pub enum BuildTool {
     Dotnet,
     Make,
     CMake,
+    Python,
     Custom { command: String, args: Vec<String> },
 }
+
+pub const DOTNET_PERF_MAP_ENV_VAR: &str = "DOTNET_PerfMapEnabled";
+pub const DOTNET_PERF_MAP_ENV_VALUE: &str = "1";
 
 pub struct ExecutableComponentBuilder {
     identifier: String,
@@ -23,6 +28,10 @@ pub struct ExecutableComponentBuilder {
     env_vars: Vec<(String, String)>,
     runtime_args: Vec<(String, String)>,
     readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
+    cpu_profile_output: Option<PathBuf>,
+    cpu_profile_auto_open: bool,
+    cpu_profile_hotspots: bool,
+    cpu_profile_preparer: Option<Box<dyn CpuProfilePreparer>>,
 }
 
 const DEFAULT_READINESS_TIMEOUT_MS: u64 = 10_000;
@@ -41,6 +50,10 @@ impl ExecutableComponentBuilder {
             env_vars: Vec::new(),
             runtime_args: Vec::new(),
             readiness_checks: Vec::new(),
+            cpu_profile_output: None,
+            cpu_profile_auto_open: false,
+            cpu_profile_hotspots: false,
+            cpu_profile_preparer: None,
         }
     }
 
@@ -95,6 +108,29 @@ impl ExecutableComponentBuilder {
         self
     }
 
+    pub fn with_cpu_profile(mut self, output_path: impl Into<PathBuf>) -> Self {
+        self.cpu_profile_output = Some(output_path.into());
+        self
+    }
+
+    pub fn with_cpu_profile_auto_open(mut self) -> Self {
+        self.cpu_profile_auto_open = true;
+        self
+    }
+
+    pub fn with_hotspots(mut self) -> Self {
+        self.cpu_profile_hotspots = true;
+        self
+    }
+
+    pub fn with_cpu_profile_preparer<P>(mut self, preparer: P) -> Self
+    where
+        P: CpuProfilePreparer + 'static,
+    {
+        self.cpu_profile_preparer = Some(Box::new(preparer));
+        self
+    }
+
     pub fn build(self) -> ExecutableComponent {
         if let (Some(ref source_path), Some(ref build_tool)) = (&self.source_path, &self.build_tool)
         {
@@ -127,11 +163,13 @@ impl ExecutableComponentBuilder {
                     ))
             };
 
-            let output = Self::execute_build(build_tool, &source_dir);
+            if !matches!(build_tool, BuildTool::Python) {
+                let output = Self::execute_build(build_tool, &source_dir);
 
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                panic!("build failed: {}", stderr);
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    panic!("build failed: {}", stderr);
+                }
             }
 
             tracing::debug!(
@@ -162,13 +200,57 @@ impl ExecutableComponentBuilder {
             resolve_executable_extension(resolved)
         });
 
+        let cpu_profile_auto_open = self.cpu_profile_auto_open;
+        let cpu_profile_hotspots = self.cpu_profile_hotspots;
+        let cpu_profile = self.cpu_profile_output.map(|output_path| CpuProfileConfig {
+            backend: Self::backend_for(self.build_tool.as_ref(), &self.identifier),
+            env_vars: Self::profile_env_vars(self.build_tool.as_ref()),
+            output_path,
+            auto_open: cpu_profile_auto_open,
+            include_hotspots: cpu_profile_hotspots,
+        });
+
         let mut component = ExecutableComponent::new(self.identifier);
         component.children = self.children;
         component.executable_path = executable_path;
         component.env_vars = self.env_vars;
         component.runtime_args = self.runtime_args;
         component.readiness_checks = self.readiness_checks;
+        component.cpu_profile = cpu_profile;
+        if let Some(preparer) = self.cpu_profile_preparer {
+            component.cpu_profile_preparer = preparer;
+        }
         component
+    }
+
+    fn backend_for(build_tool: Option<&BuildTool>, identifier: &str) -> CpuProfilerBackend {
+        match build_tool {
+            Some(BuildTool::Cargo) | Some(BuildTool::Dotnet) => CpuProfilerBackend::Perf,
+            Some(BuildTool::Maven) | Some(BuildTool::Gradle) => CpuProfilerBackend::AsyncProfiler,
+            Some(BuildTool::Python) => CpuProfilerBackend::PySpy,
+            Some(BuildTool::Make) => panic!(
+                "{identifier}: .with_cpu_profile() is not supported for BuildTool::Make"
+            ),
+            Some(BuildTool::CMake) => panic!(
+                "{identifier}: .with_cpu_profile() is not supported for BuildTool::CMake"
+            ),
+            Some(BuildTool::Custom { command, .. }) => panic!(
+                "{identifier}: .with_cpu_profile() is not supported for BuildTool::Custom(\"{command}\")"
+            ),
+            None => panic!(
+                "{identifier}: .with_cpu_profile() requires a build_tool of Cargo, Dotnet, Maven, Gradle, or Python"
+            ),
+        }
+    }
+
+    fn profile_env_vars(build_tool: Option<&BuildTool>) -> Vec<(String, String)> {
+        match build_tool {
+            Some(BuildTool::Dotnet) => vec![(
+                DOTNET_PERF_MAP_ENV_VAR.to_string(),
+                DOTNET_PERF_MAP_ENV_VALUE.to_string(),
+            )],
+            _ => Vec::new(),
+        }
     }
 
     fn execute_build(build_tool: &BuildTool, source_dir: &PathBuf) -> std::process::Output {
@@ -202,6 +284,9 @@ impl ExecutableComponentBuilder {
                 .current_dir(source_dir)
                 .output()
                 .expect("failed to run cmake"),
+            BuildTool::Python => {
+                unreachable!("build() skips execute_build for BuildTool::Python")
+            }
             BuildTool::Custom { command, args } => std::process::Command::new(command)
                 .args(args)
                 .current_dir(source_dir)

@@ -1,0 +1,19 @@
+[package]
+name = "arena-profiler"
+version.workspace = true
+edition = "2021"
+authors = ["David Pope"]
+description = "CPU profiling for Arena-managed processes: attaches a per-runtime external sampler and renders results to an HTML flamegraph report via inferno."
+license = "todo"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+base64 = { workspace = true }
+inferno = { workspace = true }
+runfiles = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

@@ -31,7 +31,16 @@ pub struct ExecutableComponentConfig {
     pub readiness_checks: Option<Vec<ReadinessCheckConfig>>,
     #[serde(default)]
     pub readiness_check_url: Option<String>,
+    #[serde(default)]
+    pub cpu_profile_output: Option<String>,
+    #[serde(default)]
+    pub cpu_profile_auto_open: bool,
+    #[serde(default)]
+    pub cpu_profile_hotspots: bool,
 }
+
+const CPU_PROFILE_SUPPORTED_BUILD_TOOLS: &[&str] =
+    &["cargo", "dotnet", "maven", "gradle", "python"];
 
 pub fn build(config: &ExecutableComponentConfig) -> Result<Component, String> {
     let mut builder = ExecutableComponent::builder(&config.identifier)
@@ -54,6 +63,17 @@ pub fn build(config: &ExecutableComponentConfig) -> Result<Component, String> {
         }
     }
     builder = apply_readiness_checks(builder, &readiness_checks_for(config));
+
+    if let Some(output_path) = &config.cpu_profile_output {
+        validate_cpu_profile_build_tool(config)?;
+        builder = builder.with_cpu_profile(output_path);
+        if config.cpu_profile_auto_open {
+            builder = builder.with_cpu_profile_auto_open();
+        }
+        if config.cpu_profile_hotspots {
+            builder = builder.with_hotspots();
+        }
+    }
 
     Ok(Box::new(builder.build()))
 }
@@ -96,6 +116,21 @@ fn apply_readiness_checks(
     builder
 }
 
+fn validate_cpu_profile_build_tool(config: &ExecutableComponentConfig) -> Result<(), String> {
+    match &config.build_tool {
+        Some(BuildToolConfig::Simple(name))
+            if CPU_PROFILE_SUPPORTED_BUILD_TOOLS.contains(&name.as_str()) =>
+        {
+            Ok(())
+        }
+        _ => Err(format!(
+            "{}: cpu_profile_output requires build_tool to be one of {}",
+            config.identifier,
+            CPU_PROFILE_SUPPORTED_BUILD_TOOLS.join(", ")
+        )),
+    }
+}
+
 fn build_tool_from_config(spec: &BuildToolConfig) -> Result<BuildTool, String> {
     match spec {
         BuildToolConfig::Simple(s) => match s.as_str() {
@@ -105,6 +140,7 @@ fn build_tool_from_config(spec: &BuildToolConfig) -> Result<BuildTool, String> {
             "dotnet" => Ok(BuildTool::Dotnet),
             "make" => Ok(BuildTool::Make),
             "cmake" => Ok(BuildTool::CMake),
+            "python" => Ok(BuildTool::Python),
             other => Err(format!("unknown build_tool '{other}'")),
         },
         BuildToolConfig::Custom { command, args } => Ok(BuildTool::Custom {
