@@ -11,10 +11,13 @@ use std::time::Duration;
 use crate::arena_config::{calibration_validate_path, reset_validation_db_id};
 use crate::playbooks::{calibration_api_error_path_id, calibration_api_flaky_path_id};
 use crate::arena::{
-    axum_component_runtime, exec_web_app_port,
+    axum_component_runtime, exec_web_app_port, signed_token_with_scope,
     shared_arena, KAFKA_ID, SCENARIO_LOCK,
 };
-use crate::http::{consume_reading_created_event, create_reading, get_readings, post_reading_raw};
+use crate::http::{
+    consume_reading_created_event, create_reading, get_readings, get_readings_with_bearer_token,
+    get_readings_without_token, post_reading_raw,
+};
 
 const CONSUME_READING_CREATED_EVENT_TIMEOUT_MS: u64 = 5000;
 
@@ -87,6 +90,31 @@ fn create_reading_publishes_event_and_lists_via_http() {
             .expect("should find newly created reading");
         assert_eq!(found.user_name, "Readings API User");
         assert_eq!(found.value, 77);
+    });
+}
+
+#[test]
+fn get_readings_without_bearer_token_is_rejected() {
+    axum_component_runtime().block_on(async {
+        let _arena = shared_arena().await;
+        let status = get_readings_without_token(exec_web_app_port()).await;
+        assert_eq!(
+            status, 401,
+            "the resource server must reject a request with no bearer token, proving it actually validates against the Cognito-shaped issuer's JWKS rather than accepting requests unconditionally"
+        );
+    });
+}
+
+#[test]
+fn get_readings_with_token_missing_required_scope_is_rejected() {
+    axum_component_runtime().block_on(async {
+        let arena = shared_arena().await;
+        let token = signed_token_with_scope(arena, "other-scope");
+        let status = get_readings_with_bearer_token(exec_web_app_port(), &token).await;
+        assert_eq!(
+            status, 401,
+            "a token signed by the real issuer key but missing the required 'readings' scope must be rejected, proving the resource server enforces scope and not just signature validity"
+        );
     });
 }
 

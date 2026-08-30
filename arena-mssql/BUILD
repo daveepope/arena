@@ -61,6 +61,7 @@ rust_test(
     ) + [
         ":arena_mssql",
         "//arena",
+        "//arena-host:arena_host",
     ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,
@@ -79,6 +80,7 @@ rust_test(
     ) + [
         ":arena_mssql",
         "//arena",
+        "//arena-host:arena_host",
     ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,

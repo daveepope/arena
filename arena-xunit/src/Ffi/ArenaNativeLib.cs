@@ -18,6 +18,8 @@ internal static class ArenaNativeLib
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_hard_reset_fn(IntPtr handle, string dependencyIdentifier, out IntPtr errOut);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate int arena_find_available_port_fn(int rangeStart, int rangeEnd, int strategy, out int portOut, out IntPtr errOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void arena_set_log_level_fn(int level);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate ulong arena_add_log_target_fn(ArenaLogCallback callback, IntPtr userData);
@@ -35,6 +37,8 @@ internal static class ArenaNativeLib
     private delegate void arena_free_string_fn(IntPtr ptr);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate IntPtr arena_oauth_loopback_tls_pem_json_fn(out IntPtr errOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate IntPtr arena_oauth_sign_claims_fn(IntPtr handle, string dependencyIdentifier, string providerJson, string claimsJson, out IntPtr errOut);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate IntPtr arena_match_playbook_run_fn(IntPtr arena, string identifier, out IntPtr errOut);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -54,6 +58,7 @@ internal static class ArenaNativeLib
     private static arena_close_fn? _arena_close;
     private static arena_soft_reset_fn? _arena_soft_reset;
     private static arena_hard_reset_fn? _arena_hard_reset;
+    private static arena_find_available_port_fn? _arena_find_available_port;
     private static arena_set_log_level_fn? _arena_set_log_level;
     private static arena_add_log_target_fn? _arena_add_log_target;
     private static arena_remove_log_target_fn? _arena_remove_log_target;
@@ -63,6 +68,7 @@ internal static class ArenaNativeLib
     private static arena_dispatcher_component_allow_json_set_fn? _arena_dispatcher_component_allow_json_set;
     private static arena_free_string_fn? _arena_free_string;
     private static arena_oauth_loopback_tls_pem_json_fn? _arena_oauth_loopback_tls_pem_json;
+    private static arena_oauth_sign_claims_fn? _arena_oauth_sign_claims;
     private static arena_match_playbook_run_fn? _arena_match_playbook_run;
     private static arena_active_playbook_drop_fn? _arena_active_playbook_drop;
     private static arena_http_playbook_open_fn? _arena_http_playbook_open;
@@ -107,6 +113,7 @@ internal static class ArenaNativeLib
             LoadFunction(out _arena_close, "arena_close");
             LoadFunction(out _arena_soft_reset, "arena_soft_reset");
             LoadFunction(out _arena_hard_reset, "arena_hard_reset");
+            LoadFunction(out _arena_find_available_port, "arena_find_available_port");
             LoadFunction(out _arena_set_log_level, "arena_set_log_level");
             LoadFunction(out _arena_add_log_target, "arena_add_log_target");
             LoadFunction(out _arena_remove_log_target, "arena_remove_log_target");
@@ -116,6 +123,7 @@ internal static class ArenaNativeLib
             LoadFunction(out _arena_dispatcher_component_allow_json_set, "arena_dispatcher_component_allow_json_set");
             LoadFunction(out _arena_free_string, "arena_free_string");
             LoadFunction(out _arena_oauth_loopback_tls_pem_json, "arena_oauth_loopback_tls_pem_json");
+            LoadFunction(out _arena_oauth_sign_claims, "arena_oauth_sign_claims");
             LoadFunction(out _arena_match_playbook_run, "arena_match_playbook_run");
             LoadFunction(out _arena_active_playbook_drop, "arena_active_playbook_drop");
             LoadFunction(out _arena_http_playbook_open, "arena_http_playbook_open");
@@ -207,6 +215,9 @@ internal static class ArenaNativeLib
     internal static int arena_hard_reset(IntPtr handle, string dependencyIdentifier, out IntPtr errOut) =>
         _arena_hard_reset!.Invoke(handle, dependencyIdentifier, out errOut);
 
+    internal static int arena_find_available_port(int rangeStart, int rangeEnd, int strategy, out int portOut, out IntPtr errOut) =>
+        _arena_find_available_port!.Invoke(rangeStart, rangeEnd, strategy, out portOut, out errOut);
+
     internal static void arena_set_log_level(int level) =>
         _arena_set_log_level!.Invoke(level);
 
@@ -233,6 +244,9 @@ internal static class ArenaNativeLib
 
     internal static IntPtr arena_oauth_loopback_tls_pem_json(out IntPtr errOut) =>
         _arena_oauth_loopback_tls_pem_json!.Invoke(out errOut);
+
+    internal static IntPtr arena_oauth_sign_claims(IntPtr handle, string dependencyIdentifier, string providerJson, string claimsJson, out IntPtr errOut) =>
+        _arena_oauth_sign_claims!.Invoke(handle, dependencyIdentifier, providerJson, claimsJson, out errOut);
 
     internal static IntPtr arena_match_playbook_run(IntPtr arena, string identifier, out IntPtr errOut) =>
         _arena_match_playbook_run!.Invoke(arena, identifier, out errOut);

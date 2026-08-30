@@ -27,5 +27,6 @@ aws-smithy-http-client = { workspace = true }
 zip = { workspace = true }
 
 [dev-dependencies]
+arena-host = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing-subscriber = { workspace = true }

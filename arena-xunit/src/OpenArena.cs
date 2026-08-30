@@ -116,7 +116,7 @@ public sealed class OpenArena : IDisposable
         throw new AggregateException("one or more session playbooks failed verification on arena close", errors);
     }
 
-    private void ThrowIfDisposed()
+    internal void ThrowIfDisposed()
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(OpenArena));

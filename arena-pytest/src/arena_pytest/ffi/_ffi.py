@@ -432,6 +432,15 @@ def load_ffi() -> Optional[ArenaNativeLib]:
     ]
     lib.arena_hard_reset.restype = ctypes.c_int
 
+    lib.arena_find_available_port.argtypes = [
+        ctypes.c_int32,
+        ctypes.c_int32,
+        ctypes.c_int32,
+        ctypes.POINTER(ctypes.c_int32),
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    lib.arena_find_available_port.restype = ctypes.c_int
+
     lib.arena_set_log_level.argtypes = [ctypes.c_int]
     lib.arena_set_log_level.restype = None
 
@@ -465,6 +474,15 @@ def load_ffi() -> Optional[ArenaNativeLib]:
 
     lib.arena_oauth_loopback_tls_pem_json.argtypes = [ctypes.POINTER(ctypes.c_void_p)]
     lib.arena_oauth_loopback_tls_pem_json.restype = ctypes.c_void_p
+
+    lib.arena_oauth_sign_claims.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    lib.arena_oauth_sign_claims.restype = ctypes.c_void_p
 
     lib.arena_match_playbook_run.argtypes = [
         ctypes.c_void_p,
@@ -583,6 +601,32 @@ def soft_reset(ffi: ArenaNativeLib, handle: int, dependency_identifier: str) -> 
 
 def hard_reset(ffi: ArenaNativeLib, handle: int, dependency_identifier: str) -> None:
     _reset(ffi, ffi.lib.arena_hard_reset, handle, dependency_identifier)
+
+
+def oauth_sign_claims(
+    ffi: ArenaNativeLib,
+    handle: int,
+    dependency_identifier: str,
+    provider_json: str,
+    claims_json: str,
+) -> str:
+    if not handle:
+        raise ArenaBindingError("oauth_sign_claims called on closed arena")
+    err = ctypes.c_void_p()
+    raw = ffi.lib.arena_oauth_sign_claims(
+        handle,
+        dependency_identifier.encode("utf-8"),
+        provider_json.encode("utf-8"),
+        claims_json.encode("utf-8"),
+        ctypes.byref(err),
+    )
+    if not raw:
+        msg = _take_err(err, ffi) or "arena_oauth_sign_claims returned null"
+        raise ArenaBindingError(msg)
+    try:
+        return ctypes.string_at(raw).decode("utf-8")
+    finally:
+        ffi.lib.arena_free_string(raw)
 
 
 def match_playbook_run(

@@ -37,14 +37,16 @@ import arena.junit.dep.temporal.TemporalDependencyBuilder;
 import arena.junit.exec.ExecutableComponent;
 import arena.junit.exec.ExecutableComponentBuilder;
 import arena.junit.ffi.ArenaLogLevel;
+import arena.examples.oauth.OauthClaims;
 import arena.junit.oauth.OauthDependency;
 import arena.junit.oauth.OauthDependencyBuilder;
 import arena.junit.oauth.OauthLoopbackTls;
+import arena.junit.oauth.OauthSigner;
+import arena.junit.oauth.Provider;
 import arena.junit.playbook.LocalstackModels;
 import arena.junit.readiness.HttpReadinessCheck;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
@@ -54,17 +56,10 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.KeyStore;
-import java.security.SecureRandom;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateFactory;
 import java.time.Duration;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManagerFactory;
 import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
 import org.slf4j.Logger;
@@ -107,6 +102,8 @@ public final class ComponentTestSuite {
   private static final String TEMPORAL_TARGET = "127.0.0.1:" + TEMPORAL_GRPC_PORT;
   private static final int OAUTH_PORT = RT.oauthPort;
   private static final String OAUTH_ISSUER = RT.oauthIssuer;
+  private static final String OAUTH_COGNITO_POOL_ID = "us-east-1_exampleUsers";
+  private static final String OAUTH_PROVIDER_ISSUER = OAUTH_ISSUER + "/" + OAUTH_COGNITO_POOL_ID;
   private static final String POSTGRES_DB_NAME = "readings_db";
   private static final String POSTGRES_DB_USER = "readings_user";
   private static final String POSTGRES_DB_PASS = "readings_password";
@@ -133,7 +130,6 @@ public final class ComponentTestSuite {
   private static final String MSSQL_JDBC_URL =
       SeedValidationReadingPlaybook.jdbcUrl(MSSQL_PORT, MSSQL_DB_NAME, MSSQL_DB_USER, MSSQL_DB_PASS);
 
-  private static String accessToken;
   private static SqsClient sqsClient;
   private static String sqsQueueUrl;
   static long readingsDeviceId;
@@ -145,6 +141,7 @@ public final class ComponentTestSuite {
           .withListenIp("0.0.0.0")
           .withServerTlsPem(OAUTH_PEM.certificatePem(), OAUTH_PEM.privateKeyPem())
           .withMetadataBaseUrl(OAUTH_ISSUER)
+          .withIssuerCognito(OAUTH_COGNITO_POOL_ID)
           .build();
 
   @ArenaDependency(logs = false)
@@ -241,7 +238,6 @@ public final class ComponentTestSuite {
 
   @ArenaAfterOpen
   static void afterOpen() throws Exception {
-    fetchAccessToken();
     readingsDeviceId = apiClient().createDevice("Readings Component Test Device");
     var creds =
         StaticCredentialsProvider.create(
@@ -345,7 +341,7 @@ public final class ComponentTestSuite {
         .withEnvVar("TEMPORAL_TARGET", TEMPORAL_TARGET)
         .withEnvVar("SMTP_HOST", "127.0.0.1")
         .withEnvVar("SMTP_PORT", String.valueOf(SMTP_HOST_PORT))
-        .withEnvVar("OAUTH_ISSUER_URL", OAUTH_ISSUER)
+        .withEnvVar("OAUTH_ISSUER_URL", OAUTH_PROVIDER_ISSUER)
         .withEnvVar("OAUTH_TLS_CA_FILE", OAUTH_CA_PATH)
         .withEnvVar("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
         .withEnvVar("AWS_ENDPOINT_URL", LOCALSTACK_ENDPOINT)
@@ -374,64 +370,30 @@ public final class ComponentTestSuite {
     }
   }
 
-  private static void fetchAccessToken() throws Exception {
-    HttpClient client = oauthHttpClient();
-    HttpResponse<String> disc =
-        client.send(
-            HttpRequest.newBuilder()
-                .uri(URI.create(OAUTH_ISSUER + "/.well-known/oauth-authorization-server"))
-                .GET()
-                .timeout(Duration.ofSeconds(30))
-                .build(),
-            HttpResponse.BodyHandlers.ofString());
-    assertEquals(200, disc.statusCode(), disc.body());
-    String tokenUrl = MAPPER.readTree(disc.body()).get("token_endpoint").asText();
-    String form = "grant_type=client_credentials&client_id=arena-examples&scope=readings";
-    HttpResponse<String> tok =
-        client.send(
-            HttpRequest.newBuilder()
-                .uri(URI.create(tokenUrl))
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .POST(HttpRequest.BodyPublishers.ofString(form))
-                .timeout(Duration.ofSeconds(30))
-                .build(),
-            HttpResponse.BodyHandlers.ofString());
-    assertEquals(200, tok.statusCode(), tok.body());
-    accessToken = MAPPER.readTree(tok.body()).get("access_token").asText();
+  static String claimsWithScope(String scope) throws Exception {
+    return OauthClaims.withScope(MAPPER, OAUTH_PROVIDER_ISSUER, scope);
   }
 
-  private static HttpClient oauthHttpClient() throws Exception {
-    return HttpClient.newBuilder()
-        .sslContext(sslContextFromPemFile(OAUTH_CA_PATH))
-        .connectTimeout(Duration.ofSeconds(30))
-        .build();
+  static Provider oauthProvider() {
+    return new Provider.Cognito(OAUTH_COGNITO_POOL_ID);
   }
 
-  private static SSLContext sslContextFromPemFile(String path) throws Exception {
-    String pem = Files.readString(Path.of(path), StandardCharsets.UTF_8);
-    CertificateFactory cf = CertificateFactory.getInstance("X.509");
-    Collection<? extends Certificate> certs =
-        cf.generateCertificates(new ByteArrayInputStream(pem.getBytes(StandardCharsets.UTF_8)));
-    KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
-    ks.load(null);
-    int i = 0;
-    for (Certificate c : certs) {
-      ks.setCertificateEntry("ca" + i++, c);
-    }
-    TrustManagerFactory tmf =
-        TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-    tmf.init(ks);
-    SSLContext ctx = SSLContext.getInstance("TLS");
-    ctx.init(null, tmf.getTrustManagers(), new SecureRandom());
-    return ctx;
+  static ApiClient apiClient() throws Exception {
+    String token =
+        OauthSigner.forFixture(ComponentTestSuite.class)
+            .sign(oauthProvider(), claimsWithScope("readings"));
+    return new ApiClient("http://127.0.0.1:" + WEB_APP_PORT, token, MAPPER);
   }
 
-  static ApiClient apiClient() {
-    return new ApiClient("http://127.0.0.1:" + WEB_APP_PORT, accessToken, MAPPER);
+  static ApiClient apiClient2() throws Exception {
+    String token =
+        OauthSigner.forFixture(ComponentTestSuite.class)
+            .sign(oauthProvider(), claimsWithScope("readings"));
+    return new ApiClient("http://127.0.0.1:" + WEB_APP_2_PORT, token, MAPPER);
   }
 
-  static ApiClient apiClient2() {
-    return new ApiClient("http://127.0.0.1:" + WEB_APP_2_PORT, accessToken, MAPPER);
+  static String webAppBaseUrl() {
+    return "http://127.0.0.1:" + WEB_APP_PORT;
   }
 
   static void waitDeviceProvisionedEmail(String needle) throws Exception {

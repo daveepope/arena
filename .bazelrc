@@ -1,6 +1,9 @@
 test --test_verbose_timeout_warnings
 test --test_env=RUST_LOG=info
-test --test_output=streamed
+test --test_output=errors
+
+common:stream --test_output=streamed
+common:stream --test_summary=detailed
 common --java_runtime_version=remotejdk_25
 common --tool_java_runtime_version=remotejdk_25
 common --java_header_compilation=false
@@ -19,6 +22,9 @@ build:ci --keep_going
 common --noremote_upload_local_results
 common --remote_cache_compression
 common --nolegacy_important_outputs
+
+common --enable_platform_specific_config
+build:linux --@rules_rust//rust/settings:extra_rustc_flag=-Clink-arg=-fuse-ld=mold
 
 common:ci --remote_cache=grpcs://arena.buildbuddy.io
 common:ci --remote_timeout=10m

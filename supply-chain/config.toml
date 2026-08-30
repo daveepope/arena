@@ -219,6 +219,10 @@ criteria = "safe-to-deploy"
 version = "1.2.60"
 criteria = "safe-to-deploy"
 
+[[exemptions.chacha20]]
+version = "0.10.2"
+criteria = "safe-to-deploy"
+
 [[exemptions.chrono]]
 version = "0.4.44"
 criteria = "safe-to-deploy"
@@ -1040,7 +1044,7 @@ version = "0.6.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.spin]]
-version = "0.9.8"
+version = "0.9.9"
 criteria = "safe-to-deploy"
 
 [[exemptions.spki]]

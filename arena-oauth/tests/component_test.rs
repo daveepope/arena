@@ -1,6 +1,9 @@
 use arena::dependency::RunnableDependency;
-use arena_oauth::{ensure_scopes, OauthDependency, TokenError};
-use serde_json::Value;
+use arena_oauth::{ensure_scopes, IssuerConfig, OauthDependency, Provider, TokenError};
+use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+use rsa::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
+use rsa::RsaPrivateKey;
+use serde_json::{json, Value};
 
 fn init_test_logging() {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
@@ -286,4 +289,293 @@ async fn oauth_dependency_issued_token_scope_claims_enforce_ensure_scopes() {
     );
 
     dep.stop().await;
+}
+
+fn decoding_key_for(dep: &OauthDependency, provider: &Provider) -> jsonwebtoken::DecodingKey {
+    let pem = dep.signing_key_pem_for(provider).expect("signing key pem");
+    let private_key = RsaPrivateKey::from_pkcs8_pem(&pem).expect("parse pkcs8 pem");
+    let public_pem = private_key
+        .to_public_key()
+        .to_public_key_pem(LineEnding::LF)
+        .expect("public key pem");
+    jsonwebtoken::DecodingKey::from_rsa_pem(public_pem.as_bytes()).expect("build decoding key")
+}
+
+fn unpublished_key_token(claims: &Value) -> String {
+    let mut rng = rand::thread_rng();
+    let private_key = RsaPrivateKey::new(&mut rng, 2048).expect("generate rsa key");
+    let pem = private_key
+        .to_pkcs8_pem(LineEnding::LF)
+        .expect("encode pkcs8 pem");
+    let encoding_key = EncodingKey::from_rsa_pem(pem.as_bytes()).expect("build encoding key");
+    encode(&Header::new(Algorithm::RS256), claims, &encoding_key).expect("sign with unpublished key")
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn oauth_dependency_with_cognito_and_okta_issuers_reproduces_mixed_topology_use_case() {
+    init_test_logging();
+    let cognito_provider = Provider::Cognito {
+        pool_id: "us-east-1_abc123".to_string(),
+    };
+    let okta_provider = Provider::Okta;
+    let mut dep = OauthDependency::builder("oauth cognito okta mixed")
+        .with_http()
+        .with_provider(cognito_provider.clone())
+        .with_provider(okta_provider.clone())
+        .build();
+    dep.start().await;
+
+    let base = dep
+        .base_url()
+        .expect("base_url after start")
+        .trim_end_matches('/')
+        .to_string();
+    let client = reqwest::Client::new();
+
+    let cognito_jwks: Value = client
+        .get(format!("{base}/us-east-1_abc123/.well-known/jwks.json"))
+        .send()
+        .await
+        .expect("cognito jwks GET")
+        .error_for_status()
+        .expect("cognito jwks status")
+        .json()
+        .await
+        .expect("cognito jwks JSON");
+    let okta_jwks: Value = client
+        .get(format!("{base}/v1/keys"))
+        .send()
+        .await
+        .expect("okta jwks GET")
+        .error_for_status()
+        .expect("okta jwks status")
+        .json()
+        .await
+        .expect("okta jwks JSON");
+    let cognito_kid = cognito_jwks["keys"][0]["kid"].as_str().expect("cognito kid");
+    let okta_kid = okta_jwks["keys"][0]["kid"].as_str().expect("okta kid");
+    assert_ne!(
+        cognito_kid, okta_kid,
+        "each issuer must publish a distinct signing key"
+    );
+
+    let cognito_issuer = dep.issuer_for(&cognito_provider).expect("cognito issuer");
+    let okta_issuer = dep.issuer_for(&okta_provider).expect("okta issuer");
+    assert_eq!(cognito_issuer, format!("{base}/us-east-1_abc123"));
+    assert_eq!(okta_issuer, base);
+
+    let cognito_claims = json!({
+        "iss": cognito_issuer,
+        "sub": "test-subject",
+        "exp": 9_999_999_999u64,
+        "iat": 0,
+    });
+    let cognito_token = dep
+        .sign_claims(&cognito_provider, &cognito_claims)
+        .expect("sign cognito token");
+    dep.verify_access_token(&cognito_token)
+        .expect("dependency verify_access_token succeeds for the default issuer's token");
+
+    let okta_claims = json!({
+        "iss": okta_issuer,
+        "sub": "test-subject",
+        "exp": 9_999_999_999u64,
+        "iat": 0,
+    });
+    let okta_token = dep
+        .sign_claims(&okta_provider, &okta_claims)
+        .expect("sign okta token");
+    dep.verify_access_token(&okta_token).expect(
+        "dependency verify_access_token succeeds for a non-default (Okta) issuer's token",
+    );
+
+    let mut cognito_validation = jsonwebtoken::Validation::new(Algorithm::RS256);
+    cognito_validation.set_issuer(&[cognito_issuer.as_str()]);
+    jsonwebtoken::decode::<Value>(
+        &cognito_token,
+        &decoding_key_for(&dep, &cognito_provider),
+        &cognito_validation,
+    )
+    .expect("cognito token verifies against cognito's own key");
+
+    let mut okta_validation = jsonwebtoken::Validation::new(Algorithm::RS256);
+    okta_validation.set_issuer(&[cognito_issuer.as_str()]);
+    jsonwebtoken::decode::<Value>(
+        &cognito_token,
+        &decoding_key_for(&dep, &okta_provider),
+        &okta_validation,
+    )
+    .expect_err("cognito token must not verify against okta's key");
+
+    let forged_claims = json!({
+        "iss": cognito_issuer,
+        "sub": "attacker",
+        "exp": 9_999_999_999u64,
+        "iat": 0,
+    });
+    let forged_token = unpublished_key_token(&forged_claims);
+    jsonwebtoken::decode::<Value>(
+        &forged_token,
+        &decoding_key_for(&dep, &cognito_provider),
+        &cognito_validation,
+    )
+    .expect_err("token signed by an unpublished key must not verify against cognito's key");
+    jsonwebtoken::decode::<Value>(
+        &forged_token,
+        &decoding_key_for(&dep, &okta_provider),
+        &okta_validation,
+    )
+    .expect_err("token signed by an unpublished key must not verify against okta's key");
+    dep.verify_access_token(&forged_token)
+        .expect_err("dependency verify_access_token must reject a token signed by an unpublished key against every registered issuer");
+
+    let introspect_url = format!("{base}/oauth/introspect");
+    let okta_introspect: Value = client
+        .post(&introspect_url)
+        .form(&[("token", okta_token.as_str())])
+        .send()
+        .await
+        .expect("okta introspect POST")
+        .error_for_status()
+        .expect("okta introspect status")
+        .json()
+        .await
+        .expect("okta introspect JSON");
+    assert_eq!(
+        okta_introspect["active"].as_bool(),
+        Some(true),
+        "introspection must recognize a valid non-default (Okta) issuer's token as active"
+    );
+
+    let forged_introspect: Value = client
+        .post(&introspect_url)
+        .form(&[("token", forged_token.as_str())])
+        .send()
+        .await
+        .expect("forged introspect POST")
+        .error_for_status()
+        .expect("forged introspect status")
+        .json()
+        .await
+        .expect("forged introspect JSON");
+    assert_eq!(forged_introspect["active"].as_bool(), Some(false));
+
+    dep.stop().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn oauth_dependency_serves_jwks_and_verifiable_tokens_across_all_providers() {
+    init_test_logging();
+
+    enum IssuerSource {
+        Provider(Provider),
+        Custom(IssuerConfig),
+    }
+
+    struct Case {
+        name: &'static str,
+        source: IssuerSource,
+        provider: Provider,
+        expected_issuer_path: &'static str,
+        expected_jwks_path: &'static str,
+    }
+
+    let cases = vec![
+        Case {
+            name: "cognito",
+            source: IssuerSource::Provider(Provider::Cognito {
+                pool_id: "pool-x".to_string(),
+            }),
+            provider: Provider::Cognito {
+                pool_id: "pool-x".to_string(),
+            },
+            expected_issuer_path: "/pool-x",
+            expected_jwks_path: "/pool-x/.well-known/jwks.json",
+        },
+        Case {
+            name: "okta",
+            source: IssuerSource::Provider(Provider::Okta),
+            provider: Provider::Okta,
+            expected_issuer_path: "",
+            expected_jwks_path: "/v1/keys",
+        },
+        Case {
+            name: "entra_id",
+            source: IssuerSource::Provider(Provider::EntraId {
+                tenant_id: "tenant-x".to_string(),
+            }),
+            provider: Provider::EntraId {
+                tenant_id: "tenant-x".to_string(),
+            },
+            expected_issuer_path: "/tenant-x/v2.0",
+            expected_jwks_path: "/tenant-x/discovery/v2.0/keys",
+        },
+        Case {
+            name: "custom",
+            source: IssuerSource::Custom(
+                IssuerConfig::new()
+                    .with_issuer_path("/custom")
+                    .with_jwks_path("/custom/keys"),
+            ),
+            provider: Provider::Custom {
+                issuer_path: Some("/custom".to_string()),
+            },
+            expected_issuer_path: "/custom",
+            expected_jwks_path: "/custom/keys",
+        },
+    ];
+
+    for case in cases {
+        let builder = OauthDependency::builder(format!("oauth provider matrix {}", case.name))
+            .with_http();
+        let builder = match case.source {
+            IssuerSource::Provider(provider) => builder.with_provider(provider),
+            IssuerSource::Custom(config) => builder.with_issuer(config),
+        };
+        let mut dep = builder.build();
+        dep.start().await;
+
+        let base = dep
+            .base_url()
+            .unwrap_or_else(|| panic!("{}: base_url after start", case.name))
+            .trim_end_matches('/')
+            .to_string();
+        let client = reqwest::Client::new();
+
+        let jwks_url = format!("{base}{}", case.expected_jwks_path);
+        let jwks: Value = client
+            .get(&jwks_url)
+            .send()
+            .await
+            .unwrap_or_else(|e| panic!("{}: jwks GET failed: {e}", case.name))
+            .error_for_status()
+            .unwrap_or_else(|e| panic!("{}: jwks status: {e}", case.name))
+            .json()
+            .await
+            .unwrap_or_else(|e| panic!("{}: jwks JSON: {e}", case.name));
+        assert!(
+            jwks["keys"][0]["kid"].as_str().is_some(),
+            "{}: expected kid in jwks",
+            case.name
+        );
+
+        let issuer = dep
+            .issuer_for(&case.provider)
+            .unwrap_or_else(|| panic!("{}: issuer_for", case.name));
+        assert_eq!(
+            issuer,
+            format!("{base}{}", case.expected_issuer_path),
+            "{}: issuer path mismatch",
+            case.name
+        );
+
+        let claims = json!({ "iss": issuer, "sub": "test-subject", "exp": 9_999_999_999u64, "iat": 0 });
+        let token = dep
+            .sign_claims(&case.provider, &claims)
+            .unwrap_or_else(|e| panic!("{}: sign_claims: {e}", case.name));
+        dep.verify_access_token(&token)
+            .unwrap_or_else(|e| panic!("{}: verify_access_token: {e:?}", case.name));
+
+        dep.stop().await;
+    }
 }

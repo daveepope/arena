@@ -5,9 +5,9 @@ use async_trait::async_trait;
 
 use crate::builder::OauthDependencyBuilder;
 use arena_cryptography::ephemeral_tls;
-use crate::keys::RsaKeyPair;
-use crate::oauth_common::OauthListenAddr;
+use crate::oauth_common::{IssuerRegistration, OauthListenAddr};
 use crate::oauth_server::OauthServer;
+use crate::provider::Provider;
 use crate::token::{AccessTokenClaims, TokenError};
 
 pub(crate) enum OauthTlsPlan {
@@ -23,7 +23,7 @@ pub struct OauthDependency {
     running: bool,
     needs_teardown: bool,
     children_started: bool,
-    keys: RsaKeyPair,
+    issuers: Vec<IssuerRegistration>,
     scopes_supported: Vec<String>,
     token_ttl_secs: u64,
     active_server_tls: Option<(String, String)>,
@@ -34,7 +34,7 @@ pub struct OauthDependency {
 impl OauthDependency {
     pub(crate) fn new(
         identifier: String,
-        keys: RsaKeyPair,
+        issuers: Vec<IssuerRegistration>,
         listen: OauthListenAddr,
         dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
         scopes_supported: Vec<String>,
@@ -63,7 +63,7 @@ impl OauthDependency {
             running: false,
             needs_teardown: false,
             children_started: false,
-            keys,
+            issuers,
             scopes_supported,
             token_ttl_secs,
             active_server_tls,
@@ -81,7 +81,9 @@ impl OauthDependency {
     }
 
     pub fn issuer(&self) -> Option<String> {
-        self.base_url().map(|b| b.trim_end_matches('/').to_string())
+        let issuer = self.issuers.first()?;
+        let base = self.base_url()?.trim_end_matches('/');
+        Some(format!("{base}{}", issuer.issuer_path))
     }
 
     pub fn server_tls_certificate_pem(&self) -> Option<&str> {
@@ -93,7 +95,61 @@ impl OauthDependency {
             .oauth_server
             .signing_state()
             .ok_or(TokenError::NotRunning)?;
-        crate::token::verify_access_token(token, state.keys.as_ref(), &state.metadata.issuer)
+        let base = self
+            .base_url()
+            .ok_or(TokenError::NotRunning)?
+            .trim_end_matches('/');
+        let mut first_err: Option<TokenError> = None;
+        for issuer in state.issuers.iter() {
+            let issuer_string = format!("{base}{}", issuer.issuer_path);
+            match crate::token::verify_access_token(token, &issuer.keys, &issuer_string) {
+                Ok(claims) => return Ok(claims),
+                Err(e) => {
+                    if first_err.is_none() {
+                        first_err = Some(e);
+                    }
+                }
+            }
+        }
+        Err(first_err.unwrap_or(TokenError::NotRunning))
+    }
+
+    pub fn issuer_count(&self) -> usize {
+        self.issuers.len()
+    }
+
+    pub fn jwks_path_at(&self, index: usize) -> Option<&str> {
+        self.issuers.get(index).map(|i| i.jwks_path.as_str())
+    }
+
+    pub fn issuer_path_at(&self, index: usize) -> Option<&str> {
+        self.issuers.get(index).map(|i| i.issuer_path.as_str())
+    }
+
+    pub fn issuer_for(&self, provider: &Provider) -> Option<String> {
+        let issuer = self.issuers.iter().find(|i| &i.provider == provider)?;
+        let base = self.base_url()?.trim_end_matches('/');
+        Some(format!("{base}{}", issuer.issuer_path))
+    }
+
+    pub fn signing_key_pem_for(&self, provider: &Provider) -> Option<String> {
+        self.issuers
+            .iter()
+            .find(|i| &i.provider == provider)
+            .and_then(|issuer| issuer.keys.private_key_pkcs8_pem().ok())
+    }
+
+    pub fn sign_claims(
+        &self,
+        provider: &Provider,
+        claims: &serde_json::Value,
+    ) -> Result<String, String> {
+        let issuer = self
+            .issuers
+            .iter()
+            .find(|i| &i.provider == provider)
+            .ok_or_else(|| format!("no issuer registered for provider {provider:?}"))?;
+        issuer.keys.sign_claims(claims)
     }
 
     fn tls_pair_for_listen(&mut self) -> Option<(String, String)> {
@@ -139,7 +195,7 @@ impl RunnableDependency for OauthDependency {
             .start(
                 &self.identifier,
                 self.listen,
-                self.keys.clone(),
+                self.issuers.clone(),
                 self.scopes_supported.clone(),
                 self.token_ttl_secs,
                 tls_for_server,

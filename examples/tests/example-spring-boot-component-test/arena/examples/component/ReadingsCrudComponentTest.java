@@ -8,10 +8,18 @@ import arena.examples.playbooks.ResetValidationDbPlaybook;
 import arena.examples.playbooks.SeedValidationReadingPlaybook;
 import arena.junit.Arena;
 import arena.junit.Playbook;
+import arena.junit.oauth.ArenaOauthSigner;
+import arena.junit.oauth.OauthSigner;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 @Arena(ComponentTestSuite.class)
+@ArenaOauthSigner
 final class ReadingsCrudComponentTest {
 
   @Test
@@ -59,5 +67,46 @@ final class ReadingsCrudComponentTest {
   @Playbook(SeedValidationReadingPlaybook.class)
   void seedValidationReadingPlaybook_rowVisibleBeforeTestBody() throws Exception {
     assertEquals(1, ComponentTestSuite.seededValidationRowCount());
+  }
+
+  @Test
+  void getReadingsWithoutBearerToken_isRejected() throws Exception {
+    HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    HttpResponse<String> response =
+        client.send(
+            HttpRequest.newBuilder()
+                .uri(URI.create(ComponentTestSuite.webAppBaseUrl() + "/readings"))
+                .GET()
+                .timeout(Duration.ofSeconds(10))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertEquals(
+        401,
+        response.statusCode(),
+        "the resource server must reject a request with no bearer token, proving it actually "
+            + "validates against the Cognito-shaped issuer's JWKS rather than accepting requests "
+            + "unconditionally");
+  }
+
+  @Test
+  void getReadingsWithTokenMissingRequiredScope_isRejected(OauthSigner signer) throws Exception {
+    String token =
+        signer.sign(ComponentTestSuite.oauthProvider(), ComponentTestSuite.claimsWithScope("other-scope"));
+    HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    HttpResponse<String> response =
+        client.send(
+            HttpRequest.newBuilder()
+                .uri(URI.create(ComponentTestSuite.webAppBaseUrl() + "/readings"))
+                .header("Authorization", "Bearer " + token)
+                .GET()
+                .timeout(Duration.ofSeconds(10))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertEquals(
+        401,
+        response.statusCode(),
+        "a token signed by the real issuer key but missing the required 'readings' scope must "
+            + "be rejected, proving the resource server enforces scope and not just signature "
+            + "validity");
   }
 }

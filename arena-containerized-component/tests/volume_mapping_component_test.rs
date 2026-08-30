@@ -25,7 +25,10 @@ fn unique_host_dir(name: &str) -> PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("system clock")
         .as_nanos();
-    let dir = std::env::temp_dir().join(format!(
+    let base = std::env::var_os("TEST_TMPDIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir);
+    let dir = base.join(format!(
         "arena-containerized-component-{name}-{}-{nanos}",
         std::process::id(),
     ));

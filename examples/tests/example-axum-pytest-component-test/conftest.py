@@ -26,6 +26,7 @@ if not _arena_plugin_already_registered_via_entry_point():
     pytest_plugins = ("arena_pytest.arena",)
 
 from api_http import ApiClient
+from oauth_claims import claims_with_scope
 from playbook_fixtures import active_http_playbook
 from playbooks import (
     CalibrationApiErrorPathPlaybook,
@@ -71,6 +72,7 @@ from arena_pytest import (
     ArenaLogLevel,
     BuildTool,
     ClosedArena,
+    Custom,
     ExecutableComponentBuilder,
     HttpDependencyBuilder,
     HttpReadinessCheck,
@@ -80,6 +82,7 @@ from arena_pytest import (
     MssqlDependencyBuilder,
     OauthDependencyBuilder,
     PostgresDependencyBuilder,
+    oauth_signer_fixture,
 )
 _LOG = logging.getLogger(__name__)
 
@@ -142,16 +145,22 @@ def _find_web_app_binary() -> str:
     return os.path.join(repo_root, "target", "release", "example-readings-axum-web-app")
 
 
+_OAUTH: object | None = None
+
+
 def _build_oauth():
-    cert, key, _ = _arena_oauth_tls_session()
-    return (
-        OauthDependencyBuilder(DEP_NAME_OAUTH)
-        .with_port(OAUTH_PORT)
-        .with_listen_ip("0.0.0.0")
-        .with_server_tls_pem(cert, key)
-        .with_metadata_base_url(OAUTH_ISSUER)
-        .build()
-    )
+    global _OAUTH
+    if _OAUTH is None:
+        cert, key, _ = _arena_oauth_tls_session()
+        _OAUTH = (
+            OauthDependencyBuilder(DEP_NAME_OAUTH)
+            .with_port(OAUTH_PORT)
+            .with_listen_ip("0.0.0.0")
+            .with_server_tls_pem(cert, key)
+            .with_metadata_base_url(OAUTH_ISSUER)
+            .build()
+        )
+    return _OAUTH
 
 
 def _build_postgres(startup_sql: list[str]):
@@ -288,35 +297,18 @@ def closed_arena() -> ClosedArena:
     )
 
 
-def _fetch_oauth_access_token() -> str:
-    import requests
 
-    _, _, ca = _arena_oauth_tls_session()
-    s = requests.Session()
-    s.verify = ca
-    issuer = OAUTH_ISSUER
-    disc = s.get(f"{issuer}/.well-known/oauth-authorization-server", timeout=30)
-    disc.raise_for_status()
-    token_url = disc.json()["token_endpoint"]
-    tok = s.post(
-        token_url,
-        data={
-            "grant_type": "client_credentials",
-            "client_id": "arena-examples",
-        },
-        timeout=30,
-    )
-    tok.raise_for_status()
-    return str(tok.json()["access_token"])
+
+oauth_signer = oauth_signer_fixture(_build_oauth)
 
 
 @pytest.fixture(scope="session")
-def api_client(arena, base_url) -> ApiClient:
+async def api_client(oauth_signer, base_url) -> ApiClient:
     import requests
 
-    _ = arena
     session = requests.Session()
-    session.headers.update({"Authorization": f"Bearer {_fetch_oauth_access_token()}"})
+    token = await oauth_signer.sign(Custom(), claims_with_scope(OAUTH_ISSUER, "readings"))
+    session.headers.update({"Authorization": f"Bearer {token}"})
     return ApiClient(base_url, session)
 
 

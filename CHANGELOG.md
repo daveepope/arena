@@ -5,6 +5,36 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.2.0]
+
+### Added
+
+- `arena-oauth`: multi-issuer support on `OauthDependency` via `with_issuer`/`with_provider` (#218)
+- `arena-oauth`: `Provider` presets for Cognito, Okta, and Entra ID (#218)
+- `arena-oauth`: `sign_claims`/`signing_key_pem`/`issuer_at`/`issuer_count` on `OauthDependency` (#218)
+- `arena-ffi`: `arena_oauth_sign_claims` (#218)
+- `arena-pytest`, `arena-junit`, `arena-xunit`: `with_issuer_cognito`/`with_issuer_okta`/`with_issuer_entra_id`/`with_issuer`/`sign_claims` bindings (#218)
+- Example apps (Rust, Spring Boot, ASP.NET): Cognito-shaped OAuth provider in test fixtures (#218)
+- `arena-junit`: `OauthSigner`/`@ArenaOauthSigner` for injecting a per-test OAuth signer (#218)
+- `arena-xunit`: `ArenaCollectionFixture.Signer`/`GetDependency<T>()` for injecting a per-fixture OAuth signer (#218)
+- `arena-pytest`: `oauth_signer_fixture` for wiring an `OauthSigner` pytest fixture (#218)
+- `arena-host`: new crate providing `find_available_port`/`PortSearchStrategy` for zero-dependency, process-safe free TCP port discovery (#202)
+- `arena-ffi`: `arena_find_available_port` (#202)
+- `arena-pytest`, `arena-junit`, `arena-xunit`: `find_available_port`/`ArenaHost` bindings, `PortSearchStrategy`, `ArenaPortNotFoundError`/`ArenaPortNotFoundException` (#202)
+- `--config=stream` for streamed test output with a detailed summary
+- mold linker for Rust targets on Linux, installed by CI and required for local builds
+
+### Changed
+
+- `bazel test` now defaults to `--test_output=errors`; use `--config=stream` for streamed output
+
+### Fixed
+
+- `arena-junit`: `ArenaExtension` now makes the arena queryable during `@ArenaAfterOpen`, not just after
+- `arena-oracledb`: SQL readiness fails immediately when the container has stopped or been removed, instead of retrying it for the full timeout
+- FastAPI example component tests: dependency containers get run-unique names, so parallel targets no longer force-remove each other's containers
+- Example test runtimes (pytest, junit, xunit): ephemeral port ranges partitioned per test target to stop parallel targets drawing colliding host ports (#220)
+
 ## [6.1.0]
 
 ### Added

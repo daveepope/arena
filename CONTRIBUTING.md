@@ -6,6 +6,7 @@ Contributions are welcome and encouraged. This document covers the basics for op
 
 - Bazel is the source of truth for builds and tests. Install [Bazelisk](https://github.com/bazelbuild/bazelisk).
 - Docker is required for component tests.
+- On Linux, [mold](https://github.com/rui314/mold) is required (`sudo apt install mold`). Rust targets link with it, and matching CI's linker keeps your remote cache keys aligned.
 - Build: `bazel build //...`
 - Test: `bazel test //...`
 - Do not run `pip`, `npm`, `maven`, or `nuget` directly on the host. Use the Bazel targets (e.g. `bazel run //arena-pytest:pip_requirements.update`).

@@ -44,6 +44,9 @@ class OpenArena:
     def handle(self) -> int:
         return self._handle
 
+    def ffi(self) -> ArenaNativeLib:
+        return self._ffi
+
     async def close(self) -> None:
         if self._handle:
             await asyncio.to_thread(

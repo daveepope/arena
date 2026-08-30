@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net.Http;
-using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using ArenaExamples.Test.Shared;
 using ArenaDotnet.Xunit;
@@ -36,6 +34,8 @@ public sealed class ExampleFixture : ArenaCollectionFixture
     public static int SmtpPort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int SmtpUiPort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int OauthPort { get; } = EphemeralTestRuntime.AllocatePort();
+    private const string OauthCognitoPoolId = "us-east-1_exampleUsers";
+    public static string OauthProviderIssuer { get; } = $"https://127.0.0.1:{OauthPort}/{OauthCognitoPoolId}";
 
     [ArenaLogger(Level = ArenaLogLevel.Debug)]
     private static readonly ILogger Log =
@@ -116,6 +116,7 @@ public sealed class ExampleFixture : ArenaCollectionFixture
             .WithPort(OauthPort)
             .WithServerTlsPem(OauthPem.CertificatePem, OauthPem.PrivateKeyPem)
             .WithMetadataBaseUrl($"https://127.0.0.1:{OauthPort}")
+            .WithIssuerCognito(OauthCognitoPoolId)
             .Build();
 
     [ArenaDependency]
@@ -194,10 +195,11 @@ public sealed class ExampleFixture : ArenaCollectionFixture
             .WithEnvVar("EVENT_SOURCE", EventSource)
             .WithEnvVar("OAUTH_URL", $"https://127.0.0.1:{OauthPort}")
             .WithEnvVar("OAUTH_ISSUER", $"https://127.0.0.1:{OauthPort}")
-            .WithEnvVar("OAUTH_ISSUER_URL", $"https://127.0.0.1:{OauthPort}")
+            .WithEnvVar("OAUTH_ISSUER_URL", OauthProviderIssuer)
             .WithEnvVar("OAUTH_TLS_CA_FILE", ResolveOauthCaCertFilePath())
             .WithEnvVar("OAUTH_CLIENT_ID", "test-client")
             .WithEnvVar("OAUTH_CLIENT_SECRET", "test-secret")
+            .WithEnvVar("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
             .WithEnvVar("LD_LIBRARY_PATH", ResolveTemporalNativeLibDir())
             .WithReadinessCheck(HttpReadinessCheck.Create(), $"http://127.0.0.1:{port}/health")
             .Build();
@@ -207,31 +209,24 @@ public sealed class ExampleFixture : ArenaCollectionFixture
 
     public ExampleFixture() : base()
     {
-        var authToken = GetAuthToken();
+        var authToken = Signer.Sign(OauthProvider(), ClaimsWithScope("readings"));
         ApiClient = new ApiClient($"http://127.0.0.1:{WebAppPort}", authToken);
         ApiClient2 = new ApiClient($"http://127.0.0.1:{WebApp2Port}", authToken);
     }
 
-    private static string GetAuthToken()
+    public static Provider OauthProvider() => new Provider.Cognito(OauthCognitoPoolId);
+
+    public static string ClaimsWithScope(string scope)
     {
-        var trustedCert = X509Certificate2.CreateFromPem(OauthPem.CertificatePem);
-        var handler = new HttpClientHandler
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        return JsonSerializer.Serialize(new
         {
-            ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
-                cert != null && cert.GetCertHashString() == trustedCert.GetCertHashString(),
-        };
-        using var client = new HttpClient(handler);
-        var content = new Dictionary<string, string>
-        {
-            ["grant_type"] = "client_credentials",
-            ["client_id"] = "test-client",
-            ["client_secret"] = "test-secret"
-        };
-        var response = client.PostAsync($"https://127.0.0.1:{OauthPort}/oauth/token",
-            new FormUrlEncodedContent(content)).Result;
-        response.EnsureSuccessStatusCode();
-        var json = JsonSerializer.Deserialize<JsonElement>(response.Content.ReadAsStringAsync().Result);
-        return json.GetProperty("access_token").GetString()!;
+            iss = OauthProviderIssuer,
+            sub = "arena-examples",
+            scope,
+            iat = now,
+            exp = now + 300,
+        });
     }
 
     private static string ResolveOauthCaCertFilePath()

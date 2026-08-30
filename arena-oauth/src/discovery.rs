@@ -20,13 +20,18 @@ pub(crate) struct OAuthAuthorizationServerMetadata {
 }
 
 impl OAuthAuthorizationServerMetadata {
-    pub(crate) fn for_base_url(base: &str, scopes_supported: Vec<String>) -> Self {
+    pub(crate) fn for_base_url(
+        base: &str,
+        issuer_path: &str,
+        jwks_path: &str,
+        scopes_supported: Vec<String>,
+    ) -> Self {
         let base = base.trim_end_matches('/');
         Self {
-            issuer: base.to_string(),
+            issuer: format!("{base}{issuer_path}"),
             authorization_endpoint: None,
             token_endpoint: format!("{base}/oauth/token"),
-            jwks_uri: format!("{base}/.well-known/jwks.json"),
+            jwks_uri: format!("{base}{jwks_path}"),
             scopes_supported,
             response_types_supported: vec!["token".into()],
             grant_types_supported: vec!["client_credentials".into()],

@@ -7,8 +7,7 @@ use axum_server::{bind, bind_rustls, Handle};
 use std::sync::Once;
 
 use crate::discovery::OAuthAuthorizationServerMetadata;
-use crate::keys::RsaKeyPair;
-use crate::oauth_common::{OAuthSigningState, OauthListenAddr};
+use crate::oauth_common::{IssuerRegistration, OAuthSigningState, OauthListenAddr};
 use crate::oauth_https::https_router;
 
 static RUSTLS_CRYPTO_INSTALL: Once = Once::new();
@@ -51,7 +50,7 @@ impl OauthServer {
         &mut self,
         log_label: &str,
         listen: OauthListenAddr,
-        keys: RsaKeyPair,
+        issuers: Vec<IssuerRegistration>,
         scopes_supported: Vec<String>,
         token_ttl_secs: u64,
         tls_pem: Option<(String, String)>,
@@ -83,12 +82,15 @@ impl OauthServer {
 
         let metadata = Arc::new(OAuthAuthorizationServerMetadata::for_base_url(
             &metadata_base,
+            &issuers[0].issuer_path,
+            &issuers[0].jwks_path,
             scopes_supported,
         ));
         let signing_state = Arc::new(OAuthSigningState {
             metadata,
-            keys: Arc::new(keys),
+            issuers,
             token_ttl_secs,
+            base_url: metadata_base.clone(),
         });
 
         let addr = SocketAddr::new(listen.ip, bind_port);

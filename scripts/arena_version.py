@@ -304,8 +304,8 @@ def run_cargo_vet_check_report(root: Path) -> dict:
     return json.loads(result.stdout)
 
 
-CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK = 141
-CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK = 358
+CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK = 140
+CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK = 359
 
 
 def _check_cargo_vet_watermark(

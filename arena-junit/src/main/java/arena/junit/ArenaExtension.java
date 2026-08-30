@@ -33,6 +33,8 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
   private static final ConcurrentHashMap<Class<?>, CachedArena> CACHE = new ConcurrentHashMap<>();
   private static final ConcurrentHashMap<Class<?>, OpenArena> SHUTDOWN_ARENAS =
       new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<Class<?>, OpenArena> OPENING_ARENAS =
+      new ConcurrentHashMap<>();
   private static final ConcurrentHashMap<Class<?>, Class<?>> TOPOLOGY_ROOT_CACHE =
       new ConcurrentHashMap<>();
   private static final Set<Class<?>> WARNED_MISSING_SELECT_CLASSES =
@@ -287,11 +289,15 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
 
   private static OpenArena openArenaForRoot(Class<?> root) {
     CachedArena cached = CACHE.get(root);
-    if (cached == null) {
-      throw new IllegalStateException(
-          "@Arena: no open arena for " + root.getName() + " (beforeAll has not run yet)");
+    if (cached != null) {
+      return cached.openArena;
     }
-    return cached.openArena;
+    OpenArena opening = OPENING_ARENAS.get(root);
+    if (opening != null) {
+      return opening;
+    }
+    throw new IllegalStateException(
+        "@Arena: no open arena for " + root.getName() + " (beforeAll has not run yet)");
   }
 
   private static CachedArena buildOrCacheFailure(Class<?> root) {
@@ -314,7 +320,12 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
     }
     registerShutdownHookOnce();
     SHUTDOWN_ARENAS.put(root, openArena);
-    invokeLifecycleMethod(root, ArenaAfterOpen.class, openArena);
+    OPENING_ARENAS.put(root, openArena);
+    try {
+      invokeLifecycleMethod(root, ArenaAfterOpen.class, openArena);
+    } finally {
+      OPENING_ARENAS.remove(root);
+    }
     return new CachedArena(openArena, expectedSuiteMembers(root));
   }
 

@@ -10,7 +10,12 @@ import arena.junit.support.ArenaJson;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import java.util.stream.Stream;
+
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 final class OauthDependencyBuilderSerializationTest {
 
@@ -83,5 +88,70 @@ final class OauthDependencyBuilderSerializationTest {
   void identifier_returnsConfiguredIdentifier() {
     OauthDependency dep = new OauthDependencyBuilder("oauth").build();
     assertTrue(dep.identifier().startsWith("arena-oauth-oauth-"));
+  }
+
+  @Test
+  void withIssuerCognito_poolId_appendsCognitoProviderEntry() {
+    ObjectNode config =
+        new OauthDependencyBuilder("oauth").withIssuerCognito("us-east-1_abc123").build().forFfi();
+    ArrayNode issuers = (ArrayNode) config.path("issuers");
+    assertEquals(1, issuers.size());
+    assertEquals("cognito", issuers.get(0).path("provider").asText());
+    assertEquals("us-east-1_abc123", issuers.get(0).path("pool_id").asText());
+  }
+
+  @Test
+  void withIssuerOkta_appendsOktaProviderEntry() {
+    ObjectNode config = new OauthDependencyBuilder("oauth").withIssuerOkta().build().forFfi();
+    ArrayNode issuers = (ArrayNode) config.path("issuers");
+    assertEquals(1, issuers.size());
+    assertEquals("okta", issuers.get(0).path("provider").asText());
+  }
+
+  @Test
+  void withIssuerEntraId_tenantId_appendsEntraIdProviderEntry() {
+    ObjectNode config =
+        new OauthDependencyBuilder("oauth").withIssuerEntraId("my-tenant").build().forFfi();
+    ArrayNode issuers = (ArrayNode) config.path("issuers");
+    assertEquals(1, issuers.size());
+    assertEquals("entra_id", issuers.get(0).path("provider").asText());
+    assertEquals("my-tenant", issuers.get(0).path("tenant_id").asText());
+  }
+
+  static Stream<Arguments> customIssuerFields() {
+    return Stream.of(
+        Arguments.of("/custom", "/custom/keys", null),
+        Arguments.of(null, "/v1/keys", null),
+        Arguments.of(null, null, "pkcs8-pem-placeholder"));
+  }
+
+  @ParameterizedTest
+  @MethodSource("customIssuerFields")
+  void withIssuer_customFields_serializesOnlySuppliedFields(
+      String issuerPath, String jwksPath, String rsaPkcs8Pem) {
+    ObjectNode config =
+        new OauthDependencyBuilder("oauth")
+            .withIssuer(issuerPath, jwksPath, rsaPkcs8Pem)
+            .build()
+            .forFfi();
+    ObjectNode entry = (ObjectNode) ((ArrayNode) config.path("issuers")).get(0);
+    assertEquals("custom", entry.path("provider").asText());
+    assertEquals(issuerPath != null, entry.has("issuer_path"));
+    assertEquals(jwksPath != null, entry.has("jwks_path"));
+    assertEquals(rsaPkcs8Pem != null, entry.has("rsa_pkcs8_pem"));
+  }
+
+  @Test
+  void withIssuerCalls_multipleProviders_accumulateInOrder() {
+    ObjectNode config =
+        new OauthDependencyBuilder("oauth")
+            .withIssuerCognito("pool-a")
+            .withIssuerOkta()
+            .build()
+            .forFfi();
+    ArrayNode issuers = (ArrayNode) config.path("issuers");
+    assertEquals(2, issuers.size());
+    assertEquals("cognito", issuers.get(0).path("provider").asText());
+    assertEquals("okta", issuers.get(1).path("provider").asText());
   }
 }

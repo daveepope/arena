@@ -12,6 +12,7 @@ from arena_pytest.arena import (
     closed_arena,
 )
 from arena_pytest.closed_arena import ClosedArena
+from arena_pytest.host import ArenaPortNotFoundError, PortSearchStrategy, find_available_port
 from arena_pytest.match import Match, MatchBuilder
 from arena_pytest.exec.containerized_component import (
     ContainerizedComponent,
@@ -82,10 +83,17 @@ from arena_pytest.dep.mssql import (
 from arena_pytest.oauth import (
     DEFAULT_OAUTH_PORT,
     OAUTH_ISSUER,
+    Cognito,
+    Custom,
+    EntraId,
+    Okta,
     OauthDependency,
     OauthDependencyBuilder,
+    OauthSigner,
+    Provider,
     oauth_issuer_host_is_non_loopback,
     oauth_loopback_tls_pem_pair,
+    oauth_signer_fixture,
 )
 from arena_pytest.dep.oracle import (
     ManagedOraclePlaybook,
@@ -105,6 +113,9 @@ __all__ = [
     "ArenaBindingError",
     "ArenaLogLevel",
     "ArenaNativeLib",
+    "ArenaPortNotFoundError",
+    "PortSearchStrategy",
+    "find_available_port",
     "ClosedArena",
     "register_dispatcher_logging_target_for_logger",
     "unregister_dispatcher_logging_target",
@@ -165,6 +176,13 @@ __all__ = [
     "OAUTH_ISSUER",
     "OauthDependency",
     "OauthDependencyBuilder",
+    "OauthSigner",
+    "Provider",
+    "Cognito",
+    "Okta",
+    "EntraId",
+    "Custom",
+    "oauth_signer_fixture",
     "oauth_issuer_host_is_non_loopback",
     "oauth_loopback_tls_pem_pair",
     "ManagedOraclePlaybook",

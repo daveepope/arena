@@ -15,7 +15,10 @@
 
 ## AI communication
 
-- Keep replies **concise** and **consistent** in tone and structure.
+- **VERY SHORT ANSWERS.** Default to one or two sentences, or a bare command. No essays, no summaries of what you just did, no restating the question. Expand only when the developer explicitly asks for detail.
+- **No unsolicited tables, headings, or bullet lists** in chat replies. Prose only, and as little of it as possible.
+- Answer the question that was asked. Nothing adjacent, nothing extra.
+- Keep replies **consistent** in tone and structure.
 - Be **clear**; ask **direct questions** when something is ambiguous. **Do not waffle**, hedge with filler, or pad with generic advice.
 - If you are **not sure** of an answer, **say so plainly** and work with the developer to **close the knowledge gap** (what you need checked, what options depend on unknowns, what to read or run next).
 - **Never use em dashes** (`—`). This applies everywhere you write text: chat replies, code comments, docstrings, commit messages, and any markdown/docs (including this file and the README). Use a period, comma, colon, or parentheses instead.

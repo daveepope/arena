@@ -10,20 +10,29 @@ use serde_json::json;
 use crate::oauth_common::{introspection_active, IntrospectForm, OAuthSigningState, TokenForm};
 use crate::token::{issue_access_token, verify_access_token};
 
+pub(crate) const RESERVED_PATHS: [&str; 4] = [
+    "/.well-known/oauth-authorization-server",
+    "/.well-known/openid-configuration",
+    "/oauth/token",
+    "/oauth/introspect",
+];
+
 pub(crate) fn https_router(state: Arc<OAuthSigningState>) -> Router {
-    Router::new()
-        .route(
-            "/.well-known/oauth-authorization-server",
-            get(get_authorization_server_metadata),
-        )
-        .route(
-            "/.well-known/openid-configuration",
-            get(get_openid_configuration),
-        )
-        .route("/.well-known/jwks.json", get(get_jwks))
-        .route("/oauth/token", post(post_token))
-        .route("/oauth/introspect", post(post_introspect))
-        .with_state(state)
+    let mut router = Router::new()
+        .route(RESERVED_PATHS[0], get(get_authorization_server_metadata))
+        .route(RESERVED_PATHS[1], get(get_openid_configuration))
+        .route(RESERVED_PATHS[2], post(post_token))
+        .route(RESERVED_PATHS[3], post(post_introspect));
+
+    for idx in 0..state.issuers.len() {
+        let jwks_path = state.issuers[idx].jwks_path.clone();
+        router = router.route(
+            &jwks_path,
+            get(move |State(s): State<Arc<OAuthSigningState>>| get_jwks_for_issuer(s, idx)),
+        );
+    }
+
+    router.with_state(state)
 }
 
 async fn get_authorization_server_metadata(
@@ -38,8 +47,8 @@ async fn get_openid_configuration(
     Json((*s.metadata).clone())
 }
 
-async fn get_jwks(State(s): State<Arc<OAuthSigningState>>) -> Json<serde_json::Value> {
-    Json(s.keys.jwks_json())
+async fn get_jwks_for_issuer(s: Arc<OAuthSigningState>, idx: usize) -> Json<serde_json::Value> {
+    Json(s.issuers[idx].keys.jwks_json())
 }
 
 async fn post_token(
@@ -66,7 +75,7 @@ async fn post_token(
         .clone()
         .unwrap_or_else(|| "client".to_string());
     let access_token = match issue_access_token(
-        s.keys.as_ref(),
+        &s.default_issuer().keys,
         &s.metadata.issuer,
         &sub,
         &scopes,
@@ -95,8 +104,11 @@ async fn post_introspect(
     State(s): State<Arc<OAuthSigningState>>,
     Form(form): Form<IntrospectForm>,
 ) -> impl IntoResponse {
-    match verify_access_token(&form.token, s.keys.as_ref(), &s.metadata.issuer) {
-        Ok(claims) => Json(introspection_active(&claims)).into_response(),
-        Err(_) => Json(json!({ "active": false })).into_response(),
+    for issuer in &s.issuers {
+        let issuer_string = s.issuer_string(issuer);
+        if let Ok(claims) = verify_access_token(&form.token, &issuer.keys, &issuer_string) {
+            return Json(introspection_active(&claims)).into_response();
+        }
     }
+    Json(json!({ "active": false })).into_response()
 }

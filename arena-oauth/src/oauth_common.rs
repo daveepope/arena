@@ -6,6 +6,7 @@ use serde_json::json;
 
 use crate::discovery::OAuthAuthorizationServerMetadata;
 use crate::keys::RsaKeyPair;
+use crate::provider::Provider;
 use crate::token::AccessTokenClaims;
 
 #[derive(Clone, Copy, Debug)]
@@ -14,10 +15,29 @@ pub(crate) struct OauthListenAddr {
     pub(crate) port: u16,
 }
 
+#[derive(Clone)]
+pub(crate) struct IssuerRegistration {
+    pub(crate) provider: Provider,
+    pub(crate) issuer_path: String,
+    pub(crate) jwks_path: String,
+    pub(crate) keys: RsaKeyPair,
+}
+
 pub(crate) struct OAuthSigningState {
     pub(crate) metadata: Arc<OAuthAuthorizationServerMetadata>,
-    pub(crate) keys: Arc<RsaKeyPair>,
+    pub(crate) issuers: Vec<IssuerRegistration>,
     pub(crate) token_ttl_secs: u64,
+    pub(crate) base_url: String,
+}
+
+impl OAuthSigningState {
+    pub(crate) fn default_issuer(&self) -> &IssuerRegistration {
+        &self.issuers[0]
+    }
+
+    pub(crate) fn issuer_string(&self, issuer: &IssuerRegistration) -> String {
+        format!("{}{}", self.base_url, issuer.issuer_path)
+    }
 }
 
 #[derive(Debug, Deserialize)]
