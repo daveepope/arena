@@ -5,6 +5,14 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Dependencies and containerized components now request a platform the image actually publishes, falling back to `linux/amd64` for amd64-only images, so arenas start on arm64 hosts
+- `arena-oauth`: the HTTPS readiness probe now verifies the server certificate Arena generated instead of accepting any certificate
+- `arena-http`: the admin client only skips certificate verification for loopback hosts, and directs callers to `with_trusted_certificate_pem` otherwise
+
 ## [6.2.0]
 
 ### Added

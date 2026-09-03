@@ -62,7 +62,7 @@ impl TemporalImpl for TemporalContainerImpl {
         let mut request = image
             .with_health_check(tcp_healthcheck(TEMPORAL_GRPC_CONTAINER_PORT))
             .with_container_name(container_name)
-            .with_platform(arena_container::platform::docker_platform())
+            .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await)
             .with_mapped_port(grpc_port, grpc_container_port)
             .with_mapped_port(ui_port, ui_container_port)
             .with_cmd(["server", "start-dev", "--ip", "0.0.0.0"]);

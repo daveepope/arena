@@ -92,7 +92,7 @@ impl OracleImpl for OracleContainerImpl {
 
         let mut request = image
             .with_container_name(container_name)
-            .with_platform(arena_container::platform::docker_platform())
+            .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await)
             .with_mapped_port(port, container_port)
             .with_env_var("ORACLE_PASSWORD", admin_password)
             .with_env_var("APP_USER", database_username)
