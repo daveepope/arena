@@ -185,6 +185,7 @@ jobs:
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -303,6 +304,7 @@ jobs:
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -369,6 +371,7 @@ jobs:
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -435,6 +438,7 @@ jobs:
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -503,6 +507,7 @@ jobs:
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -561,6 +566,7 @@ jobs:
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -621,6 +627,7 @@ jobs:
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -689,6 +696,7 @@ jobs:
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -743,6 +751,7 @@ jobs:
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -797,6 +806,7 @@ jobs:
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -865,6 +875,7 @@ jobs:
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -964,6 +975,51 @@ jobs:
             examples/requirements_windows.txt
           if-no-files-found: error
 
+  prior_checks:
+    name: Prior checks green (pre-release label)
+    needs: [changes, master_merge_guard]
+    if: >-
+      always() && !cancelled() &&
+      needs.changes.result == 'success' &&
+      github.event_name == 'pull_request' &&
+      github.event.action == 'labeled'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      checks: read
+    timeout-minutes: 10
+    steps:
+      - name: Require the head commit's checks to have passed already
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REQUIRED_CHECKS: |
+            Verify (Ubuntu 24.04)
+            Test Ubuntu 24.04
+            Test Ubuntu 24.04 ARM64
+            Test examples Ubuntu 24.04
+            Test examples Ubuntu 24.04 ARM64
+            Coverage Ubuntu 24.04
+            Test macOS Intel
+            Test macOS ARM64
+            Test Windows
+            Test examples Windows
+        run: |
+          set -euo pipefail
+          runs="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
+            --jq '.check_runs[] | [.name, (.conclusion // "pending")] | @tsv')"
+          failed=0
+          while IFS= read -r check; do
+            [ -z "$check" ] && continue
+            if printf '%s\n' "$runs" | awk -F'\t' -v n="$check" '$1 == n && $2 == "success" { found = 1 } END { exit !found }'; then
+              echo "$check: success"
+            else
+              echo "::error::$check has not passed for $HEAD_SHA; push a commit or re-run the checks before labelling"
+              failed=1
+            fi
+          done <<< "$REQUIRED_CHECKS"
+          [ "$failed" -eq 0 ]
+
   publish_gate:
     name: Publish gate
     needs:
@@ -980,6 +1036,7 @@ jobs:
       - test_macos_arm64
       - test_windows
       - test_examples_windows
+      - prior_checks
     if: >-
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
@@ -991,16 +1048,25 @@ jobs:
           github.event.pull_request.head.repo.full_name == github.repository &&
           needs.master_merge_guard.result == 'skipped' &&
           needs.require_version_bump.result == 'success' &&
-          needs.verify.result == 'success' &&
-          needs.test_ubuntu_24_04.result == 'success' &&
-          needs.test_ubuntu_24_04_arm64.result == 'success' &&
-          needs.test_examples_ubuntu_24_04.result == 'success' &&
-          needs.test_examples_ubuntu_24_04_arm64.result == 'success' &&
-          needs.coverage_ubuntu_24_04.result == 'success' &&
-          needs.test_macos_intel.result == 'success' &&
-          needs.test_macos_arm64.result == 'success' &&
-          needs.test_windows.result == 'success' &&
-          needs.test_examples_windows.result == 'success'
+          (
+            (
+              github.event.action == 'labeled' &&
+              needs.prior_checks.result == 'success'
+            ) ||
+            (
+              github.event.action != 'labeled' &&
+              needs.verify.result == 'success' &&
+              needs.test_ubuntu_24_04.result == 'success' &&
+              needs.test_ubuntu_24_04_arm64.result == 'success' &&
+              needs.test_examples_ubuntu_24_04.result == 'success' &&
+              needs.test_examples_ubuntu_24_04_arm64.result == 'success' &&
+              needs.coverage_ubuntu_24_04.result == 'success' &&
+              needs.test_macos_intel.result == 'success' &&
+              needs.test_macos_arm64.result == 'success' &&
+              needs.test_windows.result == 'success' &&
+              needs.test_examples_windows.result == 'success'
+            )
+          )
         ) ||
         (
           github.event_name == 'push' &&
