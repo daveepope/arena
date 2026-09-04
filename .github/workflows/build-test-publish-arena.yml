@@ -931,6 +931,7 @@ jobs:
       github.event.action == 'labeled'
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       contents: read
       checks: read
     timeout-minutes: 10

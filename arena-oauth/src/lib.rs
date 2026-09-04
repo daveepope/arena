@@ -13,7 +13,7 @@ mod provider;
 mod token;
 
 pub use crate::builder::{IssuerConfig, OauthDependencyBuilder};
-pub use crate::oauth_dependency::OauthDependency;
+pub use crate::oauth_dependency::{ephemeral_tls_hosts, OauthDependency};
 pub use crate::provider::Provider;
 pub use crate::oauth_ffi::{
     build_oauth_dependency_from_config, OauthFfiDependencyConfig, OauthFfiInboundTransport,

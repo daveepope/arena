@@ -62,7 +62,22 @@ fn start_failure_message_unexpected_exit_code_names_the_code() {
 
     assert_eq!(
         message,
-        "kafka container failed to start: the container exited with code Some(1)"
+        "kafka container failed to start: the container exited with code 1"
+    );
+}
+
+#[test]
+fn start_failure_message_unknown_exit_code_omits_the_code() {
+    let error = TestcontainersError::WaitContainer(WaitContainerError::UnexpectedExitCode {
+        expected: 0,
+        actual: None,
+    });
+
+    let message = start_failure_message("kafka", &error);
+
+    assert_eq!(
+        message,
+        "kafka container failed to start: the container exited with an unknown exit code"
     );
 }
 

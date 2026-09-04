@@ -1,3 +1,4 @@
+use std::net::IpAddr;
 use std::time::Instant;
 
 use arena::dependency::{Dependency, RunnableDependency};
@@ -31,6 +32,17 @@ pub struct OauthDependency {
     oauth_server: OauthServer,
 }
 
+pub fn ephemeral_tls_hosts(listen_ip: IpAddr) -> Vec<String> {
+    let mut hosts = vec!["localhost".to_string(), "127.0.0.1".to_string()];
+    if !listen_ip.is_unspecified() {
+        let listen_host = listen_ip.to_string();
+        if !hosts.contains(&listen_host) {
+            hosts.push(listen_host);
+        }
+    }
+    hosts
+}
+
 impl OauthDependency {
     pub(crate) fn new(
         identifier: String,
@@ -48,12 +60,14 @@ impl OauthDependency {
                 Some((cert_pem.clone(), key_pem.clone()))
             }
             OauthTlsPlan::EphemeralOnStart => Some(
-                ephemeral_tls::localhost_self_signed_pem_pair().unwrap_or_else(|e| {
-                    panic!(
-                        "[Oauth-{}] ephemeral TLS certificate generation failed: {e}",
-                        identifier
-                    )
-                }),
+                ephemeral_tls::self_signed_pem_pair(&ephemeral_tls_hosts(listen.ip)).unwrap_or_else(
+                    |e| {
+                        panic!(
+                            "[Oauth-{}] ephemeral TLS certificate generation failed: {e}",
+                            identifier
+                        )
+                    },
+                ),
             ),
         };
         Self {

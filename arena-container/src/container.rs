@@ -69,7 +69,10 @@ pub fn start_failure_message(
         TestcontainersError::WaitContainer(WaitContainerError::UnexpectedExitCode {
             actual,
             ..
-        }) => format!("the container exited with code {actual:?}"),
+        }) => match actual {
+            Some(code) => format!("the container exited with code {code}"),
+            None => "the container exited with an unknown exit code".to_string(),
+        },
         TestcontainersError::Client(client_error) => {
             format!("the container runtime rejected the request: {client_error}")
         }

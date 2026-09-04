@@ -19,6 +19,7 @@ rust_test(
     srcs = ["tests/drop_teardown_test.rs"],
     size = "small",
     edition = "2021",
+    tags = ["component_test"],
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,

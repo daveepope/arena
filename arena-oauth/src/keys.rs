@@ -16,10 +16,6 @@ pub(crate) struct RsaKeyPair {
 impl RsaKeyPair {
     pub(crate) const DEFAULT_KID: &'static str = "arena-oauth-1";
 
-    pub(crate) fn generate() -> Result<Self, String> {
-        Self::generate_with_kid(Self::DEFAULT_KID)
-    }
-
     pub(crate) fn generate_with_kid(kid: impl Into<String>) -> Result<Self, String> {
         let mut rng = rand::thread_rng();
         let private_key =

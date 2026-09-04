@@ -1,4 +1,4 @@
-use crate::image::resolve_registry_credentials;
+use crate::image::{inspected_platform_name, resolve_registry_credentials};
 use bollard::models::OciPlatform;
 use bollard::Docker;
 use std::collections::HashMap;
@@ -25,16 +25,21 @@ pub fn platform_for_arch(arch: &str) -> String {
     format!("linux/{arch}")
 }
 
-pub trait PublishedPlatformClient: Send + Sync {
+pub trait ImagePlatformClient: Send + Sync {
     fn published_platforms(
         &self,
         image_reference: &str,
     ) -> impl std::future::Future<Output = Result<Vec<String>, String>> + Send;
+
+    fn local_platform(
+        &self,
+        image_reference: &str,
+    ) -> impl std::future::Future<Output = Option<String>> + Send;
 }
 
 pub struct RuntimePlatformClient;
 
-impl PublishedPlatformClient for RuntimePlatformClient {
+impl ImagePlatformClient for RuntimePlatformClient {
     async fn published_platforms(&self, image_reference: &str) -> Result<Vec<String>, String> {
         let runtime_client = Docker::connect_with_defaults().map_err(|e| e.to_string())?;
         let credentials = resolve_registry_credentials(image_reference).await;
@@ -44,6 +49,12 @@ impl PublishedPlatformClient for RuntimePlatformClient {
             .await
             .map(|inspect| published_platform_names(&inspect.platforms))
             .map_err(|e| e.to_string())
+    }
+
+    async fn local_platform(&self, image_reference: &str) -> Option<String> {
+        let runtime_client = Docker::connect_with_defaults().ok()?;
+        let inspect = runtime_client.inspect_image(image_reference).await.ok()?;
+        inspected_platform_name(&inspect)
     }
 }
 
@@ -68,26 +79,31 @@ pub async fn resolve_platform_for_reference(image_reference: &str) -> String {
 pub async fn resolve_platform_with(
     image_reference: &str,
     host_platform: &str,
-    runtime_client: &impl PublishedPlatformClient,
+    runtime_client: &impl ImagePlatformClient,
 ) -> String {
     if host_platform == FALLBACK_PLATFORM {
         return host_platform.to_string();
     }
 
-    if let Some(resolved) = cached_platform(image_reference) {
+    let cache_key = cache_key(image_reference, host_platform);
+    if let Some(resolved) = cached_platform(&cache_key) {
         return resolved;
     }
 
-    let resolved = select_platform(image_reference, host_platform, runtime_client).await;
-    cache_platform(image_reference, &resolved);
-    resolved
+    match select_platform(image_reference, host_platform, runtime_client).await {
+        Some(resolved) => {
+            cache_platform(&cache_key, &resolved);
+            resolved
+        }
+        None => host_platform.to_string(),
+    }
 }
 
 pub async fn select_platform(
     image_reference: &str,
     host_platform: &str,
-    runtime_client: &impl PublishedPlatformClient,
-) -> String {
+    runtime_client: &impl ImagePlatformClient,
+) -> Option<String> {
     let published = match runtime_client.published_platforms(image_reference).await {
         Ok(published) => published,
         Err(error) => {
@@ -95,9 +111,9 @@ pub async fn select_platform(
                 image = %image_reference,
                 error = %error,
                 phase = "platform_lookup_failed",
-                "could not read the platforms published for the image, using the host platform",
+                "could not read the platforms published for the image, falling back to the local image",
             );
-            return host_platform.to_string();
+            return runtime_client.local_platform(image_reference).await;
         }
     };
 
@@ -106,7 +122,7 @@ pub async fn select_platform(
             .iter()
             .any(|platform| platform.eq_ignore_ascii_case(host_platform))
     {
-        return host_platform.to_string();
+        return Some(host_platform.to_string());
     }
 
     if published
@@ -120,22 +136,22 @@ pub async fn select_platform(
             phase = "platform_fallback",
             "image publishes no host platform variant, running the linux/amd64 variant instead",
         );
-        return FALLBACK_PLATFORM.to_string();
+        return Some(FALLBACK_PLATFORM.to_string());
     }
 
-    host_platform.to_string()
+    Some(host_platform.to_string())
 }
 
-fn cached_platform(image_reference: &str) -> Option<String> {
-    resolved_platforms()
-        .lock()
-        .ok()?
-        .get(image_reference)
-        .cloned()
+fn cache_key(image_reference: &str, host_platform: &str) -> String {
+    format!("{host_platform}|{image_reference}")
 }
 
-fn cache_platform(image_reference: &str, platform: &str) {
+fn cached_platform(cache_key: &str) -> Option<String> {
+    resolved_platforms().lock().ok()?.get(cache_key).cloned()
+}
+
+fn cache_platform(cache_key: &str, platform: &str) {
     if let Ok(mut cache) = resolved_platforms().lock() {
-        cache.insert(image_reference.to_string(), platform.to_string());
+        cache.insert(cache_key.to_string(), platform.to_string());
     }
 }
