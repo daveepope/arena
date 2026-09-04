@@ -188,6 +188,18 @@ crate.from_cargo(
     ],
 )
 
+crate.annotation(
+    crate = "rsa",
+    repositories = ["crates"],
+    rustc_flags = ["-Copt-level=2"],
+)
+
+crate.annotation(
+    crate = "num-bigint-dig",
+    repositories = ["crates"],
+    rustc_flags = ["-Copt-level=2"],
+)
+
 use_repo(crate, "crates")
 
 # .NET toolchain (for arena-xunit).

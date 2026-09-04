@@ -1,5 +1,5 @@
 {
-  "checksum": "395732f5498867cde785ecd8823be49aeab6218098754138e4aaebd45cc532ff",
+  "checksum": "064d28d3b70c84e6c9f3e295277b9efcd13d26d37abeab81cd1ab5caeaaf6ebb",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -16143,6 +16143,12 @@
           "selects": {}
         },
         "edition": "2021",
+        "rustc_flags": {
+          "common": [
+            "-Copt-level=2"
+          ],
+          "selects": {}
+        },
         "version": "0.8.6"
       },
       "build_script_attrs": {
@@ -21229,6 +21235,12 @@
           "selects": {}
         },
         "edition": "2021",
+        "rustc_flags": {
+          "common": [
+            "-Copt-level=2"
+          ],
+          "selects": {}
+        },
         "version": "0.9.10"
       },
       "license": "MIT OR Apache-2.0",

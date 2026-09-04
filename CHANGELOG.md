@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `arena-oauth`: issuer signing keys are generated when the dependency starts instead of when it is built
+- `rsa` and `num-bigint-dig` build with optimizations in unoptimized builds, so RSA key generation no longer dominates test time
 
 ### Fixed
 
