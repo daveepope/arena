@@ -13,6 +13,7 @@ path = "src/lib.rs"
 bollard = { workspace = true }
 docker_credential = { workspace = true }
 futures = { workspace = true }
+testcontainers-modules = { workspace = true }
 tokio = { workspace = true, features = ["rt"] }
 tracing = { workspace = true }
 

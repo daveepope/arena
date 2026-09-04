@@ -91,7 +91,7 @@ async def arena(closed_arena) -> OpenArena:
     try:
         open_arena_obj = await closed_arena.open()
     except ArenaBindingError as e:
-        pytest.fail(f"arena_open failed: {e}", pytrace=False)
+        pytest.fail(str(e), pytrace=False)
     yield open_arena_obj
     await open_arena_obj.close()
 

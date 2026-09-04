@@ -98,7 +98,12 @@ impl MssqlImpl for MssqlContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request.start().await.expect("start mssql container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("mssql", &e)
+            )
+        });
 
         let host = container
             .get_host()

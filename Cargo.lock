@@ -92,6 +92,7 @@ dependencies = [
  "bollard",
  "docker_credential",
  "futures",
+ "testcontainers-modules",
  "tokio",
  "tracing",
 ]

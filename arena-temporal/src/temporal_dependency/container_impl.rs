@@ -72,7 +72,12 @@ impl TemporalImpl for TemporalContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request.start().await.expect("start temporal container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("temporal", &e)
+            )
+        });
 
         let (host, grpc_host_port, ui_host_port) = tokio::join!(
             container.get_host(),

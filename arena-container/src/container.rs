@@ -44,3 +44,53 @@ pub async fn is_container_running(id_or_name: &str) -> bool {
         Err(_) => true,
     }
 }
+
+pub fn start_failure_message(
+    dependency: &str,
+    error: &testcontainers_modules::testcontainers::TestcontainersError,
+) -> String {
+    use testcontainers_modules::testcontainers::core::logs::WaitLogError;
+    use testcontainers_modules::testcontainers::core::error::WaitContainerError;
+    use testcontainers_modules::testcontainers::TestcontainersError;
+
+    let cause = match error {
+        TestcontainersError::WaitContainer(WaitContainerError::WaitLog(
+            WaitLogError::EndOfStream(lines),
+        )) => match last_log_line(lines) {
+            Some(line) => format!("the container exited during startup, last output: {line}"),
+            None => "the container exited during startup without output".to_string(),
+        },
+        TestcontainersError::WaitContainer(WaitContainerError::StartupTimeout) => {
+            "the container did not become ready within its startup budget".to_string()
+        }
+        TestcontainersError::WaitContainer(WaitContainerError::Unhealthy) => {
+            "the container reported itself unhealthy".to_string()
+        }
+        TestcontainersError::WaitContainer(WaitContainerError::UnexpectedExitCode {
+            actual,
+            ..
+        }) => format!("the container exited with code {actual:?}"),
+        TestcontainersError::Client(client_error) => {
+            format!("the container runtime rejected the request: {client_error}")
+        }
+        other => other.to_string(),
+    };
+
+    format!("{dependency} container failed to start: {cause}")
+}
+
+pub fn last_log_line<B: AsRef<[u8]>>(lines: &[B]) -> Option<String> {
+    const MAX_LEN: usize = 160;
+
+    let line = lines
+        .iter()
+        .rev()
+        .map(|line| String::from_utf8_lossy(line.as_ref()).trim().to_string())
+        .find(|line| !line.is_empty())?;
+
+    if line.chars().count() > MAX_LEN {
+        Some(line.chars().take(MAX_LEN).collect::<String>() + "...")
+    } else {
+        Some(line)
+    }
+}

@@ -88,7 +88,12 @@ impl SmtpImpl for SmtpContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request.start().await.expect("start smtp container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("smtp", &e)
+            )
+        });
 
         let (host, smtp_host_port, ui_host_port) = tokio::join!(
             container.get_host(),

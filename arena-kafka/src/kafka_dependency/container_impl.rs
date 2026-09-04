@@ -89,7 +89,12 @@ impl KafkaImpl for KafkaContainerImpl {
                 ]);
         }
 
-        let container = request.start().await.expect("start kafka container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("kafka", &e)
+            )
+        });
 
         let host = container
             .get_host()
@@ -193,7 +198,12 @@ impl KafkaImpl for ConfluentKafkaContainerImpl {
                 );
         }
 
-        let container = request.start().await.expect("start kafka container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("kafka", &e)
+            )
+        });
 
         let host = container
             .get_host()

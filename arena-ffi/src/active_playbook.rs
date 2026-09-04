@@ -106,7 +106,7 @@ pub extern "C" fn arena_match_playbook_run(
                 op = "match_playbook_run",
                 "panic during playbook run"
             );
-            unsafe { write_error(err_out, format!("panic in arena_match_playbook_run: {msg}")) };
+            unsafe { write_error(err_out, format!("arena_match_playbook_run failed: {msg}")) };
             std::ptr::null_mut()
         }
     }

@@ -107,7 +107,12 @@ impl OracleImpl for OracleContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request.start().await.expect("start oracle container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("oracle", &e)
+            )
+        });
 
         let host = container
             .get_host()

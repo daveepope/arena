@@ -1,5 +1,5 @@
 {
-  "checksum": "26e51e5810d5b3336e32ce915dc11b0631fe9b50ab44cae1488b7ec2dbb972e5",
+  "checksum": "395732f5498867cde785ecd8823be49aeab6218098754138e4aaebd45cc532ff",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -606,6 +606,10 @@
             {
               "id": "futures 0.3.32",
               "target": "futures"
+            },
+            {
+              "id": "testcontainers-modules 0.15.0",
+              "target": "testcontainers_modules"
             },
             {
               "id": "tokio 1.52.1",

@@ -129,7 +129,12 @@ impl LocalstackImpl for LocalstackContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request.start().await.expect("start localstack container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("localstack", &e)
+            )
+        });
 
         let host = container
             .get_host()

@@ -79,7 +79,7 @@ pub extern "C" fn arena_find_available_port(
                 op = "arena_find_available_port",
                 "panic while finding an available port"
             );
-            unsafe { write_error(err_out, format!("panic in arena_find_available_port: {msg}")) };
+            unsafe { write_error(err_out, format!("arena_find_available_port failed: {msg}")) };
             ArenaStatus::Panic
         }
     }
