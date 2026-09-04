@@ -1,3 +1,4 @@
+use std::net::IpAddr;
 use std::time::Instant;
 
 use arena::dependency::{Dependency, RunnableDependency};
@@ -31,6 +32,17 @@ pub struct OauthDependency {
     oauth_server: OauthServer,
 }
 
+pub fn ephemeral_tls_hosts(listen_ip: IpAddr) -> Vec<String> {
+    let mut hosts = vec!["localhost".to_string(), "127.0.0.1".to_string()];
+    if !listen_ip.is_unspecified() {
+        let listen_host = listen_ip.to_string();
+        if !hosts.contains(&listen_host) {
+            hosts.push(listen_host);
+        }
+    }
+    hosts
+}
+
 impl OauthDependency {
     pub(crate) fn new(
         identifier: String,
@@ -48,12 +60,14 @@ impl OauthDependency {
                 Some((cert_pem.clone(), key_pem.clone()))
             }
             OauthTlsPlan::EphemeralOnStart => Some(
-                ephemeral_tls::localhost_self_signed_pem_pair().unwrap_or_else(|e| {
-                    panic!(
-                        "[Oauth-{}] ephemeral TLS certificate generation failed: {e}",
-                        identifier
-                    )
-                }),
+                ephemeral_tls::self_signed_pem_pair(&ephemeral_tls_hosts(listen.ip)).unwrap_or_else(
+                    |e| {
+                        panic!(
+                            "[Oauth-{}] ephemeral TLS certificate generation failed: {e}",
+                            identifier
+                        )
+                    },
+                ),
             ),
         };
         Self {
@@ -102,7 +116,7 @@ impl OauthDependency {
         let mut first_err: Option<TokenError> = None;
         for issuer in state.issuers.iter() {
             let issuer_string = format!("{base}{}", issuer.issuer_path);
-            match crate::token::verify_access_token(token, &issuer.keys, &issuer_string) {
+            match crate::token::verify_access_token(token, issuer.keys.resolve(), &issuer_string) {
                 Ok(claims) => return Ok(claims),
                 Err(e) => {
                     if first_err.is_none() {
@@ -136,7 +150,7 @@ impl OauthDependency {
         self.issuers
             .iter()
             .find(|i| &i.provider == provider)
-            .and_then(|issuer| issuer.keys.private_key_pkcs8_pem().ok())
+            .and_then(|issuer| issuer.keys.resolve().private_key_pkcs8_pem().ok())
     }
 
     pub fn sign_claims(
@@ -149,7 +163,7 @@ impl OauthDependency {
             .iter()
             .find(|i| &i.provider == provider)
             .ok_or_else(|| format!("no issuer registered for provider {provider:?}"))?;
-        issuer.keys.sign_claims(claims)
+        issuer.keys.resolve().sign_claims(claims)
     }
 
     fn tls_pair_for_listen(&mut self) -> Option<(String, String)> {

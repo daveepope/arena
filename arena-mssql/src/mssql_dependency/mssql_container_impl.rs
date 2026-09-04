@@ -91,14 +91,19 @@ impl MssqlImpl for MssqlContainerImpl {
             .with_name(image_name)
             .with_tag(image_tag)
             .with_container_name(container_name)
-            .with_platform(arena_container::platform::docker_platform());
+            .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await);
 
         if let Some(ref network) = self.network {
             arena_container::network::ensure_network_exists(network).await;
             request = request.with_network(network);
         }
 
-        let container = request.start().await.expect("start mssql container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("mssql", &e)
+            )
+        });
 
         let host = container
             .get_host()

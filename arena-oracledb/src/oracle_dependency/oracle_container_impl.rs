@@ -92,7 +92,7 @@ impl OracleImpl for OracleContainerImpl {
 
         let mut request = image
             .with_container_name(container_name)
-            .with_platform(arena_container::platform::docker_platform())
+            .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await)
             .with_mapped_port(port, container_port)
             .with_env_var("ORACLE_PASSWORD", admin_password)
             .with_env_var("APP_USER", database_username)
@@ -107,7 +107,12 @@ impl OracleImpl for OracleContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request.start().await.expect("start oracle container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("oracle", &e)
+            )
+        });
 
         let host = container
             .get_host()

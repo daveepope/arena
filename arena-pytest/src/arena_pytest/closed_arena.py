@@ -96,6 +96,6 @@ class ClosedArena:
             await asyncio.to_thread(
                 close_arena, ffi, 0, dispatcher_logging_target_token=log_tok
             )
-            raise ArenaBindingError(f"arena_open failed: {e}") from e
+            raise
 
         return OpenArena(ffi, handle, log_tok)

@@ -63,7 +63,7 @@ where
         }
         Err(payload) => {
             let msg = panic_message(&payload);
-            unsafe { write_error(err_out, format!("panic in {fn_name}: {msg}")) };
+            unsafe { write_error(err_out, format!("{fn_name} failed: {msg}")) };
             return ArenaStatus::Failed;
         }
     };

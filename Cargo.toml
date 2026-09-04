@@ -22,7 +22,7 @@ members = [
 ]
 
 [workspace.package]
-version = "6.2.0"
+version = "6.2.1"
 [workspace.dependencies]
 arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }
@@ -86,3 +86,9 @@ oauth2 = { version = "5", default-features = false, features = ["reqwest"] }
 wiremock = "0.6.5"
 axum-server = { version = "0.8", default-features = false, features = ["tls-rustls-no-provider"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
+
+[profile.dev.package.rsa]
+opt-level = 2
+
+[profile.dev.package.num-bigint-dig]
+opt-level = 2

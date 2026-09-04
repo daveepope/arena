@@ -2,7 +2,7 @@ use std::net::{IpAddr, Ipv4Addr};
 
 use arena::dependency::RunnableDependency;
 
-use crate::keys::RsaKeyPair;
+use crate::keys::{IssuerKeys, RsaKeyPair};
 use crate::oauth_common::{IssuerRegistration, OauthListenAddr};
 use crate::oauth_dependency::{OauthDependency, OauthTlsPlan};
 use crate::provider::Provider;
@@ -161,13 +161,13 @@ impl OauthDependencyBuilder {
 
         let issuers: Vec<IssuerRegistration> = if self.issuers.is_empty() {
             let keys = match &self.rsa_pkcs8_pem {
-                Some(pem) => RsaKeyPair::from_pkcs8_pem(pem, RsaKeyPair::DEFAULT_KID)
-                    .unwrap_or_else(|e| {
-                        panic!("[Oauth-{}] invalid PKCS#8 PEM: {e}", self.identifier)
-                    }),
-                None => RsaKeyPair::generate().unwrap_or_else(|e| {
-                    panic!("[Oauth-{}] RSA generate failed: {e}", self.identifier)
-                }),
+                Some(pem) => {
+                    IssuerKeys::from_pkcs8_pem(&self.identifier, pem, RsaKeyPair::DEFAULT_KID)
+                        .unwrap_or_else(|e| {
+                            panic!("[Oauth-{}] invalid PKCS#8 PEM: {e}", self.identifier)
+                        })
+                }
+                None => IssuerKeys::deferred(&self.identifier, RsaKeyPair::DEFAULT_KID),
             };
             vec![IssuerRegistration {
                 provider: Provider::Custom {
@@ -213,12 +213,11 @@ impl OauthDependencyBuilder {
                     }
                     let kid = format!("arena-oauth-{}", i + 1);
                     let keys = match &config.rsa_pkcs8_pem {
-                        Some(pem) => RsaKeyPair::from_pkcs8_pem(pem, kid).unwrap_or_else(|e| {
-                            panic!("[Oauth-{}] invalid PKCS#8 PEM: {e}", self.identifier)
-                        }),
-                        None => RsaKeyPair::generate_with_kid(kid).unwrap_or_else(|e| {
-                            panic!("[Oauth-{}] RSA generate failed: {e}", self.identifier)
-                        }),
+                        Some(pem) => IssuerKeys::from_pkcs8_pem(&self.identifier, pem, kid)
+                            .unwrap_or_else(|e| {
+                                panic!("[Oauth-{}] invalid PKCS#8 PEM: {e}", self.identifier)
+                            }),
+                        None => IssuerKeys::deferred(&self.identifier, kid),
                     };
                     IssuerRegistration {
                         provider,

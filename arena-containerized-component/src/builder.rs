@@ -362,9 +362,13 @@ impl ContainerizedComponentBuilder {
             }
         }
 
-        let platform = self
-            .platform
-            .unwrap_or_else(arena_container::platform::docker_platform);
+        let platform = match (self.platform, &self.image_source) {
+            (Some(platform), _) => platform,
+            (None, ImageSource::Image(image)) => {
+                arena_container::platform::resolve_platform_for_reference(image).await
+            }
+            (None, ImageSource::Containerfile(_)) => arena_container::platform::docker_platform(),
+        };
 
         let runtime_client = Docker::connect_with_local_defaults().map_err(|e| {
             ContainerizedComponentBuildError::RuntimeUnavailable(format!(

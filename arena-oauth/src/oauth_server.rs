@@ -23,12 +23,29 @@ struct OauthServerStarted {
     join: tokio::task::JoinHandle<std::result::Result<(), std::io::Error>>,
     base_url: String,
     readiness_poll_base: String,
+    server_certificate_pem: Option<String>,
     signing_state: Arc<OAuthSigningState>,
 }
 
 #[derive(Default)]
 pub(crate) struct OauthServer {
     inner: Option<OauthServerStarted>,
+}
+
+fn readiness_client(log_label: &str, server_certificate_pem: Option<&str>) -> reqwest::Client {
+    let mut builder = reqwest::Client::builder();
+
+    if let Some(pem) = server_certificate_pem {
+        let certificate = reqwest::Certificate::from_pem(pem.as_bytes())
+            .unwrap_or_else(|e| panic!("[Oauth-{log_label}] readiness: invalid server TLS certificate: {e}"));
+        builder = builder
+            .add_root_certificate(certificate)
+            .tls_built_in_root_certs(false);
+    }
+
+    builder
+        .build()
+        .unwrap_or_else(|e| panic!("[Oauth-{log_label}] readiness: client build failed: {e}"))
 }
 
 fn reserve_bind_port(listen_ip: IpAddr) -> u16 {
@@ -60,6 +77,10 @@ impl OauthServer {
             self.inner.is_none(),
             "[Oauth-{log_label}] oauth server already running"
         );
+
+        for issuer in &issuers {
+            issuer.keys.resolve();
+        }
 
         let scheme = if tls_pem.is_some() { "https" } else { "http" };
 
@@ -97,9 +118,12 @@ impl OauthServer {
         let router = https_router(signing_state.clone());
         let handle = Handle::new();
 
+        let mut server_certificate_pem = None;
+
         let join = match tls_pem {
             Some((cert_pem, key_pem)) => {
                 ensure_rustls_default_crypto_provider();
+                server_certificate_pem = Some(cert_pem.clone());
                 let rustls = RustlsConfig::from_pem(cert_pem.into_bytes(), key_pem.into_bytes())
                     .await
                     .unwrap_or_else(|e| panic!("[Oauth-{log_label}] invalid TLS PEM: {e}"));
@@ -117,6 +141,7 @@ impl OauthServer {
             join,
             base_url: metadata_base,
             readiness_poll_base,
+            server_certificate_pem,
             signing_state,
         });
     }
@@ -158,10 +183,12 @@ impl OauthServer {
             .map(|s| s.readiness_poll_base.as_str())
             .unwrap_or_else(|| panic!("[Oauth-{log_label}] readiness: server not started"));
         let url = format!("{poll_base}/.well-known/oauth-authorization-server");
-        let client = reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()
-            .expect("reqwest client");
+        let client = readiness_client(
+            log_label,
+            self.inner
+                .as_ref()
+                .and_then(|s| s.server_certificate_pem.as_deref()),
+        );
 
         tracing::debug!(
             subsystem = "oauth",

@@ -75,14 +75,19 @@ impl PostgresImpl for PostgresContainerImpl {
             .with_name(image_name)
             .with_tag(image_tag)
             .with_container_name(container_name)
-            .with_platform(arena_container::platform::docker_platform());
+            .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await);
 
         if let Some(ref network) = self.network {
             arena_container::network::ensure_network_exists(network).await;
             request = request.with_network(network);
         }
 
-        let container = request.start().await.expect("start postgres container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("postgres", &e)
+            )
+        });
 
         let host = container
             .get_host()

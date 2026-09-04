@@ -92,7 +92,7 @@ fn run_reset(
                 op = "arena_reset",
                 "panic during dependency reset"
             );
-            unsafe { write_error(err_out, format!("panic in arena reset: {msg}")) };
+            unsafe { write_error(err_out, format!("arena reset failed: {msg}")) };
             ArenaStatus::Panic
         }
     }

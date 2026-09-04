@@ -103,7 +103,7 @@ impl LocalstackImpl for LocalstackContainerImpl {
             .with_mapped_port(host_port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)
             .with_container_name(container_name)
-            .with_platform(arena_container::platform::docker_platform())
+            .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await)
             .with_env_var("LS_LOG", "error")
             .with_env_var("DEBUG", "0")
             .with_env_var("PERSISTENCE", "0");
@@ -129,7 +129,12 @@ impl LocalstackImpl for LocalstackContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request.start().await.expect("start localstack container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("localstack", &e)
+            )
+        });
 
         let host = container
             .get_host()

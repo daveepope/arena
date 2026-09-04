@@ -5,7 +5,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::discovery::OAuthAuthorizationServerMetadata;
-use crate::keys::RsaKeyPair;
+use crate::keys::IssuerKeys;
 use crate::provider::Provider;
 use crate::token::AccessTokenClaims;
 
@@ -20,7 +20,7 @@ pub(crate) struct IssuerRegistration {
     pub(crate) provider: Provider,
     pub(crate) issuer_path: String,
     pub(crate) jwks_path: String,
-    pub(crate) keys: RsaKeyPair,
+    pub(crate) keys: IssuerKeys,
 }
 
 pub(crate) struct OAuthSigningState {

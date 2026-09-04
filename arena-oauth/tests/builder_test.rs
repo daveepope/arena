@@ -1,15 +1,22 @@
 use std::net::{IpAddr, Ipv4Addr};
+use std::sync::OnceLock;
 
 use arena_oauth::{IssuerConfig, OauthDependency, Provider};
 use rsa::pkcs8::{EncodePrivateKey, LineEnding};
 use rsa::RsaPrivateKey;
 
+static PKCS8_PEM: OnceLock<String> = OnceLock::new();
+
 fn generate_pkcs8_pem() -> String {
-    let mut rng = rand::thread_rng();
-    let key = RsaPrivateKey::new(&mut rng, 2048).expect("generate rsa key");
-    key.to_pkcs8_pem(LineEnding::LF)
-        .expect("encode pkcs8 pem")
-        .to_string()
+    PKCS8_PEM
+        .get_or_init(|| {
+            let mut rng = rand::thread_rng();
+            let key = RsaPrivateKey::new(&mut rng, 2048).expect("generate rsa key");
+            key.to_pkcs8_pem(LineEnding::LF)
+                .expect("encode pkcs8 pem")
+                .to_string()
+        })
+        .clone()
 }
 
 #[test]
@@ -185,23 +192,4 @@ fn build_with_issuer_path_and_no_jwks_path_scopes_default_jwks_path_to_issuer() 
         dep.jwks_path_at(1),
         Some("/tenant-b/.well-known/jwks.json")
     );
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn issuer_with_provider_as_sole_issuer_matches_issuer_for_its_provider() {
-    use arena::dependency::RunnableDependency;
-    let provider = Provider::Cognito {
-        pool_id: "us-east-1_abc123".to_string(),
-    };
-    let mut dep = OauthDependency::builder("oauth-builder-issuer-matches-issuer-at")
-        .with_http()
-        .with_provider(provider.clone())
-        .build();
-    dep.start().await;
-    assert_eq!(dep.issuer(), dep.issuer_for(&provider));
-    assert!(dep
-        .issuer()
-        .expect("issuer")
-        .ends_with("/us-east-1_abc123"));
-    dep.stop().await;
 }

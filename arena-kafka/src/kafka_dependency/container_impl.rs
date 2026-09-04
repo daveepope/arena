@@ -49,7 +49,7 @@ impl KafkaImpl for KafkaContainerImpl {
             .with_mapped_port(port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)
             .with_container_name(container_name)
-            .with_platform(arena_container::platform::docker_platform());
+            .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await);
 
         if let Some(ref network) = self.network {
             arena_container::network::ensure_network_exists(network).await;
@@ -89,7 +89,12 @@ impl KafkaImpl for KafkaContainerImpl {
                 ]);
         }
 
-        let container = request.start().await.expect("start kafka container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("kafka", &e)
+            )
+        });
 
         let host = container
             .get_host()
@@ -160,7 +165,7 @@ impl KafkaImpl for ConfluentKafkaContainerImpl {
             .with_mapped_port(port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)
             .with_container_name(container_name)
-            .with_platform(arena_container::platform::docker_platform());
+            .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await);
 
         if let Some(ref network) = self.network {
             arena_container::network::ensure_network_exists(network).await;
@@ -193,7 +198,12 @@ impl KafkaImpl for ConfluentKafkaContainerImpl {
                 );
         }
 
-        let container = request.start().await.expect("start kafka container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("kafka", &e)
+            )
+        });
 
         let host = container
             .get_host()

@@ -48,7 +48,7 @@ async fn get_openid_configuration(
 }
 
 async fn get_jwks_for_issuer(s: Arc<OAuthSigningState>, idx: usize) -> Json<serde_json::Value> {
-    Json(s.issuers[idx].keys.jwks_json())
+    Json(s.issuers[idx].keys.resolve().jwks_json())
 }
 
 async fn post_token(
@@ -75,7 +75,7 @@ async fn post_token(
         .clone()
         .unwrap_or_else(|| "client".to_string());
     let access_token = match issue_access_token(
-        &s.default_issuer().keys,
+        s.default_issuer().keys.resolve(),
         &s.metadata.issuer,
         &sub,
         &scopes,
@@ -106,7 +106,7 @@ async fn post_introspect(
 ) -> impl IntoResponse {
     for issuer in &s.issuers {
         let issuer_string = s.issuer_string(issuer);
-        if let Ok(claims) = verify_access_token(&form.token, &issuer.keys, &issuer_string) {
+        if let Ok(claims) = verify_access_token(&form.token, issuer.keys.resolve(), &issuer_string) {
             return Json(introspection_active(&claims)).into_response();
         }
     }

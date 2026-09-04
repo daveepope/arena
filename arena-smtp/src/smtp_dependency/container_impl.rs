@@ -70,7 +70,7 @@ impl SmtpImpl for SmtpContainerImpl {
 
         let mut request = image
             .with_container_name(container_name)
-            .with_platform(arena_container::platform::docker_platform())
+            .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await)
             .with_mapped_port(smtp_port, smtp_container_port)
             .with_mapped_port(ui_port, ui_container_port);
 
@@ -88,7 +88,12 @@ impl SmtpImpl for SmtpContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request.start().await.expect("start smtp container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("smtp", &e)
+            )
+        });
 
         let (host, smtp_host_port, ui_host_port) = tokio::join!(
             container.get_host(),

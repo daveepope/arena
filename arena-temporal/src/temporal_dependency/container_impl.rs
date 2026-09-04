@@ -62,7 +62,7 @@ impl TemporalImpl for TemporalContainerImpl {
         let mut request = image
             .with_health_check(tcp_healthcheck(TEMPORAL_GRPC_CONTAINER_PORT))
             .with_container_name(container_name)
-            .with_platform(arena_container::platform::docker_platform())
+            .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await)
             .with_mapped_port(grpc_port, grpc_container_port)
             .with_mapped_port(ui_port, ui_container_port)
             .with_cmd(["server", "start-dev", "--ip", "0.0.0.0"]);
@@ -72,7 +72,12 @@ impl TemporalImpl for TemporalContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request.start().await.expect("start temporal container");
+        let container = request.start().await.unwrap_or_else(|e| {
+            panic!(
+                "{}",
+                arena_container::container::start_failure_message("temporal", &e)
+            )
+        });
 
         let (host, grpc_host_port, ui_host_port) = tokio::join!(
             container.get_host(),

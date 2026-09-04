@@ -1,6 +1,6 @@
 module(
     name = "arena",
-    version = "6.2.0",
+    version = "6.2.1",
 )
 
 arena_version_ext = use_extension("//tools:arena_version.bzl", "arena_version")
@@ -126,6 +126,9 @@ arena_java_maven.install(
         "io.netty:netty-codec-http:4.1.137.Final",
         "io.netty:netty-codec-http2:4.1.136.Final",
         "org.apache.logging.log4j:log4j-api:2.25.5",
+        "org.apache.tomcat.embed:tomcat-embed-core:10.1.59",
+        "org.apache.tomcat.embed:tomcat-embed-el:10.1.59",
+        "org.apache.tomcat.embed:tomcat-embed-websocket:10.1.59",
     ],
     fail_on_missing_checksum = False,
     lock_file = "//:arena_java_maven_install.json",
@@ -183,6 +186,18 @@ crate.from_cargo(
         "x86_64-pc-windows-msvc",
         "x86_64-unknown-linux-gnu",
     ],
+)
+
+crate.annotation(
+    crate = "rsa",
+    repositories = ["crates"],
+    rustc_flags = ["-Copt-level=2"],
+)
+
+crate.annotation(
+    crate = "num-bigint-dig",
+    repositories = ["crates"],
+    rustc_flags = ["-Copt-level=2"],
 )
 
 use_repo(crate, "crates")

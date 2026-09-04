@@ -5,6 +5,22 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.2.1]
+
+### Changed
+
+- `arena-oauth`: issuer signing keys are generated when the dependency starts instead of when it is built
+- `rsa` and `num-bigint-dig` build with optimizations in unoptimized builds, so RSA key generation no longer dominates test time
+
+### Fixed
+
+- Dependencies and containerized components now request a platform the image actually publishes, falling back to `linux/amd64` for amd64-only images, so arenas start on arm64 hosts
+- `arena-oauth`: the HTTPS readiness probe now verifies the server certificate Arena generated instead of accepting any certificate
+- `arena-http`: the admin client only skips certificate verification for loopback hosts, and directs callers to `with_trusted_certificate_pem` otherwise
+- Platform resolution no longer caches a failed registry lookup, keys the cache by host platform, and falls back to the platform of the locally present image when the registry cannot be reached
+- Container start failures report the exit code as a plain number instead of Rust debug formatting
+- `arena-oauth`: the ephemeral server certificate covers the configured listen address, so a non-default listen IP passes the readiness probe
+
 ## [6.2.0]
 
 ### Added

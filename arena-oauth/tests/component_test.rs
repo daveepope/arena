@@ -1,5 +1,7 @@
 use arena::dependency::RunnableDependency;
-use arena_oauth::{ensure_scopes, IssuerConfig, OauthDependency, Provider, TokenError};
+use arena_oauth::{
+    ensure_scopes, localhost_self_signed_pem_pair, IssuerConfig, OauthDependency, Provider, TokenError,
+};
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use rsa::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding};
 use rsa::RsaPrivateKey;
@@ -578,4 +580,147 @@ async fn oauth_dependency_serves_jwks_and_verifiable_tokens_across_all_providers
 
         dep.stop().await;
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn issuer_with_provider_as_sole_issuer_matches_issuer_for_its_provider() {
+    let provider = Provider::Cognito {
+        pool_id: "us-east-1_abc123".to_string(),
+    };
+    let mut dep = OauthDependency::builder("oauth-builder-issuer-matches-issuer-at")
+        .with_http()
+        .with_provider(provider.clone())
+        .build();
+    dep.start().await;
+    assert_eq!(dep.issuer(), dep.issuer_for(&provider));
+    assert!(dep
+        .issuer()
+        .expect("issuer")
+        .ends_with("/us-east-1_abc123"));
+    dep.stop().await;
+}
+
+#[tokio::test]
+async fn oauth_dependency_ipv6_loopback_listen_ip_serves_discovery_over_https() {
+    init_test_logging();
+    let mut dep = OauthDependency::builder("oauth-ipv6-loopback")
+        .with_listen_ip(std::net::IpAddr::V6(std::net::Ipv6Addr::LOCALHOST))
+        .build();
+    dep.start().await;
+
+    let base = dep.base_url().expect("base url").to_string();
+    let pem = dep
+        .server_tls_certificate_pem()
+        .expect("server TLS certificate PEM");
+    let client = https_client_trusting_pem(pem);
+
+    let discovery: Value = client
+        .get(format!("{base}/.well-known/oauth-authorization-server"))
+        .send()
+        .await
+        .expect("discovery GET")
+        .json()
+        .await
+        .expect("discovery JSON");
+
+    assert!(
+        base.starts_with("https://[::1]"),
+        "base url must use IPv6 loopback"
+    );
+    assert_eq!(discovery["issuer"].as_str(), Some(base.as_str()));
+
+    dep.stop().await;
+}
+
+async fn fetch_access_token(client: &reqwest::Client, base: &str) -> String {
+    let disc_url = format!("{base}/.well-known/oauth-authorization-server");
+    let disc: Value = client
+        .get(&disc_url)
+        .send()
+        .await
+        .expect("discovery GET")
+        .error_for_status()
+        .expect("discovery status")
+        .json()
+        .await
+        .expect("discovery JSON");
+
+    let token_endpoint = disc["token_endpoint"]
+        .as_str()
+        .expect("token_endpoint string");
+
+    let token_resp = client
+        .post(token_endpoint)
+        .form(&[("grant_type", "client_credentials")])
+        .send()
+        .await
+        .expect("token POST")
+        .error_for_status()
+        .expect("token status");
+
+    let token_json: Value = token_resp.json().await.expect("token JSON");
+    token_json["access_token"]
+        .as_str()
+        .expect("access_token string")
+        .to_string()
+}
+
+#[tokio::test]
+async fn http_transport_serves_and_verifies_tokens_without_tls() {
+    let mut dep = OauthDependency::builder("oauth-http").with_http().build();
+
+    dep.start().await;
+    assert!(dep.server_tls_certificate_pem().is_none());
+
+    let base = dep
+        .base_url()
+        .expect("base_url after start")
+        .trim_end_matches('/')
+        .to_string();
+    assert!(base.starts_with("http://"), "expected http base_url, got {base}");
+    assert_eq!(dep.issuer(), Some(base.clone()));
+
+    let client = reqwest::Client::new();
+    let access_token = fetch_access_token(&client, &base).await;
+
+    dep.verify_access_token(&access_token)
+        .expect("dependency JWT verify while running");
+
+    dep.soft_reset().await;
+
+    dep.hard_reset().await;
+    let base_after_reset = dep
+        .base_url()
+        .expect("base_url after hard_reset")
+        .trim_end_matches('/')
+        .to_string();
+    let access_token_after_reset = fetch_access_token(&client, &base_after_reset).await;
+    dep.verify_access_token(&access_token_after_reset)
+        .expect("dependency JWT verify after hard_reset");
+
+    dep.stop().await;
+
+    let err = dep
+        .verify_access_token(&access_token_after_reset)
+        .expect_err("verify should fail once server is stopped");
+    assert!(matches!(err, TokenError::NotRunning));
+}
+
+#[tokio::test]
+async fn custom_pem_transport_exposes_provided_certificate() {
+    let (cert_pem, key_pem) = localhost_self_signed_pem_pair().expect("generate test TLS pair");
+
+    let mut dep = OauthDependency::builder("oauth-custom-pem")
+        .with_server_tls_pem(cert_pem.clone(), key_pem)
+        .build();
+
+    dep.start().await;
+
+    assert_eq!(dep.server_tls_certificate_pem(), Some(cert_pem.as_str()));
+    assert!(dep
+        .base_url()
+        .expect("base_url after start")
+        .starts_with("https://"));
+
+    dep.stop().await;
 }

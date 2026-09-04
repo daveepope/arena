@@ -71,7 +71,7 @@ pub extern "C" fn arena_open(
         }
         Err(payload) => {
             let msg = panic_message(&payload);
-            unsafe { write_error(err_out, format!("panic in arena_open: {msg}")) };
+            unsafe { write_error(err_out, format!("arena_open failed: {msg}")) };
             return std::ptr::null_mut();
         }
     };
@@ -101,7 +101,7 @@ pub extern "C" fn arena_open(
                 op = "arena_open",
                 "panic while opening arena"
             );
-            unsafe { write_error(err_out, format!("panic in arena_open: {msg}")) };
+            unsafe { write_error(err_out, format!("arena_open failed: {msg}")) };
             std::ptr::null_mut()
         }
     }
