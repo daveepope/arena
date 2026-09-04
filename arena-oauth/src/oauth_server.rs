@@ -78,6 +78,10 @@ impl OauthServer {
             "[Oauth-{log_label}] oauth server already running"
         );
 
+        for issuer in &issuers {
+            issuer.keys.resolve();
+        }
+
         let scheme = if tls_pem.is_some() { "https" } else { "http" };
 
         let bind_port = if listen.port == 0 {

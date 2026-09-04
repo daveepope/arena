@@ -3,6 +3,7 @@ use rsa::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding
 use rsa::traits::PublicKeyParts;
 use rsa::{BigUint, RsaPrivateKey, RsaPublicKey};
 use serde_json::json;
+use std::sync::{Arc, OnceLock};
 
 #[derive(Clone)]
 pub(crate) struct RsaKeyPair {
@@ -103,4 +104,44 @@ fn bigint_to_b64url(v: &BigUint) -> String {
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
     let bytes = v.to_bytes_be();
     URL_SAFE_NO_PAD.encode(bytes)
+}
+
+#[derive(Clone)]
+pub(crate) struct IssuerKeys {
+    identifier: String,
+    kid: String,
+    keys: Arc<OnceLock<RsaKeyPair>>,
+}
+
+impl IssuerKeys {
+    pub(crate) fn deferred(identifier: impl Into<String>, kid: impl Into<String>) -> Self {
+        Self {
+            identifier: identifier.into(),
+            kid: kid.into(),
+            keys: Arc::new(OnceLock::new()),
+        }
+    }
+
+    pub(crate) fn from_pkcs8_pem(
+        identifier: impl Into<String>,
+        pem: &str,
+        kid: impl Into<String>,
+    ) -> Result<Self, String> {
+        let kid = kid.into();
+        let keys = Arc::new(OnceLock::new());
+        let _ = keys.set(RsaKeyPair::from_pkcs8_pem(pem, kid.clone())?);
+        Ok(Self {
+            identifier: identifier.into(),
+            kid,
+            keys,
+        })
+    }
+
+    pub(crate) fn resolve(&self) -> &RsaKeyPair {
+        self.keys.get_or_init(|| {
+            RsaKeyPair::generate_with_kid(self.kid.clone()).unwrap_or_else(|e| {
+                panic!("[Oauth-{}] RSA generate failed: {e}", self.identifier)
+            })
+        })
+    }
 }

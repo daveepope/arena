@@ -1,15 +1,22 @@
 use std::net::{IpAddr, Ipv4Addr};
+use std::sync::OnceLock;
 
 use arena_oauth::{IssuerConfig, OauthDependency, Provider};
 use rsa::pkcs8::{EncodePrivateKey, LineEnding};
 use rsa::RsaPrivateKey;
 
+static PKCS8_PEM: OnceLock<String> = OnceLock::new();
+
 fn generate_pkcs8_pem() -> String {
-    let mut rng = rand::thread_rng();
-    let key = RsaPrivateKey::new(&mut rng, 2048).expect("generate rsa key");
-    key.to_pkcs8_pem(LineEnding::LF)
-        .expect("encode pkcs8 pem")
-        .to_string()
+    PKCS8_PEM
+        .get_or_init(|| {
+            let mut rng = rand::thread_rng();
+            let key = RsaPrivateKey::new(&mut rng, 2048).expect("generate rsa key");
+            key.to_pkcs8_pem(LineEnding::LF)
+                .expect("encode pkcs8 pem")
+                .to_string()
+        })
+        .clone()
 }
 
 #[test]

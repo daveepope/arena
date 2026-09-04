@@ -102,7 +102,7 @@ impl OauthDependency {
         let mut first_err: Option<TokenError> = None;
         for issuer in state.issuers.iter() {
             let issuer_string = format!("{base}{}", issuer.issuer_path);
-            match crate::token::verify_access_token(token, &issuer.keys, &issuer_string) {
+            match crate::token::verify_access_token(token, issuer.keys.resolve(), &issuer_string) {
                 Ok(claims) => return Ok(claims),
                 Err(e) => {
                     if first_err.is_none() {
@@ -136,7 +136,7 @@ impl OauthDependency {
         self.issuers
             .iter()
             .find(|i| &i.provider == provider)
-            .and_then(|issuer| issuer.keys.private_key_pkcs8_pem().ok())
+            .and_then(|issuer| issuer.keys.resolve().private_key_pkcs8_pem().ok())
     }
 
     pub fn sign_claims(
@@ -149,7 +149,7 @@ impl OauthDependency {
             .iter()
             .find(|i| &i.provider == provider)
             .ok_or_else(|| format!("no issuer registered for provider {provider:?}"))?;
-        issuer.keys.sign_claims(claims)
+        issuer.keys.resolve().sign_claims(claims)
     }
 
     fn tls_pair_for_listen(&mut self) -> Option<(String, String)> {

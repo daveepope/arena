@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [6.2.1]
 
+### Changed
+
+- `arena-oauth`: issuer signing keys are generated when the dependency starts instead of when it is built
+
 ### Fixed
 
 - Dependencies and containerized components now request a platform the image actually publishes, falling back to `linux/amd64` for amd64-only images, so arenas start on arm64 hosts

@@ -7,6 +7,7 @@
 - Use **`cargo check --workspace`** for fast Rust feedback when useful; treat **Bazel** as the source of truth for green builds.
 - Always report to the developer if you are adding ANY new 3rd party libraries
 - Never stray away from the plan set out by the developer
+- **NEVER commit code.** Do not run `git commit`, `git add`, `git push`, or any other command that stages or records changes. Leave changes in the working tree; committing is the developer's job. Supply a commit message as text only when asked for one.
 - You will function as an informative AI coding agent to ASSIST the developer in adding new features, fixing bugs, increasing test coverage, maintaing the architecture.
 - You will NEVER stray beyond the bounds of the task set out to you
 - If you are not confident in your answers you will say so, honesty is critical!
