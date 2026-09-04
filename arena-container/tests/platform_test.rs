@@ -1,6 +1,6 @@
 use arena_container::platform::{
-    docker_platform, platform_name, published_platform_names, resolve_platform_with,
-    select_platform, PublishedPlatformClient,
+    docker_platform, platform_for_arch, platform_name, published_platform_names,
+    resolve_platform_with, select_platform, PublishedPlatformClient,
 };
 use bollard::models::OciPlatform;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -128,4 +128,17 @@ async fn resolve_platform_with_repeated_reference_looks_up_once() {
     assert_eq!(first, "linux/amd64");
     assert_eq!(second, "linux/amd64");
     assert_eq!(runtime_client.lookups.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn platform_for_arch_known_and_unknown_arches_map_to_linux_platforms() {
+    let cases = [
+        ("x86_64", "linux/amd64"),
+        ("aarch64", "linux/arm64"),
+        ("powerpc64", "linux/powerpc64"),
+    ];
+
+    for (arch, expected) in cases {
+        assert_eq!(platform_for_arch(arch), expected, "arch: {arch}");
+    }
 }

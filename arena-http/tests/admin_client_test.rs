@@ -125,3 +125,37 @@ async fn reset_journal_loopback_tls_host_without_pem_reaches_network() {
         .unwrap_or_default();
     assert!(text.contains("reset_journal failed"), "{text}");
 }
+
+#[tokio::test]
+#[should_panic(expected = "with_trusted_certificate_pem")]
+async fn reset_journal_remote_ipv6_tls_host_without_pem_panics() {
+    let mut dep = HttpDependency::builder("http-remote-ipv6-tls")
+        .with_impl(setup_fake_impl("https://[2001:db8::1]:8443"))
+        .with_port(0)
+        .with_readiness_check(OkReadinessCheck)
+        .build();
+    dep.start().await;
+
+    dep.reset_journal().await;
+}
+
+#[tokio::test]
+async fn reset_journal_loopback_ipv6_tls_host_without_pem_reaches_network() {
+    let mut dep = HttpDependency::builder("http-loopback-ipv6-tls")
+        .with_impl(setup_fake_impl("https://[::1]:8443"))
+        .with_port(0)
+        .with_readiness_check(OkReadinessCheck)
+        .build();
+    dep.start().await;
+
+    let outcome = std::panic::AssertUnwindSafe(dep.reset_journal())
+        .catch_unwind()
+        .await;
+
+    let text = outcome
+        .expect_err("reset_journal should fail")
+        .downcast_ref::<String>()
+        .cloned()
+        .unwrap_or_default();
+    assert!(text.contains("reset_journal failed"), "{text}");
+}

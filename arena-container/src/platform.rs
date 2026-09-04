@@ -13,7 +13,11 @@ fn resolved_platforms() -> &'static Mutex<HashMap<String, String>> {
 }
 
 pub fn docker_platform() -> String {
-    let arch = match std::env::consts::ARCH {
+    platform_for_arch(std::env::consts::ARCH)
+}
+
+pub fn platform_for_arch(arch: &str) -> String {
+    let arch = match arch {
         "x86_64" => "amd64",
         "aarch64" => "arm64",
         other => other,
