@@ -623,7 +623,10 @@ async fn oauth_dependency_ipv6_loopback_listen_ip_serves_discovery_over_https() 
         .await
         .expect("discovery JSON");
 
-    assert!(base.starts_with("https://[::1]"), "base url: {base}");
+    assert!(
+        base.starts_with("https://[::1]"),
+        "base url must use IPv6 loopback"
+    );
     assert_eq!(discovery["issuer"].as_str(), Some(base.as_str()));
 
     dep.stop().await;

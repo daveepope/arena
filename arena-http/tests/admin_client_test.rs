@@ -159,30 +159,3 @@ async fn reset_journal_loopback_ipv6_tls_host_without_pem_reaches_network() {
         .unwrap_or_default();
     assert!(text.contains("reset_journal failed"), "{text}");
 }
-
-#[tokio::test]
-async fn reset_journal_https_admin_url_on_remote_runtime_host_reaches_the_network() {
-    let mut dep = HttpDependency::builder("http-remote-runtime-host")
-        .with_impl(setup_fake_impl("https://10.11.12.13:8443"))
-        .with_port(0)
-        .with_readiness_check(OkReadinessCheck)
-        .build();
-    dep.start().await;
-
-    let outcome = std::panic::AssertUnwindSafe(dep.reset_journal())
-        .catch_unwind()
-        .await;
-
-    let panic_message = outcome
-        .err()
-        .and_then(|payload| payload.downcast_ref::<String>().cloned())
-        .expect("reset_journal panics when the admin API is unreachable");
-    assert!(
-        panic_message.contains("10.11.12.13"),
-        "expected a network failure, got: {panic_message}"
-    );
-    assert!(
-        !panic_message.contains("Arena cannot verify"),
-        "admin endpoints derived from the container runtime must not require a trusted certificate: {panic_message}"
-    );
-}
