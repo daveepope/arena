@@ -136,7 +136,8 @@ impl IssuerKeys {
     pub(crate) fn resolve(&self) -> &RsaKeyPair {
         self.keys.get_or_init(|| {
             RsaKeyPair::generate_with_kid(self.kid.clone()).unwrap_or_else(|e| {
-                panic!("[Oauth-{}] RSA generate failed: {e}", self.identifier)
+                let safe_identifier = self.identifier.replace(['\r', '\n'], "");
+                panic!("[Oauth-{safe_identifier}] RSA generate failed: {e}")
             })
         })
     }
