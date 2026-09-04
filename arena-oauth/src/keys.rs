@@ -110,16 +110,16 @@ pub(crate) struct IssuerKeys {
 }
 
 impl IssuerKeys {
-    pub(crate) fn deferred(identifier: impl Into<String>, kid: impl Into<String>) -> Self {
+    pub(crate) fn deferred(identifier: &str, kid: impl Into<String>) -> Self {
         Self {
-            identifier: identifier.into(),
+            identifier: arena_container::identifier::sanitize_for_container(identifier),
             kid: kid.into(),
             keys: Arc::new(OnceLock::new()),
         }
     }
 
     pub(crate) fn from_pkcs8_pem(
-        identifier: impl Into<String>,
+        identifier: &str,
         pem: &str,
         kid: impl Into<String>,
     ) -> Result<Self, String> {
@@ -127,7 +127,7 @@ impl IssuerKeys {
         let keys = Arc::new(OnceLock::new());
         let _ = keys.set(RsaKeyPair::from_pkcs8_pem(pem, kid.clone())?);
         Ok(Self {
-            identifier: identifier.into(),
+            identifier: arena_container::identifier::sanitize_for_container(identifier),
             kid,
             keys,
         })
