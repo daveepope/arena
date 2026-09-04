@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: build-test-publish-${{ github.event.pull_request.number || github.ref }}
+  group: build-test-publish-${{ github.event.pull_request.number || github.ref }}${{ github.event.action == 'labeled' && '-labeled' || '' }}
   cancel-in-progress: true
 
 permissions: read-all
@@ -989,36 +989,20 @@ jobs:
       checks: read
     timeout-minutes: 10
     steps:
-      - name: Require the head commit's checks to have passed already
+      - name: Require the previous run for this commit to have succeeded
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          REQUIRED_CHECKS: |
-            Verify (Ubuntu 24.04)
-            Test Ubuntu 24.04
-            Test Ubuntu 24.04 ARM64
-            Test examples Ubuntu 24.04
-            Test examples Ubuntu 24.04 ARM64
-            Coverage Ubuntu 24.04
-            Test macOS Intel
-            Test macOS ARM64
-            Test Windows
-            Test examples Windows
         run: |
           set -euo pipefail
-          runs="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
-            --jq '.check_runs[] | [.name, (.conclusion // "pending")] | @tsv')"
-          failed=0
-          while IFS= read -r check; do
-            [ -z "$check" ] && continue
-            if printf '%s\n' "$runs" | awk -F'\t' -v n="$check" '$1 == n && $2 == "success" { found = 1 } END { exit !found }'; then
-              echo "$check: success"
-            else
-              echo "::error::$check has not passed for $HEAD_SHA; push a commit or re-run the checks before labelling"
-              failed=1
-            fi
-          done <<< "$REQUIRED_CHECKS"
-          [ "$failed" -eq 0 ]
+          conclusion="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/build-test-publish-arena.yml/runs?head_sha=${HEAD_SHA}&per_page=30" \
+            --jq "[.workflow_runs[] | select(.id != ${GITHUB_RUN_ID} and .status == \"completed\")] | first | .conclusion // \"none\"")"
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::the previous run for $HEAD_SHA is '$conclusion'; let it pass before adding the pre-release label"
+            exit 1
+          fi
+          echo "previous run for $HEAD_SHA passed"
 
   publish_gate:
     name: Publish gate
