@@ -79,6 +79,8 @@ Upgrading from 6.2.1 requires code changes in Rust. The FFI C ABI is unchanged, 
 - `arena-container`: the expired-container sweep runs at most once per module per minute, so a dependency starting many containers at once no longer opens a container runtime connection per container and destabilises startup
 - `arena-xunit`: identifiers are lowercased invariantly, so a non-invariant locale cannot produce an invalid container name
 - `arena-xunit`: identifier building is idempotent, matching the other clients and Rust
+- `examples`: device state transitions are applied through a workflow update instead of a signal and a bounded poll, so a state read after a write no longer races the workflow
+- CI: the pre-release gate only runs for the `pre-release` label and ignores cancelled runs when checking the previous run for the commit
 
 ## [6.2.1]
 

@@ -421,7 +421,7 @@ jobs:
 
       - name: Build and test
         run: |
-          bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
+          bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
 
   test_component_ubuntu_24_04:
     name: Test component Ubuntu 24.04
@@ -547,7 +547,7 @@ jobs:
 
       - name: Build and test
         run: |
-          bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
+          bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
 
   test_component_ubuntu_24_04_arm64:
     name: Test component Ubuntu 24.04 ARM64
@@ -675,7 +675,7 @@ jobs:
           fi
 
       - name: Build and test
-        run: bazel test //examples/... --config=ci --build_tests_only --test_tag_filters=component_test --local_test_jobs=2
+        run: bazel test //examples/... --config=ci --build_tests_only --test_tag_filters=component_test --local_test_jobs=4
 
   coverage_ubuntu_24_04:
     name: Coverage Ubuntu 24.04
@@ -799,7 +799,7 @@ jobs:
           fi
 
       - name: Build and test
-        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
 
   test_macos_arm64:
     name: Test unit macOS ARM64
@@ -854,7 +854,7 @@ jobs:
           fi
 
       - name: Build and test
-        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
 
   test_unit_windows:
     name: Test unit Windows
@@ -912,7 +912,7 @@ jobs:
       - name: Build and test
         shell: bash
         run: |
-          bazel test --config=ci --enable_runfiles --build_tests_only --test_tag_filters=-component_test,-no-windows -- //...
+          bazel test --config=ci --enable_runfiles --build_tests_only --test_tag_filters=-component_test,-no-windows --local_test_jobs=6 -- //...
 
   test_component_windows:
     name: Test component Windows
@@ -1091,7 +1091,8 @@ jobs:
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
       github.event_name == 'pull_request' &&
-      github.event.action == 'labeled'
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'pre-release'
     runs-on: ubuntu-24.04
     permissions:
       actions: read
@@ -1107,7 +1108,7 @@ jobs:
           set -euo pipefail
           conclusion="$(gh api \
             "repos/${GITHUB_REPOSITORY}/actions/workflows/build-test-publish-arena.yml/runs?head_sha=${HEAD_SHA}&per_page=30" \
-            --jq "[.workflow_runs[] | select(.id != ${GITHUB_RUN_ID} and .status == \"completed\")] | first | .conclusion // \"none\"")"
+            --jq "[.workflow_runs[] | select(.id != ${GITHUB_RUN_ID} and .status == \"completed\" and .conclusion != \"cancelled\")] | first | .conclusion // \"none\"")"
           if [ "$conclusion" != "success" ]; then
             echo "::error::the previous run for $HEAD_SHA is '$conclusion'; let it pass before adding the pre-release label"
             exit 1
