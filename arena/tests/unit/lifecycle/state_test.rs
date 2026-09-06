@@ -191,3 +191,97 @@ fn serialize_every_runnable_state_returns_its_as_str_token() {
         assert_eq!(serde_json::to_value(state).unwrap(), json!(state.as_str()));
     }
 }
+
+#[test]
+fn message_every_arena_state_returns_a_distinct_human_sentence() {
+    let states = [
+        ArenaLifecycleState::ArenaCreated,
+        ArenaLifecycleState::ArenaStarting,
+        ArenaLifecycleState::DependenciesStarting,
+        ArenaLifecycleState::DependenciesStarted,
+        ArenaLifecycleState::PlaybooksRunning,
+        ArenaLifecycleState::PlaybooksComplete,
+        ArenaLifecycleState::ComponentsStarting,
+        ArenaLifecycleState::ComponentsStarted,
+        ArenaLifecycleState::ArenaOpen,
+        ArenaLifecycleState::ArenaClosing,
+        ArenaLifecycleState::ComponentsStopping,
+        ArenaLifecycleState::ComponentsStopped,
+        ArenaLifecycleState::DependenciesStopping,
+        ArenaLifecycleState::DependenciesStopped,
+        ArenaLifecycleState::ArenaTeardown,
+        ArenaLifecycleState::ArenaClosed,
+        ArenaLifecycleState::ArenaFaulted,
+    ];
+
+    let messages: Vec<&str> = states.iter().map(|state| state.message()).collect();
+    let mut unique = messages.clone();
+    unique.sort_unstable();
+    unique.dedup();
+
+    assert_eq!(unique.len(), states.len(), "every state needs a distinct message");
+}
+
+#[test]
+fn message_every_arena_state_returns_its_sentence() {
+    let cases = [
+        (ArenaLifecycleState::ArenaCreated, "created"),
+        (ArenaLifecycleState::ArenaStarting, "opening"),
+        (ArenaLifecycleState::DependenciesStarting, "starting dependencies"),
+        (ArenaLifecycleState::DependenciesStarted, "dependencies started"),
+        (ArenaLifecycleState::PlaybooksRunning, "running playbooks"),
+        (ArenaLifecycleState::PlaybooksComplete, "playbooks complete"),
+        (ArenaLifecycleState::ComponentsStarting, "starting components"),
+        (ArenaLifecycleState::ComponentsStarted, "components started"),
+        (ArenaLifecycleState::ArenaOpen, "open"),
+        (ArenaLifecycleState::ArenaClosing, "closing"),
+        (ArenaLifecycleState::ComponentsStopping, "stopping components"),
+        (ArenaLifecycleState::ComponentsStopped, "components stopped"),
+        (ArenaLifecycleState::DependenciesStopping, "stopping dependencies"),
+        (ArenaLifecycleState::DependenciesStopped, "dependencies stopped"),
+        (ArenaLifecycleState::ArenaTeardown, "forcing teardown"),
+        (ArenaLifecycleState::ArenaClosed, "closed"),
+        (ArenaLifecycleState::ArenaFaulted, "faulted"),
+    ];
+
+    for (state, expected) in cases {
+        assert_eq!(state.message(), expected, "{}", state.as_str());
+    }
+}
+
+#[test]
+fn message_every_runnable_state_returns_a_distinct_human_sentence() {
+    let states = [
+        RunnableState::NotStarted,
+        RunnableState::Starting,
+        RunnableState::ReadinessCheck,
+        RunnableState::Started,
+        RunnableState::Stopping,
+        RunnableState::Stopped,
+        RunnableState::Faulted,
+    ];
+
+    let messages: Vec<&str> = states.iter().map(|state| state.message()).collect();
+    let mut unique = messages.clone();
+    unique.sort_unstable();
+    unique.dedup();
+
+    assert_eq!(unique.len(), states.len(), "every state needs a distinct message");
+}
+
+#[test]
+fn message_every_runnable_state_returns_its_sentence() {
+    let cases = [
+        (RunnableState::NotStarted, "not started"),
+        (RunnableState::Starting, "starting"),
+        (RunnableState::ReadinessCheck, "waiting for readiness"),
+        (RunnableState::Started, "started"),
+        (RunnableState::Stopping, "stopping"),
+        (RunnableState::Stopped, "stopped"),
+        (RunnableState::Faulted, "faulted"),
+    ];
+
+    for (state, expected) in cases {
+        assert_eq!(state.message(), expected, "{}", state.as_str());
+    }
+}

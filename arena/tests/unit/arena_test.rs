@@ -256,7 +256,9 @@ async fn open_panicking_dependency_returns_fault_and_still_tears_down() {
     assert!(state
         .faults
         .iter()
-        .any(|f| f.id == "panicky" && f.message.contains("panicked while starting")));
+        .any(|f| f.id == "panicky"
+            && f.message == "failed to start"
+            && f.faults.iter().any(|c| c.message.contains("start failed"))));
     assert_eq!(panicky_counts.force_stops(), 1);
     assert_eq!(healthy_counts.force_stops(), 1);
     assert_eq!(
@@ -286,7 +288,9 @@ async fn open_panicking_playbook_returns_fault_and_tears_down() {
     assert!(state
         .faults
         .iter()
-        .any(|f| f.id == "seed" && f.message.contains("panicked while running")));
+        .any(|f| f.id == "seed"
+            && f.message == "failed to run"
+            && f.faults.iter().any(|c| c.message.contains("run failed"))));
     assert_eq!(
         state.dependency("postgres-1").map(|d| d.state),
         Some(RunnableState::Stopped)
@@ -624,7 +628,11 @@ async fn open_match_start_panics_returns_arena_fault() {
     assert_eq!(state.state, ArenaLifecycleState::ArenaFaulted);
     assert_eq!(state.faults.len(), 1);
     assert_eq!(state.faults[0].subject, arena::lifecycle::Subject::Arena);
-    assert!(state.faults[0].message.contains("panicked while starting"));
+    assert_eq!(state.faults[0].message, "failed to start");
+    assert!(state.faults[0]
+        .faults
+        .iter()
+        .any(|c| c.message.contains("start failed")));
 }
 
 #[tokio::test]
@@ -640,7 +648,8 @@ async fn open_match_force_stop_panics_records_arena_fault() {
     assert!(state
         .faults
         .iter()
-        .any(|f| f.message.contains("panicked while being forcibly stopped")));
+        .any(|f| f.message == "failed to stop"
+            && f.faults.iter().any(|c| c.message.contains("match forced teardown failed"))));
 }
 
 #[tokio::test]
@@ -706,7 +715,8 @@ async fn close_match_stop_panics_is_recorded_on_the_arena() {
     assert!(state
         .faults
         .iter()
-        .any(|f| f.message.contains("panicked while stopping")));
+        .any(|f| f.message == "failed to stop"
+            && f.faults.iter().any(|c| c.message.contains("stop failed"))));
 }
 
 #[tokio::test]
@@ -838,8 +848,10 @@ async fn close_dependency_stop_panic_is_reported_as_a_fault() {
         state
             .faults
             .iter()
-            .any(|f| f.id == "panicky" && f.message.contains("panicked while stopping")),
-        "a panic escaping stop must surface as a fault: {:?}",
+            .any(|f| f.id == "panicky"
+                && f.message == "failed to stop"
+                && f.faults.iter().any(|c| c.message.contains("stop failed"))),
+        "a panic escaping stop must surface as a fault with the panic text as its cause: {:?}",
         state.faults
     );
 }
@@ -861,7 +873,9 @@ async fn close_component_stop_panic_is_reported_as_a_fault() {
     assert!(state
         .faults
         .iter()
-        .any(|f| f.id == "api" && f.message.contains("panicked while stopping")));
+        .any(|f| f.id == "api"
+            && f.message == "failed to stop"
+            && f.faults.iter().any(|c| c.message.contains("stop failed"))));
 }
 
 #[tokio::test]

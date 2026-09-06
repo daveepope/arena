@@ -1,4 +1,4 @@
-use crate::lifecycle::message::{self, Phase};
+use crate::lifecycle::message;
 use crate::lifecycle::{
     panic_message, ArenaLifecycleState, ArenaLifecycleObserver, ArenaState, ComponentState,
     DependencyState, Fault, LifecycleContext, RunnableState, Subject,
@@ -62,10 +62,11 @@ async fn forced_teardown(context: &LifecycleContext, matches: &mut Matches) {
             .catch_unwind()
             .await;
         if let Err(payload) = outcome {
-            context.record(Fault::arena(
-                context.arena_id(),
-                message::panicked_while(Phase::ForcedTeardown, panic_message(payload.as_ref())),
-            ));
+            context.record(
+                Fault::arena(context.arena_id(), message::stop_failed()).caused_by(
+                    Fault::from_panic(context.arena_id(), Subject::Arena, payload.as_ref()),
+                ),
+            );
         }
     }
 
@@ -206,14 +207,13 @@ impl ClosedArena {
                     "match opened"
                 ),
                 Ok(Err(match_faults)) => faults.extend(match_faults),
-                Err(payload) => faults.push(Fault::arena(
-                    &arena_id,
-                    message::match_panicked_while(
-                        i,
-                        Phase::Starting,
-                        panic_message(payload.as_ref()),
-                    ),
-                )),
+                Err(payload) => faults.push(
+                    Fault::arena(&arena_id, message::start_failed()).caused_by(Fault::from_panic(
+                        &arena_id,
+                        Subject::Arena,
+                        payload.as_ref(),
+                    )),
+                ),
             }
             started.push((i, m));
         }
@@ -354,14 +354,13 @@ impl OpenArena {
                         context.record(fault);
                     }
                 }
-                Err(payload) => context.record(Fault::arena(
-                    &self.id,
-                    message::match_panicked_while(
-                        i,
-                        Phase::Stopping,
-                        panic_message(payload.as_ref()),
-                    ),
-                )),
+                Err(payload) => context.record(
+                    Fault::arena(&self.id, message::stop_failed()).caused_by(Fault::from_panic(
+                        &self.id,
+                        Subject::Arena,
+                        payload.as_ref(),
+                    )),
+                ),
             }
         }
 

@@ -1,19 +1,5 @@
-use arena::lifecycle::message::{self, Phase};
+use arena::lifecycle::message;
 use arena::lifecycle::Subject;
-
-#[test]
-fn as_str_every_phase_returns_lifecycle_wording() {
-    let cases = [
-        (Phase::Starting, "starting"),
-        (Phase::Stopping, "stopping"),
-        (Phase::ForcedTeardown, "being forcibly stopped"),
-        (Phase::RunningPlaybook, "running"),
-    ];
-
-    for (phase, expected) in cases {
-        assert_eq!(phase.as_str(), expected, "phase {phase:?}");
-    }
-}
 
 #[test]
 fn readiness_failed_cause_returns_cause_after_prefix() {
@@ -53,19 +39,18 @@ fn forced_teardown_unconfirmed_no_input_returns_neutral_wording() {
 }
 
 #[test]
-fn panicked_while_starting_returns_phase_and_panic_text() {
-    assert_eq!(
-        message::panicked_while(Phase::Starting, "boom"),
-        "panicked while starting: boom"
-    );
+fn start_failed_no_input_returns_lifecycle_wording() {
+    assert_eq!(message::start_failed(), "failed to start");
 }
 
 #[test]
-fn panicked_while_forced_teardown_returns_phase_and_panic_text() {
-    assert_eq!(
-        message::panicked_while(Phase::ForcedTeardown, "boom"),
-        "panicked while being forcibly stopped: boom"
-    );
+fn stop_failed_no_input_returns_lifecycle_wording() {
+    assert_eq!(message::stop_failed(), "failed to stop");
+}
+
+#[test]
+fn playbook_failed_no_input_returns_lifecycle_wording() {
+    assert_eq!(message::playbook_failed(), "failed to run");
 }
 
 #[test]
@@ -81,13 +66,5 @@ fn readiness_failed_for_target_returns_target_and_cause() {
     assert_eq!(
         message::readiness_failed_for_target("http://127.0.0.1:8080/health", "timed out"),
         "readiness check failed for target http://127.0.0.1:8080/health: timed out"
-    );
-}
-
-#[test]
-fn match_panicked_while_starting_returns_index_phase_and_panic_text() {
-    assert_eq!(
-        message::match_panicked_while(2, Phase::Starting, "boom"),
-        "match 2 panicked while starting: boom"
     );
 }

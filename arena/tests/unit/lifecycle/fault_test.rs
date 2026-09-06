@@ -165,3 +165,15 @@ fn display_two_level_cause_chain_indents_each_level() {
     assert!(rendered.contains("\n  caused by "), "{rendered}");
     assert!(rendered.contains("\n    caused by "), "{rendered}");
 }
+
+#[test]
+fn from_panic_as_a_cause_keeps_the_headline_message_human_readable() {
+    let payload: Box<dyn std::any::Any + Send> = Box::new("index out of bounds".to_string());
+    let fault = Fault::dependency("orders-postgres", "failed to start").caused_by(
+        Fault::from_panic("orders-postgres", Subject::Dependency, payload.as_ref()),
+    );
+
+    assert_eq!(fault.message, "failed to start");
+    assert_eq!(fault.faults[0].message, "index out of bounds");
+    assert!(!fault.message.contains("panic"));
+}

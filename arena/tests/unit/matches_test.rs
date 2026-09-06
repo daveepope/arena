@@ -153,6 +153,31 @@ async fn start_component_fault_returns_fault_and_stops_dependencies() {
 }
 
 #[tokio::test]
+async fn start_component_panicking_start_returns_fault_with_panic_cause() {
+    let mut a_match = Match::new(
+        "panicking",
+        vec![probe_dependency("postgres-1").into_dependency()],
+        vec![probe_component("api")
+            .behaving(Behaviour::PanicStart)
+            .into_component()],
+    );
+    let (ctx, _recorder) = context();
+
+    let faults = a_match.start(&ctx).await.expect_err("match should fault");
+
+    assert_eq!(faults[0].id, "api");
+    assert_eq!(faults[0].message, "failed to start");
+    assert!(
+        faults[0]
+            .faults
+            .iter()
+            .any(|cause| cause.message.contains("start failed")),
+        "the panic text must survive as the cause: {:?}",
+        faults[0]
+    );
+}
+
+#[tokio::test]
 async fn start_playbook_fault_returns_fault_and_stops_dependencies() {
     let dependency = probe_dependency("postgres-1");
     let counts = dependency.counts();
@@ -418,7 +443,8 @@ async fn stop_panicking_subject_still_stops_the_rest() {
     assert!(ids.contains(&"api"), "{ids:?}");
     assert!(faults
         .iter()
-        .all(|f| f.message.contains("panicked while stopping")));
+        .all(|f| f.message == "failed to stop"
+            && f.faults.iter().any(|c| c.message.contains("stop failed"))));
 }
 
 #[tokio::test]

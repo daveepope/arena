@@ -2,9 +2,10 @@ use super::component::{component_state, Component};
 use super::dependency::{dependency_state, Dependency};
 use super::dependency::RunnableDependency;
 use super::playbook::{ActivePlaybook, Playbook};
-use crate::lifecycle::message::{self, Phase};
+use crate::lifecycle::message;
 use crate::lifecycle::{
     panic_message, ArenaLifecycleState, ComponentState, DependencyState, Fault, LifecycleContext,
+    Subject,
 };
 use async_trait::async_trait;
 use futures::future::join_all;
@@ -57,10 +58,11 @@ async fn graceful_stop_dependency(dep: &mut Dependency) -> Option<Fault> {
                     phase = "dependency_stop_panic",
                     "dependency panicked while stopping"
                 );
-                Some(Fault::dependency(
-                    dep.identifier(),
-                    message::panicked_while(Phase::Stopping, &panic_text),
-                ))
+                Some(
+                    Fault::dependency(dep.identifier(), message::stop_failed()).caused_by(
+                        Fault::from_panic(dep.identifier(), Subject::Dependency, payload.as_ref()),
+                    ),
+                )
             }
         }
     }
@@ -85,10 +87,11 @@ async fn graceful_stop_component(comp: &mut Component) -> Option<Fault> {
                     phase = "component_stop_panic",
                     "component panicked while stopping"
                 );
-                Some(Fault::component(
-                    comp.identifier(),
-                    message::panicked_while(Phase::Stopping, &panic_text),
-                ))
+                Some(
+                    Fault::component(comp.identifier(), message::stop_failed()).caused_by(
+                        Fault::from_panic(comp.identifier(), Subject::Component, payload.as_ref()),
+                    ),
+                )
             }
         }
     }
@@ -244,10 +247,13 @@ impl Match {
             match outcome {
                 Ok(Ok(())) => {}
                 Ok(Err(fault)) => faults.push(fault),
-                Err(payload) => faults.push(Fault::dependency(
-                    &id,
-                    message::panicked_while(Phase::Starting, panic_message(payload.as_ref())),
-                )),
+                Err(payload) => faults.push(
+                    Fault::dependency(&id, message::start_failed()).caused_by(Fault::from_panic(
+                        &id,
+                        Subject::Dependency,
+                        payload.as_ref(),
+                    )),
+                ),
             }
             started.push((i, dep));
         }
@@ -319,10 +325,13 @@ impl Match {
                     actives.push(active);
                 }
                 Ok(Err(fault)) => faults.push(fault),
-                Err(payload) => faults.push(Fault::playbook(
-                    &id,
-                    message::panicked_while(Phase::RunningPlaybook, panic_message(payload.as_ref())),
-                )),
+                Err(payload) => faults.push(
+                    Fault::playbook(&id, message::playbook_failed()).caused_by(Fault::from_panic(
+                        &id,
+                        Subject::Playbook,
+                        payload.as_ref(),
+                    )),
+                ),
             }
         }
 
@@ -384,10 +393,13 @@ impl Match {
             match outcome {
                 Ok(Ok(())) => {}
                 Ok(Err(fault)) => faults.push(fault),
-                Err(payload) => faults.push(Fault::component(
-                    &id,
-                    message::panicked_while(Phase::Starting, panic_message(payload.as_ref())),
-                )),
+                Err(payload) => faults.push(
+                    Fault::component(&id, message::start_failed()).caused_by(Fault::from_panic(
+                        &id,
+                        Subject::Component,
+                        payload.as_ref(),
+                    )),
+                ),
             }
             started.push((i, comp));
         }

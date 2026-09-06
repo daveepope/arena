@@ -49,6 +49,28 @@ impl ArenaLifecycleState {
             Self::ArenaFaulted => "arena_faulted",
         }
     }
+
+    pub fn message(&self) -> &'static str {
+        match self {
+            Self::ArenaCreated => "created",
+            Self::ArenaStarting => "opening",
+            Self::DependenciesStarting => "starting dependencies",
+            Self::DependenciesStarted => "dependencies started",
+            Self::PlaybooksRunning => "running playbooks",
+            Self::PlaybooksComplete => "playbooks complete",
+            Self::ComponentsStarting => "starting components",
+            Self::ComponentsStarted => "components started",
+            Self::ArenaOpen => "open",
+            Self::ArenaClosing => "closing",
+            Self::ComponentsStopping => "stopping components",
+            Self::ComponentsStopped => "components stopped",
+            Self::DependenciesStopping => "stopping dependencies",
+            Self::DependenciesStopped => "dependencies stopped",
+            Self::ArenaTeardown => "forcing teardown",
+            Self::ArenaClosed => "closed",
+            Self::ArenaFaulted => "faulted",
+        }
+    }
 }
 
 impl fmt::Display for ArenaLifecycleState {
@@ -83,6 +105,18 @@ impl RunnableState {
             Self::NotStarted => "not_started",
             Self::Starting => "starting",
             Self::ReadinessCheck => "readiness_check",
+            Self::Started => "started",
+            Self::Stopping => "stopping",
+            Self::Stopped => "stopped",
+            Self::Faulted => "faulted",
+        }
+    }
+
+    pub fn message(&self) -> &'static str {
+        match self {
+            Self::NotStarted => "not started",
+            Self::Starting => "starting",
+            Self::ReadinessCheck => "waiting for readiness",
             Self::Started => "started",
             Self::Stopping => "stopping",
             Self::Stopped => "stopped",
