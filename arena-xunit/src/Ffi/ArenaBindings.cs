@@ -7,7 +7,8 @@ internal static class ArenaBindings
     internal static IntPtr OpenArena(string name, string configJson, ArenaLogLevel level)
     {
         ArenaNativeLib.arena_set_log_level((int)level);
-        IntPtr handle = ArenaNativeLib.arena_open(name, configJson, out var errOut);
+        IntPtr handle = ArenaNativeLib.arena_open(name, configJson, out var errOut, out var stateOut);
+        ReleaseOutString(stateOut);
         if (handle == IntPtr.Zero)
             throw TakeErr(errOut, "arena_open failed");
         return handle;
@@ -15,7 +16,15 @@ internal static class ArenaBindings
 
     internal static void CloseArena(IntPtr handle)
     {
-        ArenaNativeLib.arena_close(handle);
+        ArenaNativeLib.arena_close(handle, out var errOut, out var stateOut);
+        ReleaseOutString(errOut);
+        ReleaseOutString(stateOut);
+    }
+
+    private static void ReleaseOutString(IntPtr value)
+    {
+        if (value != IntPtr.Zero)
+            ArenaNativeLib.arena_free_string(value);
     }
 
     internal static void SoftReset(IntPtr handle, string dependencyIdentifier)

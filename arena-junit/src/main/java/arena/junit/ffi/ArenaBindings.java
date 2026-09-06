@@ -31,7 +31,11 @@ public final class ArenaBindings {
   }
 
   public static String takeErr(PointerByReference errSlot) {
-    Pointer p = errSlot.getValue();
+    return takeOutString(errSlot);
+  }
+
+  public static String takeOutString(PointerByReference slot) {
+    Pointer p = slot.getValue();
     if (p == null) {
       return null;
     }
@@ -43,7 +47,7 @@ public final class ArenaBindings {
       return p.getString(0, StandardCharsets.UTF_8.name());
     } finally {
       ArenaNativeHolder.LIB.arena_free_string(p);
-      errSlot.setValue(null);
+      slot.setValue(null);
     }
   }
 
@@ -52,7 +56,9 @@ public final class ArenaBindings {
     ArenaNativeLib lib = lib();
     lib.arena_set_log_level(logLevel.code());
     PointerByReference err = new PointerByReference();
-    Pointer h = lib.arena_open(name, configJson, err);
+    PointerByReference state = new PointerByReference();
+    Pointer h = lib.arena_open(name, configJson, err, state);
+    takeOutString(state);
     if (h == null || Pointer.nativeValue(h) == 0) {
       String msg = takeErr(err);
       throw new ArenaBindingError(msg != null ? msg : "arena_open returned null");
@@ -155,7 +161,11 @@ public final class ArenaBindings {
     if (handle == null || Pointer.nativeValue(handle) == 0) {
       return;
     }
-    ArenaNativeHolder.LIB.arena_close(handle);
+    PointerByReference err = new PointerByReference();
+    PointerByReference state = new PointerByReference();
+    ArenaNativeHolder.LIB.arena_close(handle, err, state);
+    takeOutString(err);
+    takeOutString(state);
   }
 
   public static ArenaStatus softReset(Pointer arena, String dependencyIdentifier) {

@@ -477,7 +477,7 @@ async fn start_component_child_starts_with_its_parent() {
 
     a_match.start(&ctx).await.expect("match should start");
 
-    assert_eq!(child_counts.starts(), 0, "the fake parent does not cascade start");
+    assert_eq!(child_counts.starts(), 1, "a parent component starts its child");
     assert_eq!(a_match.component_states()[0].children[0].id, "worker");
 }
 
@@ -528,4 +528,55 @@ async fn force_stop_all_repeated_on_resisting_subject_records_one_fault() {
         1,
         "a repeated forced teardown must not accumulate duplicate faults"
     );
+}
+
+#[tokio::test]
+async fn force_stop_all_panicking_dependency_returns_a_fault_naming_the_subject() {
+    let mut a_match = Match::new(
+        "panics-on-force-stop",
+        vec![probe_dependency("postgres-1")
+            .behaving(Behaviour::PanicForceStop)
+            .into_dependency()],
+        vec![],
+    );
+
+    let faults = a_match.force_stop_all().await;
+
+    assert_eq!(faults.len(), 1);
+    assert_eq!(faults[0].id, "postgres-1");
+    assert_eq!(faults[0].message, "failed to stop");
+    assert!(
+        !faults[0].faults.is_empty(),
+        "the panic must hang off the fault as its cause"
+    );
+}
+
+#[tokio::test]
+async fn force_stop_all_panicking_component_returns_a_fault_naming_the_subject() {
+    let mut a_match = Match::new(
+        "panics-on-force-stop",
+        vec![],
+        vec![probe_component("api")
+            .behaving(Behaviour::PanicForceStop)
+            .into_component()],
+    );
+
+    let faults = a_match.force_stop_all().await;
+
+    assert_eq!(faults.len(), 1);
+    assert_eq!(faults[0].id, "api");
+    assert_eq!(faults[0].message, "failed to stop");
+}
+
+#[tokio::test]
+async fn force_stop_all_healthy_subjects_returns_no_faults() {
+    let mut a_match = Match::new(
+        "healthy",
+        vec![probe_dependency("postgres-1").into_dependency()],
+        vec![probe_component("api").into_component()],
+    );
+
+    let faults = a_match.force_stop_all().await;
+
+    assert!(faults.is_empty());
 }

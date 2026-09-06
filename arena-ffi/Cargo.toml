@@ -119,6 +119,18 @@ name = "ffi_boundary_test"
 path = "tests/unit/boundary_test.rs"
 
 [[test]]
+name = "ffi_arena_state_test"
+path = "tests/unit/arena_state_test.rs"
+
+[[test]]
+name = "ffi_open_arena_test"
+path = "tests/unit/open_arena_test.rs"
+
+[[test]]
+name = "ffi_lifecycle_observer_test"
+path = "tests/unit/lifecycle_observer_test.rs"
+
+[[test]]
 name = "ffi_temporal_dependency_test"
 path = "tests/unit/dependency/temporal/temporal_dependency_test.rs"
 

@@ -53,11 +53,15 @@ def _arena_open_null_peer_and_err_text(
     arena_host_binding: bytes = b"pytest-dispatcher-host-logging-binding",
 ) -> tuple[int, str]:
     err_slot = ctypes.c_void_p()
+    state_slot = ctypes.c_void_p()
     raw = ffi.lib.arena_open(
         ctypes.c_char_p(arena_host_binding),
         ctypes.c_char_p(_MATCH_JSON_OPEN_FAILS_AT_BUILD_WITHOUT_CONTAINERS),
         ctypes.byref(err_slot),
+        ctypes.byref(state_slot),
     )
+    if state_slot.value:
+        ffi.lib.arena_free_string(state_slot.value)
     peer = ctypes.cast(raw, ctypes.c_void_p).value or 0
     text = ""
     if err_slot.value:

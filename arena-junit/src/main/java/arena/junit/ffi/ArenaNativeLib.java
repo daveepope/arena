@@ -9,9 +9,10 @@ import java.util.Map;
 interface ArenaNativeLib extends Library {
   int arena_set_log_level(int level);
 
-  Pointer arena_open(String name, String configJson, PointerByReference errOut);
+  Pointer arena_open(
+      String name, String configJson, PointerByReference errOut, PointerByReference stateOut);
 
-  void arena_close(Pointer handle);
+  int arena_close(Pointer handle, PointerByReference errOut, PointerByReference stateOut);
 
   long arena_add_log_target(ArenaLoggingTargetCallback callback, Pointer userData);
 

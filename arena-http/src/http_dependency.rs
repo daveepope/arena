@@ -222,7 +222,7 @@ impl RunnableDependency for HttpDependency {
                 self.children_started = true;
                 let mut child_faults = Vec::new();
                 for dep in children.iter_mut() {
-                    if let Err(fault) = dep.start().await {
+                    if let Err(fault) = arena::dependency::start_child(dep).await {
                         child_faults.push(fault);
                     }
                 }
@@ -288,7 +288,7 @@ impl RunnableDependency for HttpDependency {
         let sw = Instant::now();
 
         for dep in self.dependencies.iter_mut().flatten().rev() {
-            if let Err(fault) = dep.stop().await {
+            if let Err(fault) = arena::dependency::stop_child(dep).await {
                 causes.push(fault);
             }
         }
@@ -319,7 +319,7 @@ impl RunnableDependency for HttpDependency {
         self.needs_teardown = false;
         self.children_started = false;
         for dep in self.dependencies.iter_mut().flatten().rev() {
-            dep.release();
+            arena::dependency::release_child(dep);
         }
         self.state = RunnableState::Stopped;
     }
@@ -331,7 +331,7 @@ impl RunnableDependency for HttpDependency {
         self.children_started = false;
 
         for dep in self.dependencies.iter_mut().flatten().rev() {
-            dep.force_stop().await;
+            arena::dependency::force_stop_child(dep).await;
         }
 
         if removed {

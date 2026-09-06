@@ -49,3 +49,6 @@ pub fn unexplained_after_teardown(
     )
 }
 
+pub fn reset_failed() -> String {
+    "failed to reset".to_string()
+}

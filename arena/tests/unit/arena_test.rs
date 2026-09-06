@@ -596,10 +596,11 @@ impl MatchTrait for BareMatch {
         Ok(())
     }
 
-    async fn force_stop_all(&mut self) {
+    async fn force_stop_all(&mut self) -> Vec<arena::lifecycle::Fault> {
         if self.panic_on_force_stop {
             panic!("match forced teardown failed");
         }
+        Vec::new()
     }
 }
 
@@ -903,6 +904,7 @@ fn events_recorded_during_open_and_close() -> Arc<RecordedEvents> {
     let subscriber =
         tracing_subscriber::registry().with(EventScopeRecordingLayer(Arc::clone(&recorded)));
 
+    subjects::keep_every_callsite_interesting();
     tracing::subscriber::with_default(subscriber, || {
         let runtime = tokio::runtime::Runtime::new().expect("runtime");
         runtime.block_on(async {
@@ -964,4 +966,222 @@ fn open_healthy_arena_records_arena_records_under_the_arena_span_only() {
         assert_eq!(event.arena(), Some("test-arena"), "scope {:?}", event.scope);
         assert_eq!(event.subject(), None, "scope {:?}", event.scope);
     }
+}
+
+async fn open_arena_with_dependency(behaviour: Behaviour) -> arena::OpenArena {
+    let a_match = Match::new(
+        "resettable",
+        vec![probe_dependency("postgres-1")
+            .behaving(behaviour)
+            .into_dependency()],
+        vec![],
+    );
+    let (closed, _) = arena_with(vec![Box::new(a_match)]);
+    closed.open().await.expect("arena should open")
+}
+
+#[tokio::test]
+async fn soft_reset_known_dependency_returns_ok() {
+    let mut open = open_arena_with_dependency(Behaviour::Healthy).await;
+
+    let outcome = open.soft_reset("postgres-1").await;
+
+    assert!(matches!(outcome, Some(Ok(()))));
+}
+
+#[tokio::test]
+async fn hard_reset_known_dependency_returns_ok() {
+    let mut open = open_arena_with_dependency(Behaviour::Healthy).await;
+
+    let outcome = open.hard_reset("postgres-1").await;
+
+    assert!(matches!(outcome, Some(Ok(()))));
+}
+
+#[tokio::test]
+async fn soft_reset_unknown_dependency_returns_none() {
+    let mut open = open_arena_with_dependency(Behaviour::Healthy).await;
+
+    let outcome = open.soft_reset("not-a-dependency").await;
+
+    assert!(outcome.is_none());
+}
+
+#[tokio::test]
+async fn hard_reset_unknown_dependency_returns_none() {
+    let mut open = open_arena_with_dependency(Behaviour::Healthy).await;
+
+    let outcome = open.hard_reset("not-a-dependency").await;
+
+    assert!(outcome.is_none());
+}
+
+#[tokio::test]
+async fn soft_reset_failing_dependency_returns_that_fault() {
+    let mut open = open_arena_with_dependency(Behaviour::FailReset).await;
+
+    let fault = open
+        .soft_reset("postgres-1")
+        .await
+        .expect("dependency is known")
+        .expect_err("reset should fault");
+
+    assert_eq!(fault.id, "postgres-1");
+    assert_eq!(fault.message, "probe dependency refused to reset");
+}
+
+#[tokio::test]
+async fn hard_reset_panicking_dependency_returns_a_fault_naming_the_lifecycle_phase() {
+    let mut open = open_arena_with_dependency(Behaviour::PanicReset).await;
+
+    let fault = open
+        .hard_reset("postgres-1")
+        .await
+        .expect("dependency is known")
+        .expect_err("reset should fault");
+
+    assert_eq!(fault.id, "postgres-1");
+    assert_eq!(fault.message, "failed to reset");
+    let cause = fault.faults.first().expect("panic hangs off the fault");
+    assert_eq!(cause.message, "probe dependency panicked while resetting");
+}
+
+#[test]
+fn soft_reset_records_under_the_arena_and_dependency_spans() {
+    let recorded = Arc::new(RecordedEvents::default());
+    let subscriber =
+        tracing_subscriber::registry().with(EventScopeRecordingLayer(Arc::clone(&recorded)));
+
+    subjects::keep_every_callsite_interesting();
+    tracing::subscriber::with_default(subscriber, || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let mut open = open_arena_with_dependency(Behaviour::Healthy).await;
+            let _ = open.soft_reset("postgres-1").await;
+        });
+    });
+
+    let reset = recorded.with_message("probe dependency reset");
+    assert!(!reset.is_empty(), "no reset record was emitted");
+    for event in reset {
+        assert_eq!(event.arena(), Some("test-arena"), "scope {:?}", event.scope);
+        assert_eq!(
+            event.subject(),
+            Some("dependency.postgres-1"),
+            "scope {:?}",
+            event.scope
+        );
+    }
+}
+
+fn events_recorded_during_open_of_nested_subjects() -> Arc<RecordedEvents> {
+    let recorded = Arc::new(RecordedEvents::default());
+    let subscriber =
+        tracing_subscriber::registry().with(EventScopeRecordingLayer(Arc::clone(&recorded)));
+
+    subjects::keep_every_callsite_interesting();
+    tracing::subscriber::with_default(subscriber, || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let child_dependency = probe_dependency("postgres-child").into_dependency();
+            let child_component = probe_component("api-child").into_component();
+            let a_match = Match::new(
+                "nested",
+                vec![probe_dependency("temporal-parent")
+                    .with_child(child_dependency)
+                    .into_dependency()],
+                vec![probe_component("api-parent")
+                    .with_child(child_component)
+                    .into_component()],
+            );
+            let (closed, _recorder) = arena_with(vec![Box::new(a_match)]);
+            let open = closed.open().await.expect("arena should open");
+            open.close().await.expect("arena should close");
+        });
+    });
+
+    recorded
+}
+
+#[test]
+fn open_child_dependency_records_carry_the_child_identifier_not_the_parent() {
+    let recorded = events_recorded_during_open_of_nested_subjects();
+
+    let child = recorded.with_message("probe dependency postgres-child starting");
+    assert!(!child.is_empty(), "no child dependency record was emitted");
+    for event in child {
+        assert_eq!(
+            event.subject(),
+            Some("dependency.postgres-child"),
+            "a child record must not be filed under its parent: {:?}",
+            event.scope
+        );
+    }
+}
+
+#[test]
+fn open_child_component_records_carry_the_child_identifier_not_the_parent() {
+    let recorded = events_recorded_during_open_of_nested_subjects();
+
+    let child = recorded.with_message("probe component api-child starting");
+    assert!(!child.is_empty(), "no child component record was emitted");
+    for event in child {
+        assert_eq!(
+            event.subject(),
+            Some("component.api-child"),
+            "a child record must not be filed under its parent: {:?}",
+            event.scope
+        );
+    }
+}
+
+#[tokio::test]
+async fn open_fault_force_stop_panic_records_a_stop_fault_for_that_subject() {
+    let a_match = Match::new(
+        "faulting",
+        vec![
+            probe_dependency("panicky")
+                .behaving(Behaviour::PanicForceStop)
+                .into_dependency(),
+            probe_dependency("postgres-1")
+                .behaving(Behaviour::FailStart)
+                .into_dependency(),
+        ],
+        vec![],
+    );
+    let (closed, _recorder) = arena_with(vec![Box::new(a_match)]);
+
+    let state = closed.open().await.expect_err("arena should fault");
+
+    let stop_fault = state
+        .faults
+        .iter()
+        .find(|fault| fault.id == "panicky" && fault.message == "failed to stop")
+        .unwrap_or_else(|| panic!("forced teardown panic was not recorded: {:?}", state.faults));
+    let cause = stop_fault
+        .faults
+        .first()
+        .expect("the panic must hang off the fault as its cause");
+    assert!(
+        cause.message.contains("forced teardown failed"),
+        "cause should carry the panic text: {}",
+        cause.message
+    );
+}
+
+#[tokio::test]
+async fn state_closed_arena_after_close_returns_the_terminal_state() {
+    let a_match = Match::new(
+        "healthy",
+        vec![probe_dependency("postgres-1").into_dependency()],
+        vec![],
+    );
+    let (closed, _recorder) = arena_with(vec![Box::new(a_match)]);
+    let open = closed.open().await.expect("arena should open");
+
+    let closed = open.close().await.expect("arena should close");
+
+    let state = closed.state();
+    assert_eq!(state.state, ArenaLifecycleState::ArenaClosed);
+    assert_eq!(state.dependencies[0].state, RunnableState::Stopped);
 }

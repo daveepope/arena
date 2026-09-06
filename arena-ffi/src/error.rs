@@ -11,20 +11,38 @@ pub enum ArenaStatus {
     NotFound = 4,
 }
 
-pub unsafe fn write_error(err_out: *mut *mut c_char, message: impl Into<String>) {
-    if err_out.is_null() {
+unsafe fn write_c_string(out: *mut *mut c_char, value: impl Into<String>, fallback: &str) {
+    if out.is_null() {
         return;
     }
-    let cstring = match CString::new(message.into()) {
+    let cstring = match CString::new(value.into()) {
         Ok(v) => v,
-        Err(_) => CString::new("arena-ffi: error message contained NUL byte").unwrap(),
+        Err(_) => CString::new(fallback).unwrap_or_default(),
     };
-    unsafe { *err_out = cstring.into_raw() };
+    unsafe { *out = cstring.into_raw() };
+}
+
+pub unsafe fn write_out_string(out: *mut *mut c_char, value: impl Into<String>) {
+    unsafe { write_c_string(out, value, "arena-ffi: value contained NUL byte") };
+}
+
+pub unsafe fn clear_out_string(out: *mut *mut c_char) {
+    if out.is_null() {
+        return;
+    }
+    unsafe { *out = std::ptr::null_mut() };
+}
+
+pub unsafe fn write_error(err_out: *mut *mut c_char, message: impl Into<String>) {
+    unsafe {
+        write_c_string(
+            err_out,
+            message,
+            "arena-ffi: error message contained NUL byte",
+        )
+    };
 }
 
 pub unsafe fn clear_error(err_out: *mut *mut c_char) {
-    if err_out.is_null() {
-        return;
-    }
-    unsafe { *err_out = std::ptr::null_mut() };
+    unsafe { clear_out_string(err_out) };
 }

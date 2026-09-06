@@ -2,6 +2,8 @@ pub mod dependency;
 
 pub mod boundary;
 mod active_playbook;
+mod arena_state;
+mod lifecycle_observer;
 mod closed_arena;
 mod dependency_reset;
 pub mod error;
@@ -21,7 +23,11 @@ pub mod runtime_args;
 pub use active_playbook::{
     arena_active_playbook_drop, arena_match_playbook_run, ArenaActivePlaybookHandle,
 };
+pub use arena_state::arena_state_json;
 pub use closed_arena::{arena_open, OpenArenaHandle};
+pub use lifecycle_observer::{
+    arena_add_lifecycle_observer, arena_remove_lifecycle_observer, ArenaLifecycleCallback,
+};
 #[cfg(feature = "bench-support")]
 pub use closed_arena::parse_config_for_bench;
 pub use dependency_reset::{arena_hard_reset, arena_soft_reset};

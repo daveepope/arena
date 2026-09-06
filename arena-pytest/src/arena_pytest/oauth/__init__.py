@@ -192,7 +192,7 @@ def oauth_signer_fixture(
 
 
 def oauth_loopback_tls_pem_pair() -> tuple[str, str]:
-    from arena_pytest.ffi._ffi import ArenaBindingError, load_ffi, _take_err
+    from arena_pytest.ffi._ffi import ArenaBindingError, load_ffi, _take_out_string
 
     ffi = load_ffi()
     if ffi is None:
@@ -202,7 +202,7 @@ def oauth_loopback_tls_pem_pair() -> tuple[str, str]:
     err = ctypes.c_void_p()
     raw = ffi.lib.arena_oauth_loopback_tls_pem_json(ctypes.byref(err))
     if not raw:
-        msg = _take_err(err, ffi) or "arena_oauth_loopback_tls_pem_json returned null"
+        msg = _take_out_string(err, ffi) or "arena_oauth_loopback_tls_pem_json returned null"
         raise ArenaBindingError(msg)
     try:
         payload = json.loads(ctypes.string_at(raw).decode("utf-8"))

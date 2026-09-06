@@ -31,30 +31,38 @@ pub extern "C" fn arena_hard_reset(
     run_reset(handle, dependency_identifier, err_out, ResetKind::Hard)
 }
 
-fn reset_dependency(runtime_state: &OpenArenaRuntimeState, identifier: &str, kind: ResetKind) -> ArenaStatus {
+enum ResetOutcome {
+    Reset,
+    Faulted(String),
+    NotFound,
+    Closed,
+}
+
+fn reset_dependency(
+    runtime_state: &OpenArenaRuntimeState,
+    identifier: &str,
+    kind: ResetKind,
+) -> ResetOutcome {
     runtime_state.runtime.block_on(async {
         let mut guard = runtime_state.state.lock().await;
         let arena = match guard.as_mut() {
             Some(a) => a,
-            None => return ArenaStatus::Failed,
-        };
-        let dep = match arena.dependency_mut(identifier) {
-            Some(d) => d,
-            None => return ArenaStatus::NotFound,
+            None => return ResetOutcome::Closed,
         };
         let outcome = match kind {
-            ResetKind::Soft => dep.soft_reset().await,
-            ResetKind::Hard => dep.hard_reset().await,
+            ResetKind::Soft => arena.soft_reset(identifier).await,
+            ResetKind::Hard => arena.hard_reset(identifier).await,
         };
         match outcome {
-            Ok(()) => ArenaStatus::Ok,
-            Err(fault) => {
+            None => ResetOutcome::NotFound,
+            Some(Ok(())) => ResetOutcome::Reset,
+            Some(Err(fault)) => {
                 tracing::error!(
                     error = %fault,
                     op = "arena_reset",
                     "dependency reset failed"
                 );
-                ArenaStatus::Failed
+                ResetOutcome::Faulted(fault.to_string())
             }
         }
     })
@@ -87,13 +95,18 @@ fn run_reset(
         reset_dependency(runtime_state, &identifier, kind)
     });
     match outcome {
-        Ok(status) => {
-            if status == ArenaStatus::NotFound {
-                unsafe { write_error(err_out, format!("dependency '{identifier}' not found")) };
-            } else if status == ArenaStatus::Failed {
-                unsafe { write_error(err_out, "reset: arena is already closed") };
-            }
-            status
+        Ok(ResetOutcome::Reset) => ArenaStatus::Ok,
+        Ok(ResetOutcome::NotFound) => {
+            unsafe { write_error(err_out, format!("dependency '{identifier}' not found")) };
+            ArenaStatus::NotFound
+        }
+        Ok(ResetOutcome::Closed) => {
+            unsafe { write_error(err_out, "reset: arena is already closed") };
+            ArenaStatus::Failed
+        }
+        Ok(ResetOutcome::Faulted(message)) => {
+            unsafe { write_error(err_out, message) };
+            ArenaStatus::Failed
         }
         Err(payload) => {
             let msg = panic_message(payload.as_ref());

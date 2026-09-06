@@ -1,7 +1,14 @@
-use arena_ffi::error::{clear_error, write_error};
+use arena_ffi::error::{clear_error, clear_out_string, write_error, write_out_string};
 use arena_ffi::arena_free_string;
 use std::ffi::CStr;
 use std::os::raw::c_char;
+
+fn take(out: *mut c_char) -> String {
+    assert!(!out.is_null());
+    let value = unsafe { CStr::from_ptr(out) }.to_string_lossy().into_owned();
+    arena_free_string(out);
+    value
+}
 
 #[test]
 fn write_error_null_out_does_not_panic() {
@@ -44,4 +51,44 @@ fn clear_error_sets_pointer_to_null() {
     unsafe { clear_error(&mut err as *mut _) };
 
     assert!(err.is_null());
+}
+
+#[test]
+fn write_out_string_writes_value_to_out_pointer() {
+    let mut out: *mut c_char = std::ptr::null_mut();
+
+    unsafe { write_out_string(&mut out as *mut _, "{\"id\":\"orders\"}") };
+
+    assert_eq!(take(out), "{\"id\":\"orders\"}");
+}
+
+#[test]
+fn write_out_string_value_with_interior_nul_uses_fallback_value() {
+    let mut out: *mut c_char = std::ptr::null_mut();
+
+    unsafe { write_out_string(&mut out as *mut _, "before\0after") };
+
+    assert_eq!(take(out), "arena-ffi: value contained NUL byte");
+}
+
+#[test]
+fn write_out_string_null_out_does_not_panic() {
+    unsafe { write_out_string(std::ptr::null_mut(), "ignored") };
+}
+
+#[test]
+fn clear_out_string_sets_pointer_to_null() {
+    let mut out: *mut c_char = std::ptr::null_mut();
+    unsafe { write_out_string(&mut out as *mut _, "value") };
+    let written = out;
+
+    unsafe { clear_out_string(&mut out as *mut _) };
+
+    assert!(out.is_null());
+    let _ = take(written);
+}
+
+#[test]
+fn clear_out_string_null_out_does_not_panic() {
+    unsafe { clear_out_string(std::ptr::null_mut()) };
 }

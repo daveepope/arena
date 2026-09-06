@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use std::any::Any;
+use tracing::Instrument;
 
 use crate::lifecycle::{DependencyState, Fault, RunnableState};
 
@@ -22,6 +23,27 @@ pub trait RunnableDependency: Send + Sync {
 }
 
 pub type Dependency = Box<dyn RunnableDependency>;
+
+pub async fn start_child(child: &mut Dependency) -> Result<(), Fault> {
+    let span = crate::matches::dependency_span(child.identifier());
+    child.start().instrument(span).await
+}
+
+pub async fn stop_child(child: &mut Dependency) -> Result<(), Fault> {
+    let span = crate::matches::dependency_span(child.identifier());
+    child.stop().instrument(span).await
+}
+
+pub async fn force_stop_child(child: &mut Dependency) {
+    let span = crate::matches::dependency_span(child.identifier());
+    child.force_stop().instrument(span).await
+}
+
+pub fn release_child(child: &mut Dependency) {
+    let span = crate::matches::dependency_span(child.identifier());
+    let _entered = span.enter();
+    child.release();
+}
 
 pub fn find_dependency<'a>(
     deps: &'a [Dependency],

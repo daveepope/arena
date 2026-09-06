@@ -11,6 +11,12 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 use std::time::Instant;
 
+#[derive(Clone, Copy)]
+enum ResetKind {
+    Soft,
+    Hard,
+}
+
 type Matches = Vec<Box<dyn MatchTrait>>;
 type Observers = Vec<Arc<dyn ArenaLifecycleObserver>>;
 
@@ -18,6 +24,7 @@ pub struct ClosedArena {
     pub id: String,
     pub matches: Matches,
     observers: Observers,
+    closed_state: Option<ArenaState>,
 }
 
 pub struct OpenArena {
@@ -61,12 +68,17 @@ async fn forced_teardown(context: &LifecycleContext, matches: &mut Matches) {
         let outcome = AssertUnwindSafe(a_match.force_stop_all())
             .catch_unwind()
             .await;
-        if let Err(payload) = outcome {
-            context.record(
+        match outcome {
+            Ok(faults) => {
+                for fault in faults {
+                    context.record(fault);
+                }
+            }
+            Err(payload) => context.record(
                 Fault::arena(context.arena_id(), message::stop_failed()).caused_by(
                     Fault::from_panic(context.arena_id(), Subject::Arena, payload.as_ref()),
                 ),
-            );
+            ),
         }
     }
 
@@ -148,6 +160,7 @@ impl ClosedArena {
             id,
             matches,
             observers: Vec::new(),
+            closed_state: None,
         }
     }
 
@@ -157,6 +170,9 @@ impl ClosedArena {
     }
 
     pub fn state(&self) -> ArenaState {
+        if let Some(state) = &self.closed_state {
+            return state.clone();
+        }
         let (dependencies, components) = collect_states(&self.matches);
         ArenaState::new(
             self.id.clone(),
@@ -290,6 +306,45 @@ impl OpenArena {
         None
     }
 
+    pub async fn soft_reset(&mut self, identifier: &str) -> Option<Result<(), Fault>> {
+        let span = tracing::info_span!("arena", arena.id = %self.id);
+        self.reset_within_span(identifier, ResetKind::Soft)
+            .instrument(span)
+            .await
+    }
+
+    pub async fn hard_reset(&mut self, identifier: &str) -> Option<Result<(), Fault>> {
+        let span = tracing::info_span!("arena", arena.id = %self.id);
+        self.reset_within_span(identifier, ResetKind::Hard)
+            .instrument(span)
+            .await
+    }
+
+    async fn reset_within_span(
+        &mut self,
+        identifier: &str,
+        kind: ResetKind,
+    ) -> Option<Result<(), Fault>> {
+        let dependency = self.dependency_mut(identifier)?;
+        let id = dependency.identifier().to_string();
+        let span = crate::matches::dependency_span(&id);
+        let outcome = AssertUnwindSafe(async move {
+            match kind {
+                ResetKind::Soft => dependency.soft_reset().await,
+                ResetKind::Hard => dependency.hard_reset().await,
+            }
+        })
+        .catch_unwind()
+        .instrument(span)
+        .await;
+        Some(match outcome {
+            Ok(result) => result,
+            Err(payload) => Err(Fault::dependency(&id, message::reset_failed()).caused_by(
+                Fault::from_panic(&id, Subject::Dependency, payload.as_ref()),
+            )),
+        })
+    }
+
     pub async fn run_playbook(
         &self,
         identifier: &str,
@@ -330,6 +385,7 @@ impl OpenArena {
             id,
             matches,
             observers,
+            closed_state: Some(state),
         })
     }
 

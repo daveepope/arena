@@ -1433,3 +1433,31 @@ java_test(
     ],
     jvm_flags = ["-Djna.nosys=true"],
 )
+
+java_test(
+    name = "arena_junit_native_lib_symbols_unit_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/ffi/ArenaNativeLibSymbolsUnitTest.java"],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.ffi.ArenaNativeLibSymbolsUnitTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:net_java_dev_jna_jna",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+    data = ["//arena-ffi:arena_ffi_shared"],
+    jvm_flags = ["-Djna.nosys=true"],
+)

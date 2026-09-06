@@ -14,11 +14,11 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::time::Instant;
 use tracing::Instrument;
 
-pub(crate) fn dependency_span(id: &str) -> tracing::Span {
+pub fn dependency_span(id: &str) -> tracing::Span {
     tracing::info_span!("subject", arena.subject.kind = "dependency", arena.subject.id = %id)
 }
 
-pub(crate) fn component_span(id: &str) -> tracing::Span {
+pub fn component_span(id: &str) -> tracing::Span {
     tracing::info_span!("subject", arena.subject.kind = "component", arena.subject.id = %id)
 }
 
@@ -99,34 +99,56 @@ async fn graceful_stop_component(comp: &mut Component) -> Option<Fault> {
     .await
 }
 
-async fn force_stop_dependency(dep: &mut Dependency) {
-    let span = dependency_span(dep.identifier());
+async fn force_stop_dependency(dep: &mut Dependency) -> Option<Fault> {
+    let id = dep.identifier().to_string();
+    let span = dependency_span(&id);
     async move {
         let outcome = AssertUnwindSafe(dep.force_stop()).catch_unwind().await;
-        if let Err(payload) = outcome {
-            tracing::error!(
-                dependency = %dep.identifier(),
-                panic_message = %panic_message(payload.as_ref()),
-                phase = "dependency_force_stop_panic",
-                "dependency panicked while being forcibly stopped"
-            );
+        match outcome {
+            Ok(()) => None,
+            Err(payload) => {
+                tracing::error!(
+                    dependency = %id,
+                    panic_message = %panic_message(payload.as_ref()),
+                    phase = "dependency_force_stop_panic",
+                    "dependency panicked while being forcibly stopped"
+                );
+                Some(
+                    Fault::dependency(&id, message::stop_failed()).caused_by(Fault::from_panic(
+                        &id,
+                        Subject::Dependency,
+                        payload.as_ref(),
+                    )),
+                )
+            }
         }
     }
     .instrument(span)
     .await
 }
 
-async fn force_stop_component(comp: &mut Component) {
-    let span = component_span(comp.identifier());
+async fn force_stop_component(comp: &mut Component) -> Option<Fault> {
+    let id = comp.identifier().to_string();
+    let span = component_span(&id);
     async move {
         let outcome = AssertUnwindSafe(comp.force_stop()).catch_unwind().await;
-        if let Err(payload) = outcome {
-            tracing::error!(
-                component = %comp.identifier(),
-                panic_message = %panic_message(payload.as_ref()),
-                phase = "component_force_stop_panic",
-                "component panicked while being forcibly stopped"
-            );
+        match outcome {
+            Ok(()) => None,
+            Err(payload) => {
+                tracing::error!(
+                    component = %id,
+                    panic_message = %panic_message(payload.as_ref()),
+                    phase = "component_force_stop_panic",
+                    "component panicked while being forcibly stopped"
+                );
+                Some(
+                    Fault::component(&id, message::stop_failed()).caused_by(Fault::from_panic(
+                        &id,
+                        Subject::Component,
+                        payload.as_ref(),
+                    )),
+                )
+            }
         }
     }
     .instrument(span)
@@ -138,7 +160,9 @@ pub trait MatchTrait: Send + Sync {
     async fn start(&mut self, ctx: &LifecycleContext) -> Result<(), Vec<Fault>>;
     async fn stop(&mut self, ctx: &LifecycleContext) -> Result<(), Vec<Fault>>;
 
-    async fn force_stop_all(&mut self) {}
+    async fn force_stop_all(&mut self) -> Vec<Fault> {
+        Vec::new()
+    }
 
     fn release_all(&mut self) {}
 
@@ -533,13 +557,19 @@ impl MatchTrait for Match {
         }
     }
 
-    async fn force_stop_all(&mut self) {
+    async fn force_stop_all(&mut self) -> Vec<Fault> {
+        let mut faults = Vec::new();
         for comp in self.components.iter_mut().rev() {
-            force_stop_component(comp).await;
+            if let Some(fault) = force_stop_component(comp).await {
+                faults.push(fault);
+            }
         }
         for dep in self.dependencies.iter_mut().rev() {
-            force_stop_dependency(dep).await;
+            if let Some(fault) = force_stop_dependency(dep).await {
+                faults.push(fault);
+            }
         }
+        faults
     }
 
     fn release_all(&mut self) {

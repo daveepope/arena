@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use tracing::Instrument;
 
 use crate::lifecycle::{ComponentState, Fault, RunnableState};
 
@@ -17,6 +18,27 @@ pub trait RunnableComponent: Send + Sync {
 }
 
 pub type Component = Box<dyn RunnableComponent>;
+
+pub async fn start_child(child: &mut Component) -> Result<(), Fault> {
+    let span = crate::matches::component_span(child.identifier());
+    child.start().instrument(span).await
+}
+
+pub async fn stop_child(child: &mut Component) -> Result<(), Fault> {
+    let span = crate::matches::component_span(child.identifier());
+    child.stop().instrument(span).await
+}
+
+pub async fn force_stop_child(child: &mut Component) {
+    let span = crate::matches::component_span(child.identifier());
+    child.force_stop().instrument(span).await
+}
+
+pub fn release_child(child: &mut Component) {
+    let span = crate::matches::component_span(child.identifier());
+    let _entered = span.enter();
+    child.release();
+}
 
 pub fn component_state(comp: &dyn RunnableComponent) -> ComponentState {
     ComponentState::new(

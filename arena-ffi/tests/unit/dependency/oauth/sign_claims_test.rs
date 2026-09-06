@@ -10,7 +10,7 @@ use ffi_error_text::err_text;
 fn open_empty_arena() -> *mut arena_ffi::OpenArenaHandle {
     let name = CString::new("test").unwrap();
     let mut err: *mut c_char = std::ptr::null_mut();
-    let handle = arena_open(name.as_ptr(), std::ptr::null(), &mut err as *mut _);
+    let handle = arena_open(name.as_ptr(), std::ptr::null(), &mut err as *mut _, std::ptr::null_mut());
     assert!(!handle.is_null(), "arena_open failed: {}", err_text(err));
     handle
 }
@@ -33,7 +33,7 @@ fn arena_oauth_sign_claims_unknown_identifier_returns_error() {
     assert!(jwt_ptr.is_null());
     assert!(err_text(sign_err).contains("not found"));
 
-    arena_close(arena_handle);
+    arena_close(arena_handle, std::ptr::null_mut(), std::ptr::null_mut());
 }
 
 #[test]
@@ -54,7 +54,7 @@ fn arena_oauth_sign_claims_malformed_provider_json_returns_error() {
     assert!(jwt_ptr.is_null());
     assert!(err_text(sign_err).contains("provider is not valid JSON"));
 
-    arena_close(arena_handle);
+    arena_close(arena_handle, std::ptr::null_mut(), std::ptr::null_mut());
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn arena_oauth_sign_claims_malformed_claims_json_returns_error() {
     assert!(jwt_ptr.is_null());
     assert!(err_text(sign_err).contains("claims is not valid JSON"));
 
-    arena_close(arena_handle);
+    arena_close(arena_handle, std::ptr::null_mut(), std::ptr::null_mut());
 }
 
 #[test]
@@ -85,7 +85,7 @@ fn arena_open_with_misconfigured_oauth_issuers_returns_error_not_panic() {
     let config = CString::new(config_json).unwrap();
     let mut err: *mut c_char = std::ptr::null_mut();
 
-    let handle = arena_open(name.as_ptr(), config.as_ptr(), &mut err as *mut _);
+    let handle = arena_open(name.as_ptr(), config.as_ptr(), &mut err as *mut _, std::ptr::null_mut());
 
     assert!(
         handle.is_null(),

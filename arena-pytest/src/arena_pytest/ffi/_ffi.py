@@ -474,11 +474,16 @@ def load_ffi() -> Optional[ArenaNativeLib]:
         ctypes.c_char_p,
         ctypes.c_char_p,
         ctypes.POINTER(ctypes.c_void_p),
+        ctypes.POINTER(ctypes.c_void_p),
     ]
     lib.arena_open.restype = ctypes.c_void_p
 
-    lib.arena_close.argtypes = [ctypes.c_void_p]
-    lib.arena_close.restype = None
+    lib.arena_close.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_void_p),
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    lib.arena_close.restype = ctypes.c_int
 
     lib.arena_soft_reset.argtypes = [
         ctypes.c_void_p,
@@ -597,14 +602,14 @@ def load_ffi() -> Optional[ArenaNativeLib]:
     return ArenaNativeLib(lib=lib)
 
 
-def _take_err(err_slot: "ctypes.c_void_p", ffi: ArenaNativeLib) -> Optional[str]:
-    raw_ptr = err_slot.value
+def _take_out_string(slot: "ctypes.c_void_p", ffi: ArenaNativeLib) -> Optional[str]:
+    raw_ptr = slot.value
     if not raw_ptr:
         return None
-    message = ctypes.string_at(raw_ptr).decode("utf-8", errors="replace")
+    value = ctypes.string_at(raw_ptr).decode("utf-8", errors="replace")
     ffi.lib.arena_free_string(raw_ptr)
-    err_slot.value = None
-    return message
+    slot.value = None
+    return value
 
 
 def open_arena(
@@ -617,9 +622,11 @@ def open_arena(
     ffi.lib.arena_set_log_level(int(log_level))
     config_ptr = (config.encode("utf-8") + b"\0") if config else None
     err = ctypes.c_void_p()
-    handle = ffi.lib.arena_open(name, config_ptr, ctypes.byref(err))
+    state = ctypes.c_void_p()
+    handle = ffi.lib.arena_open(name, config_ptr, ctypes.byref(err), ctypes.byref(state))
+    _take_out_string(state, ffi)
     if not handle:
-        message = _take_err(err, ffi) or "arena_open returned null"
+        message = _take_out_string(err, ffi) or "arena_open returned null"
         raise ArenaBindingError(message)
     return handle
 
@@ -631,7 +638,11 @@ def close_arena(
     dispatcher_logging_target_token: int = 0,
 ) -> None:
     if handle:
-        ffi.lib.arena_close(handle)
+        err = ctypes.c_void_p()
+        state = ctypes.c_void_p()
+        ffi.lib.arena_close(handle, ctypes.byref(err), ctypes.byref(state))
+        _take_out_string(err, ffi)
+        _take_out_string(state, ffi)
     flush_lg = _dispatcher_default_logger(ffi.lib)
     if dispatcher_logging_target_token:
         bridge = _custom_dispatcher_logging_targets.get(dispatcher_logging_target_token)
@@ -653,7 +664,7 @@ def _reset(
         raise ArenaBindingError("reset called on closed arena")
     err = ctypes.c_void_p()
     raw = reset_fn(handle, dependency_identifier.encode("utf-8"), ctypes.byref(err))
-    msg = _take_err(err, ffi)
+    msg = _take_out_string(err, ffi)
     _ffi_expect_ok(raw, msg, "reset")
 
 
@@ -683,7 +694,7 @@ def oauth_sign_claims(
         ctypes.byref(err),
     )
     if not raw:
-        msg = _take_err(err, ffi) or "arena_oauth_sign_claims returned null"
+        msg = _take_out_string(err, ffi) or "arena_oauth_sign_claims returned null"
         raise ArenaBindingError(msg)
     try:
         return ctypes.string_at(raw).decode("utf-8")
@@ -704,7 +715,7 @@ def match_playbook_run(
         identifier.encode("utf-8"),
         ctypes.byref(err),
     )
-    message = _take_err(err, ffi)
+    message = _take_out_string(err, ffi)
     if not pb_handle:
         raise ArenaBindingError(message or "arena_match_playbook_run returned null")
     return pb_handle
@@ -715,7 +726,7 @@ def active_playbook_drop(ffi: ArenaNativeLib, handle: int) -> None:
         return
     err = ctypes.c_void_p()
     raw = ffi.lib.arena_active_playbook_drop(handle, ctypes.byref(err))
-    message = _take_err(err, ffi)
+    message = _take_out_string(err, ffi)
     _ffi_expect_ok(raw, message, "active_playbook_drop")
 
 
@@ -732,7 +743,7 @@ def http_playbook_open(
         open_spec_json.encode("utf-8"),
         ctypes.byref(err),
     )
-    message = _take_err(err, ffi)
+    message = _take_out_string(err, ffi)
     if not pb_handle:
         raise ArenaBindingError(message or "arena_http_playbook_open returned null")
     return pb_handle
@@ -753,7 +764,7 @@ def http_playbook_verify(
         verify_spec_json.encode("utf-8"),
         ctypes.byref(err),
     )
-    message = _take_err(err, ffi)
+    message = _take_out_string(err, ffi)
     _ffi_expect_ok(raw, message, "http_playbook_verify")
 
 
@@ -772,7 +783,7 @@ def mssql_playbook_verify(
         verify_spec_json.encode("utf-8"),
         ctypes.byref(err),
     )
-    message = _take_err(err, ffi)
+    message = _take_out_string(err, ffi)
     _ffi_expect_ok(raw, message, "mssql_playbook_verify")
 
 
@@ -791,7 +802,7 @@ def postgres_playbook_verify(
         verify_spec_json.encode("utf-8"),
         ctypes.byref(err),
     )
-    message = _take_err(err, ffi)
+    message = _take_out_string(err, ffi)
     _ffi_expect_ok(raw, message, "postgres_playbook_verify")
 
 
@@ -810,5 +821,5 @@ def oracle_playbook_verify(
         verify_spec_json.encode("utf-8"),
         ctypes.byref(err),
     )
-    message = _take_err(err, ffi)
+    message = _take_out_string(err, ffi)
     _ffi_expect_ok(raw, message, "oracle_playbook_verify")

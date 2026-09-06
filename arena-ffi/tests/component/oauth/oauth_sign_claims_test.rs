@@ -25,7 +25,7 @@ fn open_arena_with_oauth(identifier: &str) -> *mut arena_ffi::OpenArenaHandle {
     );
     let config = CString::new(config_json).unwrap();
     let mut err: *mut c_char = std::ptr::null_mut();
-    let handle = arena_open(name.as_ptr(), config.as_ptr(), &mut err as *mut _);
+    let handle = arena_open(name.as_ptr(), config.as_ptr(), &mut err as *mut _, std::ptr::null_mut());
     assert!(!handle.is_null(), "arena_open failed: {}", err_text(err));
     handle
 }
@@ -54,7 +54,7 @@ fn arena_oauth_sign_claims_running_dependency_returns_verifiable_token() {
     let jwt = take_string(jwt_ptr);
     assert_eq!(jwt.split('.').count(), 3, "expected a 3-part JWT, got {jwt}");
 
-    arena_close(arena_handle);
+    arena_close(arena_handle, std::ptr::null_mut(), std::ptr::null_mut());
 }
 
 #[test]
@@ -76,5 +76,5 @@ fn arena_oauth_sign_claims_unregistered_provider_returns_error() {
     assert!(jwt_ptr.is_null());
     assert!(err_text(sign_err).contains("no issuer registered"));
 
-    arena_close(arena_handle);
+    arena_close(arena_handle, std::ptr::null_mut(), std::ptr::null_mut());
 }

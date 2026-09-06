@@ -20,6 +20,8 @@ pub enum Behaviour {
     FailStop,
     PanicStop,
     PanicForceStop,
+    FailReset,
+    PanicReset,
     ResistTeardown,
     FaultSilently,
     ReportStoppedWithoutStopping,
@@ -103,6 +105,18 @@ impl ProbeDependency {
             .expect("order lock")
             .push(format!("{}:{what}", self.identifier));
     }
+
+    fn reset_outcome(&self) -> Result<(), Fault> {
+        tracing::info!(dependency = %self.identifier, "probe dependency reset");
+        match self.behaviour {
+            Behaviour::FailReset => Err(Fault::dependency(
+                &self.identifier,
+                "probe dependency refused to reset",
+            )),
+            Behaviour::PanicReset => panic!("probe dependency panicked while resetting"),
+            _ => Ok(()),
+        }
+    }
 }
 
 #[async_trait]
@@ -133,7 +147,11 @@ impl RunnableDependency for ProbeDependency {
     async fn start(&mut self) -> Result<(), Fault> {
         self.counts.start.fetch_add(1, Ordering::SeqCst);
         self.note("start");
+        tracing::info!("probe dependency {} starting", self.identifier);
         self.state = RunnableState::Starting;
+        for child in self.children.iter_mut() {
+            arena::dependency::start_child(child).await?;
+        }
         if self.behaviour == Behaviour::PanicStart {
             panic!("dependency '{}' start failed", self.identifier);
         }
@@ -169,7 +187,7 @@ impl RunnableDependency for ProbeDependency {
         self.counts.release.fetch_add(1, Ordering::SeqCst);
         self.note("release");
         for child in self.children.iter_mut() {
-            child.release();
+            arena::dependency::release_child(child);
         }
         self.state = RunnableState::Stopped;
     }
@@ -178,7 +196,7 @@ impl RunnableDependency for ProbeDependency {
         self.counts.force_stop.fetch_add(1, Ordering::SeqCst);
         self.note("force_stop");
         for child in self.children.iter_mut() {
-            child.force_stop().await;
+            arena::dependency::force_stop_child(child).await;
         }
         if self.behaviour == Behaviour::PanicForceStop {
             panic!("dependency '{}' forced teardown failed", self.identifier);
@@ -213,11 +231,11 @@ impl RunnableDependency for ProbeDependency {
     }
 
     async fn soft_reset(&self) -> Result<(), Fault> {
-        Ok(())
+        self.reset_outcome()
     }
 
     async fn hard_reset(&mut self) -> Result<(), Fault> {
-        Ok(())
+        self.reset_outcome()
     }
 }
 
@@ -295,7 +313,11 @@ impl RunnableComponent for ProbeComponent {
     async fn start(&mut self) -> Result<(), Fault> {
         self.counts.start.fetch_add(1, Ordering::SeqCst);
         self.note("start");
+        tracing::info!("probe component {} starting", self.identifier);
         self.state = RunnableState::Starting;
+        for child in self.children.iter_mut() {
+            arena::component::start_child(child).await?;
+        }
         if self.behaviour == Behaviour::PanicStart {
             panic!("component '{}' start failed", self.identifier);
         }
@@ -331,7 +353,7 @@ impl RunnableComponent for ProbeComponent {
         self.counts.release.fetch_add(1, Ordering::SeqCst);
         self.note("release");
         for child in self.children.iter_mut() {
-            child.release();
+            arena::component::release_child(child);
         }
         self.state = RunnableState::Stopped;
     }
@@ -340,7 +362,7 @@ impl RunnableComponent for ProbeComponent {
         self.counts.force_stop.fetch_add(1, Ordering::SeqCst);
         self.note("force_stop");
         for child in self.children.iter_mut() {
-            child.force_stop().await;
+            arena::component::force_stop_child(child).await;
         }
         if self.behaviour == Behaviour::PanicForceStop {
             panic!("component '{}' forced teardown failed", self.identifier);
@@ -531,6 +553,17 @@ impl RecordedEvents {
             .filter(|event| event.message.contains(needle))
             .collect()
     }
+}
+
+static INTERESTED_GLOBAL_SUBSCRIBER: std::sync::Once = std::sync::Once::new();
+
+pub fn keep_every_callsite_interesting() {
+    INTERESTED_GLOBAL_SUBSCRIBER.call_once(|| {
+        use tracing_subscriber::layer::SubscriberExt;
+        let subscriber = tracing_subscriber::registry()
+            .with(tracing_subscriber::filter::LevelFilter::TRACE);
+        let _ = tracing::subscriber::set_global_default(subscriber);
+    });
 }
 
 pub struct EventScopeRecordingLayer(pub Arc<RecordedEvents>);

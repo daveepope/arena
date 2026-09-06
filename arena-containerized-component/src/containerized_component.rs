@@ -389,7 +389,7 @@ impl RunnableComponent for ContainerizedComponent {
 
         let mut child_faults = Vec::new();
         for child in self.children.iter_mut().flatten() {
-            if let Err(fault) = child.start().await {
+            if let Err(fault) = arena::component::start_child(child).await {
                 child_faults.push(fault);
             }
         }
@@ -448,7 +448,7 @@ impl RunnableComponent for ContainerizedComponent {
 
         let mut causes = Vec::new();
         for child in self.children.iter_mut().flatten().rev() {
-            if let Err(fault) = child.stop().await {
+            if let Err(fault) = arena::component::stop_child(child).await {
                 causes.push(fault);
             }
         }
@@ -471,7 +471,7 @@ impl RunnableComponent for ContainerizedComponent {
         self.container_id = None;
         self.stopped = true;
         for child in self.children.iter_mut().flatten().rev() {
-            child.release();
+            arena::component::release_child(child);
         }
         self.state = RunnableState::Stopped;
     }
@@ -485,7 +485,7 @@ impl RunnableComponent for ContainerizedComponent {
         }
 
         for child in self.children.iter_mut().flatten().rev() {
-            child.force_stop().await;
+            arena::component::force_stop_child(child).await;
         }
 
         if removed {

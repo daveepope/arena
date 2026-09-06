@@ -68,3 +68,8 @@ fn readiness_failed_for_target_returns_target_and_cause() {
         "readiness check failed for target http://127.0.0.1:8080/health: timed out"
     );
 }
+
+#[test]
+fn reset_failed_no_input_returns_lifecycle_wording() {
+    assert_eq!(message::reset_failed(), "failed to reset");
+}
