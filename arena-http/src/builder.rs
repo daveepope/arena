@@ -1,3 +1,4 @@
+use std::time::Duration;
 use crate::http_dependency::container_impl::{HttpContainerCliConfig, HttpContainerImpl};
 use crate::http_dependency::{HttpDependency, HttpImpl};
 use arena::dependency::RunnableDependency;
@@ -7,6 +8,7 @@ const DEFAULT_CONTAINER_HTTP_PORT: u16 = 8080;
 
 pub struct HttpDependencyBuilder {
     identifier: String,
+    expiry: Option<Duration>,
     http_impl: Option<Box<dyn HttpImpl>>,
     port: Option<u16>,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
@@ -83,6 +85,7 @@ impl HttpDependencyBuilder {
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {
             identifier: identifier.into(),
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
             http_impl: None,
             port: None,
             dependencies: None,
@@ -162,6 +165,16 @@ impl HttpDependencyBuilder {
         self.with_image_tag(image_tag)
     }
 
+    pub fn with_expiry(mut self, expiry: Duration) -> Self {
+        self.expiry = Some(expiry);
+        self
+    }
+
+    pub fn without_expiry(mut self) -> Self {
+        self.expiry = None;
+        self
+    }
+
     pub fn build(self) -> HttpDependency {
         let https = self.https;
         let container_cli_cfg = match &self.http_impl {
@@ -169,9 +182,10 @@ impl HttpDependencyBuilder {
             Some(_) => HttpContainerCliConfig::default(),
         };
 
-        let http_impl = self
+        let mut http_impl = self
             .http_impl
             .unwrap_or_else(|| Box::new(HttpContainerImpl::new(self.network, container_cli_cfg)));
+        http_impl.set_expiry(self.expiry);
 
         let port = self.port.unwrap_or(Self::DEFAULT_PORT);
         let image_name = self
@@ -182,7 +196,7 @@ impl HttpDependencyBuilder {
             .unwrap_or_else(|| Self::DEFAULT_IMAGE_TAG.to_string());
 
         let mut dep = HttpDependency::new(
-            arena_container::identifier::build("arena-http", &self.identifier),
+            arena_container::identifier::build(crate::MODULE, &self.identifier),
             http_impl,
             port,
             self.dependencies,

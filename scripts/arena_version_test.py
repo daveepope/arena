@@ -255,7 +255,7 @@ class SyncWorkspaceVersionTest(unittest.TestCase):
             root = Path(tmp)
             with (
                 patch("arena_version.subprocess.run") as run,
-                patch("arena_version.shutil.which", return_value=None),
+                patch("arena_version.shutil.which", side_effect=_cargo_only),
             ):
                 audit_arena_ffi_binary(root)
                 self.assertEqual(run.call_count, 3)
@@ -277,11 +277,51 @@ class SyncWorkspaceVersionTest(unittest.TestCase):
             root = Path(tmp)
             with (
                 patch("arena_version.subprocess.run") as run,
-                patch("arena_version.shutil.which", return_value=None),
+                patch("arena_version.shutil.which", side_effect=_cargo_only),
             ):
                 vet_rust_dependencies(root)
                 self.assertEqual(run.call_count, 2)
                 self.assertIn("install", run.call_args_list[0].args[0])
+
+
+class RequireCargoTest(unittest.TestCase):
+    def test_audit_arena_ffi_binary_cargo_missing_raises_actionable_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with (
+                patch("arena_version.subprocess.run") as run,
+                patch("arena_version.shutil.which", return_value=None),
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    audit_arena_ffi_binary(root)
+                self.assertIn("cargo not found on PATH", str(raised.exception))
+                self.assertIn("rustup.rs", str(raised.exception))
+                run.assert_not_called()
+
+    def test_vet_rust_dependencies_cargo_missing_raises_actionable_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with (
+                patch("arena_version.subprocess.run") as run,
+                patch("arena_version.shutil.which", return_value=None),
+            ):
+                with self.assertRaises(SystemExit) as raised:
+                    vet_rust_dependencies(root)
+                self.assertIn("cargo not found on PATH", str(raised.exception))
+                run.assert_not_called()
+
+    def test_vet_rust_dependencies_cargo_present_does_not_raise(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with (
+                patch("arena_version.subprocess.run"),
+                patch("arena_version.shutil.which", side_effect=_cargo_only),
+            ):
+                vet_rust_dependencies(root)
+
+
+def _cargo_only(tool: str):
+    return "/usr/bin/cargo" if tool == "cargo" else None
 
 
 def _vet_report(audited: int, exempted: int) -> dict:

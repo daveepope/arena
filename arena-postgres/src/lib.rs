@@ -1,3 +1,5 @@
+pub(crate) const MODULE: &str = "arena-postgres";
+
 pub(crate) mod blocking;
 pub mod builder;
 pub mod managed_playbook;

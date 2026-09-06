@@ -292,7 +292,8 @@ fn http_playbook_verify_at_least_succeeds_with_traffic() {
         let active = arena
             .run_playbook(calibration_api_error_path_id())
             .await
-            .expect("calibration error path playbook");
+            .expect("calibration error path playbook")
+            .expect("calibration error path playbook should run");
         let http = active
             .as_any()
             .downcast_ref::<HttpActivePlaybook>()
@@ -318,7 +319,8 @@ fn http_playbook_verify_count_mismatch_raises() {
         let active = arena
             .run_playbook(calibration_api_error_path_id())
             .await
-            .expect("calibration error path playbook");
+            .expect("calibration error path playbook")
+            .expect("calibration error path playbook should run");
         let http = active
             .as_any()
             .downcast_ref::<HttpActivePlaybook>()

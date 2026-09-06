@@ -3,6 +3,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public final class ArenaIdentifiers {
   private static final int SUFFIX_LEN = 6;
+  private static final String MODULE_PREFIX = "arena-";
   private static final String ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
   private static final int BASE = ALPHABET.length();
   private static final long MASK_64 = 0xFFFFFFFFFFFFFFFFL;
@@ -51,7 +52,10 @@ public final class ArenaIdentifiers {
     return new String(digits);
   }
 
-  private static boolean hasSuffix(String name) {
+  private static boolean isAlreadyBuilt(String name) {
+    if (!name.startsWith(MODULE_PREFIX)) {
+      return false;
+    }
     int dash = name.lastIndexOf('-');
     if (dash < 0) {
       return false;
@@ -69,7 +73,7 @@ public final class ArenaIdentifiers {
   }
 
   public static String build(String module, String name) {
-    if (hasSuffix(name)) {
+    if (isAlreadyBuilt(name)) {
       return name;
     }
     String slug = slugify(name);

@@ -1,7 +1,7 @@
+use arena::lifecycle::{Fault, RunnableState, Subject};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::Playbook;
 use arena_postgres::{ManagedPostgresPlaybook, PostgresDependency};
-use futures::FutureExt;
 
 #[test]
 fn identifier_returns_configured_value() {
@@ -16,19 +16,20 @@ fn into_box_preserves_identifier() {
 }
 
 #[tokio::test]
-async fn run_missing_dependency_panics() {
+async fn run_missing_dependency_returns_fault() {
     let playbook = ManagedPostgresPlaybook::new("missing", "does-not-exist");
     let deps: Vec<Dependency> = Vec::new();
 
-    let outcome = std::panic::AssertUnwindSafe(playbook.run(&deps))
-        .catch_unwind()
-        .await;
+    let Err(fault) = playbook.run(&deps).await else {
+        panic!("playbook should fault");
+    };
 
-    assert!(outcome.is_err());
+    assert_eq!(fault.subject, Subject::Playbook);
+    assert_eq!(fault.id, playbook.identifier());
 }
 
 #[tokio::test]
-async fn run_dependency_present_but_not_postgres_panics() {
+async fn run_dependency_present_but_not_postgres_returns_fault() {
     struct OtherDependency;
 
     #[async_trait::async_trait]
@@ -42,8 +43,24 @@ async fn run_dependency_present_but_not_postgres_panics() {
         fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
             self
         }
-        async fn start(&mut self) {}
-        async fn stop(&mut self) {}
+    fn state(&self) -> RunnableState {
+        RunnableState::NotStarted
+    }
+
+    fn faults(&self) -> &[Fault] {
+        &[]
+    }
+
+    async fn force_stop(&mut self) {}
+    fn release(&mut self) {}
+
+
+        async fn start(&mut self) -> Result<(), Fault> {
+            Ok(())
+        }
+        async fn stop(&mut self) -> Result<(), Fault> {
+            Ok(())
+        }
         fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
         fn children(&self) -> &[Dependency] {
             &[]
@@ -51,22 +68,27 @@ async fn run_dependency_present_but_not_postgres_panics() {
         fn children_mut(&mut self) -> &mut [Dependency] {
             &mut []
         }
-        async fn soft_reset(&self) {}
-        async fn hard_reset(&mut self) {}
+        async fn soft_reset(&self) -> Result<(), Fault> {
+            Ok(())
+        }
+        async fn hard_reset(&mut self) -> Result<(), Fault> {
+            Ok(())
+        }
     }
 
     let playbook = ManagedPostgresPlaybook::new("wrong-type", "other-dep");
     let deps: Vec<Dependency> = vec![Box::new(OtherDependency)];
 
-    let outcome = std::panic::AssertUnwindSafe(playbook.run(&deps))
-        .catch_unwind()
-        .await;
+    let Err(fault) = playbook.run(&deps).await else {
+        panic!("playbook should fault");
+    };
 
-    assert!(outcome.is_err());
+    assert_eq!(fault.subject, Subject::Playbook);
+    assert_eq!(fault.id, playbook.identifier());
 }
 
 #[tokio::test]
-async fn run_postgres_not_started_panics() {
+async fn run_postgres_not_started_returns_fault() {
     let pg = PostgresDependency::builder("postgres-for-playbook").build();
     let dependency_identifier = pg.identifier().to_string();
     let dep: Box<dyn RunnableDependency> = Box::new(pg);
@@ -74,9 +96,10 @@ async fn run_postgres_not_started_panics() {
 
     let playbook = ManagedPostgresPlaybook::new("unstarted", dependency_identifier);
 
-    let outcome = std::panic::AssertUnwindSafe(playbook.run(&deps))
-        .catch_unwind()
-        .await;
+    let Err(fault) = playbook.run(&deps).await else {
+        panic!("playbook should fault");
+    };
 
-    assert!(outcome.is_err());
+    assert_eq!(fault.subject, Subject::Playbook);
+    assert_eq!(fault.id, playbook.identifier());
 }

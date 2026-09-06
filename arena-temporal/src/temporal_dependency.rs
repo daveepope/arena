@@ -5,12 +5,14 @@ use crate::builder::TemporalDependencyBuilder;
 use crate::temporal_dependency::healthcheck::DefaultTemporalReadinessCheck;
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
+use arena::lifecycle::{Fault, RunnableState};
 use async_trait::async_trait;
 use futures_timer::Delay;
 use std::time::{Duration, Instant};
 
 #[async_trait]
 pub trait TemporalImpl: Send + Sync {
+    fn set_expiry(&mut self, _expiry: Option<Duration>) {}
     async fn start(
         &mut self,
         grpc_port: u16,
@@ -18,8 +20,10 @@ pub trait TemporalImpl: Send + Sync {
         image_name: &str,
         image_tag: &str,
         container_name: &str,
-    );
-    async fn stop(&mut self);
+    ) -> Result<(), String>;
+    async fn stop(&mut self) -> Result<(), String>;
+    async fn force_stop(&mut self) -> bool;
+    fn release(&mut self);
     fn grpc_endpoint(&self) -> Option<&str>;
     fn ui_url(&self) -> Option<&str>;
 }
@@ -37,6 +41,8 @@ pub struct TemporalDependency {
     image_tag: String,
     container_name: Option<String>,
     readiness_check: Box<dyn ReadinessCheck>,
+    state: RunnableState,
+    faults: Vec<Fault>,
 }
 
 impl TemporalDependency {
@@ -64,6 +70,8 @@ impl TemporalDependency {
             needs_teardown: false,
             children_started: false,
             readiness_check: Box::new(DefaultTemporalReadinessCheck),
+            state: RunnableState::NotStarted,
+            faults: Vec::new(),
         }
     }
 
@@ -88,17 +96,16 @@ impl TemporalDependency {
             .ok_or_else(|| "temporal grpc endpoint not available yet".to_string())
     }
 
-    async fn wait_until_ready(&self) {
+    async fn wait_until_ready(&self) -> Result<(), String> {
         let timeout = Duration::from_secs(30);
         let poll_every = Duration::from_millis(100);
         let start = Instant::now();
 
         let endpoint = loop {
             if start.elapsed() >= timeout {
-                panic!(
-                    "[Temporal-{}] temporal did not become ready within {:?}",
-                    self.identifier, timeout
-                );
+                return Err(format!(
+                    "temporal did not become ready within {timeout:?}"
+                ));
             }
 
             match self.grpc_endpoint_on_host() {
@@ -116,23 +123,20 @@ impl TemporalDependency {
 
         let remaining = timeout.saturating_sub(start.elapsed());
         if remaining.is_zero() {
-            panic!(
-                "[Temporal-{}] temporal did not become ready within {:?}",
-                self.identifier, timeout
-            );
+            return Err(format!("temporal did not become ready within {timeout:?}"));
         }
 
-        match self
-            .readiness_check
+        self.readiness_check
             .is_ready(&self.identifier, &endpoint, remaining.as_millis() as u64)
             .await
-        {
-            Ok(()) => {}
-            Err(err) => panic!(
-                "[Temporal-{}] readiness check failed: {}",
-                self.identifier, err
-            ),
-        }
+            .map_err(|err| format!("readiness check failed: {err}"))
+    }
+
+    async fn fail(&mut self, message: impl Into<String>, causes: Vec<Fault>) -> Fault {
+        let fault = Fault::dependency(&self.identifier, message).caused_by_all(causes);
+        self.faults.push(fault.clone());
+        <Self as RunnableDependency>::force_stop(self).await;
+        fault
     }
 }
 
@@ -150,19 +154,34 @@ impl RunnableDependency for TemporalDependency {
         self
     }
 
-    async fn start(&mut self) {
+    fn state(&self) -> RunnableState {
+        self.state
+    }
+
+    fn faults(&self) -> &[Fault] {
+        &self.faults
+    }
+
+    async fn start(&mut self) -> Result<(), Fault> {
         if self.running {
-            return;
+            return Ok(());
         }
 
         tracing::debug!(dependency = %self.identifier, phase = "start_begin", "starting");
         let sw = Instant::now();
+        self.state = RunnableState::Starting;
 
         if let Some(children) = self.dependencies.as_mut() {
             if !children.is_empty() {
                 self.children_started = true;
+                let mut child_faults = Vec::new();
                 for dep in children.iter_mut() {
-                    dep.start().await;
+                    if let Err(fault) = dep.start().await {
+                        child_faults.push(fault);
+                    }
+                }
+                if !child_faults.is_empty() {
+                    return Err(self.fail("child dependency failed to start", child_faults).await);
                 }
             }
         }
@@ -176,7 +195,8 @@ impl RunnableDependency for TemporalDependency {
 
         let sw_container = Instant::now();
         self.needs_teardown = true;
-        self.temporal_impl
+        if let Err(message) = self
+            .temporal_impl
             .start(
                 self.grpc_port,
                 self.ui_port,
@@ -184,7 +204,10 @@ impl RunnableDependency for TemporalDependency {
                 &image_tag,
                 &container_name,
             )
-            .await;
+            .await
+        {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw_container.elapsed(),
@@ -192,7 +215,10 @@ impl RunnableDependency for TemporalDependency {
         );
 
         let sw_ready = Instant::now();
-        self.wait_until_ready().await;
+        self.state = RunnableState::ReadinessCheck;
+        if let Err(message) = self.wait_until_ready().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw_ready.elapsed(),
@@ -200,41 +226,91 @@ impl RunnableDependency for TemporalDependency {
         );
 
         self.running = true;
+        self.state = RunnableState::Started;
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw.elapsed(),
             "started"
         );
+        Ok(())
     }
 
-    async fn stop(&mut self) {
-        self.temporal_impl.stop().await;
-        self.needs_teardown = false;
+    async fn stop(&mut self) -> Result<(), Fault> {
+        self.state = RunnableState::Stopping;
+        let mut causes = Vec::new();
 
-        if !self.running {
-            if self.children_started {
-                for dep in self.dependencies.iter_mut().flatten().rev() {
-                    dep.stop().await;
-                }
-                self.children_started = false;
-            }
-            return;
+        if let Err(message) = self.temporal_impl.stop().await {
+            causes.push(Fault::dependency(&self.identifier, message));
         }
+        self.needs_teardown = false;
 
         tracing::debug!(dependency = %self.identifier, phase = "stop_begin", "stopping");
         let sw = Instant::now();
 
         for dep in self.dependencies.iter_mut().flatten().rev() {
-            dep.stop().await;
+            if let Err(fault) = dep.stop().await {
+                causes.push(fault);
+            }
         }
 
         self.children_started = false;
         self.running = false;
+
+        if !causes.is_empty() {
+            let fault = Fault::dependency(&self.identifier, "stop did not complete")
+                .caused_by_all(causes);
+            self.faults.push(fault.clone());
+            self.state = RunnableState::Faulted;
+            return Err(fault);
+        }
+
+        self.state = RunnableState::Stopped;
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw.elapsed(),
             "stopped"
         );
+        Ok(())
+    }
+
+    fn release(&mut self) {
+        self.temporal_impl.release();
+        self.running = false;
+        self.needs_teardown = false;
+        self.children_started = false;
+        for dep in self.dependencies.iter_mut().flatten().rev() {
+            dep.release();
+        }
+        self.state = RunnableState::Stopped;
+    }
+
+    async fn force_stop(&mut self) {
+        let removed = self.temporal_impl.force_stop().await;
+        self.needs_teardown = false;
+        self.running = false;
+        self.children_started = false;
+
+        for dep in self.dependencies.iter_mut().flatten().rev() {
+            dep.force_stop().await;
+        }
+
+        if removed {
+            self.state = RunnableState::Stopped;
+            return;
+        }
+
+        let unconfirmed = Fault::dependency(
+            &self.identifier,
+            "forced teardown could not confirm the container was removed",
+        );
+        if !self
+            .faults
+            .iter()
+            .any(|f| f.message == unconfirmed.message && f.id == unconfirmed.id)
+        {
+            self.faults.push(unconfirmed);
+        }
+        self.state = RunnableState::Faulted;
     }
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
@@ -249,20 +325,21 @@ impl RunnableDependency for TemporalDependency {
         self.dependencies.as_deref_mut().unwrap_or(&mut [])
     }
 
-    async fn soft_reset(&self) {
+    async fn soft_reset(&self) -> Result<(), Fault> {
         if !self.running {
-            return;
+            return Ok(());
         }
 
         tracing::warn!(
             dependency = %self.identifier,
             "soft reset skipped: no reset primitive without a temporal client"
         );
+        Ok(())
     }
 
-    async fn hard_reset(&mut self) {
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
         if !self.running {
-            return;
+            return Ok(());
         }
 
         tracing::debug!(
@@ -278,10 +355,13 @@ impl RunnableDependency for TemporalDependency {
             self.container_name.as_deref(),
         );
 
-        self.temporal_impl.stop().await;
+        if let Err(message) = self.temporal_impl.stop().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         self.running = false;
 
-        self.temporal_impl
+        if let Err(message) = self
+            .temporal_impl
             .start(
                 self.grpc_port,
                 self.ui_port,
@@ -289,22 +369,31 @@ impl RunnableDependency for TemporalDependency {
                 &image_tag,
                 &container_name,
             )
-            .await;
-        self.wait_until_ready().await;
+            .await
+        {
+            return Err(self.fail(message, Vec::new()).await);
+        }
+        if let Err(message) = self.wait_until_ready().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         self.running = true;
+        self.state = RunnableState::Started;
+        Ok(())
     }
 }
 
 impl Drop for TemporalDependency {
     fn drop(&mut self) {
-        if self.running {
+        if self.running || self.needs_teardown || self.children_started {
             tracing::warn!(
                 dependency = %self.identifier,
-                "drop while running; forcing stop"
+                "drop while running; releasing container"
             );
-            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
-        } else if self.needs_teardown || self.children_started {
-            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
+            self.temporal_impl.release();
+            self.running = false;
+            self.needs_teardown = false;
+            self.children_started = false;
+            self.state = RunnableState::Stopped;
         }
     }
 }

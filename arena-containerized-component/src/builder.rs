@@ -1,3 +1,4 @@
+use std::time::Duration;
 use crate::containerized_component::ContainerizedComponent;
 use crate::error::ContainerizedComponentBuildError;
 use arena::healthcheck::ReadinessCheck;
@@ -14,6 +15,7 @@ enum ImageSource {
 
 pub struct ContainerizedComponentBuilder {
     identifier: String,
+    expiry: Option<Duration>,
     children: Option<Vec<Component>>,
     image_source: ImageSource,
     build_context: Option<PathBuf>,
@@ -34,10 +36,8 @@ const DEFAULT_READINESS_TIMEOUT_MS: u64 = 10_000;
 impl ContainerizedComponentBuilder {
     fn empty(identifier: impl Into<String>, image_source: ImageSource) -> Self {
         Self {
-            identifier: arena_container::identifier::build(
-                "arena-containerized-component",
-                &identifier.into(),
-            ),
+            identifier: arena_container::identifier::build(crate::MODULE, &identifier.into()),
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
             children: None,
             image_source,
             build_context: None,
@@ -346,6 +346,16 @@ impl ContainerizedComponentBuilder {
         Ok(())
     }
 
+    pub fn with_expiry(mut self, expiry: Duration) -> Self {
+        self.expiry = Some(expiry);
+        self
+    }
+
+    pub fn without_expiry(mut self) -> Self {
+        self.expiry = None;
+        self
+    }
+
     pub async fn build(self) -> Result<ContainerizedComponent, ContainerizedComponentBuildError> {
         if let ImageSource::Image(_) = &self.image_source {
             if self.build_context.is_some() {
@@ -410,6 +420,7 @@ impl ContainerizedComponentBuilder {
 
         Ok(ContainerizedComponent {
             identifier: self.identifier,
+            expiry: self.expiry,
             children: self.children,
             image_tag,
             network: self.network,
@@ -423,6 +434,8 @@ impl ContainerizedComponentBuilder {
             runtime_client,
             container_id: None,
             stopped: false,
+            state: arena::lifecycle::RunnableState::NotStarted,
+            faults: Vec::new(),
         })
     }
 }

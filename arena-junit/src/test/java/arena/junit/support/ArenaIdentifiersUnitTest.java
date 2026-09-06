@@ -1,6 +1,7 @@
 package arena.junit.support;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -32,9 +33,16 @@ final class ArenaIdentifiersUnitTest {
   }
 
   @Test
-  void build_nameAlreadyHasValidSuffix_returnsNameUnchanged() {
-    String alreadySuffixed = "custom-name-abc123";
-    assertEquals(alreadySuffixed, ArenaIdentifiers.build("arena-postgres", alreadySuffixed));
+  void build_nameAlreadyBuilt_returnsNameUnchanged() {
+    String alreadyBuilt = "arena-postgres-custom-name-abc123";
+    assertEquals(alreadyBuilt, ArenaIdentifiers.build("arena-postgres", alreadyBuilt));
+  }
+
+  @Test
+  void build_nameEndingInSixCharacters_appendsSuffix() {
+    String built = ArenaIdentifiers.build("arena-oracle", "oracle");
+    assertTrue(built.startsWith("arena-oracle-oracle-"));
+    assertNotEquals("oracle", built);
   }
 
   @Test

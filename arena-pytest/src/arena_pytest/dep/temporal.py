@@ -1,3 +1,7 @@
+from datetime import timedelta
+
+from arena_pytest.support._expiry import _expiry_seconds
+
 from typing import Any, Dict, List, Optional
 
 from arena_pytest.ffi._ffi_children import children_for_ffi
@@ -11,6 +15,14 @@ class TemporalDependencyBuilder:
             "identifier": _build_identifier("arena-temporal", name),
         }
         self._children: List[Any] = []
+
+    def with_expiry(self, expiry: timedelta) -> "TemporalDependencyBuilder":
+        self._config["expiry_seconds"] = _expiry_seconds(expiry)
+        return self
+
+    def without_expiry(self) -> "TemporalDependencyBuilder":
+        self._config["expiry_seconds"] = 0
+        return self
 
     def with_image_name(self, image_name: str) -> "TemporalDependencyBuilder":
         self._config["image_name"] = image_name

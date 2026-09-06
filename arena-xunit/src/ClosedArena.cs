@@ -57,29 +57,73 @@ public sealed class ClosedArena
             ? ArenaLogTarget.RegisterForLogger(_logger)
             : ArenaLogTarget.RegisterForLogger(CreateDefaultLogger());
 
+        ArenaShutdown.EnsureHooksRegistered();
+
+        IntPtr handle;
         try
         {
-            var handle = ArenaBindings.OpenArena(_name, json, _logLevel);
-            var playbooks = RunExecOnStartPlaybooks(handle);
-            return System.Threading.Tasks.Task.FromResult(new OpenArena(handle, logToken, _match, playbooks));
+            handle = ArenaBindings.OpenArena(_name, json, _logLevel);
         }
         catch
         {
             ArenaLogTarget.Unregister(logToken);
             throw;
         }
+
+        Dictionary<Type, ActivePlaybook> playbooks;
+        try
+        {
+            playbooks = RunExecOnStartPlaybooks(handle);
+        }
+        catch
+        {
+            CloseArenaQuietly(handle);
+            ArenaLogTarget.Unregister(logToken);
+            throw;
+        }
+
+        return System.Threading.Tasks.Task.FromResult(new OpenArena(handle, logToken, _match, playbooks));
+    }
+
+    private static void CloseArenaQuietly(IntPtr handle)
+    {
+        try
+        {
+            ArenaBindings.CloseArena(handle);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"arena: teardown after a failed open failed: {ex.Message}");
+        }
     }
 
     private Dictionary<Type, ActivePlaybook> RunExecOnStartPlaybooks(IntPtr handle)
     {
         var result = new Dictionary<Type, ActivePlaybook>();
-        foreach (var registered in _match.Playbooks)
+        try
         {
-            if (registered.ExecOnDependencyStart)
+            foreach (var registered in _match.Playbooks)
             {
-                var playbookHandle = ArenaBindings.MatchPlaybookRun(handle, registered.Playbook.Identifier);
-                result[registered.Playbook.GetType()] = WrapActivePlaybook(registered.Playbook, playbookHandle);
+                if (registered.ExecOnDependencyStart)
+                {
+                    var playbookHandle = ArenaBindings.MatchPlaybookRun(handle, registered.Playbook.Identifier);
+                    result[registered.Playbook.GetType()] = WrapActivePlaybook(registered.Playbook, playbookHandle);
+                }
             }
+        }
+        catch
+        {
+            foreach (var started in result.Values)
+            {
+                try
+                {
+                    started.Dispose();
+                }
+                catch
+                {
+                }
+            }
+            throw;
         }
         return result;
     }

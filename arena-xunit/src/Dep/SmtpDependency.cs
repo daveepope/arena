@@ -8,6 +8,7 @@ public sealed class SmtpDependency : IArenaDependency
 {
     public string Type => "smtp";
     public string Identifier { get; }
+    public long? ExpirySeconds { get; internal set; }
     public int Port { get; }
     public int UiPort { get; }
     public string? TlsMode { get; }
@@ -38,6 +39,7 @@ public sealed class SmtpDependency : IArenaDependency
 
 public sealed class SmtpDependencyBuilder
 {
+    private long? _expirySeconds;
     private readonly string _name;
     private int _port = 1025;
     private int _uiPort = 8025;
@@ -100,9 +102,32 @@ public sealed class SmtpDependencyBuilder
         return this;
     }
 
+    public SmtpDependencyBuilder WithExpiry(System.TimeSpan expiry)
+    {
+        _expirySeconds = ExpirySeconds(expiry);
+        return this;
+    }
+
+    public SmtpDependencyBuilder WithoutExpiry()
+    {
+        _expirySeconds = 0;
+        return this;
+    }
+
     public SmtpDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-smtp", _name);
-        return new SmtpDependency(identifier, _port, _uiPort, _tlsMode, _imageName, _image, _containerName, _children);
+        var built = new SmtpDependency(identifier, _port, _uiPort, _tlsMode, _imageName, _image, _containerName, _children);
+        built.ExpirySeconds = _expirySeconds;
+        return built;
     }
+
+    private static long ExpirySeconds(System.TimeSpan expiry)
+    {
+        if (expiry < System.TimeSpan.Zero)
+            throw new System.ArgumentOutOfRangeException(nameof(expiry), "expiry must not be negative");
+        var seconds = (long)expiry.TotalSeconds;
+        return seconds == 0 && expiry > System.TimeSpan.Zero ? 1 : seconds;
+    }
+
 }

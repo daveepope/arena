@@ -21,6 +21,16 @@ public final class KafkaDependencyBuilder {
     config.put("identifier", ArenaIdentifiers.build("arena-kafka", name));
   }
 
+  public KafkaDependencyBuilder withExpiry(java.time.Duration expiry) {
+    config.put("expiry_seconds", expirySeconds(expiry));
+    return this;
+  }
+
+  public KafkaDependencyBuilder withoutExpiry() {
+    config.put("expiry_seconds", 0);
+    return this;
+  }
+
   public KafkaDependencyBuilder withImageName(String imageName) {
     config.put("image_name", imageName);
     return this;
@@ -58,4 +68,13 @@ public final class KafkaDependencyBuilder {
     }
     return new KafkaDependency(cfg);
   }
+
+  private static long expirySeconds(java.time.Duration expiry) {
+    if (expiry.isNegative()) {
+      throw new IllegalArgumentException("expiry must not be negative: " + expiry);
+    }
+    long seconds = expiry.toSeconds();
+    return seconds == 0 && !expiry.isZero() ? 1 : seconds;
+  }
+
 }

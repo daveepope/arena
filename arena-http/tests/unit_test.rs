@@ -1,3 +1,4 @@
+use arena::lifecycle::{Fault, RunnableState};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_http::{HttpDependency, HttpImpl};
@@ -22,15 +23,22 @@ struct FakeHttpImpl {
 
 #[async_trait]
 impl HttpImpl for FakeHttpImpl {
-    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) {
+    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) -> Result<(), String> {
         self.base_url = Some("http://127.0.0.1:8080".to_string());
         self.admin_url = Some("http://127.0.0.1:8081".to_string());
         self.events.lock().unwrap().push(Event::HttpStart);
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.events.lock().unwrap().push(Event::HttpStop);
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn base_url(&self) -> Option<&str> {
         self.base_url.as_deref()
@@ -83,13 +91,26 @@ impl RunnableDependency for FakeChildDependency {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
-
-    async fn start(&mut self) {
-        self.events.lock().unwrap().push("start");
+    fn state(&self) -> RunnableState {
+        RunnableState::NotStarted
     }
 
-    async fn stop(&mut self) {
+    fn faults(&self) -> &[Fault] {
+        &[]
+    }
+
+    async fn force_stop(&mut self) {}
+    fn release(&mut self) {}
+
+
+    async fn start(&mut self) -> Result<(), Fault> {
+        self.events.lock().unwrap().push("start");
+        Ok(())
+    }
+
+    async fn stop(&mut self) -> Result<(), Fault> {
         self.events.lock().unwrap().push("stop");
+        Ok(())
     }
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
@@ -100,9 +121,13 @@ impl RunnableDependency for FakeChildDependency {
         &mut []
     }
 
-    async fn soft_reset(&self) {}
+    async fn soft_reset(&self) -> Result<(), Fault> {
+        Ok(())
+    }
 
-    async fn hard_reset(&mut self) {}
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 }
 
 #[tokio::test]
@@ -126,9 +151,9 @@ async fn start_stop_happy_path_records_events() {
         })
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
     assert_eq!(dep.base_url(), Some("http://127.0.0.1:8080"));
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 
     assert_eq!(
         events.lock().unwrap().as_slice(),
@@ -152,7 +177,7 @@ async fn start_readiness_err_panics_after_impl_start() {
         .build();
 
     let outcome = std::panic::AssertUnwindSafe(async {
-        dep.start().await;
+        dep.start().await.expect("start should succeed");
     })
     .catch_unwind()
     .await;
@@ -191,10 +216,10 @@ async fn identifier_as_any_and_children_reflect_dependency_state() {
     assert_eq!(dep.children().len(), 1);
     assert_eq!(dep.children_mut().len(), 1);
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
     assert_eq!(dep.https_base_url(), Some("https://127.0.0.1:8443"));
     let _playbook = dep.playbook();
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }
 
 struct FlakyHttpImpl {
@@ -205,9 +230,18 @@ struct FlakyHttpImpl {
 
 #[async_trait]
 impl HttpImpl for FlakyHttpImpl {
-    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) {}
+    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) -> Result<(), String> {
+        Ok(())
+    }
 
-    async fn stop(&mut self) {}
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn base_url(&self) -> Option<&str> {
         None
@@ -244,9 +278,9 @@ async fn wait_until_ready_retries_until_impl_reports_admin_url() {
         .with_readiness_check(ImmediateReadinessCheck)
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
     assert_eq!(dep.admin_url(), Some("http://127.0.0.1:8081".to_string()));
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }
 
 struct DefaultHttpsUrlImpl {
@@ -255,13 +289,20 @@ struct DefaultHttpsUrlImpl {
 
 #[async_trait]
 impl HttpImpl for DefaultHttpsUrlImpl {
-    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) {
+    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) -> Result<(), String> {
         self.base_url = Some("http://127.0.0.1:8080".to_string());
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.base_url = None;
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn base_url(&self) -> Option<&str> {
         self.base_url.as_deref()
@@ -291,7 +332,9 @@ async fn reset_journal_not_running_returns_without_panic() {
         .with_readiness_check(ImmediateReadinessCheck)
         .build();
 
-    dep.reset_journal().await;
+    dep.reset_journal()
+        .await
+        .expect("reset journal on a stopped dependency should be a no-op");
 }
 
 #[tokio::test]
@@ -302,7 +345,7 @@ async fn soft_reset_not_running_returns_without_panic() {
         .with_readiness_check(ImmediateReadinessCheck)
         .build();
 
-    dep.soft_reset().await;
+    dep.soft_reset().await.expect("soft reset should succeed");
 }
 
 #[tokio::test]
@@ -313,7 +356,7 @@ async fn hard_reset_not_running_returns_without_panic() {
         .with_readiness_check(ImmediateReadinessCheck)
         .build();
 
-    dep.hard_reset().await;
+    dep.hard_reset().await.expect("hard reset should succeed");
 }
 
 #[tokio::test]
@@ -324,11 +367,11 @@ async fn hard_reset_running_restarts_impl_stays_ready() {
         .with_readiness_check(ImmediateReadinessCheck)
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
     assert_eq!(dep.base_url(), Some("http://127.0.0.1:8080"));
 
-    dep.hard_reset().await;
+    dep.hard_reset().await.expect("hard reset should succeed");
     assert_eq!(dep.base_url(), Some("http://127.0.0.1:8080"));
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }

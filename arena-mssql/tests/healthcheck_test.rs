@@ -186,13 +186,20 @@ impl MssqlImpl for SilentEndpointMssqlImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
         *self.started.lock().unwrap() = true;
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         *self.started.lock().unwrap() = false;
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn connection_string(&self) -> Option<&str> {
         Some(&self.conn_str)
@@ -237,7 +244,7 @@ async fn start_silent_post_readiness_endpoint_panics_within_configured_connect_b
 
     let started_at = Instant::now();
     let outcome = std::panic::AssertUnwindSafe(async {
-        mssql.start().await;
+        mssql.start().await.expect("start should succeed");
     })
     .catch_unwind()
     .await;

@@ -25,6 +25,11 @@ pub async fn try_remove_existing_container(name: &str) {
     }
 }
 
+pub async fn force_remove_container(name: &str) -> bool {
+    try_remove_existing_container(name).await;
+    !is_container_running(name).await
+}
+
 pub async fn is_container_running(id_or_name: &str) -> bool {
     let Some(docker) = Docker::connect_with_defaults().ok() else {
         return true;

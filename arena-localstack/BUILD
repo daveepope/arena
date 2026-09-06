@@ -85,6 +85,7 @@ rust_test(
     ) + [
         ":arena_localstack",
         "//arena",
+        "//arena-container:arena_container",
     ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,

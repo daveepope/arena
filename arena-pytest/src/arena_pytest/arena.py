@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import signal
 from typing import Any, List, Optional, Type
 
 import pytest
@@ -96,7 +97,58 @@ async def arena(closed_arena) -> OpenArena:
     await open_arena_obj.close()
 
 
+_previous_sigterm_handler: Any = None
+
+
+def _exit_session_on_sigterm(signum: int, _frame: Any) -> None:
+    pytest.exit(f"arena: terminated by signal {signum}", returncode=128 + signum)
+
+
+def _install_sigterm_teardown() -> None:
+    global _previous_sigterm_handler
+    if _sigterm_teardown_installed():
+        return
+    try:
+        current = signal.getsignal(signal.SIGTERM)
+    except (AttributeError, ValueError):
+        return
+    if current not in (signal.SIG_DFL, None):
+        return
+    try:
+        _previous_sigterm_handler = signal.signal(
+            signal.SIGTERM, _exit_session_on_sigterm
+        )
+    except ValueError:
+        _previous_sigterm_handler = None
+
+
+def _sigterm_teardown_installed() -> bool:
+    try:
+        return signal.getsignal(signal.SIGTERM) is _exit_session_on_sigterm
+    except (AttributeError, ValueError):
+        return False
+
+
+def _restore_sigterm_handler() -> None:
+    global _previous_sigterm_handler
+    if not _sigterm_teardown_installed():
+        _previous_sigterm_handler = None
+        return
+    if _previous_sigterm_handler is None:
+        _previous_sigterm_handler = signal.SIG_DFL
+    try:
+        signal.signal(signal.SIGTERM, _previous_sigterm_handler)
+    except ValueError:
+        pass
+    _previous_sigterm_handler = None
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    _restore_sigterm_handler()
+
+
 def pytest_configure(config: pytest.Config) -> None:
+    _install_sigterm_teardown()
     config.addinivalue_line(
         "markers",
         f"{PLAYBOOK_MARKER}(klass): open one playbook identified by its Playbook "

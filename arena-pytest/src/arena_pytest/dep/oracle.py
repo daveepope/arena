@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import timedelta
+
+from arena_pytest.support._expiry import _expiry_seconds
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from arena_pytest.ffi._ffi import match_playbook_run
@@ -19,6 +21,14 @@ class OracleDependencyBuilder:
             "identifier": _build_identifier("arena-oracle", name),
         }
         self._children: List[Any] = []
+
+    def with_expiry(self, expiry: timedelta) -> "OracleDependencyBuilder":
+        self._config["expiry_seconds"] = _expiry_seconds(expiry)
+        return self
+
+    def without_expiry(self) -> "OracleDependencyBuilder":
+        self._config["expiry_seconds"] = 0
+        return self
 
     def with_image_name(self, image_name: str) -> "OracleDependencyBuilder":
         self._config["image_name"] = image_name

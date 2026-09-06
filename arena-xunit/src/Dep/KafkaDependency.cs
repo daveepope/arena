@@ -14,6 +14,7 @@ public sealed class KafkaDependency : IArenaDependency
 {
     public string Type => "kafka";
     public string Identifier { get; }
+    public long? ExpirySeconds { get; internal set; }
     public int Port { get; }
     public KafkaFlavor Flavor { get; }
     public string? ImageName { get; }
@@ -49,6 +50,7 @@ public sealed class KafkaDependency : IArenaDependency
 
 public sealed class KafkaDependencyBuilder
 {
+    private long? _expirySeconds;
     private readonly string _name;
     private int _port = 9092;
     private KafkaFlavor _flavor = KafkaFlavor.ApacheNative;
@@ -98,9 +100,32 @@ public sealed class KafkaDependencyBuilder
         return this;
     }
 
+    public KafkaDependencyBuilder WithExpiry(System.TimeSpan expiry)
+    {
+        _expirySeconds = ExpirySeconds(expiry);
+        return this;
+    }
+
+    public KafkaDependencyBuilder WithoutExpiry()
+    {
+        _expirySeconds = 0;
+        return this;
+    }
+
     public KafkaDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-kafka", _name);
-        return new KafkaDependency(identifier, _port, _flavor, _imageName, _containerName, new List<string>(_topics), _children);
+        var built = new KafkaDependency(identifier, _port, _flavor, _imageName, _containerName, new List<string>(_topics), _children);
+        built.ExpirySeconds = _expirySeconds;
+        return built;
     }
+
+    private static long ExpirySeconds(System.TimeSpan expiry)
+    {
+        if (expiry < System.TimeSpan.Zero)
+            throw new System.ArgumentOutOfRangeException(nameof(expiry), "expiry must not be negative");
+        var seconds = (long)expiry.TotalSeconds;
+        return seconds == 0 && expiry > System.TimeSpan.Zero ? 1 : seconds;
+    }
+
 }

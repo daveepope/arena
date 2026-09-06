@@ -2,6 +2,7 @@ use std::net::IpAddr;
 use std::time::Instant;
 
 use arena::dependency::{Dependency, RunnableDependency};
+use arena::lifecycle::{Fault, RunnableState};
 use async_trait::async_trait;
 
 use crate::builder::OauthDependencyBuilder;
@@ -30,6 +31,9 @@ pub struct OauthDependency {
     active_server_tls: Option<(String, String)>,
     metadata_base_url: Option<String>,
     oauth_server: OauthServer,
+    state: RunnableState,
+    faults: Vec<Fault>,
+    build_fault: Option<Fault>,
 }
 
 pub fn ephemeral_tls_hosts(listen_ip: IpAddr) -> Vec<String> {
@@ -54,21 +58,23 @@ impl OauthDependency {
         tls_plan: OauthTlsPlan,
         metadata_base_url: Option<String>,
     ) -> Self {
-        let active_server_tls = match &tls_plan {
-            OauthTlsPlan::Disabled => None,
+        let (active_server_tls, build_fault) = match &tls_plan {
+            OauthTlsPlan::Disabled => (None, None),
             OauthTlsPlan::CustomPem { cert_pem, key_pem } => {
-                Some((cert_pem.clone(), key_pem.clone()))
+                (Some((cert_pem.clone(), key_pem.clone())), None)
             }
-            OauthTlsPlan::EphemeralOnStart => Some(
-                ephemeral_tls::self_signed_pem_pair(&ephemeral_tls_hosts(listen.ip)).unwrap_or_else(
-                    |e| {
-                        panic!(
-                            "[Oauth-{}] ephemeral TLS certificate generation failed: {e}",
-                            identifier
-                        )
-                    },
-                ),
-            ),
+            OauthTlsPlan::EphemeralOnStart => {
+                match ephemeral_tls::self_signed_pem_pair(&ephemeral_tls_hosts(listen.ip)) {
+                    Ok(pair) => (Some(pair), None),
+                    Err(e) => (
+                        None,
+                        Some(Fault::dependency(
+                            &identifier,
+                            format!("ephemeral TLS certificate generation failed: {e}"),
+                        )),
+                    ),
+                }
+            }
         };
         Self {
             identifier,
@@ -83,6 +89,9 @@ impl OauthDependency {
             active_server_tls,
             metadata_base_url,
             oauth_server: OauthServer::default(),
+            state: RunnableState::NotStarted,
+            faults: Vec::new(),
+            build_fault,
         }
     }
 
@@ -185,10 +194,23 @@ impl RunnableDependency for OauthDependency {
         self
     }
 
-    async fn start(&mut self) {
+    fn state(&self) -> RunnableState {
+        self.state
+    }
+
+    fn faults(&self) -> &[Fault] {
+        &self.faults
+    }
+
+    async fn start(&mut self) -> Result<(), Fault> {
         if self.running {
-            return;
+            return Ok(());
         }
+        if let Some(fault) = self.build_fault.take() {
+            self.faults.push(fault.clone());
+            return Err(fault);
+        }
+        self.state = RunnableState::Starting;
 
         tracing::debug!(dependency = %self.identifier, phase = "start_begin", "starting");
         let sw = Instant::now();
@@ -196,8 +218,14 @@ impl RunnableDependency for OauthDependency {
         if let Some(children) = self.dependencies.as_mut() {
             if !children.is_empty() {
                 self.children_started = true;
+                let mut child_faults = Vec::new();
                 for dep in children.iter_mut() {
-                    dep.start().await;
+                    if let Err(fault) = dep.start().await {
+                        child_faults.push(fault);
+                    }
+                }
+                if !child_faults.is_empty() {
+                    return Err(self.fail("child dependency failed to start", child_faults).await);
                 }
             }
         }
@@ -205,9 +233,9 @@ impl RunnableDependency for OauthDependency {
         let tls_for_server = self.tls_pair_for_listen();
 
         self.needs_teardown = true;
-        self.oauth_server
+        if let Err(message) = self
+            .oauth_server
             .start(
-                &self.identifier,
                 self.listen,
                 self.issuers.clone(),
                 self.scopes_supported.clone(),
@@ -215,41 +243,79 @@ impl RunnableDependency for OauthDependency {
                 tls_for_server,
                 self.metadata_base_url.clone(),
             )
-            .await;
-        self.oauth_server.wait_until_ready(&self.identifier).await;
+            .await
+        {
+            return Err(self.fail(message, Vec::new()).await);
+        }
+
+        self.state = RunnableState::ReadinessCheck;
+        if let Err(message) = self.oauth_server.wait_until_ready(&self.identifier).await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
 
         self.running = true;
+        self.state = RunnableState::Started;
         tracing::debug!(
             dependency = %self.identifier,
             issuer = %self.base_url().unwrap_or(""),
             elapsed = ?sw.elapsed(),
             "started"
         );
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), Fault> {
+        self.state = RunnableState::Stopping;
         self.oauth_server.stop().await;
         self.needs_teardown = false;
 
-        if !self.running {
-            if self.children_started {
-                for dep in self.dependencies.iter_mut().flatten().rev() {
-                    dep.stop().await;
-                }
-                self.children_started = false;
-            }
-            return;
-        }
-
         tracing::debug!(dependency = %self.identifier, phase = "stop_begin", "stopping");
 
+        let mut causes = Vec::new();
         for dep in self.dependencies.iter_mut().flatten().rev() {
-            dep.stop().await;
+            if let Err(fault) = dep.stop().await {
+                causes.push(fault);
+            }
         }
 
         self.children_started = false;
         self.running = false;
+
+        if !causes.is_empty() {
+            let fault =
+                Fault::dependency(&self.identifier, "stop did not complete").caused_by_all(causes);
+            self.faults.push(fault.clone());
+            self.state = RunnableState::Faulted;
+            return Err(fault);
+        }
+
+        self.state = RunnableState::Stopped;
         tracing::debug!(dependency = %self.identifier, phase = "stopped", "stopped");
+        Ok(())
+    }
+
+    fn release(&mut self) {
+        self.oauth_server.release();
+        self.running = false;
+        self.needs_teardown = false;
+        self.children_started = false;
+        for dep in self.dependencies.iter_mut().flatten().rev() {
+            dep.release();
+        }
+        self.state = RunnableState::Stopped;
+    }
+
+    async fn force_stop(&mut self) {
+        self.oauth_server.stop().await;
+        self.needs_teardown = false;
+        self.running = false;
+        self.children_started = false;
+
+        for dep in self.dependencies.iter_mut().flatten().rev() {
+            dep.force_stop().await;
+        }
+
+        self.state = RunnableState::Stopped;
     }
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
@@ -264,33 +330,48 @@ impl RunnableDependency for OauthDependency {
         self.dependencies.as_deref_mut().unwrap_or(&mut [])
     }
 
-    async fn soft_reset(&self) {
+    async fn soft_reset(&self) -> Result<(), Fault> {
         if !self.running {
-            return;
+            return Ok(());
         }
         tracing::debug!(dependency = %self.identifier, phase = "soft_reset", "no-op");
+        Ok(())
     }
 
-    async fn hard_reset(&mut self) {
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
         if !self.running {
-            return;
+            return Ok(());
         }
         tracing::debug!(dependency = %self.identifier, phase = "hard_reset", "restarting oauth server");
-        self.stop().await;
-        self.start().await;
+        if let Err(fault) = self.stop().await {
+            return Err(self.fail("hard reset could not stop the oauth server", vec![fault])
+                .await);
+        }
+        self.start().await
+    }
+}
+
+impl OauthDependency {
+    async fn fail(&mut self, message: impl Into<String>, causes: Vec<Fault>) -> Fault {
+        let fault = Fault::dependency(&self.identifier, message).caused_by_all(causes);
+        self.faults.push(fault.clone());
+        <Self as RunnableDependency>::force_stop(self).await;
+        fault
     }
 }
 
 impl Drop for OauthDependency {
     fn drop(&mut self) {
-        if self.running {
+        if self.running || self.needs_teardown || self.children_started {
             tracing::warn!(
                 dependency = %self.identifier,
-                "drop while oauth server running; forcing stop"
+                "drop while oauth server running; releasing server"
             );
-            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
-        } else if self.needs_teardown || self.children_started {
-            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
+            self.oauth_server.release();
+            self.running = false;
+            self.needs_teardown = false;
+            self.children_started = false;
+            self.state = RunnableState::Stopped;
         }
     }
 }

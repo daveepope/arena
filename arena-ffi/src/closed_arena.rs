@@ -113,7 +113,7 @@ async fn open_arena_from_config(
 ) -> Result<OpenArena, String> {
     let a_match = build_match_async(&parsed).await?;
     let closed = ClosedArena::new(name, vec![a_match]);
-    Ok(closed.open().await)
+    closed.open().await.map_err(|state| state.to_string())
 }
 
 unsafe fn parse_config(ptr: *const c_char) -> Result<crate::matches::MatchConfig, String> {

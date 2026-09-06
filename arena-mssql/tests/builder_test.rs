@@ -1,3 +1,4 @@
+use arena::lifecycle::{Fault, RunnableState};
 use arena::dependency::RunnableDependency;
 use arena_mssql::{MssqlDependency, MssqlEncryption};
 use std::time::Duration;
@@ -15,8 +16,24 @@ impl RunnableDependency for NoopChildDependency {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
-    async fn start(&mut self) {}
-    async fn stop(&mut self) {}
+    fn state(&self) -> RunnableState {
+        RunnableState::NotStarted
+    }
+
+    fn faults(&self) -> &[Fault] {
+        &[]
+    }
+
+    async fn force_stop(&mut self) {}
+    fn release(&mut self) {}
+
+
+    async fn start(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
+    async fn stop(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
     fn children(&self) -> &[arena::dependency::Dependency] {
         &[]
@@ -24,8 +41,12 @@ impl RunnableDependency for NoopChildDependency {
     fn children_mut(&mut self) -> &mut [arena::dependency::Dependency] {
         &mut []
     }
-    async fn soft_reset(&self) {}
-    async fn hard_reset(&mut self) {}
+    async fn soft_reset(&self) -> Result<(), Fault> {
+        Ok(())
+    }
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 }
 
 #[test]
@@ -118,4 +139,76 @@ fn build_with_all_metadata_options_does_not_panic() {
 
     assert!(dep.identifier().starts_with("arena-mssql-builder-metadata"));
     assert!(dep.managed_tables().is_empty());
+}
+
+
+#[derive(Clone, Default)]
+struct ExpiryRecordingImpl {
+    expiry: std::sync::Arc<std::sync::Mutex<Option<Option<std::time::Duration>>>>,
+}
+
+#[async_trait::async_trait]
+impl arena_mssql::MssqlImpl for ExpiryRecordingImpl {
+    fn set_expiry(&mut self, expiry: Option<std::time::Duration>) {
+        *self.expiry.lock().unwrap() = Some(expiry);
+    }
+    #[allow(clippy::too_many_arguments)]
+    async fn start(
+        &mut self,
+        _port: u16,
+        _database_name: &str,
+        _database_username: &str,
+        _database_password: &str,
+        _image_name: &str,
+        _image_tag: &str,
+        _container_name: &str,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+    fn connection_string(&self) -> Option<&str> {
+        None
+    }
+    fn admin_connection_string(&self) -> Option<&str> {
+        None
+    }
+}
+
+#[test]
+fn build_no_expiry_override_uses_default_expiry() {
+    let recorder = ExpiryRecordingImpl::default();
+    let _dep = MssqlDependency::builder("orders").with_impl(recorder.clone()).build();
+
+    assert_eq!(
+        *recorder.expiry.lock().unwrap(),
+        Some(Some(arena_container::expiry::DEFAULT_EXPIRY))
+    );
+}
+
+#[test]
+fn build_with_expiry_uses_given_expiry() {
+    let recorder = ExpiryRecordingImpl::default();
+    let _dep = MssqlDependency::builder("orders")
+        .with_impl(recorder.clone())
+        .with_expiry(std::time::Duration::from_secs(30))
+        .build();
+
+    assert_eq!(
+        *recorder.expiry.lock().unwrap(),
+        Some(Some(std::time::Duration::from_secs(30)))
+    );
+}
+
+#[test]
+fn build_without_expiry_disables_expiry() {
+    let recorder = ExpiryRecordingImpl::default();
+    let _dep = MssqlDependency::builder("orders").with_impl(recorder.clone()).without_expiry().build();
+
+    assert_eq!(*recorder.expiry.lock().unwrap(), Some(None));
 }

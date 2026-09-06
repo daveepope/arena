@@ -920,6 +920,7 @@ java_test(
 csharp_library(
     name = "xunit_shared",
     target_frameworks = ["net8.0"],
+    nullable = "enable",
     srcs = glob(["tests/xunit-shared/**/*.cs"]),
     deps = [
         "//arena-xunit:arena_xunit_lib",
@@ -937,6 +938,7 @@ csharp_library(
 csharp_library(
     name = "ephemeral_test_runtime_dotnet",
     target_frameworks = ["net8.0"],
+    nullable = "enable",
     srcs = ["tests/xunit-shared/EphemeralTestRuntime.cs"],
     deps = [
         "//arena-xunit:arena_xunit_lib",

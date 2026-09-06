@@ -5,6 +5,7 @@ use crate::builder::MssqlDependencyBuilder;
 use crate::mssql_dependency::healthcheck::DefaultMssqlReadinessCheck;
 use crate::mssql_dependency::mssql_container_impl::DEFAULT_CONNECT_TIMEOUT;
 use arena::dependency::{Dependency, RunnableDependency};
+use arena::lifecycle::{Fault, RunnableState};
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
 use futures::channel::oneshot;
@@ -31,6 +32,8 @@ pub struct MssqlDependency {
     readiness_check: Box<dyn ReadinessCheck>,
     connect_timeout: Option<Duration>,
     managed_tables: Vec<(String, String)>,
+    state: RunnableState,
+    faults: Vec<Fault>,
 }
 
 impl MssqlDependency {
@@ -65,6 +68,8 @@ impl MssqlDependency {
             readiness_check: Box::new(DefaultMssqlReadinessCheck::new()),
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             managed_tables: Vec::new(),
+            state: RunnableState::NotStarted,
+            faults: Vec::new(),
         }
     }
 
@@ -142,29 +147,32 @@ impl MssqlDependency {
         Ok(())
     }
 
-    async fn wait_until_ready(&self) {
+    async fn wait_until_ready(&self) -> Result<(), String> {
         let conn_str = self
             .admin_connection_string()
-            .expect("admin connection string should be available after mssql starts");
+            .ok_or("admin connection string not available after mssql started")?;
 
-        match self
-            .readiness_check
+        self.readiness_check
             .is_ready(&self.identifier, conn_str, READINESS_TIMEOUT.as_millis() as u64)
             .await
-        {
-            Ok(()) => {}
-            Err(msg) => panic!("{msg}"),
-        }
+            .map_err(|err| format!("readiness check failed: {err}"))
     }
 
-    async fn ensure_database_exists(&self) {
+    async fn fail(&mut self, message: impl Into<String>, causes: Vec<Fault>) -> Fault {
+        let fault = Fault::dependency(&self.identifier, message).caused_by_all(causes);
+        self.faults.push(fault.clone());
+        <Self as RunnableDependency>::force_stop(self).await;
+        fault
+    }
+
+    async fn ensure_database_exists(&self) -> Result<(), String> {
         if self.database_name.eq_ignore_ascii_case("master") {
-            return;
+            return Ok(());
         }
 
         let admin_conn = self
             .admin_connection_string()
-            .expect("admin connection string should be available after mssql starts")
+            .ok_or("admin connection string not available after mssql started")?
             .to_string();
         let identifier = self.identifier.clone();
         let database_name = self.database_name.clone();
@@ -203,23 +211,19 @@ impl MssqlDependency {
         });
 
         match rx.await {
-            Ok(Ok(())) => {}
-            Ok(Err(msg)) => panic!(
-                "[MssqlDependency-{}] ensure_database_exists: {msg}",
-                self.identifier
-            ),
-            Err(_canceled) => panic!(
-                "[MssqlDependency-{}] ensure_database_exists worker unexpectedly stopped.",
-                self.identifier
-            ),
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(msg)) => Err(format!("ensure database exists: {msg}")),
+            Err(_canceled) => {
+                Err("ensure database exists worker unexpectedly stopped".to_string())
+            }
         }
     }
 
-    async fn snapshot_managed_tables(&mut self) {
+    async fn snapshot_managed_tables(&mut self) -> Result<(), String> {
         let identifier = self.identifier.clone();
         let conn_str = self
             .connection_string()
-            .expect("connection string should be available after mssql starts")
+            .ok_or("connection string not available after mssql started")?
             .to_string();
         let connect_timeout = self.connect_timeout;
 
@@ -271,19 +275,20 @@ impl MssqlDependency {
                     "captured managed table snapshot"
                 );
                 self.managed_tables = tables;
+                Ok(())
             }
-            Ok(Err(msg)) => panic!("[MssqlDependency-{identifier}] snapshot managed tables: {msg}"),
-            Err(_canceled) => panic!(
-                "[MssqlDependency-{identifier}] snapshot managed tables worker unexpectedly stopped."
-            ),
+            Ok(Err(msg)) => Err(format!("snapshot managed tables: {msg}")),
+            Err(_canceled) => {
+                Err("snapshot managed tables worker unexpectedly stopped".to_string())
+            }
         }
     }
 
-    async fn run_startup_sql_scripts_blocking(&self, scripts: Vec<String>) {
+    async fn run_startup_sql_scripts_blocking(&self, scripts: Vec<String>) -> Result<(), String> {
         let identifier = self.identifier.clone();
         let conn_str = self
             .connection_string()
-            .expect("connection string should be available after mssql starts")
+            .ok_or("connection string not available after mssql started")?
             .to_string();
         let connect_timeout = self.connect_timeout;
 
@@ -301,12 +306,9 @@ impl MssqlDependency {
         });
 
         match rx.await {
-            Ok(Ok(())) => {}
-            Ok(Err(msg)) => panic!("{msg}"),
-            Err(_canceled) => panic!(
-                "[MssqlDependency-{}] startup-scripts worker unexpectedly stopped.",
-                self.identifier
-            ),
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(msg)) => Err(msg),
+            Err(_canceled) => Err("startup scripts worker unexpectedly stopped".to_string()),
         }
     }
 }
@@ -325,10 +327,19 @@ impl RunnableDependency for MssqlDependency {
         self
     }
 
-    async fn start(&mut self) {
+    fn state(&self) -> RunnableState {
+        self.state
+    }
+
+    fn faults(&self) -> &[Fault] {
+        &self.faults
+    }
+
+    async fn start(&mut self) -> Result<(), Fault> {
         if self.running {
-            return;
+            return Ok(());
         }
+        self.state = RunnableState::Starting;
 
         tracing::debug!(dependency = %self.identifier, phase = "start_begin", "starting");
         let sw = Instant::now();
@@ -336,8 +347,14 @@ impl RunnableDependency for MssqlDependency {
         if let Some(children) = self.dependencies.as_mut() {
             if !children.is_empty() {
                 self.children_started = true;
+                let mut child_faults = Vec::new();
                 for dep in children.iter_mut() {
-                    dep.start().await;
+                    if let Err(fault) = dep.start().await {
+                        child_faults.push(fault);
+                    }
+                }
+                if !child_faults.is_empty() {
+                    return Err(self.fail("child dependency failed to start", child_faults).await);
                 }
             }
         }
@@ -355,7 +372,8 @@ impl RunnableDependency for MssqlDependency {
 
         let sw_container = Instant::now();
         self.needs_teardown = true;
-        self.mssql_impl
+        if let Err(message) = self
+            .mssql_impl
             .start(
                 self.port,
                 &database_name,
@@ -365,7 +383,10 @@ impl RunnableDependency for MssqlDependency {
                 &image_tag,
                 &container_name,
             )
-            .await;
+            .await
+        {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw_container.elapsed(),
@@ -373,63 +394,122 @@ impl RunnableDependency for MssqlDependency {
         );
 
         let sw_ready = Instant::now();
-        self.wait_until_ready().await;
+        self.state = RunnableState::ReadinessCheck;
+        if let Err(message) = self.wait_until_ready().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw_ready.elapsed(),
             "readiness wait finished"
         );
 
-        self.ensure_database_exists().await;
+        if let Err(message) = self.ensure_database_exists().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
 
         if let Some(scripts) = scripts {
             let sw_scripts = Instant::now();
-            self.run_startup_sql_scripts_blocking(scripts).await;
+            if let Err(message) = self.run_startup_sql_scripts_blocking(scripts).await {
+                return Err(self.fail(message, Vec::new()).await);
+            }
             tracing::debug!(
                 dependency = %self.identifier,
                 elapsed = ?sw_scripts.elapsed(),
                 "startup scripts finished"
             );
 
-            self.snapshot_managed_tables().await;
+            if let Err(message) = self.snapshot_managed_tables().await {
+                return Err(self.fail(message, Vec::new()).await);
+            }
         }
 
         self.running = true;
+        self.state = RunnableState::Started;
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw.elapsed(),
             "started and ready"
         );
+        Ok(())
     }
 
-    async fn stop(&mut self) {
-        self.mssql_impl.stop().await;
-        self.needs_teardown = false;
+    async fn stop(&mut self) -> Result<(), Fault> {
+        self.state = RunnableState::Stopping;
+        let mut causes = Vec::new();
 
-        if !self.running {
-            if self.children_started {
-                for dep in self.dependencies.iter_mut().flatten().rev() {
-                    dep.stop().await;
-                }
-                self.children_started = false;
-            }
-            return;
+        if let Err(message) = self.mssql_impl.stop().await {
+            causes.push(Fault::dependency(&self.identifier, message));
         }
+        self.needs_teardown = false;
 
         tracing::debug!(dependency = %self.identifier, phase = "stop_begin", "stopping");
         let sw = Instant::now();
 
         for dep in self.dependencies.iter_mut().flatten().rev() {
-            dep.stop().await;
+            if let Err(fault) = dep.stop().await {
+                causes.push(fault);
+            }
         }
 
         self.children_started = false;
         self.running = false;
+
+        if !causes.is_empty() {
+            let fault =
+                Fault::dependency(&self.identifier, "stop did not complete").caused_by_all(causes);
+            self.faults.push(fault.clone());
+            self.state = RunnableState::Faulted;
+            return Err(fault);
+        }
+
+        self.state = RunnableState::Stopped;
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw.elapsed(),
             "stopped"
         );
+        Ok(())
+    }
+
+    fn release(&mut self) {
+        self.mssql_impl.release();
+        self.running = false;
+        self.needs_teardown = false;
+        self.children_started = false;
+        for dep in self.dependencies.iter_mut().flatten().rev() {
+            dep.release();
+        }
+        self.state = RunnableState::Stopped;
+    }
+
+    async fn force_stop(&mut self) {
+        let removed = self.mssql_impl.force_stop().await;
+        self.needs_teardown = false;
+        self.running = false;
+        self.children_started = false;
+
+        for dep in self.dependencies.iter_mut().flatten().rev() {
+            dep.force_stop().await;
+        }
+
+        if removed {
+            self.state = RunnableState::Stopped;
+            return;
+        }
+
+        let unconfirmed = Fault::dependency(
+            &self.identifier,
+            "forced teardown could not confirm the container was removed",
+        );
+        if !self
+            .faults
+            .iter()
+            .any(|f| f.message == unconfirmed.message && f.id == unconfirmed.id)
+        {
+            self.faults.push(unconfirmed);
+        }
+        self.state = RunnableState::Faulted;
     }
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
@@ -444,9 +524,9 @@ impl RunnableDependency for MssqlDependency {
         self.dependencies.as_deref_mut().unwrap_or(&mut [])
     }
 
-    async fn soft_reset(&self) {
+    async fn soft_reset(&self) -> Result<(), Fault> {
         if !self.running {
-            return;
+            return Ok(());
         }
 
         let Some(scripts) = &self.startup_sql_scripts else {
@@ -454,16 +534,26 @@ impl RunnableDependency for MssqlDependency {
                 dependency = %self.identifier,
                 "soft reset skipped: no startup scripts"
             );
-            return;
+            return Ok(());
         };
 
         let admin_conn = self
             .admin_connection_string()
-            .expect("admin connection string for soft reset")
+            .ok_or_else(|| {
+                Fault::dependency(
+                    &self.identifier,
+                    "admin connection string not available for soft reset",
+                )
+            })?
             .to_string();
         let conn_str = self
             .connection_string()
-            .expect("connection string for soft reset")
+            .ok_or_else(|| {
+                Fault::dependency(
+                    &self.identifier,
+                    "connection string not available for soft reset",
+                )
+            })?
             .to_string();
         let database_name = self.database_name.clone();
         let identifier = self.identifier.clone();
@@ -499,19 +589,20 @@ impl RunnableDependency for MssqlDependency {
         .await;
 
         if let Err(msg) = reset_res {
-            panic!("[MssqlDependency-{identifier}] soft reset failed: {msg}");
+            return Err(Fault::dependency(
+                &self.identifier,
+                format!("soft reset failed: {msg}"),
+            ));
         }
 
-        if let Err(msg) =
-            Self::run_startup_sql_scripts(&identifier, &conn_str, scripts, connect_timeout).await
-        {
-            panic!("{msg}");
-        }
+        Self::run_startup_sql_scripts(&identifier, &conn_str, scripts, connect_timeout)
+            .await
+            .map_err(|msg| Fault::dependency(&self.identifier, msg))
     }
 
-    async fn hard_reset(&mut self) {
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
         if !self.running {
-            return;
+            return Ok(());
         }
 
         tracing::debug!(
@@ -531,10 +622,13 @@ impl RunnableDependency for MssqlDependency {
             self.container_name.as_deref(),
         );
 
-        self.mssql_impl.stop().await;
+        if let Err(message) = self.mssql_impl.stop().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         self.running = false;
 
-        self.mssql_impl
+        if let Err(message) = self
+            .mssql_impl
             .start(
                 self.port,
                 &database_name,
@@ -544,29 +638,44 @@ impl RunnableDependency for MssqlDependency {
                 &image_tag,
                 &container_name,
             )
-            .await;
-        self.wait_until_ready().await;
-        self.ensure_database_exists().await;
+            .await
+        {
+            return Err(self.fail(message, Vec::new()).await);
+        }
+        if let Err(message) = self.wait_until_ready().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
+        if let Err(message) = self.ensure_database_exists().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
 
         if let Some(scripts) = scripts {
-            self.run_startup_sql_scripts_blocking(scripts).await;
-            self.snapshot_managed_tables().await;
+            if let Err(message) = self.run_startup_sql_scripts_blocking(scripts).await {
+                return Err(self.fail(message, Vec::new()).await);
+            }
+            if let Err(message) = self.snapshot_managed_tables().await {
+                return Err(self.fail(message, Vec::new()).await);
+            }
         }
 
         self.running = true;
+        self.state = RunnableState::Started;
+        Ok(())
     }
 }
 
 impl Drop for MssqlDependency {
     fn drop(&mut self) {
-        if self.running {
+        if self.running || self.needs_teardown || self.children_started {
             tracing::warn!(
                 dependency = %self.identifier,
-                "drop while running; forcing stop"
+                "drop while running; releasing container"
             );
-            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
-        } else if self.needs_teardown || self.children_started {
-            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
+            self.mssql_impl.release();
+            self.running = false;
+            self.needs_teardown = false;
+            self.children_started = false;
+            self.state = RunnableState::Stopped;
         }
     }
 }

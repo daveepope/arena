@@ -1,3 +1,4 @@
+use std::time::Duration;
 use crate::oracle_dependency::oracle_container_impl::{
     OracleContainerImpl, OracleImpl, DEFAULT_SERVICE_NAME,
 };
@@ -17,6 +18,7 @@ pub enum OracleSetupMode {
 
 pub struct OracleDependencyBuilder {
     identifier: String,
+    expiry: Option<Duration>,
     oracle_impl: Option<Arc<dyn OracleImpl>>,
     port: Option<u16>,
     database_name: Option<String>,
@@ -45,6 +47,7 @@ impl OracleDependencyBuilder {
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {
             identifier: identifier.into(),
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
             oracle_impl: None,
             port: None,
             database_name: None,
@@ -155,10 +158,21 @@ impl OracleDependencyBuilder {
         self.with_image_tag(image_tag)
     }
 
+    pub fn with_expiry(mut self, expiry: Duration) -> Self {
+        self.expiry = Some(expiry);
+        self
+    }
+
+    pub fn without_expiry(mut self) -> Self {
+        self.expiry = None;
+        self
+    }
+
     pub fn build(self) -> OracleDependency {
         let oracle_impl = self
             .oracle_impl
             .unwrap_or_else(|| Arc::new(OracleContainerImpl::new(self.network)));
+        oracle_impl.set_expiry(self.expiry);
 
         let port = self.port.unwrap_or(Self::DEFAULT_PORT);
         let database_name = self
@@ -195,7 +209,7 @@ impl OracleDependencyBuilder {
         let readiness_check = self.readiness_check;
 
         let mut dep = OracleDependency::new(
-            arena_container::identifier::build("arena-oracledb", &self.identifier),
+            arena_container::identifier::build(crate::MODULE, &self.identifier),
             oracle_impl,
             port,
             database_name,

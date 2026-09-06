@@ -1,4 +1,5 @@
 use arena::dependency::{find_dependency, Dependency};
+use arena::lifecycle::Fault;
 use arena::playbook::{ActivePlaybook, Playbook as PlaybookTrait};
 use async_trait::async_trait;
 
@@ -40,17 +41,30 @@ impl PlaybookTrait for ManagedHttpPlaybook {
         &self.identifier
     }
 
-    async fn run(&self, dependencies: &[Dependency]) -> Box<dyn ActivePlaybook> {
+    async fn run(&self, dependencies: &[Dependency]) -> Result<Box<dyn ActivePlaybook>, Fault> {
         let http = find_dependency(dependencies, &self.dependency_identifier)
             .and_then(|d| d.as_any().downcast_ref::<HttpDependency>())
-            .unwrap_or_else(|| {
-                panic!(
-                    "ManagedHttpPlaybook '{}': dependency '{}' not found or is not an HttpDependency",
-                    self.identifier, self.dependency_identifier
+            .ok_or_else(|| {
+                Fault::playbook(
+                    &self.identifier,
+                    format!(
+                        "dependency '{}' not found or is not an HttpDependency",
+                        self.dependency_identifier
+                    ),
                 )
-            });
+            })?;
+
+        if http.admin_url().is_none() {
+            return Err(Fault::playbook(
+                &self.identifier,
+                format!(
+                    "dependency '{}' is not started",
+                    self.dependency_identifier
+                ),
+            ));
+        }
 
         let playbook = (self.build)(http.playbook()).with_identifier(&self.identifier);
-        Box::new(playbook.run().await)
+        Ok(Box::new(playbook.run().await))
     }
 }

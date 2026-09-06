@@ -19,6 +19,16 @@ public final class HttpDependencyBuilder {
     config.put("identifier", ArenaIdentifiers.build("arena-http", name));
   }
 
+  public HttpDependencyBuilder withExpiry(java.time.Duration expiry) {
+    config.put("expiry_seconds", expirySeconds(expiry));
+    return this;
+  }
+
+  public HttpDependencyBuilder withoutExpiry() {
+    config.put("expiry_seconds", 0);
+    return this;
+  }
+
   public HttpDependencyBuilder withPort(int port) {
     config.put("port", port);
     return this;
@@ -51,4 +61,13 @@ public final class HttpDependencyBuilder {
     }
     return new HttpDependency(cfg);
   }
+
+  private static long expirySeconds(java.time.Duration expiry) {
+    if (expiry.isNegative()) {
+      throw new IllegalArgumentException("expiry must not be negative: " + expiry);
+    }
+    long seconds = expiry.toSeconds();
+    return seconds == 0 && !expiry.isZero() ? 1 : seconds;
+  }
+
 }

@@ -1,3 +1,4 @@
+use arena::lifecycle::{Fault, RunnableState};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena_oauth::OauthDependency;
 
@@ -16,10 +17,25 @@ impl RunnableDependency for NoopChildDependency {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+    fn state(&self) -> RunnableState {
+        RunnableState::NotStarted
+    }
 
-    async fn start(&mut self) {}
+    fn faults(&self) -> &[Fault] {
+        &[]
+    }
 
-    async fn stop(&mut self) {}
+    async fn force_stop(&mut self) {}
+    fn release(&mut self) {}
+
+
+    async fn start(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
+
+    async fn stop(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
     fn children(&self) -> &[Dependency] {
@@ -29,9 +45,13 @@ impl RunnableDependency for NoopChildDependency {
         &mut []
     }
 
-    async fn soft_reset(&self) {}
+    async fn soft_reset(&self) -> Result<(), Fault> {
+        Ok(())
+    }
 
-    async fn hard_reset(&mut self) {}
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 }
 
 #[test]
@@ -73,4 +93,24 @@ fn ephemeral_tls_hosts_loopback_and_unspecified_listen_ips_stay_localhost_only()
             "listen ip: {listen_ip}"
         );
     }
+}
+
+#[tokio::test]
+async fn build_ephemeral_tls_exposes_certificate_before_start() {
+    let dep = OauthDependency::builder("oauth-tls-available").build();
+
+    assert!(
+        dep.server_tls_certificate_pem().is_some(),
+        "ephemeral TLS must be generated at build time so clients can trust it before start"
+    );
+    assert!(dep.faults().is_empty());
+    assert_eq!(dep.state(), RunnableState::NotStarted);
+}
+
+#[tokio::test]
+async fn build_http_transport_records_no_certificate_and_no_fault() {
+    let dep = OauthDependency::builder("oauth-http-no-tls").with_http().build();
+
+    assert!(dep.server_tls_certificate_pem().is_none());
+    assert!(dep.faults().is_empty());
 }

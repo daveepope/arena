@@ -1,4 +1,5 @@
 use arena::dependency::RunnableDependency;
+use arena::lifecycle::RunnableState;
 use arena::healthcheck::ReadinessCheck;
 use arena_oracledb::{OracleDependency, OracleImpl};
 use async_trait::async_trait;
@@ -16,12 +17,14 @@ impl ReadinessCheck for AlwaysReadyCheck {
 #[derive(Default)]
 struct RecorderInner {
     stop_calls: Mutex<u32>,
+    force_stop_calls: Mutex<u32>,
+    release_calls: Mutex<u32>,
 }
 
 #[derive(Clone, Default)]
 struct RecordingOracleImpl {
     inner: Arc<RecorderInner>,
-    panic_on_start: bool,
+    fail_on_start: bool,
 }
 
 impl RecordingOracleImpl {
@@ -29,10 +32,22 @@ impl RecordingOracleImpl {
         *self.inner.stop_calls.lock().expect("stop_calls lock")
     }
 
-    fn panicking() -> Self {
+    fn force_stop_call_count(&self) -> u32 {
+        *self
+            .inner
+            .force_stop_calls
+            .lock()
+            .expect("force_stop_calls lock")
+    }
+
+    fn release_call_count(&self) -> u32 {
+        *self.inner.release_calls.lock().expect("release_calls lock")
+    }
+
+    fn failing() -> Self {
         Self {
             inner: Arc::default(),
-            panic_on_start: true,
+            fail_on_start: true,
         }
     }
 }
@@ -50,15 +65,30 @@ impl OracleImpl for RecordingOracleImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
-        if self.panic_on_start {
-            panic!("simulated start failure");
+    ) -> Result<(), String> {
+        if self.fail_on_start {
+            return Err("simulated start failure".to_string());
         }
+        Ok(())
     }
 
-    async fn stop(&self) {
+    async fn stop(&self) -> Result<(), String> {
         *self.inner.stop_calls.lock().expect("stop_calls lock") += 1;
+        Ok(())
     }
+
+    async fn force_stop(&self) -> bool {
+        *self
+            .inner
+            .force_stop_calls
+            .lock()
+            .expect("force_stop_calls lock") += 1;
+        true
+    }
+    fn release(&self) {
+        *self.inner.release_calls.lock().expect("release_calls lock") += 1;
+    }
+
 
     fn connection_string(&self) -> Option<String> {
         Some("//localhost:1521/FREEPDB1".to_string())
@@ -78,7 +108,7 @@ impl OracleImpl for RecordingOracleImpl {
 }
 
 #[test]
-fn drop_without_start_does_not_call_stop() {
+fn drop_without_start_does_not_tear_down() {
     let recorder = RecordingOracleImpl::default();
     {
         let _dep = OracleDependency::builder("drop-unstarted")
@@ -88,6 +118,7 @@ fn drop_without_start_does_not_call_stop() {
     }
 
     assert_eq!(recorder.stop_call_count(), 0);
+    assert_eq!(recorder.force_stop_call_count(), 0);
 }
 
 #[tokio::test]
@@ -98,39 +129,71 @@ async fn drop_after_explicit_stop_does_not_call_stop_again() {
             .with_impl(recorder.clone())
             .with_readiness_check(AlwaysReadyCheck)
             .build();
-        dep.start().await;
-        dep.stop().await;
+        dep.start().await.expect("start should succeed");
+        dep.stop().await.expect("stop should succeed");
     }
 
     assert_eq!(recorder.stop_call_count(), 1);
 }
 
 #[tokio::test]
-async fn drop_while_running_forces_stop() {
+async fn drop_while_running_releases_container() {
     let recorder = RecordingOracleImpl::default();
     {
         let mut dep = OracleDependency::builder("drop-while-running")
             .with_impl(recorder.clone())
             .with_readiness_check(AlwaysReadyCheck)
             .build();
-        dep.start().await;
+        dep.start().await.expect("start should succeed");
     }
 
-    assert_eq!(recorder.stop_call_count(), 1);
+    assert_eq!(recorder.release_call_count(), 1);
 }
 
-#[test]
-fn start_panic_still_triggers_cleanup_on_drop() {
-    let recorder = RecordingOracleImpl::panicking();
-    let recorder_check = recorder.clone();
+#[tokio::test]
+async fn start_failure_returns_fault_and_forces_stop() {
+    let recorder = RecordingOracleImpl::failing();
+    let mut dep = OracleDependency::builder("drop-start-fault")
+        .with_impl(recorder.clone())
+        .with_readiness_check(AlwaysReadyCheck)
+        .build();
 
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let mut dep = OracleDependency::builder("drop-start-panic")
-            .with_impl(recorder)
+    let fault = dep.start().await.expect_err("dependency should fault");
+
+    assert_eq!(fault.id, dep.identifier());
+    assert!(fault.message.contains("simulated start failure"));
+    assert_eq!(dep.state(), RunnableState::Stopped);
+    assert_eq!(recorder.force_stop_call_count(), 1);
+}
+
+#[tokio::test]
+async fn start_failure_then_drop_does_not_force_stop_twice() {
+    let recorder = RecordingOracleImpl::failing();
+    {
+        let mut dep = OracleDependency::builder("drop-start-fault")
+            .with_impl(recorder.clone())
+            .with_readiness_check(AlwaysReadyCheck)
             .build();
-        futures::executor::block_on(dep.start());
-    }));
+        let _fault = dep.start().await.expect_err("dependency should fault");
+    }
 
-    assert!(result.is_err());
-    assert_eq!(recorder_check.stop_call_count(), 1);
+    assert_eq!(recorder.force_stop_call_count(), 1);
+}
+
+#[tokio::test]
+async fn force_stop_called_twice_is_indistinguishable_from_once() {
+    let recorder = RecordingOracleImpl::default();
+    let mut dep = OracleDependency::builder("force-stop-twice")
+        .with_impl(recorder.clone())
+        .with_readiness_check(AlwaysReadyCheck)
+        .build();
+
+    dep.start().await.expect("start should succeed");
+    dep.force_stop().await;
+    let after_first = dep.state();
+    dep.force_stop().await;
+
+    assert_eq!(after_first, RunnableState::Stopped);
+    assert_eq!(dep.state(), RunnableState::Stopped);
+    assert!(dep.faults().is_empty());
 }

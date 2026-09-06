@@ -5,6 +5,7 @@ import os
 import time
 
 _SUFFIX_LEN = 6
+_MODULE_PREFIX = "arena-"
 _ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
 _BASE = len(_ALPHABET)
 _MASK_64 = 0xFFFFFFFFFFFFFFFF
@@ -45,8 +46,8 @@ def _new_suffix() -> str:
     return "".join(reversed(digits))
 
 
-def _has_suffix(name: str) -> bool:
-    if "-" not in name:
+def _is_already_built(name: str) -> bool:
+    if not name.startswith(_MODULE_PREFIX):
         return False
     last = name.rsplit("-", 1)[-1]
     if len(last) != _SUFFIX_LEN:
@@ -55,7 +56,7 @@ def _has_suffix(name: str) -> bool:
 
 
 def build(module: str, name: str) -> str:
-    if _has_suffix(name):
+    if _is_already_built(name):
         return name
     slug = _slugify(name)
     suffix = _new_suffix()

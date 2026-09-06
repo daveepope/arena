@@ -10,6 +10,7 @@ public sealed class ContainerizedComponent : IArenaComponent
 {
     public string Type => "container";
     public string Identifier { get; }
+    public long? ExpirySeconds { get; internal set; }
     public string? Containerfile { get; }
     public string? Image { get; }
     public string? BuildContext { get; }
@@ -53,6 +54,7 @@ public sealed class ContainerizedComponent : IArenaComponent
         {
             Type = Type,
             Identifier = Identifier,
+            ExpirySeconds = ExpirySeconds,
             Containerfile = Containerfile,
             Image = Image,
             BuildContext = BuildContext,
@@ -74,6 +76,7 @@ public sealed class ContainerizedComponent : IArenaComponent
     {
         [JsonProperty("type")] public string Type { get; set; } = default!;
         [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
+        [JsonProperty("expiry_seconds", NullValueHandling = NullValueHandling.Ignore)] public long? ExpirySeconds { get; set; }
         [JsonProperty("containerfile")] public string? Containerfile { get; set; }
         [JsonProperty("image")] public string? Image { get; set; }
         [JsonProperty("build_context")] public string? BuildContext { get; set; }
@@ -132,6 +135,7 @@ internal sealed class PortMappingEntry
 
 public sealed class ContainerizedComponentBuilder
 {
+    private long? _expirySeconds;
     private readonly string _name;
     private string? _containerfile;
     private string? _image;
@@ -236,6 +240,18 @@ public sealed class ContainerizedComponentBuilder
         return this;
     }
 
+    public ContainerizedComponentBuilder WithExpiry(System.TimeSpan expiry)
+    {
+        _expirySeconds = ExpirySeconds(expiry);
+        return this;
+    }
+
+    public ContainerizedComponentBuilder WithoutExpiry()
+    {
+        _expirySeconds = 0;
+        return this;
+    }
+
     public ContainerizedComponent Build()
     {
         var hasContainerfile = !string.IsNullOrEmpty(_containerfile);
@@ -244,11 +260,22 @@ public sealed class ContainerizedComponentBuilder
             throw new System.InvalidOperationException(
                 "exactly one of containerfile or image must be set");
         var identifier = ArenaIdentifiers.Build("arena-container", _name);
-        return new ContainerizedComponent(identifier, _containerfile, _image, _buildContext, _imageTag,
+        var built = new ContainerizedComponent(identifier, _containerfile, _image, _buildContext, _imageTag,
             _platform, _network,
             new Dictionary<string, string>(_envVars), new List<RuntimeArgEntry>(_runtimeArgs),
             new List<PortMappingEntry>(_portMappings), new List<string>(_hostMappings),
             new List<VolumeMappingEntry>(_volumeMappings),
             new List<ReadinessCheckEntry>(_readinessChecks), new List<IArenaComponent>(_children));
+        built.ExpirySeconds = _expirySeconds;
+        return built;
     }
+
+    private static long ExpirySeconds(System.TimeSpan expiry)
+    {
+        if (expiry < System.TimeSpan.Zero)
+            throw new System.ArgumentOutOfRangeException(nameof(expiry), "expiry must not be negative");
+        var seconds = (long)expiry.TotalSeconds;
+        return seconds == 0 && expiry > System.TimeSpan.Zero ? 1 : seconds;
+    }
+
 }

@@ -18,6 +18,8 @@ pub(crate) struct KafkaContainerImpl {
     container: Option<testcontainers::core::ContainerAsync<kafka::apache::Kafka>>,
     bootstrap: Option<String>,
     network: Option<String>,
+    container_name: Option<String>,
+    expiry: Option<Duration>,
 }
 
 impl KafkaContainerImpl {
@@ -26,16 +28,31 @@ impl KafkaContainerImpl {
             container: None,
             bootstrap: None,
             network,
+            container_name: None,
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
         }
     }
 }
 
 #[async_trait]
 impl KafkaImpl for KafkaContainerImpl {
-    async fn start(&mut self, port: u16, image_name: &str, image_tag: &str, container_name: &str) {
+    fn set_expiry(&mut self, expiry: Option<Duration>) {
+        self.expiry = expiry;
+    }
+
+    async fn start(
+        &mut self,
+        port: u16,
+        image_name: &str,
+        image_tag: &str,
+        container_name: &str,
+    ) -> Result<(), String> {
         if self.container.is_some() {
-            return;
+            return Ok(());
         }
+
+        arena_container::expiry::remove_expired_containers_if_enabled(crate::MODULE, self.expiry)
+            .await;
 
         arena_container::container::try_remove_existing_container(container_name).await;
 
@@ -49,6 +66,10 @@ impl KafkaImpl for KafkaContainerImpl {
             .with_mapped_port(port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)
             .with_container_name(container_name)
+            .with_labels(arena_container::expiry::expiry_labels_for(
+                crate::MODULE,
+                self.expiry,
+            ))
             .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await);
 
         if let Some(ref network) = self.network {
@@ -89,32 +110,32 @@ impl KafkaImpl for KafkaContainerImpl {
                 ]);
         }
 
-        let container = request.start().await.unwrap_or_else(|e| {
-            panic!(
-                "{}",
-                arena_container::container::start_failure_message("kafka", &e)
-            )
-        });
+        let container = request
+            .start()
+            .await
+            .map_err(|e| arena_container::container::start_failure_message("kafka", &e))?;
 
         let host = container
             .get_host()
             .await
-            .expect("Failed to get host")
+            .map_err(|e| format!("kafka container host unavailable: {e}"))?
             .to_string();
 
         let port = container
             .get_host_port_ipv4(DEFAULT_CONTAINER_PORT)
             .await
-            .expect("Failed to get port")
+            .map_err(|e| format!("kafka port unavailable: {e}"))?
             .to_string();
 
         self.bootstrap = Some(format!("{host}:{port}"));
         self.container = Some(container);
+        self.container_name = Some(container_name.to_string());
 
         tracing::debug!(layer = "kafka_container", phase = "container_started");
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.container.take();
         self.bootstrap = None;
         tracing::debug!(layer = "kafka_container", phase = "container_stopped");
@@ -122,6 +143,26 @@ impl KafkaImpl for KafkaContainerImpl {
         if let Some(ref network) = self.network {
             arena_container::network::remove_network(network).await;
         }
+        Ok(())
+    }
+
+    fn release(&mut self) {
+        self.container.take();
+        self.bootstrap = None;
+    }
+
+    async fn force_stop(&mut self) -> bool {
+        self.release();
+
+        let removed = match self.container_name.as_deref() {
+            Some(name) => arena_container::container::force_remove_container(name).await,
+            None => true,
+        };
+
+        if let Some(ref network) = self.network {
+            arena_container::network::remove_network(network).await;
+        }
+        removed
     }
 
     fn bootstrap_servers(&self) -> Option<&str> {
@@ -133,6 +174,8 @@ pub(crate) struct ConfluentKafkaContainerImpl {
     container: Option<testcontainers::core::ContainerAsync<kafka::confluent::Kafka>>,
     bootstrap: Option<String>,
     network: Option<String>,
+    container_name: Option<String>,
+    expiry: Option<Duration>,
 }
 
 impl ConfluentKafkaContainerImpl {
@@ -141,18 +184,33 @@ impl ConfluentKafkaContainerImpl {
             container: None,
             bootstrap: None,
             network,
+            container_name: None,
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
         }
     }
 }
 
 #[async_trait]
 impl KafkaImpl for ConfluentKafkaContainerImpl {
-    async fn start(&mut self, port: u16, image_name: &str, image_tag: &str, container_name: &str) {
+    fn set_expiry(&mut self, expiry: Option<Duration>) {
+        self.expiry = expiry;
+    }
+
+    async fn start(
+        &mut self,
+        port: u16,
+        image_name: &str,
+        image_tag: &str,
+        container_name: &str,
+    ) -> Result<(), String> {
         if self.container.is_some() {
-            return;
+            return Ok(());
         }
 
         // Remove any leftover container with the same name from a previous run
+        arena_container::expiry::remove_expired_containers_if_enabled(crate::MODULE, self.expiry)
+            .await;
+
         arena_container::container::try_remove_existing_container(container_name).await;
 
         const DEFAULT_CONTAINER_PORT: ContainerPort = kafka::confluent::KAFKA_PORT;
@@ -165,6 +223,10 @@ impl KafkaImpl for ConfluentKafkaContainerImpl {
             .with_mapped_port(port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)
             .with_container_name(container_name)
+            .with_labels(arena_container::expiry::expiry_labels_for(
+                crate::MODULE,
+                self.expiry,
+            ))
             .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await);
 
         if let Some(ref network) = self.network {
@@ -198,32 +260,32 @@ impl KafkaImpl for ConfluentKafkaContainerImpl {
                 );
         }
 
-        let container = request.start().await.unwrap_or_else(|e| {
-            panic!(
-                "{}",
-                arena_container::container::start_failure_message("kafka", &e)
-            )
-        });
+        let container = request
+            .start()
+            .await
+            .map_err(|e| arena_container::container::start_failure_message("kafka", &e))?;
 
         let host = container
             .get_host()
             .await
-            .expect("Failed to get host")
+            .map_err(|e| format!("kafka container host unavailable: {e}"))?
             .to_string();
 
         let port = container
             .get_host_port_ipv4(DEFAULT_CONTAINER_PORT)
             .await
-            .expect("Failed to get port")
+            .map_err(|e| format!("kafka port unavailable: {e}"))?
             .to_string();
 
         self.bootstrap = Some(format!("{host}:{port}"));
         self.container = Some(container);
+        self.container_name = Some(container_name.to_string());
 
         tracing::debug!(layer = "kafka_container", phase = "container_started");
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.container.take();
         self.bootstrap = None;
         tracing::debug!(layer = "kafka_container", phase = "container_stopped");
@@ -231,6 +293,26 @@ impl KafkaImpl for ConfluentKafkaContainerImpl {
         if let Some(ref network) = self.network {
             arena_container::network::remove_network(network).await;
         }
+        Ok(())
+    }
+
+    fn release(&mut self) {
+        self.container.take();
+        self.bootstrap = None;
+    }
+
+    async fn force_stop(&mut self) -> bool {
+        self.release();
+
+        let removed = match self.container_name.as_deref() {
+            Some(name) => arena_container::container::force_remove_container(name).await,
+            None => true,
+        };
+
+        if let Some(ref network) = self.network {
+            arena_container::network::remove_network(network).await;
+        }
+        removed
     }
 
     fn bootstrap_servers(&self) -> Option<&str> {

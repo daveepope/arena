@@ -18,13 +18,20 @@ impl PostgresImpl for FakePostgresImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
         self.conn_str = Some("postgres://127.0.0.1:5432/fake".to_string());
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.conn_str = None;
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn connection_string(&self) -> Option<&str> {
         self.conn_str.as_deref()
@@ -107,7 +114,82 @@ async fn builder_with_readiness_check_used_on_start() {
         .with_readiness_check(FakeReadinessCheck)
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
     assert_eq!(dep.connection_string(), Some("postgres://127.0.0.1:5432/fake"));
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
+}
+
+#[derive(Clone, Default)]
+struct ExpiryRecordingImpl {
+    expiry: std::sync::Arc<std::sync::Mutex<Option<Option<std::time::Duration>>>>,
+}
+
+#[async_trait]
+impl PostgresImpl for ExpiryRecordingImpl {
+    fn set_expiry(&mut self, expiry: Option<std::time::Duration>) {
+        *self.expiry.lock().unwrap() = Some(expiry);
+    }
+
+    async fn start(
+        &mut self,
+        _port: u16,
+        _database_name: &str,
+        _database_username: &str,
+        _database_password: &str,
+        _image_name: &str,
+        _image_tag: &str,
+        _container_name: &str,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
+    fn connection_string(&self) -> Option<&str> {
+        None
+    }
+}
+
+#[test]
+fn build_without_expiry_override_uses_the_default_expiry() {
+    let recorder = ExpiryRecordingImpl::default();
+    let _dep = PostgresDependency::builder("orders")
+        .with_impl(recorder.clone())
+        .build();
+
+    assert_eq!(
+        *recorder.expiry.lock().unwrap(),
+        Some(Some(arena_container::expiry::DEFAULT_EXPIRY))
+    );
+}
+
+#[test]
+fn build_with_expiry_uses_the_given_expiry() {
+    let recorder = ExpiryRecordingImpl::default();
+    let _dep = PostgresDependency::builder("orders")
+        .with_impl(recorder.clone())
+        .with_expiry(std::time::Duration::from_secs(30))
+        .build();
+
+    assert_eq!(
+        *recorder.expiry.lock().unwrap(),
+        Some(Some(std::time::Duration::from_secs(30)))
+    );
+}
+
+#[test]
+fn build_without_expiry_disables_expiry() {
+    let recorder = ExpiryRecordingImpl::default();
+    let _dep = PostgresDependency::builder("orders")
+        .with_impl(recorder.clone())
+        .without_expiry()
+        .build();
+
+    assert_eq!(*recorder.expiry.lock().unwrap(), Some(None));
 }

@@ -22,8 +22,25 @@ rust_library(
 )
 
 rust_test(
+    name = "expiry_test",
+    srcs = ["tests/unit/expiry_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_container",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
     name = "identifier_test",
-    srcs = ["tests/identifier_test.rs"],
+    srcs = ["tests/unit/identifier_test.rs"],
     size = "small",
     edition = "2021",
     deps = all_crate_deps(
@@ -40,7 +57,7 @@ rust_test(
 
 rust_test(
     name = "container_test",
-    srcs = ["tests/container_test.rs"],
+    srcs = ["tests/unit/container_test.rs"],
     size = "small",
     edition = "2021",
     deps = all_crate_deps(
@@ -57,7 +74,7 @@ rust_test(
 
 rust_test(
     name = "platform_test",
-    srcs = ["tests/platform_test.rs"],
+    srcs = ["tests/unit/platform_test.rs"],
     size = "small",
     edition = "2021",
     deps = all_crate_deps(
@@ -74,7 +91,7 @@ rust_test(
 
 rust_test(
     name = "image_test",
-    srcs = ["tests/image_test.rs"],
+    srcs = ["tests/unit/image_test.rs"],
     size = "small",
     edition = "2021",
     deps = all_crate_deps(
@@ -91,7 +108,7 @@ rust_test(
 
 rust_test(
     name = "default_images_test",
-    srcs = ["tests/default_images_test.rs"],
+    srcs = ["tests/unit/default_images_test.rs"],
     size = "small",
     edition = "2021",
     deps = [":arena_container"],
@@ -105,8 +122,8 @@ rust_test(
 )
 
 rust_test(
-    name = "network_component_test",
-    srcs = ["tests/network_component_test.rs"],
+    name = "component_test",
+    srcs = ["tests/component/component_test.rs"],
     size = "medium",
     edition = "2021",
     tags = ["component_test"],

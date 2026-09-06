@@ -1,18 +1,15 @@
-use super::component::Component;
-use super::dependency::Dependency;
+use super::component::{component_state, Component};
+use super::dependency::{dependency_state, Dependency};
 use super::dependency::RunnableDependency;
 use super::playbook::{ActivePlaybook, Playbook};
+use crate::lifecycle::{
+    panic_message, ArenaLifecycleState, ComponentState, DependencyState, Fault, LifecycleContext,
+};
 use async_trait::async_trait;
 use futures::future::join_all;
 use futures::FutureExt;
-use std::panic::{AssertUnwindSafe, resume_unwind};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::time::Instant;
-
-async fn stop_dependencies(deps: &mut [Dependency]) {
-    for dep in deps.iter_mut().rev() {
-        dep.stop().await;
-    }
-}
 
 fn find_dependency_mut<'a>(
     deps: &'a mut [Dependency],
@@ -29,16 +26,92 @@ fn find_dependency_mut<'a>(
     None
 }
 
-async fn stop_components(comps: &mut [Component]) {
-    for comp in comps.iter_mut().rev() {
-        comp.stop().await;
+async fn graceful_stop_dependency(dep: &mut Dependency) -> Option<Fault> {
+    if dep.state().is_inactive() {
+        return None;
+    }
+    match AssertUnwindSafe(dep.stop()).catch_unwind().await {
+        Ok(Ok(())) => None,
+        Ok(Err(fault)) => Some(fault),
+        Err(payload) => {
+            let message = panic_message(payload.as_ref());
+            tracing::error!(
+                dependency = %dep.identifier(),
+                panic_message = %message,
+                phase = "dependency_stop_panic",
+                "dependency panicked while stopping"
+            );
+            Some(Fault::dependency(
+                dep.identifier(),
+                format!("panicked while stopping: {message}"),
+            ))
+        }
+    }
+}
+
+async fn graceful_stop_component(comp: &mut Component) -> Option<Fault> {
+    if comp.state().is_inactive() {
+        return None;
+    }
+    match AssertUnwindSafe(comp.stop()).catch_unwind().await {
+        Ok(Ok(())) => None,
+        Ok(Err(fault)) => Some(fault),
+        Err(payload) => {
+            let message = panic_message(payload.as_ref());
+            tracing::error!(
+                component = %comp.identifier(),
+                panic_message = %message,
+                phase = "component_stop_panic",
+                "component panicked while stopping"
+            );
+            Some(Fault::component(
+                comp.identifier(),
+                format!("panicked while stopping: {message}"),
+            ))
+        }
+    }
+}
+
+async fn force_stop_dependency(dep: &mut Dependency) {
+    let outcome = AssertUnwindSafe(dep.force_stop()).catch_unwind().await;
+    if let Err(payload) = outcome {
+        tracing::error!(
+            dependency = %dep.identifier(),
+            panic_message = %panic_message(payload.as_ref()),
+            phase = "dependency_force_stop_panic",
+            "dependency panicked while being forcibly stopped"
+        );
+    }
+}
+
+async fn force_stop_component(comp: &mut Component) {
+    let outcome = AssertUnwindSafe(comp.force_stop()).catch_unwind().await;
+    if let Err(payload) = outcome {
+        tracing::error!(
+            component = %comp.identifier(),
+            panic_message = %panic_message(payload.as_ref()),
+            phase = "component_force_stop_panic",
+            "component panicked while being forcibly stopped"
+        );
     }
 }
 
 #[async_trait]
 pub trait MatchTrait: Send + Sync {
-    async fn start(&mut self);
-    async fn stop(&mut self);
+    async fn start(&mut self, ctx: &LifecycleContext) -> Result<(), Vec<Fault>>;
+    async fn stop(&mut self, ctx: &LifecycleContext) -> Result<(), Vec<Fault>>;
+
+    async fn force_stop_all(&mut self) {}
+
+    fn release_all(&mut self) {}
+
+    fn dependency_states(&self) -> Vec<DependencyState> {
+        Vec::new()
+    }
+
+    fn component_states(&self) -> Vec<ComponentState> {
+        Vec::new()
+    }
 
     fn dependency(&self, _identifier: &str) -> Option<&(dyn RunnableDependency + '_)> {
         None
@@ -48,7 +121,7 @@ pub trait MatchTrait: Send + Sync {
         None
     }
 
-    async fn run_playbook(&self, _identifier: &str) -> Option<Box<dyn ActivePlaybook>> {
+    async fn run_playbook(&self, _identifier: &str) -> Option<Result<Box<dyn ActivePlaybook>, Fault>> {
         None
     }
 }
@@ -83,27 +156,17 @@ impl Match {
         self
     }
 
-    async fn rollback_after_failed_start(&mut self) {
-        stop_components(&mut self.components).await;
-        self.active_playbooks.clear();
-        stop_dependencies(&mut self.dependencies).await;
+    fn snapshot(&self) -> (Vec<DependencyState>, Vec<ComponentState>) {
+        (self.dependency_states(), self.component_states())
     }
-}
 
-#[async_trait]
-impl MatchTrait for Match {
-    async fn start(&mut self) {
-        if self.started {
-            return;
-        }
+    fn transition(&self, ctx: &LifecycleContext, state: ArenaLifecycleState) {
+        let (dependencies, components) = self.snapshot();
+        ctx.transition(state, dependencies, components);
+    }
 
-        tracing::info!(match_name = %self.name, phase = "start_begin", "starting");
-        let sw = Instant::now();
-
+    async fn start_dependencies(&mut self) -> Vec<Fault> {
         let dep_count = self.dependencies.len();
-        let deps = std::mem::take(&mut self.dependencies);
-        let match_label = self.name.clone();
-
         if dep_count > 0 {
             tracing::info!(
                 match_name = %self.name,
@@ -112,126 +175,124 @@ impl MatchTrait for Match {
                 "starting dependencies"
             );
         }
-        let sw_deps_batch = Instant::now();
+        let sw_batch = Instant::now();
+        let match_label = self.name.clone();
+        let deps = std::mem::take(&mut self.dependencies);
+
         let outcomes = join_all(deps.into_iter().enumerate().map(|(i, mut dep)| {
             let match_label = match_label.clone();
             async move {
                 let id = dep.identifier().to_string();
                 let sw_one = Instant::now();
-                let outcome = AssertUnwindSafe(async {
-                    dep.start().await;
-                    dep
-                })
-                .catch_unwind()
-                .await;
-                (i, id, match_label, sw_one, outcome)
+                let outcome = AssertUnwindSafe(dep.start()).catch_unwind().await;
+                (i, id, match_label, sw_one, dep, outcome)
             }
         }))
         .await;
 
-        let mut dep_panics = Vec::new();
+        let mut faults = Vec::new();
         let mut started = Vec::with_capacity(dep_count);
-        for (i, id, match_label, sw_one, outcome) in outcomes {
+        for (i, id, match_label, sw_one, dep, outcome) in outcomes {
             match outcome {
-                Ok(dep) => {
-                    tracing::info!(
-                        match_name = %match_label,
-                        dependency = %id,
-                        elapsed = ?sw_one.elapsed(),
-                        phase = "dependency_start_complete",
-                        "dependency started"
-                    );
-                    started.push((i, dep));
-                }
-                Err(payload) => dep_panics.push(payload),
+                Ok(Ok(())) => tracing::info!(
+                    match_name = %match_label,
+                    dependency = %id,
+                    elapsed = ?sw_one.elapsed(),
+                    phase = "dependency_start_complete",
+                    "dependency started"
+                ),
+                Ok(Err(fault)) => faults.push(fault),
+                Err(payload) => faults.push(Fault::dependency(
+                    &id,
+                    format!("panicked while starting: {}", panic_message(payload.as_ref())),
+                )),
             }
-        }
-
-        if !dep_panics.is_empty() {
-            started.sort_by_key(|(i, _)| *i);
-            self.dependencies = started.into_iter().map(|(_, dep)| dep).collect();
-            self.rollback_after_failed_start().await;
-            resume_unwind(dep_panics.into_iter().next().unwrap());
+            started.push((i, dep));
         }
 
         started.sort_by_key(|(i, _)| *i);
         self.dependencies = started.into_iter().map(|(_, dep)| dep).collect();
 
-        if dep_count > 0 {
+        if dep_count > 0 && faults.is_empty() {
             tracing::info!(
                 match_name = %self.name,
-                elapsed = ?sw_deps_batch.elapsed(),
+                elapsed = ?sw_batch.elapsed(),
                 dependency_count = dep_count,
                 phase = "dependencies_start_end",
                 "dependencies started"
             );
         }
+        faults
+    }
 
+    async fn run_startup_playbooks(&mut self) -> Vec<Fault> {
         let startup: Vec<&dyn Playbook> = self
             .playbooks
             .iter()
             .filter_map(|(pb, exec_on_start)| exec_on_start.then(|| pb.as_ref()))
             .collect();
 
-        if !startup.is_empty() {
+        if startup.is_empty() {
+            return Vec::new();
+        }
+
+        tracing::info!(
+            match_name = %self.name,
+            playbook_count = startup.len(),
+            phase = "playbook_parallel_begin",
+            "running playbooks in parallel"
+        );
+        let sw_batch = Instant::now();
+        let deps_ref: &[Dependency] = &self.dependencies;
+        let match_label = self.name.clone();
+
+        let outcomes = join_all(startup.iter().map(|pb| {
+            let id = pb.identifier().to_string();
+            let match_label = match_label.clone();
+            async move {
+                let sw_one = Instant::now();
+                let outcome = AssertUnwindSafe(pb.run(deps_ref)).catch_unwind().await;
+                (id, match_label, sw_one, outcome)
+            }
+        }))
+        .await;
+
+        let mut faults = Vec::new();
+        let mut actives = Vec::with_capacity(outcomes.len());
+        for (id, match_label, sw_one, outcome) in outcomes {
+            match outcome {
+                Ok(Ok(active)) => {
+                    tracing::info!(
+                        match_name = %match_label,
+                        playbook = %id,
+                        elapsed = ?sw_one.elapsed(),
+                        phase = "playbook_run_complete",
+                        "playbook applied"
+                    );
+                    actives.push(active);
+                }
+                Ok(Err(fault)) => faults.push(fault),
+                Err(payload) => faults.push(Fault::playbook(
+                    &id,
+                    format!("panicked while running: {}", panic_message(payload.as_ref())),
+                )),
+            }
+        }
+
+        self.active_playbooks = actives;
+
+        if faults.is_empty() {
             tracing::info!(
                 match_name = %self.name,
-                playbook_count = startup.len(),
-                phase = "playbook_parallel_begin",
-                "running playbooks in parallel"
-            );
-            let sw_pb = Instant::now();
-            let deps_ref: &[Dependency] = &self.dependencies;
-            let match_label_for_pb = self.name.clone();
-            let outcomes = join_all((0..startup.len()).map(|idx| {
-                let pb = startup[idx];
-                let id = pb.identifier().to_string();
-                let match_label_for_pb = match_label_for_pb.clone();
-                async move {
-                    let sw_one = Instant::now();
-                    let outcome = AssertUnwindSafe(async {
-                        pb.run(deps_ref).await
-                    })
-                    .catch_unwind()
-                    .await;
-                    (id, match_label_for_pb, sw_one, outcome)
-                }
-            }))
-            .await;
-
-            let mut pb_panics = Vec::new();
-            let mut actives = Vec::with_capacity(outcomes.len());
-            for (id, match_label_for_pb, sw_one, outcome) in outcomes {
-                match outcome {
-                    Ok(active) => {
-                        tracing::info!(
-                            match_name = %match_label_for_pb,
-                            playbook = %id,
-                            elapsed = ?sw_one.elapsed(),
-                            phase = "playbook_run_complete",
-                            "playbook applied"
-                        );
-                        actives.push(active);
-                    }
-                    Err(payload) => pb_panics.push(payload),
-                }
-            }
-
-            if !pb_panics.is_empty() {
-                self.active_playbooks = actives;
-                self.rollback_after_failed_start().await;
-                resume_unwind(pb_panics.into_iter().next().unwrap());
-            }
-
-            self.active_playbooks = actives;
-            tracing::info!(
-                match_name = %self.name,
-                elapsed = ?sw_pb.elapsed(),
+                elapsed = ?sw_batch.elapsed(),
                 phase = "playbook_parallel_end",
                 "playbooks complete"
             );
         }
+        faults
+    }
 
+    async fn start_components(&mut self) -> Vec<Fault> {
         let comp_count = self.components.len();
         if comp_count > 0 {
             tracing::info!(
@@ -241,60 +302,138 @@ impl MatchTrait for Match {
                 "starting components"
             );
         }
-        let sw_comps_batch = Instant::now();
+        let sw_batch = Instant::now();
+        let match_label = self.name.clone();
         let comps = std::mem::take(&mut self.components);
+
         let outcomes = join_all(comps.into_iter().enumerate().map(|(i, mut comp)| {
             let match_label = match_label.clone();
             async move {
+                let id = comp.identifier().to_string();
                 let sw_one = Instant::now();
-                let outcome = AssertUnwindSafe(async {
-                    comp.start().await;
-                    comp
-                })
-                .catch_unwind()
-                .await;
-                (i, match_label, sw_one, outcome)
+                let outcome = AssertUnwindSafe(comp.start()).catch_unwind().await;
+                (i, id, match_label, sw_one, comp, outcome)
             }
         }))
         .await;
 
-        let mut comp_panics = Vec::new();
-        let mut started_comps = Vec::with_capacity(comp_count);
-        for (i, match_label, sw_one, outcome) in outcomes {
+        let mut faults = Vec::new();
+        let mut started = Vec::with_capacity(comp_count);
+        for (i, id, match_label, sw_one, comp, outcome) in outcomes {
             match outcome {
-                Ok(comp) => {
-                    tracing::info!(
-                        match_name = %match_label,
-                        component_index = i,
-                        elapsed = ?sw_one.elapsed(),
-                        phase = "component_start_complete",
-                        "component started"
-                    );
-                    started_comps.push((i, comp));
-                }
-                Err(payload) => comp_panics.push(payload),
+                Ok(Ok(())) => tracing::info!(
+                    match_name = %match_label,
+                    component = %id,
+                    elapsed = ?sw_one.elapsed(),
+                    phase = "component_start_complete",
+                    "component started"
+                ),
+                Ok(Err(fault)) => faults.push(fault),
+                Err(payload) => faults.push(Fault::component(
+                    &id,
+                    format!("panicked while starting: {}", panic_message(payload.as_ref())),
+                )),
             }
+            started.push((i, comp));
         }
 
-        if !comp_panics.is_empty() {
-            started_comps.sort_by_key(|(i, _)| *i);
-            self.components = started_comps.into_iter().map(|(_, comp)| comp).collect();
-            self.rollback_after_failed_start().await;
-            resume_unwind(comp_panics.into_iter().next().unwrap());
-        }
+        started.sort_by_key(|(i, _)| *i);
+        self.components = started.into_iter().map(|(_, comp)| comp).collect();
 
-        started_comps.sort_by_key(|(i, _)| *i);
-        self.components = started_comps.into_iter().map(|(_, comp)| comp).collect();
-
-        if comp_count > 0 {
+        if comp_count > 0 && faults.is_empty() {
             tracing::info!(
                 match_name = %self.name,
-                elapsed = ?sw_comps_batch.elapsed(),
+                elapsed = ?sw_batch.elapsed(),
                 component_count = comp_count,
                 phase = "components_start_end",
                 "components started"
             );
         }
+        faults
+    }
+
+    async fn graceful_teardown(&mut self, ctx: &LifecycleContext) -> Vec<Fault> {
+        let mut faults = Vec::new();
+        self.transition(ctx, ArenaLifecycleState::ComponentsStopping);
+        tracing::info!(
+            match_name = %self.name,
+            component_count = self.components.len(),
+            phase = "components_stop_begin",
+            "stopping components"
+        );
+        let sw_comps = Instant::now();
+        for comp in self.components.iter_mut().rev() {
+            if let Some(fault) = graceful_stop_component(comp).await {
+                faults.push(fault);
+            }
+        }
+        tracing::info!(
+            match_name = %self.name,
+            elapsed = ?sw_comps.elapsed(),
+            phase = "components_stop_end",
+            "components stopped"
+        );
+        self.transition(ctx, ArenaLifecycleState::ComponentsStopped);
+
+        self.active_playbooks.clear();
+
+        self.transition(ctx, ArenaLifecycleState::DependenciesStopping);
+        tracing::info!(
+            match_name = %self.name,
+            dependency_count = self.dependencies.len(),
+            phase = "dependencies_stop_begin",
+            "stopping dependencies"
+        );
+        let sw_deps = Instant::now();
+        for dep in self.dependencies.iter_mut().rev() {
+            if let Some(fault) = graceful_stop_dependency(dep).await {
+                faults.push(fault);
+            }
+        }
+        tracing::info!(
+            match_name = %self.name,
+            elapsed = ?sw_deps.elapsed(),
+            phase = "dependencies_stop_end",
+            "dependencies stopped"
+        );
+        self.transition(ctx, ArenaLifecycleState::DependenciesStopped);
+        faults
+    }
+}
+
+#[async_trait]
+impl MatchTrait for Match {
+    async fn start(&mut self, ctx: &LifecycleContext) -> Result<(), Vec<Fault>> {
+        if self.started {
+            return Ok(());
+        }
+
+        tracing::info!(match_name = %self.name, phase = "start_begin", "starting");
+        let sw = Instant::now();
+
+        self.transition(ctx, ArenaLifecycleState::DependenciesStarting);
+        let mut faults = self.start_dependencies().await;
+        if !faults.is_empty() {
+            faults.extend(self.graceful_teardown(ctx).await);
+            return Err(faults);
+        }
+        self.transition(ctx, ArenaLifecycleState::DependenciesStarted);
+
+        self.transition(ctx, ArenaLifecycleState::PlaybooksRunning);
+        let mut faults = self.run_startup_playbooks().await;
+        if !faults.is_empty() {
+            faults.extend(self.graceful_teardown(ctx).await);
+            return Err(faults);
+        }
+        self.transition(ctx, ArenaLifecycleState::PlaybooksComplete);
+
+        self.transition(ctx, ArenaLifecycleState::ComponentsStarting);
+        let mut faults = self.start_components().await;
+        if !faults.is_empty() {
+            faults.extend(self.graceful_teardown(ctx).await);
+            return Err(faults);
+        }
+        self.transition(ctx, ArenaLifecycleState::ComponentsStarted);
 
         tracing::info!(
             match_name = %self.name,
@@ -303,105 +442,14 @@ impl MatchTrait for Match {
             "started"
         );
         self.started = true;
+        Ok(())
     }
 
-    async fn stop(&mut self) {
-        if !self.started {
-            self.rollback_after_failed_start().await;
-            return;
-        }
-
+    async fn stop(&mut self, ctx: &LifecycleContext) -> Result<(), Vec<Fault>> {
         tracing::info!(match_name = %self.name, phase = "stop_begin", "stopping");
         let sw = Instant::now();
 
-        let comp_count = self.components.len();
-        let match_label = self.name.clone();
-        if comp_count > 0 {
-            tracing::info!(
-                match_name = %self.name,
-                component_count = comp_count,
-                phase = "components_stop_begin",
-                "stopping components"
-            );
-        }
-        let sw_comps_batch = Instant::now();
-        let comps = std::mem::take(&mut self.components);
-
-        let mut stopped_comps = join_all(comps.into_iter().enumerate().map(|(i, mut comp)| {
-            let match_label = match_label.clone();
-            async move {
-                let sw_one = Instant::now();
-                comp.stop().await;
-                tracing::info!(
-                    match_name = %match_label,
-                    component_index = i,
-                    elapsed = ?sw_one.elapsed(),
-                    phase = "component_stop_complete",
-                    "component stopped"
-                );
-                (i, comp)
-            }
-        }))
-        .await;
-
-        stopped_comps.sort_by_key(|(i, _)| *i);
-        self.components = stopped_comps.into_iter().map(|(_, comp)| comp).collect();
-
-        if comp_count > 0 {
-            tracing::info!(
-                match_name = %self.name,
-                elapsed = ?sw_comps_batch.elapsed(),
-                component_count = comp_count,
-                phase = "components_stop_end",
-                "components stopped"
-            );
-        }
-
-        self.active_playbooks.clear();
-
-        let dep_count = self.dependencies.len();
-        let deps = std::mem::take(&mut self.dependencies);
-
-        if dep_count > 0 {
-            tracing::info!(
-                match_name = %self.name,
-                dependency_count = dep_count,
-                phase = "dependencies_stop_begin",
-                "stopping dependencies"
-            );
-        }
-        let sw_deps_batch = Instant::now();
-
-        let mut stopped = join_all(deps.into_iter().enumerate().map(|(i, mut dep)| {
-            let match_label = match_label.clone();
-            async move {
-                let id = dep.identifier().to_string();
-                let sw_one = Instant::now();
-                dep.stop().await;
-                tracing::info!(
-                    match_name = %match_label,
-                    dependency = %id,
-                    elapsed = ?sw_one.elapsed(),
-                    phase = "dependency_stop_complete",
-                    "dependency stopped"
-                );
-                (i, dep)
-            }
-        }))
-        .await;
-
-        stopped.sort_by_key(|(i, _)| *i);
-        self.dependencies = stopped.into_iter().map(|(_, dep)| dep).collect();
-
-        if dep_count > 0 {
-            tracing::info!(
-                match_name = %self.name,
-                elapsed = ?sw_deps_batch.elapsed(),
-                dependency_count = dep_count,
-                phase = "dependencies_stop_end",
-                "dependencies stopped"
-            );
-        }
+        let faults = self.graceful_teardown(ctx).await;
 
         tracing::info!(
             match_name = %self.name,
@@ -410,6 +458,45 @@ impl MatchTrait for Match {
             "stopped"
         );
         self.started = false;
+
+        if faults.is_empty() {
+            Ok(())
+        } else {
+            Err(faults)
+        }
+    }
+
+    async fn force_stop_all(&mut self) {
+        for comp in self.components.iter_mut().rev() {
+            force_stop_component(comp).await;
+        }
+        for dep in self.dependencies.iter_mut().rev() {
+            force_stop_dependency(dep).await;
+        }
+    }
+
+    fn release_all(&mut self) {
+        for comp in self.components.iter_mut().rev() {
+            let _ = catch_unwind(AssertUnwindSafe(|| comp.release()));
+        }
+        let _ = catch_unwind(AssertUnwindSafe(|| self.active_playbooks.clear()));
+        for dep in self.dependencies.iter_mut().rev() {
+            let _ = catch_unwind(AssertUnwindSafe(|| dep.release()));
+        }
+    }
+
+    fn dependency_states(&self) -> Vec<DependencyState> {
+        self.dependencies
+            .iter()
+            .map(|d| dependency_state(d.as_ref()))
+            .collect()
+    }
+
+    fn component_states(&self) -> Vec<ComponentState> {
+        self.components
+            .iter()
+            .map(|c| component_state(c.as_ref()))
+            .collect()
     }
 
     fn dependency(&self, identifier: &str) -> Option<&(dyn RunnableDependency + '_)> {
@@ -420,7 +507,7 @@ impl MatchTrait for Match {
         find_dependency_mut(&mut self.dependencies, identifier)
     }
 
-    async fn run_playbook(&self, identifier: &str) -> Option<Box<dyn ActivePlaybook>> {
+    async fn run_playbook(&self, identifier: &str) -> Option<Result<Box<dyn ActivePlaybook>, Fault>> {
         let pb = self
             .playbooks
             .iter()

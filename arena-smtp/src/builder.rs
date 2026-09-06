@@ -1,3 +1,4 @@
+use std::time::Duration;
 use crate::smtp_dependency::container_impl::SmtpContainerImpl;
 use crate::smtp_dependency::{SmtpDependency, SmtpImpl, SmtpTlsMode};
 use arena::dependency::RunnableDependency;
@@ -5,6 +6,7 @@ use arena::healthcheck::ReadinessCheck;
 
 pub struct SmtpDependencyBuilder {
     identifier: String,
+    expiry: Option<Duration>,
     smtp_impl: Option<Box<dyn SmtpImpl>>,
     port: Option<u16>,
     ui_port: Option<u16>,
@@ -24,6 +26,7 @@ impl SmtpDependencyBuilder {
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {
             identifier: identifier.into(),
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
             smtp_impl: None,
             port: None,
             ui_port: None,
@@ -109,10 +112,21 @@ impl SmtpDependencyBuilder {
         self.with_image_tag(image_tag)
     }
 
+    pub fn with_expiry(mut self, expiry: Duration) -> Self {
+        self.expiry = Some(expiry);
+        self
+    }
+
+    pub fn without_expiry(mut self) -> Self {
+        self.expiry = None;
+        self
+    }
+
     pub fn build(self) -> SmtpDependency {
-        let smtp_impl = self
+        let mut smtp_impl = self
             .smtp_impl
             .unwrap_or_else(|| Box::new(SmtpContainerImpl::new(self.network)));
+        smtp_impl.set_expiry(self.expiry);
 
         let port = self.port.unwrap_or(Self::DEFAULT_PORT);
         let ui_port = self.ui_port.unwrap_or(Self::DEFAULT_UI_PORT);
@@ -124,7 +138,7 @@ impl SmtpDependencyBuilder {
             .unwrap_or_else(|| arena_container::default_images::SMTP.tag.to_string());
 
         let mut dep = SmtpDependency::new(
-            arena_container::identifier::build("arena-smtp", &self.identifier),
+            arena_container::identifier::build(crate::MODULE, &self.identifier),
             smtp_impl,
             port,
             ui_port,

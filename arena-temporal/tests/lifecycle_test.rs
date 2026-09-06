@@ -1,3 +1,4 @@
+use arena::lifecycle::{Fault, RunnableState};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_temporal::{TemporalDependency, TemporalImpl};
@@ -28,17 +29,24 @@ impl TemporalImpl for FakeTemporalImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
         self.grpc_endpoint = Some("127.0.0.1:7233".to_string());
         self.ui_url = Some("http://127.0.0.1:8233".to_string());
         self.events.lock().unwrap().push(Event::TemporalStart);
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.grpc_endpoint = None;
         self.ui_url = None;
         self.events.lock().unwrap().push(Event::TemporalStop);
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn grpc_endpoint(&self) -> Option<&str> {
         self.grpc_endpoint.as_deref()
@@ -86,9 +94,9 @@ async fn hard_reset_running_dep_restarts_impl_and_rechecks_readiness() {
     let calls = Arc::new(Mutex::new(0u32));
     let mut dep = build_temporal(events.clone(), calls.clone());
 
-    dep.start().await;
-    dep.hard_reset().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.hard_reset().await.expect("hard reset should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     assert_eq!(
         events.lock().unwrap().as_slice(),
@@ -103,7 +111,7 @@ async fn hard_reset_not_running_dep_is_noop() {
     let calls = Arc::new(Mutex::new(0u32));
     let mut dep = build_temporal(events.clone(), calls.clone());
 
-    dep.hard_reset().await;
+    dep.hard_reset().await.expect("hard reset should succeed");
 
     assert!(events.lock().unwrap().is_empty());
     assert_eq!(*calls.lock().unwrap(), 0);
@@ -115,9 +123,9 @@ async fn soft_reset_running_dep_does_not_restart_impl() {
     let calls = Arc::new(Mutex::new(0u32));
     let mut dep = build_temporal(events.clone(), calls.clone());
 
-    dep.start().await;
-    dep.soft_reset().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.soft_reset().await.expect("soft reset should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     assert_eq!(
         events.lock().unwrap().as_slice(),
@@ -131,7 +139,7 @@ async fn soft_reset_not_running_dep_is_noop() {
     let calls = Arc::new(Mutex::new(0u32));
     let dep = build_temporal(events.clone(), calls.clone());
 
-    dep.soft_reset().await;
+    dep.soft_reset().await.expect("soft reset should succeed");
 
     assert!(events.lock().unwrap().is_empty());
 }
@@ -161,18 +169,35 @@ async fn add_child_before_start_starts_and_stops_child() {
         fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
             self
         }
+    fn state(&self) -> RunnableState {
+        RunnableState::NotStarted
+    }
 
-        async fn start(&mut self) {
+    fn faults(&self) -> &[Fault] {
+        &[]
+    }
+
+    async fn force_stop(&mut self) {}
+    fn release(&mut self) {}
+
+
+        async fn start(&mut self) -> Result<(), Fault> {
             self.events.lock().unwrap().push(ChildEvent::Start);
+            Ok(())
         }
 
-        async fn stop(&mut self) {
+        async fn stop(&mut self) -> Result<(), Fault> {
             self.events.lock().unwrap().push(ChildEvent::Stop);
+            Ok(())
         }
 
-        async fn soft_reset(&self) {}
+        async fn soft_reset(&self) -> Result<(), Fault> {
+            Ok(())
+        }
 
-        async fn hard_reset(&mut self) {}
+        async fn hard_reset(&mut self) -> Result<(), Fault> {
+            Ok(())
+        }
 
         fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
     fn children(&self) -> &[Dependency] {
@@ -192,8 +217,8 @@ async fn add_child_before_start_starts_and_stops_child() {
         events: child_events.clone(),
     }));
 
-    dep.start().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     assert_eq!(
         child_events.lock().unwrap().as_slice(),
@@ -210,12 +235,12 @@ async fn grpc_endpoint_and_ui_url_absent_before_start_present_after() {
     assert_eq!(dep.grpc_endpoint(), None);
     assert_eq!(dep.ui_url(), None);
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
 
     assert_eq!(dep.grpc_endpoint(), Some("127.0.0.1:7233"));
     assert_eq!(dep.ui_url(), Some("http://127.0.0.1:8233"));
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }
 
 async fn spawn_real_grpc_health_server() -> SocketAddr {
@@ -246,10 +271,18 @@ impl TemporalImpl for RealAddrTemporalImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
+        Ok(())
     }
 
-    async fn stop(&mut self) {}
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn grpc_endpoint(&self) -> Option<&str> {
         Some(&self.grpc_endpoint)
@@ -270,8 +303,8 @@ async fn start_against_real_grpc_health_server_passes_default_readiness_check() 
         })
         .build();
 
-    dep.start().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.stop().await.expect("stop should succeed");
 }
 
 #[tokio::test]
@@ -281,7 +314,7 @@ async fn stop_without_start_on_real_default_impl_does_not_panic() {
     assert_eq!(dep.grpc_endpoint(), None);
     assert_eq!(dep.ui_url(), None);
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 
     assert_eq!(dep.grpc_endpoint(), None);
     assert_eq!(dep.ui_url(), None);

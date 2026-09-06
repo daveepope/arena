@@ -83,7 +83,8 @@ pub extern "C" fn arena_match_playbook_run(
             arena
                 .run_playbook(&id_str)
                 .await
-                .ok_or_else(|| format!("playbook '{id_str}' is not registered on any match"))
+                .ok_or_else(|| format!("playbook '{id_str}' is not registered on any match"))?
+                .map_err(|fault| fault.to_string())
         })?;
 
         Ok(ActivePlaybookInner {

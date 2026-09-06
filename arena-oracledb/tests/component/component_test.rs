@@ -46,16 +46,24 @@ async fn lifecycle_scenario(oracle: &OracleDependency) {
         .execute(&format!(
             "CREATE TABLE {table} (id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, v NUMBER NOT NULL);"
         ))
-        .await;
+        .await
+        .expect("execute should succeed");
 
-    oracle.execute(&format!("INSERT INTO {table} (v) VALUES (123);")).await;
+    oracle
+        .execute(&format!("INSERT INTO {table} (v) VALUES (123);"))
+        .await
+        .expect("execute should succeed");
 
     let count = oracle
         .query_scalar(&format!("SELECT COUNT(*) FROM {table};"))
-        .await;
+        .await
+        .expect("query should succeed");
     assert!(count >= 1, "expected count >= 1, got {count}");
 
-    oracle.execute(&format!("DROP TABLE {table};")).await;
+    oracle
+        .execute(&format!("DROP TABLE {table};"))
+        .await
+        .expect("execute should succeed");
 
     tracing::info!(
         suite = "crate_component",
@@ -77,13 +85,16 @@ async fn playbook_scenario(oracle: &OracleDependency) {
 
     oracle
         .execute("INSERT INTO widgets (name) VALUES ('alpha');")
-        .await;
+        .await
+        .expect("execute should succeed");
     oracle
         .execute("INSERT INTO widgets (name) VALUES ('beta');")
-        .await;
+        .await
+        .expect("execute should succeed");
     oracle
         .execute("INSERT INTO widgets (name) VALUES ('gamma');")
-        .await;
+        .await
+        .expect("execute should succeed");
 
     let playbook = oracle.playbook().run().await;
 
@@ -92,10 +103,12 @@ async fn playbook_scenario(oracle: &OracleDependency) {
 
     oracle
         .execute("INSERT INTO widgets (name) VALUES ('delta');")
-        .await;
+        .await
+        .expect("execute should succeed");
     oracle
         .execute("INSERT INTO widgets (name) VALUES ('epsilon');")
-        .await;
+        .await
+        .expect("execute should succeed");
 
     let playbook = oracle.playbook().run().await;
     let count = playbook.verify("SELECT COUNT(*) FROM widgets;").await;
@@ -131,7 +144,7 @@ async fn oracle_dependency_component_test() {
         ])
         .build();
 
-    oracle.start().await;
+    oracle.start().await.expect("oracle should start");
 
     lifecycle_scenario(&oracle).await;
     playbook_scenario(&oracle).await;

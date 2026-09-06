@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using ArenaDotnet.Xunit.Ffi;
 using ArenaDotnet.Xunit.Playbook;
 
@@ -13,7 +14,7 @@ public sealed class OpenArena : IDisposable
     private readonly Dictionary<Type, ActivePlaybook> _sessionPlaybooks;
     private readonly Dictionary<Type, Playbook.IPlaybook> _registeredPlaybooks;
     private readonly Dictionary<Type, bool> _playbookExecOnStart;
-    private bool _disposed;
+    private int _disposed;
 
     internal OpenArena(IntPtr handle, ulong logToken, Match match, Dictionary<Type, ActivePlaybook> sessionPlaybooks)
     {
@@ -28,6 +29,7 @@ public sealed class OpenArena : IDisposable
             _registeredPlaybooks[reg.Playbook.GetType()] = reg.Playbook;
             _playbookExecOnStart[reg.Playbook.GetType()] = reg.ExecOnDependencyStart;
         }
+        ArenaShutdown.Track(this);
     }
 
     internal IntPtr Handle => _handle.DangerousGetHandle();
@@ -82,9 +84,9 @@ public sealed class OpenArena : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
-        _disposed = true;
+        ArenaShutdown.Untrack(this);
 
         List<Exception>? errors = null;
         foreach (var pb in _sessionPlaybooks.Values)
@@ -118,7 +120,7 @@ public sealed class OpenArena : IDisposable
 
     internal void ThrowIfDisposed()
     {
-        if (_disposed)
+        if (Volatile.Read(ref _disposed) != 0)
             throw new ObjectDisposedException(nameof(OpenArena));
     }
 }

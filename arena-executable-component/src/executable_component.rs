@@ -1,6 +1,8 @@
 use crate::builder::ExecutableComponentBuilder;
 use arena::component::RunnableComponent;
+use arena::component::Component;
 use arena::healthcheck::ReadinessCheck;
+use arena::lifecycle::{Fault, RunnableState};
 use async_trait::async_trait;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -16,6 +18,8 @@ pub struct ExecutableComponent {
     pub(crate) process_handle: Option<Child>,
     pub(crate) stopped: bool,
     pub(crate) readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
+    pub(crate) state: RunnableState,
+    pub(crate) faults: Vec<Fault>,
 }
 
 impl ExecutableComponent {
@@ -29,6 +33,8 @@ impl ExecutableComponent {
             process_handle: None,
             stopped: false,
             readiness_checks: Vec::new(),
+            state: RunnableState::NotStarted,
+            faults: Vec::new(),
         }
     }
 
@@ -36,9 +42,9 @@ impl ExecutableComponent {
         ExecutableComponentBuilder::new(identifier)
     }
 
-    async fn wait_until_ready(&self) {
+    async fn wait_until_ready(&self) -> Result<(), String> {
         if self.readiness_checks.is_empty() {
-            return;
+            return Ok(());
         }
 
         for (check, target, check_timeout_ms) in &self.readiness_checks {
@@ -53,10 +59,9 @@ impl ExecutableComponent {
                     );
                 }
                 Err(msg) => {
-                    panic!(
-                        "{}: readiness check failed for target {}: {}",
-                        self.identifier, target, msg
-                    );
+                    return Err(format!(
+                        "readiness check failed for target {target}: {msg}"
+                    ));
                 }
             }
         }
@@ -64,6 +69,27 @@ impl ExecutableComponent {
             component = %self.identifier,
             "all readiness checks passed",
         );
+        Ok(())
+    }
+
+    async fn fail(&mut self, message: impl Into<String>, causes: Vec<Fault>) -> Fault {
+        let fault = Fault::component(&self.identifier, message).caused_by_all(causes);
+        self.faults.push(fault.clone());
+        <Self as RunnableComponent>::force_stop(self).await;
+        fault
+    }
+
+    fn terminate_process(&mut self) {
+        if let Some(mut child) = self.process_handle.take() {
+            tracing::debug!(
+                component = %self.identifier,
+                pid = child.id(),
+                phase = "terminate_begin",
+                "terminating child process",
+            );
+            let _ = child.kill();
+            let _ = child.wait();
+        }
     }
 
     fn log_line(identifier: &str, line: &str) {
@@ -144,9 +170,29 @@ impl ExecutableComponent {
 
 #[async_trait]
 impl RunnableComponent for ExecutableComponent {
-    async fn start(&mut self) {
+    fn identifier(&self) -> &str {
+        &self.identifier
+    }
+
+    fn state(&self) -> RunnableState {
+        self.state
+    }
+
+    fn faults(&self) -> &[Fault] {
+        &self.faults
+    }
+
+    async fn start(&mut self) -> Result<(), Fault> {
+        self.state = RunnableState::Starting;
+
+        let mut child_faults = Vec::new();
         for child in self.children.iter_mut().flatten() {
-            child.start().await;
+            if let Err(fault) = child.start().await {
+                child_faults.push(fault);
+            }
+        }
+        if !child_faults.is_empty() {
+            return Err(self.fail("child component failed to start", child_faults).await);
         }
 
         tracing::debug!(
@@ -157,23 +203,29 @@ impl RunnableComponent for ExecutableComponent {
 
         if self.executable_path.is_some() {
             if let Err(e) = self.spawn_process() {
-                panic!("{}: spawn failed: {}", self.identifier, e);
+                return Err(self.fail(format!("spawn failed: {e}"), Vec::new()).await);
             }
         }
 
-        self.wait_until_ready().await;
+        self.state = RunnableState::ReadinessCheck;
+        if let Err(message) = self.wait_until_ready().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
 
+        self.state = RunnableState::Started;
         tracing::debug!(
             component = %self.identifier,
             phase = "start_done",
             "started",
         );
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), Fault> {
         if self.stopped {
-            return;
+            return Ok(());
         }
+        self.state = RunnableState::Stopping;
 
         tracing::debug!(
             component = %self.identifier,
@@ -181,16 +233,7 @@ impl RunnableComponent for ExecutableComponent {
             "stopping",
         );
 
-        if let Some(mut child) = self.process_handle.take() {
-            tracing::debug!(
-                component = %self.identifier,
-                pid = child.id(),
-                phase = "kill_begin",
-                "killing child process",
-            );
-            let _ = child.kill();
-            let _ = child.wait();
-        }
+        self.terminate_process();
 
         tracing::debug!(
             component = %self.identifier,
@@ -198,14 +241,56 @@ impl RunnableComponent for ExecutableComponent {
             "stopped",
         );
 
+        let mut causes = Vec::new();
         for child in self.children.iter_mut().flatten().rev() {
-            child.stop().await;
+            if let Err(fault) = child.stop().await {
+                causes.push(fault);
+            }
         }
 
         self.stopped = true;
+
+        if !causes.is_empty() {
+            let fault =
+                Fault::component(&self.identifier, "stop did not complete").caused_by_all(causes);
+            self.faults.push(fault.clone());
+            self.state = RunnableState::Faulted;
+            return Err(fault);
+        }
+
+        self.state = RunnableState::Stopped;
+        Ok(())
+    }
+
+    fn release(&mut self) {
+        self.terminate_process();
+        self.stopped = true;
+        for child in self.children.iter_mut().flatten().rev() {
+            child.release();
+        }
+        self.state = RunnableState::Stopped;
+    }
+
+    async fn force_stop(&mut self) {
+        self.terminate_process();
+        self.stopped = true;
+
+        for child in self.children.iter_mut().flatten().rev() {
+            child.force_stop().await;
+        }
+
+        self.state = RunnableState::Stopped;
     }
 
     fn add_child(&mut self, child: Box<dyn RunnableComponent>) {
         self.children.get_or_insert_with(Vec::new).push(child);
+    }
+
+    fn children(&self) -> &[Component] {
+        self.children.as_deref().unwrap_or(&[])
+    }
+
+    fn children_mut(&mut self) -> &mut [Component] {
+        self.children.as_deref_mut().unwrap_or(&mut [])
     }
 }

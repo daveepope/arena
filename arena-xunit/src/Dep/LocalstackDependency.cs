@@ -127,6 +127,7 @@ public sealed class LocalstackDependency : IArenaDependency
 {
     public string Type => "localstack";
     public string Identifier { get; }
+    public long? ExpirySeconds { get; internal set; }
     public int Port { get; }
     public string EndpointUrl { get; }
 
@@ -231,6 +232,7 @@ public sealed class LocalstackDependency : IArenaDependency
 
 public sealed class LocalstackDependencyBuilder
 {
+    private long? _expirySeconds;
     private readonly string _name;
     private int _port = 4566;
     private readonly List<string> _services = new();
@@ -324,6 +326,18 @@ public sealed class LocalstackDependencyBuilder
         return this;
     }
 
+    public LocalstackDependencyBuilder WithExpiry(System.TimeSpan expiry)
+    {
+        _expirySeconds = ExpirySeconds(expiry);
+        return this;
+    }
+
+    public LocalstackDependencyBuilder WithoutExpiry()
+    {
+        _expirySeconds = 0;
+        return this;
+    }
+
     public LocalstackDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-localstack", _name);
@@ -362,7 +376,7 @@ public sealed class LocalstackDependencyBuilder
             eventBuses.Add(new LocalstackEventBusConfig { Name = name });
         }
 
-        return new LocalstackDependency(
+        var built = new LocalstackDependency(
             identifier,
             _port,
             new List<string>(_services),
@@ -374,5 +388,16 @@ public sealed class LocalstackDependencyBuilder
             _imageTag,
             _containerName,
             _children);
+        built.ExpirySeconds = _expirySeconds;
+        return built;
     }
+
+    private static long ExpirySeconds(System.TimeSpan expiry)
+    {
+        if (expiry < System.TimeSpan.Zero)
+            throw new System.ArgumentOutOfRangeException(nameof(expiry), "expiry must not be negative");
+        var seconds = (long)expiry.TotalSeconds;
+        return seconds == 0 && expiry > System.TimeSpan.Zero ? 1 : seconds;
+    }
+
 }

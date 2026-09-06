@@ -1,3 +1,4 @@
+use arena::lifecycle::{Fault, RunnableState};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_oracledb::{OracleDependency, OracleImpl};
@@ -18,10 +19,18 @@ impl OracleImpl for FakeOracleImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
+        Ok(())
     }
 
-    async fn stop(&self) {}
+    async fn stop(&self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&self) -> bool {
+        true
+    }
+    fn release(&self) {}
+
 
     fn connection_string(&self) -> Option<String> {
         None
@@ -62,9 +71,24 @@ impl RunnableDependency for NoopChildDependency {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+    fn state(&self) -> RunnableState {
+        RunnableState::NotStarted
+    }
 
-    async fn start(&mut self) {}
-    async fn stop(&mut self) {}
+    fn faults(&self) -> &[Fault] {
+        &[]
+    }
+
+    async fn force_stop(&mut self) {}
+    fn release(&mut self) {}
+
+
+    async fn start(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
+    async fn stop(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
 
@@ -76,8 +100,12 @@ impl RunnableDependency for NoopChildDependency {
         &mut []
     }
 
-    async fn soft_reset(&self) {}
-    async fn hard_reset(&mut self) {}
+    async fn soft_reset(&self) -> Result<(), Fault> {
+        Ok(())
+    }
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 }
 
 #[test]
@@ -193,4 +221,94 @@ fn with_child_dependencies_are_accepted() {
 #[test]
 fn with_port_is_accepted() {
     let _dep = OracleDependency::builder("custom-port").with_port(15210).build();
+}
+
+#[derive(Clone, Default)]
+struct ExpiryRecordingOracleImpl {
+    expiry: std::sync::Arc<std::sync::Mutex<Option<Option<std::time::Duration>>>>,
+}
+
+#[async_trait]
+impl OracleImpl for ExpiryRecordingOracleImpl {
+    fn set_expiry(&self, expiry: Option<std::time::Duration>) {
+        *self.expiry.lock().unwrap() = Some(expiry);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn start(
+        &self,
+        _port: u16,
+        _database_name: &str,
+        _database_username: &str,
+        _database_password: &str,
+        _admin_password: &str,
+        _image_name: &str,
+        _image_tag: &str,
+        _container_name: &str,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
+    async fn stop(&self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&self) -> bool {
+        true
+    }
+    fn release(&self) {}
+
+    fn connection_string(&self) -> Option<String> {
+        None
+    }
+
+    fn host_address(&self) -> Option<String> {
+        None
+    }
+
+    async fn run_sqlplus(
+        &self,
+        _username: &str,
+        _password: &str,
+        _script: &str,
+    ) -> Result<String, String> {
+        Ok(String::new())
+    }
+}
+
+#[test]
+fn build_no_expiry_override_uses_default_expiry() {
+    let recorder = ExpiryRecordingOracleImpl::default();
+    let _dep = OracleDependency::builder("orders")
+        .with_impl(recorder.clone())
+        .build();
+
+    assert_eq!(
+        *recorder.expiry.lock().unwrap(),
+        Some(Some(arena_container::expiry::DEFAULT_EXPIRY))
+    );
+}
+
+#[test]
+fn build_with_expiry_uses_given_expiry() {
+    let recorder = ExpiryRecordingOracleImpl::default();
+    let _dep = OracleDependency::builder("orders")
+        .with_impl(recorder.clone())
+        .with_expiry(std::time::Duration::from_secs(30))
+        .build();
+
+    assert_eq!(
+        *recorder.expiry.lock().unwrap(),
+        Some(Some(std::time::Duration::from_secs(30)))
+    );
+}
+
+#[test]
+fn build_without_expiry_disables_expiry() {
+    let recorder = ExpiryRecordingOracleImpl::default();
+    let _dep = OracleDependency::builder("orders")
+        .with_impl(recorder.clone())
+        .without_expiry()
+        .build();
+
+    assert_eq!(*recorder.expiry.lock().unwrap(), Some(None));
 }

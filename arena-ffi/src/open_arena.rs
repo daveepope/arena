@@ -14,7 +14,14 @@ pub extern "C" fn arena_close(handle: *mut OpenArenaHandle) {
         runtime_state.runtime.block_on(async {
             let arena = runtime_state.state.lock().await.take();
             if let Some(arena) = arena {
-                arena.close().await;
+                if let Err(state) = arena.close().await {
+                    tracing::error!(
+                        target: "arena::ffi",
+                        arena_state = %state,
+                        phase = "arena_close_faulted",
+                        "arena close faulted"
+                    );
+                }
             } else {
                 tracing::warn!(
                     target: "arena::ffi",

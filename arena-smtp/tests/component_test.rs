@@ -31,7 +31,7 @@ impl TestContext {
             .catch_unwind()
             .await;
         if let Err(panic_payload) = start_outcome {
-            smtp.stop().await;
+            smtp.stop().await.expect("stop should succeed");
             std::panic::resume_unwind(panic_payload);
         }
 
@@ -52,7 +52,7 @@ impl TestContext {
     }
 
     async fn stop(mut self) {
-        self.smtp.stop().await;
+        self.smtp.stop().await.expect("stop should succeed");
     }
 }
 
@@ -198,7 +198,7 @@ async fn smtp_dependency_with_starttls_advertises_starttls_component_test() {
         .catch_unwind()
         .await;
     if let Err(panic_payload) = start_outcome {
-        smtp.stop().await;
+        smtp.stop().await.expect("stop should succeed");
         std::panic::resume_unwind(panic_payload);
     }
 
@@ -220,7 +220,8 @@ async fn smtp_dependency_with_starttls_advertises_starttls_component_test() {
 
     tokio::time::timeout(Duration::from_secs(10), smtp.stop())
         .await
-        .unwrap_or_else(|_| panic!("smtp stop timed out"));
+        .unwrap_or_else(|_| panic!("smtp stop timed out"))
+        .expect("smtp should stop");
 
     match outcome {
         Ok(Ok(())) => {}
@@ -247,7 +248,8 @@ async fn smtp_dependency_with_implicit_tls_becomes_ready_component_test() {
 
     tokio::time::timeout(Duration::from_secs(10), smtp.stop())
         .await
-        .unwrap_or_else(|_| panic!("smtp stop timed out"));
+        .unwrap_or_else(|_| panic!("smtp stop timed out"))
+        .expect("smtp should stop");
 
     if let Err(panic_payload) = start_outcome {
         std::panic::resume_unwind(panic_payload);

@@ -42,11 +42,21 @@ fn reset_dependency(runtime_state: &OpenArenaRuntimeState, identifier: &str, kin
             Some(d) => d,
             None => return ArenaStatus::NotFound,
         };
-        match kind {
+        let outcome = match kind {
             ResetKind::Soft => dep.soft_reset().await,
             ResetKind::Hard => dep.hard_reset().await,
+        };
+        match outcome {
+            Ok(()) => ArenaStatus::Ok,
+            Err(fault) => {
+                tracing::error!(
+                    error = %fault,
+                    op = "arena_reset",
+                    "dependency reset failed"
+                );
+                ArenaStatus::Failed
+            }
         }
-        ArenaStatus::Ok
     })
 }
 

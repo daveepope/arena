@@ -9,6 +9,7 @@ public sealed class OracleDependency : IArenaDependency
 {
     public string Type => "oracledb";
     public string Identifier { get; }
+    public long? ExpirySeconds { get; internal set; }
     public int Port { get; }
     public string? DatabaseName { get; }
     public string? DatabaseUsername { get; }
@@ -62,6 +63,7 @@ public sealed class OracleDependency : IArenaDependency
 
 public sealed class OracleDependencyBuilder
 {
+    private long? _expirySeconds;
     private readonly string _name;
     private int _port = 1521;
     private string? _databaseName;
@@ -153,9 +155,32 @@ public sealed class OracleDependencyBuilder
         return this;
     }
 
+    public OracleDependencyBuilder WithExpiry(System.TimeSpan expiry)
+    {
+        _expirySeconds = ExpirySeconds(expiry);
+        return this;
+    }
+
+    public OracleDependencyBuilder WithoutExpiry()
+    {
+        _expirySeconds = 0;
+        return this;
+    }
+
     public OracleDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-oracle", _name);
-        return new OracleDependency(identifier, _port, _databaseName, _databaseUsername, _databasePassword, _adminPassword, _imageName, _image, _containerName, _startupSqlScripts, _setupMode, _sqlReadinessTimeoutMs, _children);
+        var built = new OracleDependency(identifier, _port, _databaseName, _databaseUsername, _databasePassword, _adminPassword, _imageName, _image, _containerName, _startupSqlScripts, _setupMode, _sqlReadinessTimeoutMs, _children);
+        built.ExpirySeconds = _expirySeconds;
+        return built;
     }
+
+    private static long ExpirySeconds(System.TimeSpan expiry)
+    {
+        if (expiry < System.TimeSpan.Zero)
+            throw new System.ArgumentOutOfRangeException(nameof(expiry), "expiry must not be negative");
+        var seconds = (long)expiry.TotalSeconds;
+        return seconds == 0 && expiry > System.TimeSpan.Zero ? 1 : seconds;
+    }
+
 }

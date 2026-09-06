@@ -26,15 +26,22 @@ impl PostgresImpl for FakePostgresImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
         self.conn_str = Some("postgres://127.0.0.1:5432/fake".to_string());
         self.events.lock().unwrap().push(Event::PostgresStart);
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.conn_str = None;
         self.events.lock().unwrap().push(Event::PostgresStop);
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn connection_string(&self) -> Option<&str> {
         self.conn_str.as_deref()
@@ -70,7 +77,7 @@ async fn soft_reset_not_running_returns_early() {
     let events = Arc::new(Mutex::new(Vec::<Event>::new()));
     let dep = build_dep(events.clone());
 
-    dep.soft_reset().await;
+    dep.soft_reset().await.expect("soft reset should succeed");
 
     assert!(events.lock().unwrap().is_empty());
 }
@@ -79,11 +86,11 @@ async fn soft_reset_not_running_returns_early() {
 async fn soft_reset_running_no_scripts_returns_early() {
     let events = Arc::new(Mutex::new(Vec::<Event>::new()));
     let mut dep = build_dep(events.clone());
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
 
-    dep.soft_reset().await;
+    dep.soft_reset().await.expect("soft reset should succeed");
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }
 
 #[tokio::test]
@@ -91,7 +98,7 @@ async fn hard_reset_not_running_returns_early() {
     let events = Arc::new(Mutex::new(Vec::<Event>::new()));
     let mut dep = build_dep(events.clone());
 
-    dep.hard_reset().await;
+    dep.hard_reset().await.expect("hard reset should succeed");
 
     assert!(events.lock().unwrap().is_empty());
 }
@@ -100,9 +107,9 @@ async fn hard_reset_not_running_returns_early() {
 async fn hard_reset_running_restarts_container() {
     let events = Arc::new(Mutex::new(Vec::<Event>::new()));
     let mut dep = build_dep(events.clone());
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
 
-    dep.hard_reset().await;
+    dep.hard_reset().await.expect("hard reset should succeed");
 
     let got = events.lock().unwrap().clone();
     assert_eq!(
@@ -114,16 +121,16 @@ async fn hard_reset_running_restarts_container() {
         ]
     );
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }
 
 #[tokio::test]
 async fn drop_needs_teardown_without_running_invokes_stop() {
     let events = Arc::new(Mutex::new(Vec::<Event>::new()));
     let mut dep = build_dep(events.clone());
-    dep.start().await;
-    dep.hard_reset().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.hard_reset().await.expect("hard reset should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     drop(dep);
 

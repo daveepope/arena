@@ -32,7 +32,7 @@ fn open_arena_with_oauth(identifier: &str) -> *mut arena_ffi::OpenArenaHandle {
 
 #[test]
 fn arena_oauth_sign_claims_running_dependency_returns_verifiable_token() {
-    let identifier = "oauth-sign-claims-ffitst";
+    let identifier = "arena-oauth-sign-claims-ffitst";
     let arena_handle = open_arena_with_oauth(identifier);
 
     let identifier_c = CString::new(identifier).unwrap();
@@ -59,7 +59,7 @@ fn arena_oauth_sign_claims_running_dependency_returns_verifiable_token() {
 
 #[test]
 fn arena_oauth_sign_claims_unregistered_provider_returns_error() {
-    let identifier = "oauth-sign-claims-badprv";
+    let identifier = "arena-oauth-sign-claims-badprv";
     let arena_handle = open_arena_with_oauth(identifier);
 
     let identifier_c = CString::new(identifier).unwrap();

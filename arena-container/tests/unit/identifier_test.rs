@@ -68,3 +68,61 @@ fn resolve_container_name_derives_from_identifier_when_override_missing() {
         "hello-world"
     );
 }
+
+#[test]
+fn build_six_character_name_appends_suffix() {
+    for name in ["oracle", "broker", "server", "kafka1"] {
+        let id = build("arena-oracledb", name);
+        assert!(
+            id.starts_with(&format!("arena-oracledb-{name}-")),
+            "expected {name} to be prefixed and suffixed, got {id}"
+        );
+        assert_eq!(id.rsplit('-').next().unwrap().len(), SUFFIX_LEN);
+    }
+}
+
+#[test]
+fn build_six_character_name_twice_produces_different_identifiers() {
+    let a = build("arena-oracledb", "oracle");
+    let b = build("arena-oracledb", "oracle");
+    assert_ne!(a, b);
+}
+
+#[test]
+fn build_identifier_built_by_a_client_module_is_preserved() {
+    for client_built in [
+        "arena-oracle-example-api-oracle-a1b2c3",
+        "arena-container-web-app-9zzzz0",
+        "arena-exec-worker-0a1b2c",
+    ] {
+        assert_eq!(build("arena-oracledb", client_built), client_built);
+    }
+}
+
+#[test]
+fn build_every_module_with_colliding_name_produces_unique_identifiers() {
+    const MODULES: [&str; 11] = [
+        "arena-http",
+        "arena-kafka",
+        "arena-localstack",
+        "arena-mssql",
+        "arena-oauth",
+        "arena-oracledb",
+        "arena-postgres",
+        "arena-smtp",
+        "arena-temporal",
+        "arena-containerized-component",
+        "arena-executable-component",
+    ];
+
+    for module in MODULES {
+        let first = build(module, "oracle");
+        let second = build(module, "oracle");
+        assert!(
+            first.starts_with(&format!("{module}-oracle-")),
+            "expected {module} to prefix and suffix a six character name, got {first}"
+        );
+        assert_ne!(first, second, "{module} reused an identifier");
+        assert_eq!(build(module, &first), first, "{module} is not idempotent");
+    }
+}
