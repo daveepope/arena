@@ -193,3 +193,13 @@ fn build_with_issuer_path_and_no_jwks_path_scopes_default_jwks_path_to_issuer() 
         Some("/tenant-b/.well-known/jwks.json")
     );
 }
+
+#[test]
+fn build_with_server_tls_pem_exposes_that_certificate() {
+    let pair = arena_oauth::localhost_self_signed_pem_pair().expect("certificate pair");
+    let dep = OauthDependency::builder("oauth-custom-tls")
+        .with_server_tls_pem(pair.0.clone(), pair.1)
+        .build();
+
+    assert_eq!(dep.server_tls_certificate_pem(), Some(pair.0.as_str()));
+}

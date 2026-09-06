@@ -13,6 +13,10 @@
 [![Dependency Vulnerability Scan](https://github.com/daveepope/arena/actions/workflows/dependency-review.yml/badge.svg?branch=master)](https://github.com/daveepope/arena/actions/workflows/dependency-review.yml)
 [![Supply Chain Protection](https://img.shields.io/github/actions/workflow/status/daveepope/arena/build-test-publish-arena.yml?branch=master&label=Supply%20Chain%20Protection%20(%3C3d))](https://github.com/daveepope/arena/actions/workflows/build-test-publish-arena.yml)
 [![Best Effort Default Container CVE Search](https://github.com/daveepope/arena/actions/workflows/container-cves.yml/badge.svg?branch=master)](https://github.com/daveepope/arena/actions/workflows/container-cves.yml)
+[![Cargo Audit](https://github.com/daveepope/arena/actions/workflows/cargo-audit.yml/badge.svg?branch=master)](https://github.com/daveepope/arena/actions/workflows/cargo-audit.yml)
+[![Cargo Vet](https://img.shields.io/github/actions/workflow/status/daveepope/arena/build-test-publish-arena.yml?branch=master&label=Cargo%20Vet)](https://github.com/daveepope/arena/actions/workflows/build-test-publish-arena.yml)
+
+Cargo Audit: checks Rust crates against RustSec advisories. Cargo Vet: checks that every crate compiled into `arena_ffi_shared` carries a trusted audit.
 
 Client packages (API surface is the same across clients):
 

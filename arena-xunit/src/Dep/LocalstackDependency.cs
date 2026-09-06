@@ -187,6 +187,7 @@ public sealed class LocalstackDependency : IArenaDependency
             Type = Type,
             Identifier = Identifier,
             Port = Port,
+            ExpirySeconds = ExpirySeconds,
         };
 
         if (_services.Count > 0) config.Services = _services;
@@ -218,6 +219,7 @@ public sealed class LocalstackDependency : IArenaDependency
         [JsonProperty("type")] public string Type { get; set; } = default!;
         [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
         [JsonProperty("port")] public int Port { get; set; }
+        [JsonProperty("expiry_seconds")] public long? ExpirySeconds { get; set; }
         [JsonProperty("services")] public List<string>? Services { get; set; }
         [JsonProperty("queues")] public List<LocalstackQueueConfig>? Queues { get; set; }
         [JsonProperty("lambdas")] public List<LocalstackLambdaConfig>? Lambdas { get; set; }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using Xunit;
@@ -16,19 +17,41 @@ public class ArenaShutdownTest
             .GetField("Open", BindingFlags.NonPublic | BindingFlags.Static)!
             .GetValue(null)!;
 
-    private static int TrackedCount() =>
-        (int)OpenList.GetType().GetProperty("Count")!.GetValue(OpenList)!;
+    private static object ShutdownGate =>
+        ShutdownType.GetField("Gate", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
+
+    private static List<OpenArena> LiveArenas()
+    {
+        var live = new List<OpenArena>();
+        foreach (var entry in (System.Collections.IList)OpenList)
+        {
+            if (entry is WeakReference<OpenArena> reference && reference.TryGetTarget(out var arena))
+                live.Add(arena);
+        }
+        return live;
+    }
 
     [Fact]
     public void Untrack_ArenaNeverTracked_LeavesRegistryUnchanged()
     {
-        var before = TrackedCount();
+        var gate = ShutdownGate;
 
-        ShutdownType
-            .GetMethod("Untrack", BindingFlags.NonPublic | BindingFlags.Static)!
-            .Invoke(null, new object?[] { null });
+        Monitor.Enter(gate);
+        try
+        {
+            var before = LiveArenas();
 
-        Assert.Equal(before, TrackedCount());
+            ShutdownType
+                .GetMethod("Untrack", BindingFlags.NonPublic | BindingFlags.Static)!
+                .Invoke(null, new object?[] { null });
+
+            Assert.Equal(before.Count, LiveArenas().Count);
+            GC.KeepAlive(before);
+        }
+        finally
+        {
+            Monitor.Exit(gate);
+        }
     }
 
     [Fact]
@@ -50,7 +73,7 @@ public class ArenaShutdownTest
     public void CloseAll_EmptyRegistry_DoesNotThrow()
     {
         var closeAll = ShutdownType.GetMethod("CloseAll", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var gate = ShutdownType.GetField("Gate", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
+        var gate = ShutdownGate;
         var list = (System.Collections.IList)OpenList;
 
         Monitor.Enter(gate);
