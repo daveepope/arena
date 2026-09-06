@@ -574,9 +574,9 @@ impl tracing::field::Visit for SpanIdentity {
 impl SpanIdentity {
     fn assign(&mut self, name: &str, value: String) {
         match name {
-            "subject_kind" => self.kind = Some(value),
-            "subject_id" => self.id = Some(value),
-            "arena_id" => self.arena_id = Some(value),
+            "arena.subject.kind" => self.kind = Some(value),
+            "arena.subject.id" => self.id = Some(value),
+            "arena.id" => self.arena_id = Some(value),
             _ => {}
         }
     }

@@ -1,5 +1,4 @@
 use std::os::raw::c_char;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use arena::{ClosedArena, OpenArena};
 use tokio::runtime::Runtime;
@@ -11,6 +10,7 @@ use crate::error::{clear_error, write_error};
 use crate::logging::init_logging;
 use crate::panic_payload::panic_message;
 use crate::strings::c_str_to_string;
+use crate::boundary::call_across_boundary;
 
 #[repr(C)]
 pub struct OpenArenaHandle {
@@ -63,25 +63,25 @@ pub extern "C" fn arena_open(
             return std::ptr::null_mut();
         }
     };
-    let parsed = match catch_unwind(AssertUnwindSafe(|| unsafe { parse_config(config) })) {
+    let parsed = match call_across_boundary(|| unsafe { parse_config(config) }) {
         Ok(Ok(c)) => c,
         Ok(Err(e)) => {
             unsafe { write_error(err_out, format!("arena_open: {e}")) };
             return std::ptr::null_mut();
         }
         Err(payload) => {
-            let msg = panic_message(&payload);
+            let msg = panic_message(payload.as_ref());
             unsafe { write_error(err_out, format!("arena_open failed: {msg}")) };
             return std::ptr::null_mut();
         }
     };
 
-    let outcome = catch_unwind(AssertUnwindSafe(|| -> Result<OpenArenaRuntimeState, String> {
+    let outcome = call_across_boundary(|| -> Result<OpenArenaRuntimeState, String> {
         let runtime = tokio::runtime::Runtime::new()
             .map_err(|e| format!("failed to create tokio runtime: {e}"))?;
         let arena = runtime.block_on(open_arena_from_config(name_str, parsed))?;
         Ok(OpenArenaRuntimeState::new(runtime, arena))
-    }));
+    });
 
     match outcome {
         Ok(Ok(runtime_state)) => runtime_state.into_raw(),
@@ -95,7 +95,7 @@ pub extern "C" fn arena_open(
             std::ptr::null_mut()
         }
         Err(payload) => {
-            let msg = panic_message(&payload);
+            let msg = panic_message(payload.as_ref());
             tracing::error!(
                 panic_message = %msg,
                 op = "arena_open",

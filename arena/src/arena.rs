@@ -168,7 +168,7 @@ impl ClosedArena {
     }
 
     pub async fn open(self) -> Result<OpenArena, ArenaState> {
-        let span = tracing::info_span!("arena", arena_id = %self.id);
+        let span = tracing::info_span!("arena", arena.id = %self.id);
         self.open_within_span().instrument(span).await
     }
 
@@ -294,6 +294,14 @@ impl OpenArena {
         &self,
         identifier: &str,
     ) -> Option<Result<Box<dyn crate::playbook::ActivePlaybook>, Fault>> {
+        let span = tracing::info_span!("arena", arena.id = %self.id);
+        self.run_playbook_within_span(identifier).instrument(span).await
+    }
+
+    async fn run_playbook_within_span(
+        &self,
+        identifier: &str,
+    ) -> Option<Result<Box<dyn crate::playbook::ActivePlaybook>, Fault>> {
         for m in &self.matches {
             if let Some(active) = m.run_playbook(identifier).await {
                 return Some(active);
@@ -303,7 +311,7 @@ impl OpenArena {
     }
 
     pub async fn close(self) -> Result<ClosedArena, ArenaState> {
-        let span = tracing::info_span!("arena", arena_id = %self.id);
+        let span = tracing::info_span!("arena", arena.id = %self.id);
         self.close_within_span().instrument(span).await
     }
 
@@ -386,7 +394,7 @@ impl Drop for OpenArena {
             return;
         }
         self.closed = true;
-        let span = tracing::info_span!("arena", arena_id = %self.id);
+        let span = tracing::info_span!("arena", arena.id = %self.id);
         let _entered = span.enter();
         tracing::warn!(
             arena = %self.id,

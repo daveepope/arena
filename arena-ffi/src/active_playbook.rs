@@ -1,11 +1,11 @@
 use std::os::raw::c_char;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::closed_arena::OpenArenaRuntimeState;
 use crate::error::{clear_error, write_error};
 use crate::panic_payload::panic_message;
 use crate::strings::c_str_to_string;
 use crate::{ArenaStatus, OpenArenaHandle};
+use crate::boundary::call_across_boundary;
 
 #[repr(C)]
 pub struct ArenaActivePlaybookHandle {
@@ -71,7 +71,7 @@ pub extern "C" fn arena_match_playbook_run(
         }
     };
 
-    let outcome = catch_unwind(AssertUnwindSafe(|| -> Result<ActivePlaybookInner, String> {
+    let outcome = call_across_boundary(|| -> Result<ActivePlaybookInner, String> {
         let arena_runtime = unsafe { OpenArenaRuntimeState::as_ref(arena_handle) };
         let runtime_handle = arena_runtime.runtime.handle().clone();
 
@@ -91,7 +91,7 @@ pub extern "C" fn arena_match_playbook_run(
             runtime_handle,
             active: Some(active),
         })
-    }));
+    });
 
     match outcome {
         Ok(Ok(inner)) => inner.into_raw(),
@@ -101,7 +101,7 @@ pub extern "C" fn arena_match_playbook_run(
             std::ptr::null_mut()
         }
         Err(payload) => {
-            let msg = panic_message(&payload);
+            let msg = panic_message(payload.as_ref());
             tracing::error!(
                 panic_message = %msg,
                 op = "match_playbook_run",
@@ -122,13 +122,13 @@ pub extern "C" fn arena_active_playbook_drop(
     if handle.is_null() {
         return ArenaStatus::Ok;
     }
-    let outcome = catch_unwind(AssertUnwindSafe(|| {
+    let outcome = call_across_boundary(|| {
         let _dropped = unsafe { ActivePlaybookInner::from_raw(handle) };
-    }));
+    });
     match outcome {
         Ok(()) => ArenaStatus::Ok,
         Err(payload) => {
-            let msg = panic_message(&payload);
+            let msg = panic_message(payload.as_ref());
             tracing::error!(error = %msg, op = "active_playbook_drop", "playbook drop failed");
             unsafe { write_error(err_out, format!("arena_active_playbook_drop: {msg}")) };
             ArenaStatus::Failed

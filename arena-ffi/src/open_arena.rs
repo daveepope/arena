@@ -1,15 +1,15 @@
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::closed_arena::{OpenArenaHandle, OpenArenaRuntimeState};
 use crate::logging;
 use crate::panic_payload::panic_message;
+use crate::boundary::call_across_boundary;
 
 #[no_mangle]
 pub extern "C" fn arena_close(handle: *mut OpenArenaHandle) {
     if handle.is_null() {
         return;
     }
-    let outcome = catch_unwind(AssertUnwindSafe(|| {
+    let outcome = call_across_boundary(|| {
         let runtime_state = unsafe { OpenArenaRuntimeState::from_raw(handle) };
         runtime_state.runtime.block_on(async {
             let arena = runtime_state.state.lock().await.take();
@@ -30,11 +30,11 @@ pub extern "C" fn arena_close(handle: *mut OpenArenaHandle) {
                 );
             }
         });
-    }));
+    });
     logging::dispatcher_allowlists_reset();
     if let Err(payload) = outcome {
         tracing::error!(
-            panic_message = %panic_message(&payload),
+            panic_message = %panic_message(payload.as_ref()),
             op = "arena_close",
             "panic while closing arena"
         );

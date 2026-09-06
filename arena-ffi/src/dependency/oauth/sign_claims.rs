@@ -1,6 +1,5 @@
 use std::ffi::CString;
 use std::os::raw::c_char;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use arena_oauth::{OauthDependency, Provider};
 
@@ -9,6 +8,7 @@ use crate::error::{clear_error, write_error};
 use crate::panic_payload::panic_message;
 use crate::strings::c_str_to_string;
 use crate::OpenArenaHandle;
+use crate::boundary::call_across_boundary;
 
 fn with_oauth_dependency<F, R>(
     runtime_state: &OpenArenaRuntimeState,
@@ -126,10 +126,10 @@ pub extern "C" fn arena_oauth_sign_claims(
         }
     };
 
-    let outcome = catch_unwind(AssertUnwindSafe(|| {
+    let outcome = call_across_boundary(|| {
         let runtime_state = unsafe { OpenArenaRuntimeState::as_ref(handle) };
         sign_claims(runtime_state, &identifier, &provider_str, &claims_str)
-    }));
+    });
 
     match outcome {
         Ok(Ok(jwt)) => match CString::new(jwt) {
@@ -144,7 +144,7 @@ pub extern "C" fn arena_oauth_sign_claims(
             std::ptr::null_mut()
         }
         Err(payload) => {
-            let msg = panic_message(&payload);
+            let msg = panic_message(payload.as_ref());
             tracing::error!(
                 panic_message = %msg,
                 op = "arena_oauth_sign_claims",

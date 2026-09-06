@@ -14,6 +14,7 @@ public sealed class ClosedArena
     private readonly Match _match;
     private readonly ArenaLogLevel _logLevel;
     private readonly ILogger? _logger;
+    private readonly ILoggerFactory? _loggerFactory;
     private readonly List<string>? _logDependencyIds;
     private readonly List<string>? _logComponentIds;
 
@@ -32,13 +33,25 @@ public sealed class ClosedArena
     {
     }
 
+    public ClosedArena(string name, Match match, ArenaLogLevel logLevel, ILoggerFactory? loggerFactory)
+        : this(name, match, logLevel, null, loggerFactory, null, null)
+    {
+    }
+
     public ClosedArena(string name, Match match, ArenaLogLevel logLevel, ILogger? logger,
         List<string>? logDependencyIds, List<string>? logComponentIds)
+        : this(name, match, logLevel, logger, null, logDependencyIds, logComponentIds)
+    {
+    }
+
+    public ClosedArena(string name, Match match, ArenaLogLevel logLevel, ILogger? logger,
+        ILoggerFactory? loggerFactory, List<string>? logDependencyIds, List<string>? logComponentIds)
     {
         _name = name;
         _match = match;
         _logLevel = logLevel;
         _logger = logger;
+        _loggerFactory = loggerFactory;
         _logDependencyIds = logDependencyIds;
         _logComponentIds = logComponentIds;
     }
@@ -53,9 +66,9 @@ public sealed class ClosedArena
             _logComponentIds != null && _logComponentIds.Count > 0
                 ? ArenaJson.Serialize(_logComponentIds) : null);
 
-        ulong logToken = _logger != null
-            ? ArenaLogTarget.RegisterForLogger(_logger)
-            : ArenaLogTarget.RegisterForLogger(CreateDefaultLogger());
+        ulong logToken = _loggerFactory != null
+            ? ArenaLogTarget.RegisterForLoggerFactory(_loggerFactory)
+            : ArenaLogTarget.RegisterForLogger(_logger ?? CreateDefaultLogger());
 
         ArenaShutdown.EnsureHooksRegistered();
 

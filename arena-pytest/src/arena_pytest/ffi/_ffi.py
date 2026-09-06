@@ -6,7 +6,7 @@ import os
 import sys
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 class ArenaLogLevel(IntEnum):
     ERROR = 1
@@ -111,9 +111,20 @@ def _flush_handlers_for_logger(lg: logging.Logger) -> None:
         lg = lg.parent
 
 
+_ARENA_ROOT_LOGGER_NAME = "arena"
+
+
+def _logger_for_record_target(lib, target_ptr) -> logging.Logger:
+    addr = _ffi_ptr_addr(target_ptr)
+    name = _utf8_zterm_at(addr) if addr else ""
+    if not name:
+        return _dispatcher_default_logger(lib)
+    return logging.getLogger(name)
+
+
 def _default_dispatcher_logging_target_invoke(
     level: int,
-    _target_ptr,
+    target_ptr,
     ignored_ts_ns: int,
     message_ptr,
     caller_file_ptr,
@@ -127,7 +138,7 @@ def _default_dispatcher_logging_target_invoke(
             return
         publish = int(lib.arena_dispatcher_default_logging_target_publish_level(int(level)))
         publish_py = _arena_dispatcher_logging_target_publish_level_for_python_logging(publish)
-        lg = _dispatcher_default_logger(lib)
+        lg = _logger_for_record_target(lib, target_ptr)
         msg_addr = _ffi_ptr_addr(message_ptr)
         text = _utf8_zterm_at(msg_addr)
         cf_addr = _ffi_ptr_addr(caller_file_ptr)
@@ -141,21 +152,45 @@ _custom_dispatcher_logging_targets: dict[int, "_UserDispatcherLoggerBridge"] = {
 
 
 class _UserDispatcherLoggerBridge:
-    __slots__ = ("_ffi_lib", "_logger", "_saved_logger_level", "_closure")
+    __slots__ = (
+        "_ffi_lib",
+        "_logger",
+        "_logger_factory",
+        "_loggers_by_name",
+        "_saved_logger_level",
+        "_closure",
+    )
 
     def __init__(
-        self, ffi: ArenaNativeLib, lg: logging.Logger, arena_log_level: ArenaLogLevel
+        self,
+        ffi: ArenaNativeLib,
+        lg: Optional[logging.Logger],
+        arena_log_level: ArenaLogLevel,
+        logger_factory: Optional[Callable[[str], logging.Logger]] = None,
     ):
         self._ffi_lib = ffi.lib
         self._logger = lg
-        self._saved_logger_level = lg.level
-        _install_dispatcher_direct_stderr_emitter(lg, arena_log_level)
+        self._logger_factory = logger_factory
+        self._loggers_by_name: dict[str, logging.Logger] = {}
+        self._saved_logger_level = lg.level if lg is not None else None
+        if lg is not None:
+            _install_dispatcher_direct_stderr_emitter(lg, arena_log_level)
         self._closure = _ARENA_LOG_TARGET_CALLBACK_ABI(self._invoke)
+
+    def _logger_for(self, logger_name: str) -> logging.Logger:
+        if self._logger_factory is None:
+            return self._logger
+        name = logger_name or _ARENA_ROOT_LOGGER_NAME
+        cached = self._loggers_by_name.get(name)
+        if cached is None:
+            cached = self._logger_factory(name)
+            self._loggers_by_name[name] = cached
+        return cached
 
     def _invoke(
         self,
         level: int,
-        _target_ptr,
+        target_ptr,
         _ignored_ts_ns: int,
         message_ptr,
         caller_file_ptr,
@@ -170,11 +205,16 @@ class _UserDispatcherLoggerBridge:
             publish_py = _arena_dispatcher_logging_target_publish_level_for_python_logging(
                 publish
             )
+            target_addr = _ffi_ptr_addr(target_ptr)
+            logger_name = _utf8_zterm_at(target_addr) if target_addr else ""
+            lg = self._logger_for(logger_name)
             msg_addr = _ffi_ptr_addr(message_ptr)
             text = _utf8_zterm_at(msg_addr)
             cf_addr = _ffi_ptr_addr(caller_file_ptr)
             text = _dispatcher_log_append_caller_suffix(text, cf_addr, int(caller_line))
-            self._logger.log(publish_py, "%s", text)
+            if self._logger_factory is None and logger_name:
+                text = f"{logger_name}  {text}"
+            lg.log(publish_py, "%s", text)
         finally:
             _ARENA_PY_GIL_RELEASE(gil_state)
 
@@ -182,6 +222,8 @@ class _UserDispatcherLoggerBridge:
         return self._closure
 
     def restore_logger_configuration(self) -> None:
+        if self._logger is None:
+            return
         _remove_dispatcher_direct_stderr_emitter(self._logger)
         self._logger.setLevel(self._saved_logger_level)
 
@@ -212,7 +254,7 @@ def _dispatcher_default_logger(lib) -> logging.Logger:
     name = (
         _utf8_zterm_at(nm_addr)
         if nm_addr
-        else "arena.rust.dispatcher"
+        else "arena"
     )
     return logging.getLogger(name)
 
@@ -273,6 +315,26 @@ def register_dispatcher_logging_target_for_logger(
     if logger is None:
         raise TypeError("logger must not be None")
     bridge = _UserDispatcherLoggerBridge(ffi, logger, arena_log_level)
+    return _open_custom_dispatcher_logging_target(ffi, bridge)
+
+
+def register_dispatcher_logging_target_for_logger_factory(
+    ffi: ArenaNativeLib,
+    logger_factory: Callable[[str], logging.Logger],
+    *,
+    arena_log_level: ArenaLogLevel = ArenaLogLevel.INFO,
+) -> int:
+    if logger_factory is None:
+        raise TypeError("logger_factory must not be None")
+    bridge = _UserDispatcherLoggerBridge(
+        ffi, None, arena_log_level, logger_factory=logger_factory
+    )
+    return _open_custom_dispatcher_logging_target(ffi, bridge)
+
+
+def _open_custom_dispatcher_logging_target(
+    ffi: ArenaNativeLib, bridge: "_UserDispatcherLoggerBridge"
+) -> int:
     token = int(ffi.lib.arena_add_log_target(bridge.ffi_callback(), ctypes.c_void_p()))
     if token == 0:
         bridge.restore_logger_configuration()
@@ -442,7 +504,7 @@ def load_ffi() -> Optional[ArenaNativeLib]:
     lib.arena_find_available_port.restype = ctypes.c_int
 
     lib.arena_set_log_level.argtypes = [ctypes.c_int]
-    lib.arena_set_log_level.restype = None
+    lib.arena_set_log_level.restype = ctypes.c_int
 
     lib.arena_free_string.argtypes = [ctypes.c_void_p]
 

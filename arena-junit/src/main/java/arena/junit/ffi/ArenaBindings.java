@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.ILoggerFactory;
 import org.slf4j.Logger;
 
 public final class ArenaBindings {
@@ -103,6 +104,18 @@ public final class ArenaBindings {
       SLF4J_DISPATCHER_STDERR_PUBLICATIONS.put(token, publication);
     }
     return token;
+  }
+
+  public static long registerSlf4jDispatcherLoggingTarget(ILoggerFactory loggerFactory) {
+    return registerSlf4jDispatcherLoggingTarget(loggerFactory, ArenaLogLevel.INFO);
+  }
+
+  public static long registerSlf4jDispatcherLoggingTarget(
+      ILoggerFactory loggerFactory, ArenaLogLevel arenaLogLevel) {
+    ArenaSlf4jLogbackAlign.alignSlf4jLoggerWithArenaLogLevel(
+        loggerFactory.getLogger(ArenaSlf4jLoggingTarget.ROOT_LOGGER_NAME), arenaLogLevel);
+    return registerDispatcherLoggingTarget(
+        new ArenaSlf4jLoggingTarget(loggerFactory), Pointer.NULL);
   }
 
   public static long registerDispatcherLoggingTarget(

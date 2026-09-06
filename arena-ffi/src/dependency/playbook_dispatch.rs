@@ -1,5 +1,4 @@
 use std::os::raw::c_char;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use async_trait::async_trait;
 use serde::Deserialize;
@@ -8,6 +7,7 @@ use crate::active_playbook::{ActivePlaybookInner, ArenaActivePlaybookHandle};
 use crate::error::write_error;
 use crate::panic_payload::panic_message;
 use crate::ArenaStatus;
+use crate::boundary::call_across_boundary;
 
 #[async_trait]
 pub(crate) trait PlaybookQueryVerify: Send + Sync {
@@ -54,7 +54,7 @@ where
         }
     };
 
-    let parsed: VerifySpec = match catch_unwind(AssertUnwindSafe(|| serde_json::from_str(&spec_str)))
+    let parsed: VerifySpec = match call_across_boundary(|| serde_json::from_str(&spec_str))
     {
         Ok(Ok(v)) => v,
         Ok(Err(e)) => {
@@ -62,14 +62,14 @@ where
             return ArenaStatus::InvalidArgument;
         }
         Err(payload) => {
-            let msg = panic_message(&payload);
+            let msg = panic_message(payload.as_ref());
             unsafe { write_error(err_out, format!("{fn_name} failed: {msg}")) };
             return ArenaStatus::Failed;
         }
     };
     let _ = parsed.dependency_identifier;
 
-    let outcome = catch_unwind(AssertUnwindSafe(|| -> Result<(), String> {
+    let outcome = call_across_boundary(|| -> Result<(), String> {
         let inner = unsafe { ActivePlaybookInner::as_ref(handle) };
         let active = inner
             .active
@@ -92,7 +92,7 @@ where
             ));
         }
         Ok(())
-    }));
+    });
 
     match outcome {
         Ok(Ok(())) => ArenaStatus::Ok,
@@ -101,7 +101,7 @@ where
             ArenaStatus::Failed
         }
         Err(payload) => {
-            let msg = panic_message(&payload);
+            let msg = panic_message(payload.as_ref());
             tracing::error!(error = %msg, op = fn_name, "playbook verify failed");
             unsafe { write_error(err_out, format!("{fn_name}: {msg}")) };
             ArenaStatus::Failed

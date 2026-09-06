@@ -107,6 +107,18 @@ name = "ffi_logging_test"
 path = "tests/unit/logging/logging_ffi_callbacks.rs"
 
 [[test]]
+name = "ffi_logging_mod_test"
+path = "tests/unit/logging/logging_test.rs"
+
+[[test]]
+name = "ffi_shared_tracing_test"
+path = "tests/unit/logging/shared_tracing_test.rs"
+
+[[test]]
+name = "ffi_boundary_test"
+path = "tests/unit/boundary_test.rs"
+
+[[test]]
 name = "ffi_temporal_dependency_test"
 path = "tests/unit/dependency/temporal/temporal_dependency_test.rs"
 

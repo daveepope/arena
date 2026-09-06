@@ -1,5 +1,6 @@
 pub mod dependency;
 
+pub mod boundary;
 mod active_playbook;
 mod closed_arena;
 mod dependency_reset;

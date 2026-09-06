@@ -3,6 +3,7 @@ from arena_pytest.ffi._ffi import (
     ArenaLogLevel,
     ArenaNativeLib,
     register_dispatcher_logging_target_for_logger,
+    register_dispatcher_logging_target_for_logger_factory,
     unregister_dispatcher_logging_target,
 )
 from arena_pytest.arena import (
@@ -118,6 +119,7 @@ __all__ = [
     "find_available_port",
     "ClosedArena",
     "register_dispatcher_logging_target_for_logger",
+    "register_dispatcher_logging_target_for_logger_factory",
     "unregister_dispatcher_logging_target",
     "ContainerizedComponent",
     "ContainerizedComponentBuilder",

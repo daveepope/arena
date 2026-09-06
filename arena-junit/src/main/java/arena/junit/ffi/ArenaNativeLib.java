@@ -7,7 +7,7 @@ import com.sun.jna.ptr.PointerByReference;
 import java.util.Map;
 
 interface ArenaNativeLib extends Library {
-  void arena_set_log_level(int level);
+  int arena_set_log_level(int level);
 
   Pointer arena_open(String name, String configJson, PointerByReference errOut);
 

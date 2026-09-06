@@ -15,15 +15,15 @@ use std::time::Instant;
 use tracing::Instrument;
 
 pub(crate) fn dependency_span(id: &str) -> tracing::Span {
-    tracing::info_span!("subject", subject_kind = "dependency", subject_id = %id)
+    tracing::info_span!("subject", arena.subject.kind = "dependency", arena.subject.id = %id)
 }
 
 pub(crate) fn component_span(id: &str) -> tracing::Span {
-    tracing::info_span!("subject", subject_kind = "component", subject_id = %id)
+    tracing::info_span!("subject", arena.subject.kind = "component", arena.subject.id = %id)
 }
 
 pub(crate) fn playbook_span(id: &str) -> tracing::Span {
-    tracing::info_span!("subject", subject_kind = "playbook", subject_id = %id)
+    tracing::info_span!("subject", arena.subject.kind = "playbook", arena.subject.id = %id)
 }
 
 fn find_dependency_mut<'a>(
