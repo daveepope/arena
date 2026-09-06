@@ -1,6 +1,8 @@
+use serde::Serialize;
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ArenaLifecycleState {
     ArenaCreated,
     ArenaStarting,
@@ -55,7 +57,8 @@ impl fmt::Display for ArenaLifecycleState {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RunnableState {
     NotStarted,
     Starting,

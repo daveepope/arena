@@ -1,6 +1,8 @@
 mod healthcheck;
 pub mod postgres_container_impl;
 
+use arena::lifecycle::message;
+use arena::lifecycle::Subject;
 use crate::blocking::run_blocking;
 use crate::builder::PostgresDependencyBuilder;
 use crate::playbook::Playbook;
@@ -134,7 +136,7 @@ impl PostgresDependency {
         self.readiness_check
             .is_ready(&self.identifier, conn_str, READINESS_TIMEOUT.as_millis() as u64)
             .await
-            .map_err(|err| format!("readiness check failed: {err}"))
+            .map_err(message::readiness_failed)
     }
 
     async fn run_startup_sql_scripts_blocking(&self, scripts: Vec<String>) -> Result<(), String> {
@@ -199,7 +201,7 @@ impl RunnableDependency for PostgresDependency {
                     }
                 }
                 if !child_faults.is_empty() {
-                    return Err(self.fail("child dependency failed to start", child_faults).await);
+                    return Err(self.fail(message::child_start_failed(Subject::Dependency), child_faults).await);
                 }
             }
         }
@@ -294,7 +296,7 @@ impl RunnableDependency for PostgresDependency {
 
         if !causes.is_empty() {
             let fault =
-                Fault::dependency(&self.identifier, "stop did not complete").caused_by_all(causes);
+                Fault::dependency(&self.identifier, message::stop_did_not_complete()).caused_by_all(causes);
             self.faults.push(fault.clone());
             self.state = RunnableState::Faulted;
             return Err(fault);
@@ -337,7 +339,7 @@ impl RunnableDependency for PostgresDependency {
 
         let unconfirmed = Fault::dependency(
             &self.identifier,
-            "forced teardown could not confirm the container was removed",
+            message::forced_teardown_unconfirmed(),
         );
         if !self
             .faults

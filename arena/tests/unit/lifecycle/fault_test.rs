@@ -90,3 +90,78 @@ fn panic_message_unknown_payload_returns_placeholder() {
 
     assert_eq!(panic_message(payload.as_ref()), "unknown panic payload");
 }
+
+#[test]
+fn from_panic_string_payload_returns_fault_carrying_the_panic_text() {
+    let payload: Box<dyn std::any::Any + Send> = Box::new("boom".to_string());
+
+    let fault = Fault::from_panic("orders-postgres", Subject::Dependency, payload.as_ref());
+
+    assert_eq!(fault.id, "orders-postgres");
+    assert_eq!(fault.subject, Subject::Dependency);
+    assert_eq!(fault.message, "boom");
+    assert!(fault.faults.is_empty());
+}
+
+#[test]
+fn from_panic_unknown_payload_returns_fault_with_placeholder_message() {
+    let payload: Box<dyn std::any::Any + Send> = Box::new(7u8);
+
+    let fault = Fault::from_panic("api", Subject::Component, payload.as_ref());
+
+    assert_eq!(fault.message, "unknown panic payload");
+}
+
+#[test]
+fn serialize_fault_returns_subject_token_and_timestamp() {
+    let fault = Fault::dependency("orders-postgres", "readiness check failed");
+
+    let value = serde_json::to_value(&fault).expect("fault serializes");
+
+    assert_eq!(value["id"], "orders-postgres");
+    assert_eq!(value["subject"], "dependency");
+    assert_eq!(value["message"], "readiness check failed");
+    assert_eq!(value["at"], fault.timestamp());
+    assert_eq!(value["faults"].as_array().unwrap().len(), 0);
+}
+
+#[test]
+fn serialize_nested_fault_returns_nested_causes() {
+    let fault = Fault::component("api", "child dependency failed to start")
+        .caused_by(Fault::dependency("orders-postgres", "readiness check failed"));
+
+    let value = serde_json::to_value(&fault).expect("fault serializes");
+
+    assert_eq!(value["faults"][0]["id"], "orders-postgres");
+    assert_eq!(value["faults"][0]["subject"], "dependency");
+}
+
+#[test]
+fn serialize_every_subject_returns_its_as_str_token() {
+    let subjects = [
+        Subject::Arena,
+        Subject::Dependency,
+        Subject::Component,
+        Subject::Playbook,
+    ];
+
+    for subject in subjects {
+        assert_eq!(
+            serde_json::to_value(subject).unwrap(),
+            serde_json::json!(subject.as_str())
+        );
+    }
+}
+
+#[test]
+fn display_two_level_cause_chain_indents_each_level() {
+    let fault = Fault::arena("orders", "open faulted")
+        .caused_by(Fault::component("api", "child dependency failed to start").caused_by(
+            Fault::dependency("orders-postgres", "readiness check failed"),
+        ));
+
+    let rendered = fault.to_string();
+
+    assert!(rendered.contains("\n  caused by "), "{rendered}");
+    assert!(rendered.contains("\n    caused by "), "{rendered}");
+}

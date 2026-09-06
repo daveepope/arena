@@ -5,6 +5,8 @@ pub(crate) mod topic_creator;
 
 pub use container_impl::KAFKA_INTERNAL_DOCKER_PORT;
 
+use arena::lifecycle::message;
+use arena::lifecycle::Subject;
 use crate::builder::KafkaDependencyBuilder;
 use crate::kafka_dependency::healthcheck::DefaultKafkaReadinessCheck;
 use crate::kafka_dependency::topic_creator::TopicCreator;
@@ -125,7 +127,7 @@ impl KafkaDependency {
         self.readiness_check
             .is_ready(&self.identifier, &bootstrap, remaining.as_millis() as u64)
             .await
-            .map_err(|err| format!("readiness check failed: {err}"))
+            .map_err(message::readiness_failed)
     }
 
     async fn fail(&mut self, message: impl Into<String>, causes: Vec<Fault>) -> Fault {
@@ -201,7 +203,7 @@ impl RunnableDependency for KafkaDependency {
                     }
                 }
                 if !child_faults.is_empty() {
-                    return Err(self.fail("child dependency failed to start", child_faults).await);
+                    return Err(self.fail(message::child_start_failed(Subject::Dependency), child_faults).await);
                 }
             }
         }
@@ -276,7 +278,7 @@ impl RunnableDependency for KafkaDependency {
 
         if !causes.is_empty() {
             let fault =
-                Fault::dependency(&self.identifier, "stop did not complete").caused_by_all(causes);
+                Fault::dependency(&self.identifier, message::stop_did_not_complete()).caused_by_all(causes);
             self.faults.push(fault.clone());
             self.state = RunnableState::Faulted;
             return Err(fault);
@@ -319,7 +321,7 @@ impl RunnableDependency for KafkaDependency {
 
         let unconfirmed = Fault::dependency(
             &self.identifier,
-            "forced teardown could not confirm the container was removed",
+            message::forced_teardown_unconfirmed(),
         );
         if !self
             .faults

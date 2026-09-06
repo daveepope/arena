@@ -2,6 +2,7 @@ use super::component::{component_state, Component};
 use super::dependency::{dependency_state, Dependency};
 use super::dependency::RunnableDependency;
 use super::playbook::{ActivePlaybook, Playbook};
+use crate::lifecycle::message::{self, Phase};
 use crate::lifecycle::{
     panic_message, ArenaLifecycleState, ComponentState, DependencyState, Fault, LifecycleContext,
 };
@@ -10,6 +11,19 @@ use futures::future::join_all;
 use futures::FutureExt;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::time::Instant;
+use tracing::Instrument;
+
+pub(crate) fn dependency_span(id: &str) -> tracing::Span {
+    tracing::info_span!("subject", subject_kind = "dependency", subject_id = %id)
+}
+
+pub(crate) fn component_span(id: &str) -> tracing::Span {
+    tracing::info_span!("subject", subject_kind = "component", subject_id = %id)
+}
+
+pub(crate) fn playbook_span(id: &str) -> tracing::Span {
+    tracing::info_span!("subject", subject_kind = "playbook", subject_id = %id)
+}
 
 fn find_dependency_mut<'a>(
     deps: &'a mut [Dependency],
@@ -30,70 +44,90 @@ async fn graceful_stop_dependency(dep: &mut Dependency) -> Option<Fault> {
     if dep.state().is_inactive() {
         return None;
     }
-    match AssertUnwindSafe(dep.stop()).catch_unwind().await {
-        Ok(Ok(())) => None,
-        Ok(Err(fault)) => Some(fault),
-        Err(payload) => {
-            let message = panic_message(payload.as_ref());
-            tracing::error!(
-                dependency = %dep.identifier(),
-                panic_message = %message,
-                phase = "dependency_stop_panic",
-                "dependency panicked while stopping"
-            );
-            Some(Fault::dependency(
-                dep.identifier(),
-                format!("panicked while stopping: {message}"),
-            ))
+    let span = dependency_span(dep.identifier());
+    async move {
+        match AssertUnwindSafe(dep.stop()).catch_unwind().await {
+            Ok(Ok(())) => None,
+            Ok(Err(fault)) => Some(fault),
+            Err(payload) => {
+                let panic_text = panic_message(payload.as_ref());
+                tracing::error!(
+                    dependency = %dep.identifier(),
+                    panic_message = %panic_text,
+                    phase = "dependency_stop_panic",
+                    "dependency panicked while stopping"
+                );
+                Some(Fault::dependency(
+                    dep.identifier(),
+                    message::panicked_while(Phase::Stopping, &panic_text),
+                ))
+            }
         }
     }
+    .instrument(span)
+    .await
 }
 
 async fn graceful_stop_component(comp: &mut Component) -> Option<Fault> {
     if comp.state().is_inactive() {
         return None;
     }
-    match AssertUnwindSafe(comp.stop()).catch_unwind().await {
-        Ok(Ok(())) => None,
-        Ok(Err(fault)) => Some(fault),
-        Err(payload) => {
-            let message = panic_message(payload.as_ref());
-            tracing::error!(
-                component = %comp.identifier(),
-                panic_message = %message,
-                phase = "component_stop_panic",
-                "component panicked while stopping"
-            );
-            Some(Fault::component(
-                comp.identifier(),
-                format!("panicked while stopping: {message}"),
-            ))
+    let span = component_span(comp.identifier());
+    async move {
+        match AssertUnwindSafe(comp.stop()).catch_unwind().await {
+            Ok(Ok(())) => None,
+            Ok(Err(fault)) => Some(fault),
+            Err(payload) => {
+                let panic_text = panic_message(payload.as_ref());
+                tracing::error!(
+                    component = %comp.identifier(),
+                    panic_message = %panic_text,
+                    phase = "component_stop_panic",
+                    "component panicked while stopping"
+                );
+                Some(Fault::component(
+                    comp.identifier(),
+                    message::panicked_while(Phase::Stopping, &panic_text),
+                ))
+            }
         }
     }
+    .instrument(span)
+    .await
 }
 
 async fn force_stop_dependency(dep: &mut Dependency) {
-    let outcome = AssertUnwindSafe(dep.force_stop()).catch_unwind().await;
-    if let Err(payload) = outcome {
-        tracing::error!(
-            dependency = %dep.identifier(),
-            panic_message = %panic_message(payload.as_ref()),
-            phase = "dependency_force_stop_panic",
-            "dependency panicked while being forcibly stopped"
-        );
+    let span = dependency_span(dep.identifier());
+    async move {
+        let outcome = AssertUnwindSafe(dep.force_stop()).catch_unwind().await;
+        if let Err(payload) = outcome {
+            tracing::error!(
+                dependency = %dep.identifier(),
+                panic_message = %panic_message(payload.as_ref()),
+                phase = "dependency_force_stop_panic",
+                "dependency panicked while being forcibly stopped"
+            );
+        }
     }
+    .instrument(span)
+    .await
 }
 
 async fn force_stop_component(comp: &mut Component) {
-    let outcome = AssertUnwindSafe(comp.force_stop()).catch_unwind().await;
-    if let Err(payload) = outcome {
-        tracing::error!(
-            component = %comp.identifier(),
-            panic_message = %panic_message(payload.as_ref()),
-            phase = "component_force_stop_panic",
-            "component panicked while being forcibly stopped"
-        );
+    let span = component_span(comp.identifier());
+    async move {
+        let outcome = AssertUnwindSafe(comp.force_stop()).catch_unwind().await;
+        if let Err(payload) = outcome {
+            tracing::error!(
+                component = %comp.identifier(),
+                panic_message = %panic_message(payload.as_ref()),
+                phase = "component_force_stop_panic",
+                "component panicked while being forcibly stopped"
+            );
+        }
     }
+    .instrument(span)
+    .await
 }
 
 #[async_trait]
@@ -183,28 +217,36 @@ impl Match {
             let match_label = match_label.clone();
             async move {
                 let id = dep.identifier().to_string();
-                let sw_one = Instant::now();
-                let outcome = AssertUnwindSafe(dep.start()).catch_unwind().await;
-                (i, id, match_label, sw_one, dep, outcome)
+                let span = dependency_span(&id);
+                async move {
+                    let sw_one = Instant::now();
+                    let outcome = AssertUnwindSafe(dep.start()).catch_unwind().await;
+                    if matches!(outcome, Ok(Ok(()))) {
+                        tracing::info!(
+                            match_name = %match_label,
+                            dependency = %id,
+                            elapsed = ?sw_one.elapsed(),
+                            phase = "dependency_start_complete",
+                            "dependency started"
+                        );
+                    }
+                    (i, id, dep, outcome)
+                }
+                .instrument(span)
+                .await
             }
         }))
         .await;
 
         let mut faults = Vec::new();
         let mut started = Vec::with_capacity(dep_count);
-        for (i, id, match_label, sw_one, dep, outcome) in outcomes {
+        for (i, id, dep, outcome) in outcomes {
             match outcome {
-                Ok(Ok(())) => tracing::info!(
-                    match_name = %match_label,
-                    dependency = %id,
-                    elapsed = ?sw_one.elapsed(),
-                    phase = "dependency_start_complete",
-                    "dependency started"
-                ),
+                Ok(Ok(())) => {}
                 Ok(Err(fault)) => faults.push(fault),
                 Err(payload) => faults.push(Fault::dependency(
                     &id,
-                    format!("panicked while starting: {}", panic_message(payload.as_ref())),
+                    message::panicked_while(Phase::Starting, panic_message(payload.as_ref())),
                 )),
             }
             started.push((i, dep));
@@ -250,9 +292,14 @@ impl Match {
             let id = pb.identifier().to_string();
             let match_label = match_label.clone();
             async move {
-                let sw_one = Instant::now();
-                let outcome = AssertUnwindSafe(pb.run(deps_ref)).catch_unwind().await;
-                (id, match_label, sw_one, outcome)
+                let span = playbook_span(&id);
+                async move {
+                    let sw_one = Instant::now();
+                    let outcome = AssertUnwindSafe(pb.run(deps_ref)).catch_unwind().await;
+                    (id, match_label, sw_one, outcome)
+                }
+                .instrument(span)
+                .await
             }
         }))
         .await;
@@ -274,7 +321,7 @@ impl Match {
                 Ok(Err(fault)) => faults.push(fault),
                 Err(payload) => faults.push(Fault::playbook(
                     &id,
-                    format!("panicked while running: {}", panic_message(payload.as_ref())),
+                    message::panicked_while(Phase::RunningPlaybook, panic_message(payload.as_ref())),
                 )),
             }
         }
@@ -310,28 +357,36 @@ impl Match {
             let match_label = match_label.clone();
             async move {
                 let id = comp.identifier().to_string();
-                let sw_one = Instant::now();
-                let outcome = AssertUnwindSafe(comp.start()).catch_unwind().await;
-                (i, id, match_label, sw_one, comp, outcome)
+                let span = component_span(&id);
+                async move {
+                    let sw_one = Instant::now();
+                    let outcome = AssertUnwindSafe(comp.start()).catch_unwind().await;
+                    if matches!(outcome, Ok(Ok(()))) {
+                        tracing::info!(
+                            match_name = %match_label,
+                            component = %id,
+                            elapsed = ?sw_one.elapsed(),
+                            phase = "component_start_complete",
+                            "component started"
+                        );
+                    }
+                    (i, id, comp, outcome)
+                }
+                .instrument(span)
+                .await
             }
         }))
         .await;
 
         let mut faults = Vec::new();
         let mut started = Vec::with_capacity(comp_count);
-        for (i, id, match_label, sw_one, comp, outcome) in outcomes {
+        for (i, id, comp, outcome) in outcomes {
             match outcome {
-                Ok(Ok(())) => tracing::info!(
-                    match_name = %match_label,
-                    component = %id,
-                    elapsed = ?sw_one.elapsed(),
-                    phase = "component_start_complete",
-                    "component started"
-                ),
+                Ok(Ok(())) => {}
                 Ok(Err(fault)) => faults.push(fault),
                 Err(payload) => faults.push(Fault::component(
                     &id,
-                    format!("panicked while starting: {}", panic_message(payload.as_ref())),
+                    message::panicked_while(Phase::Starting, panic_message(payload.as_ref())),
                 )),
             }
             started.push((i, comp));
@@ -512,6 +567,7 @@ impl MatchTrait for Match {
             .playbooks
             .iter()
             .find(|(p, _)| p.identifier() == identifier)?;
-        Some(pb.0.run(&self.dependencies).await)
+        let span = playbook_span(identifier);
+        Some(pb.0.run(&self.dependencies).instrument(span).await)
     }
 }

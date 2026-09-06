@@ -1,6 +1,8 @@
 pub mod healthcheck;
 pub mod mssql_container_impl;
 
+use arena::lifecycle::message;
+use arena::lifecycle::Subject;
 use crate::builder::MssqlDependencyBuilder;
 use crate::mssql_dependency::healthcheck::DefaultMssqlReadinessCheck;
 use crate::mssql_dependency::mssql_container_impl::DEFAULT_CONNECT_TIMEOUT;
@@ -155,7 +157,7 @@ impl MssqlDependency {
         self.readiness_check
             .is_ready(&self.identifier, conn_str, READINESS_TIMEOUT.as_millis() as u64)
             .await
-            .map_err(|err| format!("readiness check failed: {err}"))
+            .map_err(message::readiness_failed)
     }
 
     async fn fail(&mut self, message: impl Into<String>, causes: Vec<Fault>) -> Fault {
@@ -354,7 +356,7 @@ impl RunnableDependency for MssqlDependency {
                     }
                 }
                 if !child_faults.is_empty() {
-                    return Err(self.fail("child dependency failed to start", child_faults).await);
+                    return Err(self.fail(message::child_start_failed(Subject::Dependency), child_faults).await);
                 }
             }
         }
@@ -457,7 +459,7 @@ impl RunnableDependency for MssqlDependency {
 
         if !causes.is_empty() {
             let fault =
-                Fault::dependency(&self.identifier, "stop did not complete").caused_by_all(causes);
+                Fault::dependency(&self.identifier, message::stop_did_not_complete()).caused_by_all(causes);
             self.faults.push(fault.clone());
             self.state = RunnableState::Faulted;
             return Err(fault);
@@ -500,7 +502,7 @@ impl RunnableDependency for MssqlDependency {
 
         let unconfirmed = Fault::dependency(
             &self.identifier,
-            "forced teardown could not confirm the container was removed",
+            message::forced_teardown_unconfirmed(),
         );
         if !self
             .faults

@@ -1,3 +1,5 @@
+use arena::lifecycle::message;
+use arena::lifecycle::Subject;
 use crate::builder::ExecutableComponentBuilder;
 use arena::component::RunnableComponent;
 use arena::component::Component;
@@ -59,9 +61,7 @@ impl ExecutableComponent {
                     );
                 }
                 Err(msg) => {
-                    return Err(format!(
-                        "readiness check failed for target {target}: {msg}"
-                    ));
+                    return Err(message::readiness_failed_for_target(target, msg));
                 }
             }
         }
@@ -192,7 +192,7 @@ impl RunnableComponent for ExecutableComponent {
             }
         }
         if !child_faults.is_empty() {
-            return Err(self.fail("child component failed to start", child_faults).await);
+            return Err(self.fail(message::child_start_failed(Subject::Component), child_faults).await);
         }
 
         tracing::debug!(
@@ -252,7 +252,7 @@ impl RunnableComponent for ExecutableComponent {
 
         if !causes.is_empty() {
             let fault =
-                Fault::component(&self.identifier, "stop did not complete").caused_by_all(causes);
+                Fault::component(&self.identifier, message::stop_did_not_complete()).caused_by_all(causes);
             self.faults.push(fault.clone());
             self.state = RunnableState::Faulted;
             return Err(fault);

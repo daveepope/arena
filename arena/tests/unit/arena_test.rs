@@ -5,7 +5,11 @@ use arena::lifecycle::{ArenaLifecycleState, RunnableState};
 use arena::matches::Match;
 use arena::{ClosedArena, MatchTrait};
 use std::sync::Arc;
-use subjects::{probe_component, probe_dependency, probe_playbook, Behaviour, StateRecorder};
+use subjects::{
+    probe_component, probe_dependency, probe_playbook, Behaviour, EventScopeRecordingLayer,
+    RecordedEvents, StateRecorder,
+};
+use tracing_subscriber::layer::SubscriberExt;
 
 fn arena_with(matches: Vec<Box<dyn MatchTrait>>) -> (ClosedArena, Arc<StateRecorder>) {
     let recorder = Arc::new(StateRecorder::default());
@@ -636,7 +640,7 @@ async fn open_match_force_stop_panics_records_arena_fault() {
     assert!(state
         .faults
         .iter()
-        .any(|f| f.message.contains("panicked during forced teardown")));
+        .any(|f| f.message.contains("panicked while being forcibly stopped")));
 }
 
 #[tokio::test]
@@ -878,4 +882,72 @@ async fn close_dependency_stop_fault_is_reported_by_the_arena() {
         .faults
         .iter()
         .any(|f| f.id == "postgres-1" && f.message.contains("stop did not complete")));
+}
+
+fn events_recorded_during_open_and_close() -> Arc<RecordedEvents> {
+    let recorded = Arc::new(RecordedEvents::default());
+    let subscriber =
+        tracing_subscriber::registry().with(EventScopeRecordingLayer(Arc::clone(&recorded)));
+
+    tracing::subscriber::with_default(subscriber, || {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime");
+        runtime.block_on(async {
+            let a_match = Match::new(
+                "spans",
+                vec![probe_dependency("postgres-1").into_dependency()],
+                vec![probe_component("api").into_component()],
+            );
+            let (closed, _recorder) = arena_with(vec![Box::new(a_match)]);
+            let open = closed.open().await.expect("arena should open");
+            open.close().await.expect("arena should close");
+        });
+    });
+
+    recorded
+}
+
+#[test]
+fn open_healthy_arena_records_dependency_start_inside_its_subject_span() {
+    let recorded = events_recorded_during_open_and_close();
+
+    let started = recorded.with_message("dependency started");
+    assert!(!started.is_empty(), "no dependency start record was emitted");
+    for event in started {
+        assert_eq!(event.arena(), Some("test-arena"), "scope {:?}", event.scope);
+        assert_eq!(
+            event.subject(),
+            Some("dependency.postgres-1"),
+            "scope {:?}",
+            event.scope
+        );
+    }
+}
+
+#[test]
+fn open_healthy_arena_records_component_start_inside_its_subject_span() {
+    let recorded = events_recorded_during_open_and_close();
+
+    let started = recorded.with_message("component started");
+    assert!(!started.is_empty(), "no component start record was emitted");
+    for event in started {
+        assert_eq!(event.arena(), Some("test-arena"), "scope {:?}", event.scope);
+        assert_eq!(
+            event.subject(),
+            Some("component.api"),
+            "scope {:?}",
+            event.scope
+        );
+    }
+}
+
+#[test]
+fn open_healthy_arena_records_arena_records_under_the_arena_span_only() {
+    let recorded = events_recorded_during_open_and_close();
+
+    let opening = recorded.with_message("opening");
+    assert!(!opening.is_empty(), "no arena open record was emitted");
+    for event in opening {
+        assert_eq!(event.arena(), Some("test-arena"), "scope {:?}", event.scope);
+        assert_eq!(event.subject(), None, "scope {:?}", event.scope);
+    }
 }

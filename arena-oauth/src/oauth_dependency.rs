@@ -1,3 +1,5 @@
+use arena::lifecycle::message;
+use arena::lifecycle::Subject;
 use std::net::IpAddr;
 use std::time::Instant;
 
@@ -225,7 +227,7 @@ impl RunnableDependency for OauthDependency {
                     }
                 }
                 if !child_faults.is_empty() {
-                    return Err(self.fail("child dependency failed to start", child_faults).await);
+                    return Err(self.fail(message::child_start_failed(Subject::Dependency), child_faults).await);
                 }
             }
         }
@@ -283,7 +285,7 @@ impl RunnableDependency for OauthDependency {
 
         if !causes.is_empty() {
             let fault =
-                Fault::dependency(&self.identifier, "stop did not complete").caused_by_all(causes);
+                Fault::dependency(&self.identifier, message::stop_did_not_complete()).caused_by_all(causes);
             self.faults.push(fault.clone());
             self.state = RunnableState::Faulted;
             return Err(fault);

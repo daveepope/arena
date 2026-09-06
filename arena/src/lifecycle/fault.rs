@@ -1,7 +1,9 @@
 use chrono::{DateTime, SecondsFormat, Utc};
+use serde::{Serialize, Serializer};
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Subject {
     Arena,
     Dependency,
@@ -26,11 +28,12 @@ impl fmt::Display for Subject {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Fault {
     pub id: String,
     pub subject: Subject,
     pub message: String,
+    #[serde(serialize_with = "serialize_timestamp")]
     pub at: DateTime<Utc>,
     pub faults: Vec<Fault>,
 }
@@ -62,6 +65,14 @@ impl Fault {
         Self::new(id, Subject::Playbook, message)
     }
 
+    pub fn from_panic(
+        id: impl Into<String>,
+        subject: Subject,
+        payload: &(dyn std::any::Any + Send),
+    ) -> Self {
+        Self::new(id, subject, panic_message(payload))
+    }
+
     pub fn caused_by(mut self, fault: Fault) -> Self {
         self.faults.push(fault);
         self
@@ -85,8 +96,8 @@ impl Fault {
     }
 }
 
-impl fmt::Display for Fault {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Fault {
+    pub(crate) fn render(&self, f: &mut fmt::Formatter<'_>, depth: usize) -> fmt::Result {
         write!(
             f,
             "[{}] {} '{}': {}",
@@ -95,14 +106,29 @@ impl fmt::Display for Fault {
             self.id,
             self.message
         )?;
+        let indent = "  ".repeat(depth + 1);
         for nested in &self.faults {
-            write!(f, "\n  caused by {nested}")?;
+            write!(f, "\n{indent}caused by ")?;
+            nested.render(f, depth + 1)?;
         }
         Ok(())
     }
 }
 
+impl fmt::Display for Fault {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.render(f, 0)
+    }
+}
+
 impl std::error::Error for Fault {}
+
+pub(crate) fn serialize_timestamp<S>(at: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&at.to_rfc3339_opts(SecondsFormat::Millis, true))
+}
 
 pub fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
     if let Some(s) = payload.downcast_ref::<&'static str>() {

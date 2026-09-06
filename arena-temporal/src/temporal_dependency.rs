@@ -1,6 +1,8 @@
 pub(crate) mod container_impl;
 mod healthcheck;
 
+use arena::lifecycle::message;
+use arena::lifecycle::Subject;
 use crate::builder::TemporalDependencyBuilder;
 use crate::temporal_dependency::healthcheck::DefaultTemporalReadinessCheck;
 use arena::dependency::{Dependency, RunnableDependency};
@@ -129,7 +131,7 @@ impl TemporalDependency {
         self.readiness_check
             .is_ready(&self.identifier, &endpoint, remaining.as_millis() as u64)
             .await
-            .map_err(|err| format!("readiness check failed: {err}"))
+            .map_err(message::readiness_failed)
     }
 
     async fn fail(&mut self, message: impl Into<String>, causes: Vec<Fault>) -> Fault {
@@ -181,7 +183,7 @@ impl RunnableDependency for TemporalDependency {
                     }
                 }
                 if !child_faults.is_empty() {
-                    return Err(self.fail("child dependency failed to start", child_faults).await);
+                    return Err(self.fail(message::child_start_failed(Subject::Dependency), child_faults).await);
                 }
             }
         }
@@ -257,7 +259,7 @@ impl RunnableDependency for TemporalDependency {
         self.running = false;
 
         if !causes.is_empty() {
-            let fault = Fault::dependency(&self.identifier, "stop did not complete")
+            let fault = Fault::dependency(&self.identifier, message::stop_did_not_complete())
                 .caused_by_all(causes);
             self.faults.push(fault.clone());
             self.state = RunnableState::Faulted;
@@ -301,7 +303,7 @@ impl RunnableDependency for TemporalDependency {
 
         let unconfirmed = Fault::dependency(
             &self.identifier,
-            "forced teardown could not confirm the container was removed",
+            message::forced_teardown_unconfirmed(),
         );
         if !self
             .faults

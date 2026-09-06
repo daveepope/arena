@@ -1,10 +1,12 @@
+use crate::lifecycle::message::{self, Phase};
 use crate::lifecycle::{
     panic_message, ArenaLifecycleState, ArenaLifecycleObserver, ArenaState, ComponentState,
-    DependencyState, Fault, LifecycleContext, RunnableState,
+    DependencyState, Fault, LifecycleContext, RunnableState, Subject,
 };
 use crate::matches::MatchTrait;
 use futures::future::join_all;
 use futures::FutureExt;
+use tracing::Instrument;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 use std::time::Instant;
@@ -62,10 +64,7 @@ async fn forced_teardown(context: &LifecycleContext, matches: &mut Matches) {
         if let Err(payload) = outcome {
             context.record(Fault::arena(
                 context.arena_id(),
-                format!(
-                    "match panicked during forced teardown: {}",
-                    panic_message(payload.as_ref())
-                ),
+                message::panicked_while(Phase::ForcedTeardown, panic_message(payload.as_ref())),
             ));
         }
     }
@@ -80,7 +79,7 @@ async fn forced_teardown(context: &LifecycleContext, matches: &mut Matches) {
 }
 
 struct Unexplained<'a> {
-    subject: &'a str,
+    subject: Subject,
     id: &'a str,
     state: RunnableState,
     explained: bool,
@@ -90,7 +89,7 @@ struct Unexplained<'a> {
 impl<'a> From<&'a DependencyState> for Unexplained<'a> {
     fn from(value: &'a DependencyState) -> Self {
         Unexplained {
-            subject: "dependency",
+            subject: Subject::Dependency,
             id: &value.id,
             state: value.state,
             explained: !value.faults.is_empty(),
@@ -102,7 +101,7 @@ impl<'a> From<&'a DependencyState> for Unexplained<'a> {
 impl<'a> From<&'a ComponentState> for Unexplained<'a> {
     fn from(value: &'a ComponentState) -> Self {
         Unexplained {
-            subject: "component",
+            subject: Subject::Component,
             id: &value.id,
             state: value.state,
             explained: !value.faults.is_empty(),
@@ -115,10 +114,7 @@ fn record_unexplained(context: &LifecycleContext, node: Unexplained<'_>) {
     if !node.state.is_inactive() && !node.explained {
         context.record(Fault::arena(
             context.arena_id(),
-            format!(
-                "{} '{}' is {} after forced teardown and reported no fault",
-                node.subject, node.id, node.state
-            ),
+            message::unexplained_after_teardown(node.subject, node.id, node.state.as_str()),
         ));
     }
     for child in node.dependencies {
@@ -170,7 +166,12 @@ impl ClosedArena {
         )
     }
 
-    pub async fn open(mut self) -> Result<OpenArena, ArenaState> {
+    pub async fn open(self) -> Result<OpenArena, ArenaState> {
+        let span = tracing::info_span!("arena", arena_id = %self.id);
+        self.open_within_span().instrument(span).await
+    }
+
+    async fn open_within_span(mut self) -> Result<OpenArena, ArenaState> {
         tracing::info!(arena = %self.id, phase = "open_begin", "opening");
         let sw = Instant::now();
 
@@ -207,9 +208,10 @@ impl ClosedArena {
                 Ok(Err(match_faults)) => faults.extend(match_faults),
                 Err(payload) => faults.push(Fault::arena(
                     &arena_id,
-                    format!(
-                        "match {i} panicked while starting: {}",
-                        panic_message(payload.as_ref())
+                    message::match_panicked_while(
+                        i,
+                        Phase::Starting,
+                        panic_message(payload.as_ref()),
                     ),
                 )),
             }
@@ -300,7 +302,12 @@ impl OpenArena {
         None
     }
 
-    pub async fn close(mut self) -> Result<ClosedArena, ArenaState> {
+    pub async fn close(self) -> Result<ClosedArena, ArenaState> {
+        let span = tracing::info_span!("arena", arena_id = %self.id);
+        self.close_within_span().instrument(span).await
+    }
+
+    async fn close_within_span(mut self) -> Result<ClosedArena, ArenaState> {
         let state = self.internal_close().await;
 
         let id = std::mem::take(&mut self.id);
@@ -349,9 +356,10 @@ impl OpenArena {
                 }
                 Err(payload) => context.record(Fault::arena(
                     &self.id,
-                    format!(
-                        "match {i} panicked while stopping: {}",
-                        panic_message(payload.as_ref())
+                    message::match_panicked_while(
+                        i,
+                        Phase::Stopping,
+                        panic_message(payload.as_ref()),
                     ),
                 )),
             }
@@ -379,6 +387,8 @@ impl Drop for OpenArena {
             return;
         }
         self.closed = true;
+        let span = tracing::info_span!("arena", arena_id = %self.id);
+        let _entered = span.enter();
         tracing::warn!(
             arena = %self.id,
             phase = "drop_without_close",

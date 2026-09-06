@@ -1,4 +1,5 @@
 use arena::lifecycle::{ArenaLifecycleState, RunnableState};
+use serde_json::json;
 
 #[test]
 fn arena_lifecycle_state_full_sequence_is_strictly_increasing() {
@@ -144,5 +145,49 @@ fn as_str_runnable_states_returns_unique_snake_case_names() {
             name.chars().all(|c| c.is_ascii_lowercase() || c == '_'),
             "{name} is not snake_case"
         );
+    }
+}
+
+#[test]
+fn serialize_every_arena_state_returns_its_as_str_token() {
+    let states = [
+        ArenaLifecycleState::ArenaCreated,
+        ArenaLifecycleState::ArenaStarting,
+        ArenaLifecycleState::DependenciesStarting,
+        ArenaLifecycleState::DependenciesStarted,
+        ArenaLifecycleState::PlaybooksRunning,
+        ArenaLifecycleState::PlaybooksComplete,
+        ArenaLifecycleState::ComponentsStarting,
+        ArenaLifecycleState::ComponentsStarted,
+        ArenaLifecycleState::ArenaOpen,
+        ArenaLifecycleState::ArenaClosing,
+        ArenaLifecycleState::ComponentsStopping,
+        ArenaLifecycleState::ComponentsStopped,
+        ArenaLifecycleState::DependenciesStopping,
+        ArenaLifecycleState::DependenciesStopped,
+        ArenaLifecycleState::ArenaTeardown,
+        ArenaLifecycleState::ArenaClosed,
+        ArenaLifecycleState::ArenaFaulted,
+    ];
+
+    for state in states {
+        assert_eq!(serde_json::to_value(state).unwrap(), json!(state.as_str()));
+    }
+}
+
+#[test]
+fn serialize_every_runnable_state_returns_its_as_str_token() {
+    let states = [
+        RunnableState::NotStarted,
+        RunnableState::Starting,
+        RunnableState::ReadinessCheck,
+        RunnableState::Started,
+        RunnableState::Stopping,
+        RunnableState::Stopped,
+        RunnableState::Faulted,
+    ];
+
+    for state in states {
+        assert_eq!(serde_json::to_value(state).unwrap(), json!(state.as_str()));
     }
 }

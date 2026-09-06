@@ -80,6 +80,8 @@ dependencies = [
  "futures",
  "futures-timer",
  "mockall",
+ "serde",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",

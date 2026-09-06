@@ -195,9 +195,118 @@ fn display_faulted_arena_lists_subjects_and_faults() {
     let rendered = state.to_string();
 
     assert!(rendered.contains("arena 'test-arena' is arena_faulted"));
-    assert!(rendered.contains("dependency 'postgres-1': faulted"));
-    assert!(rendered.contains("component 'api': not_started"));
+    assert!(rendered.contains("\n  dependencies:\n    'postgres-1': faulted"));
+    assert!(rendered.contains("\n  components:\n    'api': not_started"));
+    assert!(rendered.contains("\n  faults:\n    ["));
     assert!(rendered.contains("readiness check never passed"));
+}
+
+#[test]
+fn display_nested_children_indents_each_level() {
+    let child = DependencyState::new(
+        "postgres-seed",
+        RunnableState::Stopped,
+        Vec::new(),
+        Vec::new(),
+    );
+    let parent = DependencyState::new(
+        "postgres-1",
+        RunnableState::Faulted,
+        Vec::new(),
+        vec![child],
+    );
+    let state = ArenaState::new(
+        "test-arena",
+        ArenaLifecycleState::ArenaFaulted,
+        vec![parent],
+        Vec::new(),
+        Vec::new(),
+    );
+
+    let rendered = state.to_string();
+
+    assert!(rendered.contains("\n    'postgres-1': faulted"));
+    assert!(rendered.contains("\n      'postgres-seed': stopped"));
+}
+
+#[test]
+fn display_healthy_arena_omits_empty_sections() {
+    let state = ArenaState::new(
+        "test-arena",
+        ArenaLifecycleState::ArenaOpen,
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    );
+
+    let rendered = state.to_string();
+
+    assert!(!rendered.contains("dependencies:"));
+    assert!(!rendered.contains("components:"));
+    assert!(!rendered.contains("faults:"));
+}
+
+#[test]
+fn serialize_faulted_state_returns_every_section() {
+    let state = ArenaState::new(
+        "test-arena",
+        ArenaLifecycleState::ArenaFaulted,
+        vec![dependency(
+            "postgres-1",
+            RunnableState::Faulted,
+            vec![Fault::dependency("postgres-1", "readiness check failed")],
+        )],
+        vec![component("api", RunnableState::NotStarted, Vec::new())],
+        Vec::new(),
+    );
+
+    let value = serde_json::to_value(&state).expect("state serializes");
+
+    assert_eq!(value["id"], "test-arena");
+    assert_eq!(value["state"], "arena_faulted");
+    assert_eq!(value["dependencies"][0]["id"], "postgres-1");
+    assert_eq!(value["dependencies"][0]["state"], "faulted");
+    assert_eq!(value["dependencies"][0]["children"].as_array().unwrap().len(), 0);
+    assert_eq!(value["components"][0]["state"], "not_started");
+    assert_eq!(value["faults"][0]["subject"], "dependency");
+    assert_eq!(value["faults"][0]["message"], "readiness check failed");
+}
+
+#[test]
+fn serialize_state_at_returns_the_display_timestamp() {
+    let state = ArenaState::new(
+        "test-arena",
+        ArenaLifecycleState::ArenaOpen,
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    );
+
+    let value = serde_json::to_value(&state).expect("state serializes");
+
+    assert_eq!(value["at"], state.timestamp());
+}
+
+#[test]
+fn serialize_nested_children_returns_the_full_tree() {
+    let grandchild = DependencyState::new("seed", RunnableState::Stopped, Vec::new(), Vec::new());
+    let child = DependencyState::new(
+        "postgres-1",
+        RunnableState::Stopped,
+        Vec::new(),
+        vec![grandchild],
+    );
+    let state = ArenaState::new(
+        "test-arena",
+        ArenaLifecycleState::ArenaClosed,
+        vec![child],
+        Vec::new(),
+        Vec::new(),
+    );
+
+    let value = serde_json::to_value(&state).expect("state serializes");
+
+    assert_eq!(value["dependencies"][0]["children"][0]["id"], "seed");
 }
 
 #[test]
@@ -214,4 +323,27 @@ fn timestamp_any_state_returns_utc_rfc3339_with_milliseconds() {
 
     assert!(stamped.ends_with('Z'), "expected UTC suffix in {stamped}");
     assert_eq!(stamped.len(), 24, "expected millisecond precision in {stamped}");
+}
+
+#[test]
+fn display_fault_cause_inside_state_indents_under_its_fault() {
+    let state = ArenaState::new(
+        "test-arena",
+        ArenaLifecycleState::ArenaFaulted,
+        Vec::new(),
+        vec![component(
+            "api",
+            RunnableState::NotStarted,
+            vec![Fault::component("api", "child dependency failed to start")
+                .caused_by(Fault::dependency("postgres-1", "readiness check failed"))],
+        )],
+        Vec::new(),
+    );
+
+    let rendered = state.to_string();
+
+    assert!(
+        rendered.contains("\n      caused by [") ,
+        "cause should sit under its fault, got {rendered}"
+    );
 }

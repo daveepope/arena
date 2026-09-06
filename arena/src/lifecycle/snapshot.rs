@@ -1,10 +1,11 @@
 use chrono::{DateTime, SecondsFormat, Utc};
+use serde::Serialize;
 use std::fmt;
 
-use super::fault::Fault;
+use super::fault::{serialize_timestamp, Fault};
 use super::state::{ArenaLifecycleState, RunnableState};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct DependencyState {
     pub id: String,
     pub state: RunnableState,
@@ -46,7 +47,7 @@ impl DependencyState {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct ComponentState {
     pub id: String,
     pub state: RunnableState,
@@ -88,10 +89,11 @@ impl ComponentState {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct ArenaState {
     pub id: String,
     pub state: ArenaLifecycleState,
+    #[serde(serialize_with = "serialize_timestamp")]
     pub at: DateTime<Utc>,
     pub dependencies: Vec<DependencyState>,
     pub components: Vec<ComponentState>,
@@ -167,6 +169,28 @@ pub fn aggregate_faults(
     unique
 }
 
+impl DependencyState {
+    fn render(&self, f: &mut fmt::Formatter<'_>, depth: usize) -> fmt::Result {
+        let indent = "  ".repeat(depth);
+        write!(f, "\n{indent}'{}': {}", self.id, self.state)?;
+        for child in &self.children {
+            child.render(f, depth + 1)?;
+        }
+        Ok(())
+    }
+}
+
+impl ComponentState {
+    fn render(&self, f: &mut fmt::Formatter<'_>, depth: usize) -> fmt::Result {
+        let indent = "  ".repeat(depth);
+        write!(f, "\n{indent}'{}': {}", self.id, self.state)?;
+        for child in &self.children {
+            child.render(f, depth + 1)?;
+        }
+        Ok(())
+    }
+}
+
 impl fmt::Display for ArenaState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -176,14 +200,24 @@ impl fmt::Display for ArenaState {
             self.state,
             self.timestamp()
         )?;
-        for dependency in &self.dependencies {
-            write!(f, "\n  dependency '{}': {}", dependency.id, dependency.state)?;
+        if !self.dependencies.is_empty() {
+            write!(f, "\n  dependencies:")?;
+            for dependency in &self.dependencies {
+                dependency.render(f, 2)?;
+            }
         }
-        for component in &self.components {
-            write!(f, "\n  component '{}': {}", component.id, component.state)?;
+        if !self.components.is_empty() {
+            write!(f, "\n  components:")?;
+            for component in &self.components {
+                component.render(f, 2)?;
+            }
         }
-        for fault in &self.faults {
-            write!(f, "\n  {fault}")?;
+        if !self.faults.is_empty() {
+            write!(f, "\n  faults:")?;
+            for fault in &self.faults {
+                write!(f, "\n    ")?;
+                fault.render(f, 2)?;
+            }
         }
         Ok(())
     }

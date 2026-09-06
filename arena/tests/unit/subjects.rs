@@ -488,3 +488,140 @@ impl ArenaLifecycleObserver for PanickingObserver {
         }
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecordedEvent {
+    pub message: String,
+    pub scope: Vec<String>,
+}
+
+impl RecordedEvent {
+    pub fn subject(&self) -> Option<&str> {
+        self.scope
+            .iter()
+            .find(|entry| entry.starts_with("subject:"))
+            .map(|entry| &entry["subject:".len()..])
+    }
+
+    pub fn arena(&self) -> Option<&str> {
+        self.scope
+            .iter()
+            .find(|entry| entry.starts_with("arena:"))
+            .map(|entry| &entry["arena:".len()..])
+    }
+}
+
+#[derive(Default)]
+pub struct RecordedEvents {
+    events: Mutex<Vec<RecordedEvent>>,
+}
+
+impl RecordedEvents {
+    pub fn push(&self, event: RecordedEvent) {
+        self.events.lock().expect("recorded events lock").push(event);
+    }
+
+    pub fn all(&self) -> Vec<RecordedEvent> {
+        self.events.lock().expect("recorded events lock").clone()
+    }
+
+    pub fn with_message(&self, needle: &str) -> Vec<RecordedEvent> {
+        self.all()
+            .into_iter()
+            .filter(|event| event.message.contains(needle))
+            .collect()
+    }
+}
+
+pub struct EventScopeRecordingLayer(pub Arc<RecordedEvents>);
+
+#[derive(Default)]
+struct MessageCollector {
+    message: String,
+}
+
+impl tracing::field::Visit for MessageCollector {
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        if field.name() == "message" {
+            self.message = format!("{value:?}");
+        }
+    }
+
+    fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+        if field.name() == "message" {
+            self.message = value.to_string();
+        }
+    }
+}
+
+#[derive(Default)]
+struct SpanIdentity {
+    kind: Option<String>,
+    id: Option<String>,
+    arena_id: Option<String>,
+}
+
+impl tracing::field::Visit for SpanIdentity {
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        self.assign(field.name(), format!("{value:?}"));
+    }
+
+    fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+        self.assign(field.name(), value.to_string());
+    }
+}
+
+impl SpanIdentity {
+    fn assign(&mut self, name: &str, value: String) {
+        match name {
+            "subject_kind" => self.kind = Some(value),
+            "subject_id" => self.id = Some(value),
+            "arena_id" => self.arena_id = Some(value),
+            _ => {}
+        }
+    }
+}
+
+impl<S> tracing_subscriber::Layer<S> for EventScopeRecordingLayer
+where
+    S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+{
+    fn on_new_span(
+        &self,
+        attrs: &tracing::span::Attributes<'_>,
+        id: &tracing::span::Id,
+        ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        let mut identity = SpanIdentity::default();
+        attrs.record(&mut identity);
+        let rendered = match attrs.metadata().name() {
+            "arena" => format!("arena:{}", identity.arena_id.unwrap_or_default()),
+            "subject" => format!(
+                "subject:{}.{}",
+                identity.kind.unwrap_or_default(),
+                identity.id.unwrap_or_default()
+            ),
+            other => other.to_string(),
+        };
+        if let Some(span) = ctx.span(id) {
+            span.extensions_mut().insert(rendered);
+        }
+    }
+
+    fn on_event(&self, event: &tracing::Event<'_>, ctx: tracing_subscriber::layer::Context<'_, S>) {
+        let mut collector = MessageCollector::default();
+        event.record(&mut collector);
+        let mut scope = Vec::new();
+        if let Some(spans) = ctx.event_scope(event) {
+            for span in spans {
+                if let Some(rendered) = span.extensions().get::<String>() {
+                    scope.push(rendered.clone());
+                }
+            }
+        }
+        self.0.push(RecordedEvent {
+            message: collector.message,
+            scope,
+        });
+    }
+}
