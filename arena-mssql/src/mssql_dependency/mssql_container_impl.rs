@@ -25,6 +25,7 @@ impl Default for MssqlEncryption {
 
 #[async_trait]
 pub trait MssqlImpl: Send + Sync {
+    fn set_expiry(&mut self, _expiry: Option<Duration>) {}
     async fn start(
         &mut self,
         port: u16,
@@ -34,8 +35,10 @@ pub trait MssqlImpl: Send + Sync {
         image_name: &str,
         image_tag: &str,
         container_name: &str,
-    );
-    async fn stop(&mut self);
+    ) -> Result<(), String>;
+    async fn stop(&mut self) -> Result<(), String>;
+    async fn force_stop(&mut self) -> bool;
+    fn release(&mut self);
 
     fn connection_string(&self) -> Option<&str>;
 
@@ -48,6 +51,8 @@ pub(crate) struct MssqlContainerImpl {
     admin_connection_string: Option<String>,
     network: Option<String>,
     encryption: MssqlEncryption,
+    container_name: Option<String>,
+    expiry: Option<Duration>,
 }
 
 impl MssqlContainerImpl {
@@ -58,12 +63,18 @@ impl MssqlContainerImpl {
             admin_connection_string: None,
             network,
             encryption,
+            container_name: None,
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
         }
     }
 }
 
 #[async_trait]
 impl MssqlImpl for MssqlContainerImpl {
+    fn set_expiry(&mut self, expiry: Option<Duration>) {
+        self.expiry = expiry;
+    }
+
     async fn start(
         &mut self,
         port: u16,
@@ -73,10 +84,13 @@ impl MssqlImpl for MssqlContainerImpl {
         image_name: &str,
         image_tag: &str,
         container_name: &str,
-    ) {
+    ) -> Result<(), String> {
         if self.container.is_some() {
-            return;
+            return Ok(());
         }
+
+        arena_container::expiry::remove_expired_containers_if_enabled(crate::MODULE, self.expiry)
+            .await;
 
         arena_container::container::try_remove_existing_container(container_name).await;
 
@@ -91,6 +105,10 @@ impl MssqlImpl for MssqlContainerImpl {
             .with_name(image_name)
             .with_tag(image_tag)
             .with_container_name(container_name)
+            .with_labels(arena_container::expiry::expiry_labels_for(
+                crate::MODULE,
+                self.expiry,
+            ))
             .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await);
 
         if let Some(ref network) = self.network {
@@ -98,23 +116,21 @@ impl MssqlImpl for MssqlContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request.start().await.unwrap_or_else(|e| {
-            panic!(
-                "{}",
-                arena_container::container::start_failure_message("mssql", &e)
-            )
-        });
+        let container = request
+            .start()
+            .await
+            .map_err(|e| arena_container::container::start_failure_message("mssql", &e))?;
 
         let host = container
             .get_host()
             .await
-            .expect("Failed to get host")
+            .map_err(|e| format!("mssql container host unavailable: {e}"))?
             .to_string();
 
         let host_port = container
             .get_host_port_ipv4(DEFAULT_CONTAINER_PORT)
             .await
-            .expect("Failed to get port");
+            .map_err(|e| format!("mssql port unavailable: {e}"))?;
 
         self.admin_connection_string = Some(build_ado_connection_string(
             &host,
@@ -133,11 +149,13 @@ impl MssqlImpl for MssqlContainerImpl {
             self.encryption,
         ));
         self.container = Some(container);
+        self.container_name = Some(container_name.to_string());
 
         tracing::debug!(layer = "mssql_container", phase = "container_started");
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.container.take();
         self.connection_string = None;
         self.admin_connection_string = None;
@@ -146,6 +164,27 @@ impl MssqlImpl for MssqlContainerImpl {
         if let Some(ref network) = self.network {
             arena_container::network::remove_network(network).await;
         }
+        Ok(())
+    }
+
+    fn release(&mut self) {
+        self.container.take();
+        self.connection_string = None;
+        self.admin_connection_string = None;
+    }
+
+    async fn force_stop(&mut self) -> bool {
+        self.release();
+
+        let removed = match self.container_name.as_deref() {
+            Some(name) => arena_container::container::force_remove_container(name).await,
+            None => true,
+        };
+
+        if let Some(ref network) = self.network {
+            arena_container::network::remove_network(network).await;
+        }
+        removed
     }
 
     fn connection_string(&self) -> Option<&str> {

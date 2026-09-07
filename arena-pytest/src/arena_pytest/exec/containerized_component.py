@@ -1,3 +1,7 @@
+from datetime import timedelta
+
+from arena_pytest.support._expiry import _expiry_seconds
+
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from arena_pytest.ffi._ffi_children import children_for_ffi
@@ -10,6 +14,14 @@ class ContainerizedComponentBuilder:
     def __init__(self, name: str, containerfile: str):
         self._init_config(name)
         self._config["containerfile"] = containerfile
+
+    def with_expiry(self, expiry: timedelta) -> "ContainerizedComponentBuilder":
+        self._config["expiry_seconds"] = _expiry_seconds(expiry)
+        return self
+
+    def without_expiry(self) -> "ContainerizedComponentBuilder":
+        self._config["expiry_seconds"] = 0
+        return self
 
     def _init_config(self, name: str) -> None:
         self._config: Dict[str, Any] = {

@@ -32,12 +32,14 @@ pub(crate) struct OauthServer {
     inner: Option<OauthServerStarted>,
 }
 
-fn readiness_client(log_label: &str, server_certificate_pem: Option<&str>) -> reqwest::Client {
+fn readiness_client(
+    server_certificate_pem: Option<&str>,
+) -> Result<reqwest::Client, String> {
     let mut builder = reqwest::Client::builder();
 
     if let Some(pem) = server_certificate_pem {
         let certificate = reqwest::Certificate::from_pem(pem.as_bytes())
-            .unwrap_or_else(|e| panic!("[Oauth-{log_label}] readiness: invalid server TLS certificate: {e}"));
+            .map_err(|e| format!("readiness: invalid server TLS certificate: {e}"))?;
         builder = builder
             .add_root_certificate(certificate)
             .tls_built_in_root_certs(false);
@@ -45,7 +47,7 @@ fn readiness_client(log_label: &str, server_certificate_pem: Option<&str>) -> re
 
     builder
         .build()
-        .unwrap_or_else(|e| panic!("[Oauth-{log_label}] readiness: client build failed: {e}"))
+        .map_err(|e| format!("readiness: client build failed: {e}"))
 }
 
 fn reserve_bind_port(listen_ip: IpAddr) -> u16 {
@@ -65,18 +67,16 @@ fn origin_base_url(scheme: &str, listen_ip: IpAddr, bind_port: u16) -> String {
 impl OauthServer {
     pub(crate) async fn start(
         &mut self,
-        log_label: &str,
         listen: OauthListenAddr,
         issuers: Vec<IssuerRegistration>,
         scopes_supported: Vec<String>,
         token_ttl_secs: u64,
         tls_pem: Option<(String, String)>,
         metadata_base_url_override: Option<String>,
-    ) {
-        assert!(
-            self.inner.is_none(),
-            "[Oauth-{log_label}] oauth server already running"
-        );
+    ) -> Result<(), String> {
+        if self.inner.is_some() {
+            return Err("oauth server already running".to_string());
+        }
 
         for issuer in &issuers {
             issuer.keys.resolve();
@@ -126,7 +126,7 @@ impl OauthServer {
                 server_certificate_pem = Some(cert_pem.clone());
                 let rustls = RustlsConfig::from_pem(cert_pem.into_bytes(), key_pem.into_bytes())
                     .await
-                    .unwrap_or_else(|e| panic!("[Oauth-{log_label}] invalid TLS PEM: {e}"));
+                    .map_err(|e| format!("invalid TLS PEM: {e}"))?;
                 let server = bind_rustls(addr, rustls).handle(handle.clone());
                 tokio::spawn(async move { server.serve(router.into_make_service()).await })
             }
@@ -144,6 +144,14 @@ impl OauthServer {
             server_certificate_pem,
             signing_state,
         });
+        Ok(())
+    }
+
+    pub(crate) fn release(&mut self) {
+        if let Some(inner) = self.inner.take() {
+            inner.handle.graceful_shutdown(None);
+            inner.join.abort();
+        }
     }
 
     pub(crate) async fn stop(&mut self) {
@@ -173,22 +181,23 @@ impl OauthServer {
         self.inner.as_ref().map(|s| &s.signing_state)
     }
 
-    pub(crate) async fn wait_until_ready(&self, log_label: &str) {
+    pub(crate) async fn wait_until_ready(&self, log_label: &str) -> Result<(), String> {
         let timeout = Duration::from_secs(30);
         let poll_every = Duration::from_millis(100);
         let start = Instant::now();
-        let poll_base = self
+        let Some(poll_base) = self
             .inner
             .as_ref()
             .map(|s| s.readiness_poll_base.as_str())
-            .unwrap_or_else(|| panic!("[Oauth-{log_label}] readiness: server not started"));
+        else {
+            return Err("readiness: server not started".to_string());
+        };
         let url = format!("{poll_base}/.well-known/oauth-authorization-server");
         let client = readiness_client(
-            log_label,
             self.inner
                 .as_ref()
                 .and_then(|s| s.server_certificate_pem.as_deref()),
-        );
+        )?;
 
         tracing::debug!(
             subsystem = "oauth",
@@ -204,10 +213,9 @@ impl OauthServer {
 
         loop {
             if start.elapsed() >= timeout {
-                panic!(
-                    "[Oauth-{log_label}] did not become ready within {:?}. url={url}, attempts={attempt}, last_outcome={:?}",
-                    timeout, last_outcome
-                );
+                return Err(format!(
+                    "did not become ready within {timeout:?}. url={url}, attempts={attempt}, last_outcome={last_outcome:?}"
+                ));
             }
 
             attempt = attempt.saturating_add(1);
@@ -251,5 +259,6 @@ impl OauthServer {
             }
             tokio::time::sleep(poll_every).await;
         }
+        Ok(())
     }
 }

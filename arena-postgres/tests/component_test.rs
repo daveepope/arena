@@ -53,7 +53,7 @@ impl TestContext {
         let mut pg = PostgresDependency::builder("")
             .with_port(ephemeral_tcp_port())
             .build();
-        pg.start().await;
+        pg.start().await.expect("start should succeed");
 
         let conn_str = pg
             .connection_string()
@@ -127,7 +127,7 @@ impl TestContext {
     }
 
     async fn stop(mut self) {
-        self.pg.stop().await;
+        self.pg.stop().await.expect("stop should succeed");
     }
 }
 
@@ -261,7 +261,7 @@ async fn postgres_dependency_playbook_component_test() {
         .to_string()])
         .build();
 
-    pg.start().await;
+    pg.start().await.expect("start should succeed");
 
     let outcome = std::panic::AssertUnwindSafe(playbook_scenario(&pg))
         .catch_unwind()
@@ -269,7 +269,8 @@ async fn postgres_dependency_playbook_component_test() {
 
     tokio::time::timeout(Duration::from_secs(10), pg.stop())
         .await
-        .unwrap_or_else(|_| panic!("postgres stop timed out"));
+        .unwrap_or_else(|_| panic!("postgres stop timed out"))
+        .expect("postgres should stop");
 
     match outcome {
         Ok(Ok(())) => {}

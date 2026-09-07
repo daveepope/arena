@@ -47,4 +47,33 @@ public class IdentifierTest
         Assert.StartsWith("arena-kafka-", id1);
         Assert.StartsWith("arena-postgres-", id2);
     }
+
+    [Theory]
+    [InlineData("oracle")]
+    [InlineData("broker")]
+    [InlineData("server")]
+    [InlineData("kafka1")]
+    public void Build_SixCharacterName_AppendsSuffix(string name)
+    {
+        var id = ArenaIdentifiers.Build("arena-postgres", name);
+
+        Assert.StartsWith($"arena-postgres-{name}-", id);
+        Assert.NotEqual(name, id);
+    }
+
+    [Fact]
+    public void Build_AlreadyBuiltIdentifier_ReturnsItUnchanged()
+    {
+        var once = ArenaIdentifiers.Build("arena-postgres", "orders");
+
+        Assert.Equal(once, ArenaIdentifiers.Build("arena-postgres", once));
+    }
+
+    [Fact]
+    public void Build_IdentifierBuiltByAnotherModule_IsPreserved()
+    {
+        const string built = "arena-oracle-api-oracle-a1b2c3";
+
+        Assert.Equal(built, ArenaIdentifiers.Build("arena-postgres", built));
+    }
 }

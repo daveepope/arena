@@ -28,7 +28,8 @@ impl ReadinessCheck for DefaultHttpReadinessCheck {
         let timeout = Duration::from_millis(timeout_ms);
         let poll_every = Duration::from_millis(100);
         let start = Instant::now();
-        let client = admin_api_client(admin_url, self.trusted_tls_certificate_pem.as_deref());
+        let client = admin_api_client(admin_url, self.trusted_tls_certificate_pem.as_deref())
+            .expect("HTTP admin API client");
         let mappings_url = format!("{admin_url}/mappings");
 
         loop {

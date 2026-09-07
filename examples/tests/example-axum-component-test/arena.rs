@@ -284,7 +284,10 @@ pub async fn create_arena() -> OpenArena {
     )];
     let closed_arena = ClosedArena::new(rt.closed_arena_name.clone(), matches);
 
-    closed_arena.open().await
+    closed_arena
+        .open()
+        .await
+        .unwrap_or_else(|state| panic!("arena failed to open: {state}"))
 }
 
 static SHARED_ARENA: OnceCell<OpenArena> = OnceCell::const_new();

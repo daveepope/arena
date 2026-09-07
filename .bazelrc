@@ -2,6 +2,10 @@ test --test_verbose_timeout_warnings
 test --test_env=RUST_LOG=info
 test --test_output=errors
 
+common:unit --local_test_jobs=8
+common:component --local_test_jobs=8
+common:examples --local_test_jobs=4
+
 common:stream --test_output=streamed
 common:stream --test_summary=detailed
 common --java_runtime_version=remotejdk_25

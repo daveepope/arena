@@ -2,9 +2,12 @@ pub mod healthcheck;
 pub mod oracle_container_impl;
 pub mod sqlplus;
 
+use arena::lifecycle::message;
+use arena::lifecycle::Subject;
 use crate::builder::OracleDependencyBuilder;
 use crate::oracle_dependency::healthcheck::DefaultOracleReadinessCheck;
 use arena::dependency::{Dependency, RunnableDependency};
+use arena::lifecycle::{Fault, RunnableState};
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
 use oracle_container_impl::OracleImpl;
@@ -36,6 +39,8 @@ pub struct OracleDependency {
     readiness_check: Box<dyn ReadinessCheck>,
     sql_readiness_timeout: std::time::Duration,
     managed_tables: Vec<String>,
+    state: RunnableState,
+    faults: Vec<Fault>,
 }
 
 impl OracleDependency {
@@ -73,6 +78,8 @@ impl OracleDependency {
             readiness_check: Box::new(DefaultOracleReadinessCheck::new()),
             sql_readiness_timeout: READINESS_TIMEOUT,
             managed_tables: Vec::new(),
+            state: RunnableState::NotStarted,
+            faults: Vec::new(),
         }
     }
 
@@ -104,7 +111,7 @@ impl OracleDependency {
         OracleDependencyBuilder::new(identifier)
     }
 
-    pub async fn execute(&self, sql: &str) {
+    pub async fn execute(&self, sql: &str) -> Result<(), Fault> {
         oracle_container_impl::exec_sql(
             self.oracle_impl.as_ref(),
             &self.database_username,
@@ -112,10 +119,11 @@ impl OracleDependency {
             sql,
         )
         .await
-        .unwrap_or_else(|e| panic!("[OracleDependency-{}] execute: {e}", self.identifier));
+        .map(|_| ())
+        .map_err(|e| Fault::dependency(&self.identifier, format!("execute: {e}")))
     }
 
-    pub async fn query_scalar(&self, sql: &str) -> i32 {
+    pub async fn query_scalar(&self, sql: &str) -> Result<i32, Fault> {
         oracle_container_impl::exec_scalar_query(
             self.oracle_impl.as_ref(),
             &self.database_username,
@@ -123,7 +131,7 @@ impl OracleDependency {
             sql,
         )
         .await
-        .unwrap_or_else(|e| panic!("[OracleDependency-{}] query_scalar: {e}", self.identifier))
+        .map_err(|e| Fault::dependency(&self.identifier, format!("query_scalar: {e}")))
     }
 
     pub fn playbook(&self) -> crate::playbook::Playbook {
@@ -138,7 +146,7 @@ impl OracleDependency {
         self.sql_readiness_timeout = timeout;
     }
 
-    async fn run_startup_sql_scripts(&self, scripts: &[String]) {
+    async fn run_startup_sql_scripts(&self, scripts: &[String]) -> Result<(), String> {
         tracing::debug!(
             dependency = %self.identifier,
             script_count = scripts.len(),
@@ -160,40 +168,43 @@ impl OracleDependency {
                 sql,
             )
             .await
-            .unwrap_or_else(|e| {
-                panic!(
-                    "[OracleDependency-{}] startup sql script {}/{} failed: {e}",
-                    self.identifier,
+            .map_err(|e| {
+                format!(
+                    "startup sql script {}/{} failed: {e}",
                     idx + 1,
                     scripts.len()
                 )
-            });
+            })?;
         }
 
         tracing::debug!(dependency = %self.identifier, "startup sql scripts complete");
+        Ok(())
     }
 
-    async fn wait_until_ready(&self) {
+    async fn fail(&mut self, message: impl Into<String>, causes: Vec<Fault>) -> Fault {
+        let fault = Fault::dependency(&self.identifier, message).caused_by_all(causes);
+        self.faults.push(fault.clone());
+        <Self as RunnableDependency>::force_stop(self).await;
+        fault
+    }
+
+    async fn wait_until_ready(&self) -> Result<(), String> {
         let target = self
             .oracle_impl
             .host_address()
-            .expect("host address should be available after oracle starts");
+            .ok_or("host address not available after oracle started")?;
 
         let timeout_ms = READINESS_TIMEOUT.as_millis() as u64;
 
-        match self
-            .readiness_check
+        self.readiness_check
             .is_ready(&self.identifier, &target, timeout_ms)
             .await
-        {
-            Ok(()) => {}
-            Err(msg) => panic!("{msg}"),
-        }
+            .map_err(message::readiness_failed)?;
 
-        self.wait_for_sql_ready().await;
+        self.wait_for_sql_ready().await
     }
 
-    async fn wait_for_sql_ready(&self) {
+    async fn wait_for_sql_ready(&self) -> Result<(), String> {
         let start = std::time::Instant::now();
         let poll_every = std::time::Duration::from_millis(200);
 
@@ -206,21 +217,20 @@ impl OracleDependency {
             )
             .await
             {
-                Ok(_) => return,
+                Ok(_) => return Ok(()),
                 Err(e) => {
                     if !self.oracle_impl.is_container_running().await {
-                        panic!(
-                            "[OracleDependency-{}] container stopped or was removed during sql-level readiness after {:?}: {e}",
-                            self.identifier,
+                        return Err(format!(
+                            "container stopped or was removed during sql-level readiness after {:?}: {e}",
                             start.elapsed()
-                        );
+                        ));
                     }
 
                     if start.elapsed() >= self.sql_readiness_timeout {
-                        panic!(
-                            "[OracleDependency-{}] sql-level readiness check did not succeed within {:?}: {e}",
-                            self.identifier, self.sql_readiness_timeout
-                        );
+                        return Err(format!(
+                            "sql-level readiness check did not succeed within {:?}: {e}",
+                            self.sql_readiness_timeout
+                        ));
                     }
 
                     tracing::debug!(
@@ -234,7 +244,7 @@ impl OracleDependency {
         }
     }
 
-    async fn snapshot_managed_tables(&mut self) {
+    async fn snapshot_managed_tables(&mut self) -> Result<(), String> {
         let tables = oracle_container_impl::exec_table_list(
             self.oracle_impl.as_ref(),
             &self.database_username,
@@ -242,7 +252,7 @@ impl OracleDependency {
             "SELECT TABLE_NAME FROM USER_TABLES ORDER BY TABLE_NAME;",
         )
         .await
-        .unwrap_or_else(|e| panic!("[OracleDependency-{}] snapshot managed tables: {e}", self.identifier));
+        .map_err(|e| format!("snapshot managed tables: {e}"))?;
 
         tracing::debug!(
             dependency = %self.identifier,
@@ -251,9 +261,10 @@ impl OracleDependency {
             "captured managed table snapshot"
         );
         self.managed_tables = tables;
+        Ok(())
     }
 
-    async fn recreate_app_user(&self) {
+    async fn recreate_app_user(&self) -> Result<(), String> {
         let safe_user = self.database_username.replace('"', "\"\"");
         let safe_password = self.database_password.replace('\'', "''");
 
@@ -276,7 +287,7 @@ impl OracleDependency {
             &drop_sql,
         )
         .await
-        .unwrap_or_else(|e| panic!("[OracleDependency-{}] soft reset: drop user: {e}", self.identifier));
+        .map_err(|e| format!("soft reset: drop user: {e}"))?;
 
         oracle_container_impl::exec_sql(
             self.oracle_impl.as_ref(),
@@ -285,7 +296,8 @@ impl OracleDependency {
             &create_sql,
         )
         .await
-        .unwrap_or_else(|e| panic!("[OracleDependency-{}] soft reset: create user: {e}", self.identifier));
+        .map_err(|e| format!("soft reset: create user: {e}"))?;
+        Ok(())
     }
 }
 
@@ -303,10 +315,19 @@ impl RunnableDependency for OracleDependency {
         self
     }
 
-    async fn start(&mut self) {
+    fn state(&self) -> RunnableState {
+        self.state
+    }
+
+    fn faults(&self) -> &[Fault] {
+        &self.faults
+    }
+
+    async fn start(&mut self) -> Result<(), Fault> {
         if self.running {
-            return;
+            return Ok(());
         }
+        self.state = RunnableState::Starting;
 
         tracing::debug!(dependency = %self.identifier, phase = "start_begin", "starting");
         let sw = Instant::now();
@@ -314,8 +335,14 @@ impl RunnableDependency for OracleDependency {
         if let Some(children) = self.dependencies.as_mut() {
             if !children.is_empty() {
                 self.children_started = true;
+                let mut child_faults = Vec::new();
                 for dep in children.iter_mut() {
-                    dep.start().await;
+                    if let Err(fault) = arena::dependency::start_child(dep).await {
+                        child_faults.push(fault);
+                    }
+                }
+                if !child_faults.is_empty() {
+                    return Err(self.fail(message::child_start_failed(Subject::Dependency), child_faults).await);
                 }
             }
         }
@@ -333,7 +360,8 @@ impl RunnableDependency for OracleDependency {
 
         let sw_container = Instant::now();
         self.needs_teardown = true;
-        self.oracle_impl
+        if let Err(message) = self
+            .oracle_impl
             .start(
                 self.port,
                 &database_name,
@@ -344,7 +372,10 @@ impl RunnableDependency for OracleDependency {
                 &image_tag,
                 &container_name,
             )
-            .await;
+            .await
+        {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw_container.elapsed(),
@@ -352,7 +383,10 @@ impl RunnableDependency for OracleDependency {
         );
 
         let sw_ready = Instant::now();
-        self.wait_until_ready().await;
+        self.state = RunnableState::ReadinessCheck;
+        if let Err(message) = self.wait_until_ready().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw_ready.elapsed(),
@@ -361,7 +395,9 @@ impl RunnableDependency for OracleDependency {
 
         if let Some(scripts) = self.startup_sql_scripts.clone() {
             let sw_scripts = Instant::now();
-            self.run_startup_sql_scripts(&scripts).await;
+            if let Err(message) = self.run_startup_sql_scripts(&scripts).await {
+                return Err(self.fail(message, Vec::new()).await);
+            }
             tracing::debug!(
                 dependency = %self.identifier,
                 elapsed = ?sw_scripts.elapsed(),
@@ -369,44 +405,96 @@ impl RunnableDependency for OracleDependency {
             );
         }
 
-        self.snapshot_managed_tables().await;
+        if let Err(message) = self.snapshot_managed_tables().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
 
         self.running = true;
+        self.state = RunnableState::Started;
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw.elapsed(),
             "started and ready"
         );
+        Ok(())
     }
 
-    async fn stop(&mut self) {
-        self.oracle_impl.stop().await;
-        self.needs_teardown = false;
+    async fn stop(&mut self) -> Result<(), Fault> {
+        self.state = RunnableState::Stopping;
+        let mut causes = Vec::new();
 
-        if !self.running {
-            if self.children_started {
-                for dep in self.dependencies.iter_mut().flatten().rev() {
-                    dep.stop().await;
-                }
-                self.children_started = false;
-            }
-            return;
+        if let Err(message) = self.oracle_impl.stop().await {
+            causes.push(Fault::dependency(&self.identifier, message));
         }
+        self.needs_teardown = false;
 
         tracing::debug!(dependency = %self.identifier, phase = "stop_begin", "stopping");
         let sw = Instant::now();
 
         for dep in self.dependencies.iter_mut().flatten().rev() {
-            dep.stop().await;
+            if let Err(fault) = arena::dependency::stop_child(dep).await {
+                causes.push(fault);
+            }
         }
 
         self.children_started = false;
         self.running = false;
+
+        if !causes.is_empty() {
+            let fault =
+                Fault::dependency(&self.identifier, message::stop_did_not_complete()).caused_by_all(causes);
+            self.faults.push(fault.clone());
+            self.state = RunnableState::Faulted;
+            return Err(fault);
+        }
+
+        self.state = RunnableState::Stopped;
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw.elapsed(),
             "stopped"
         );
+        Ok(())
+    }
+
+    fn release(&mut self) {
+        self.oracle_impl.release();
+        self.running = false;
+        self.needs_teardown = false;
+        self.children_started = false;
+        for dep in self.dependencies.iter_mut().flatten().rev() {
+            arena::dependency::release_child(dep);
+        }
+        self.state = RunnableState::Stopped;
+    }
+
+    async fn force_stop(&mut self) {
+        let removed = self.oracle_impl.force_stop().await;
+        self.needs_teardown = false;
+        self.running = false;
+        self.children_started = false;
+
+        for dep in self.dependencies.iter_mut().flatten().rev() {
+            arena::dependency::force_stop_child(dep).await;
+        }
+
+        if removed {
+            self.state = RunnableState::Stopped;
+            return;
+        }
+
+        let unconfirmed = Fault::dependency(
+            &self.identifier,
+            message::forced_teardown_unconfirmed(),
+        );
+        if !self
+            .faults
+            .iter()
+            .any(|f| f.message == unconfirmed.message && f.id == unconfirmed.id)
+        {
+            self.faults.push(unconfirmed);
+        }
+        self.state = RunnableState::Faulted;
     }
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
@@ -421,9 +509,9 @@ impl RunnableDependency for OracleDependency {
         self.dependencies.as_deref_mut().unwrap_or(&mut [])
     }
 
-    async fn soft_reset(&self) {
+    async fn soft_reset(&self) -> Result<(), Fault> {
         if !self.running {
-            return;
+            return Ok(());
         }
 
         let Some(scripts) = &self.startup_sql_scripts else {
@@ -431,7 +519,7 @@ impl RunnableDependency for OracleDependency {
                 dependency = %self.identifier,
                 "soft reset skipped: no startup scripts"
             );
-            return;
+            return Ok(());
         };
 
         tracing::debug!(
@@ -440,13 +528,17 @@ impl RunnableDependency for OracleDependency {
             "drop and recreate app user"
         );
 
-        self.recreate_app_user().await;
-        self.run_startup_sql_scripts(scripts).await;
+        self.recreate_app_user()
+            .await
+            .map_err(|message| Fault::dependency(&self.identifier, message))?;
+        self.run_startup_sql_scripts(scripts)
+            .await
+            .map_err(|message| Fault::dependency(&self.identifier, message))
     }
 
-    async fn hard_reset(&mut self) {
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
         if !self.running {
-            return;
+            return Ok(());
         }
 
         tracing::debug!(
@@ -466,10 +558,13 @@ impl RunnableDependency for OracleDependency {
             self.container_name.as_deref(),
         );
 
-        self.oracle_impl.stop().await;
+        if let Err(message) = self.oracle_impl.stop().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         self.running = false;
 
-        self.oracle_impl
+        if let Err(message) = self
+            .oracle_impl
             .start(
                 self.port,
                 &database_name,
@@ -480,28 +575,41 @@ impl RunnableDependency for OracleDependency {
                 &image_tag,
                 &container_name,
             )
-            .await;
-        self.wait_until_ready().await;
+            .await
+        {
+            return Err(self.fail(message, Vec::new()).await);
+        }
+        if let Err(message) = self.wait_until_ready().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
 
         if let Some(scripts) = self.startup_sql_scripts.clone() {
-            self.run_startup_sql_scripts(&scripts).await;
+            if let Err(message) = self.run_startup_sql_scripts(&scripts).await {
+                return Err(self.fail(message, Vec::new()).await);
+            }
         }
-        self.snapshot_managed_tables().await;
+        if let Err(message) = self.snapshot_managed_tables().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
 
         self.running = true;
+        self.state = RunnableState::Started;
+        Ok(())
     }
 }
 
 impl Drop for OracleDependency {
     fn drop(&mut self) {
-        if self.running {
+        if self.running || self.needs_teardown || self.children_started {
             tracing::warn!(
                 dependency = %self.identifier,
-                "drop while running; forcing stop"
+                "drop while running; releasing container"
             );
-            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
-        } else if self.needs_teardown || self.children_started {
-            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
+            self.oracle_impl.release();
+            self.running = false;
+            self.needs_teardown = false;
+            self.children_started = false;
+            self.state = RunnableState::Stopped;
         }
     }
 }

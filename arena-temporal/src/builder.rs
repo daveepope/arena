@@ -1,3 +1,4 @@
+use std::time::Duration;
 use crate::temporal_dependency::container_impl::TemporalContainerImpl;
 use crate::temporal_dependency::{TemporalDependency, TemporalImpl};
 use arena::dependency::RunnableDependency;
@@ -5,6 +6,7 @@ use arena::healthcheck::ReadinessCheck;
 
 pub struct TemporalDependencyBuilder {
     identifier: String,
+    expiry: Option<Duration>,
     temporal_impl: Option<Box<dyn TemporalImpl>>,
     port: Option<u16>,
     ui_port: Option<u16>,
@@ -23,6 +25,7 @@ impl TemporalDependencyBuilder {
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {
             identifier: identifier.into(),
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
             temporal_impl: None,
             port: None,
             ui_port: None,
@@ -97,10 +100,21 @@ impl TemporalDependencyBuilder {
         self.with_image_tag(image_tag)
     }
 
+    pub fn with_expiry(mut self, expiry: Duration) -> Self {
+        self.expiry = Some(expiry);
+        self
+    }
+
+    pub fn without_expiry(mut self) -> Self {
+        self.expiry = None;
+        self
+    }
+
     pub fn build(self) -> TemporalDependency {
-        let temporal_impl = self
+        let mut temporal_impl = self
             .temporal_impl
             .unwrap_or_else(|| Box::new(TemporalContainerImpl::new(self.network)));
+        temporal_impl.set_expiry(self.expiry);
 
         let port = self.port.unwrap_or(Self::DEFAULT_PORT);
         let ui_port = self.ui_port.unwrap_or(Self::DEFAULT_UI_PORT);
@@ -112,7 +126,7 @@ impl TemporalDependencyBuilder {
             .unwrap_or_else(|| arena_container::default_images::TEMPORAL.tag.to_string());
 
         let mut dep = TemporalDependency::new(
-            arena_container::identifier::build("arena-temporal", &self.identifier),
+            arena_container::identifier::build(crate::MODULE, &self.identifier),
             temporal_impl,
             port,
             ui_port,

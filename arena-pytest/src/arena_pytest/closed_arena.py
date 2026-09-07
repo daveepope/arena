@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import List, Optional, Sequence
+from typing import Callable, List, Optional, Sequence
 
 from arena_pytest.arena import OpenArena
+from arena_pytest.lifecycle import as_lifecycle_error
 from arena_pytest.ffi._ffi import (
     ArenaBindingError,
     ArenaLogLevel,
@@ -14,6 +15,7 @@ from arena_pytest.ffi._ffi import (
     open_arena as ffi_open_arena,
     register_default_dispatcher_logging_target,
     register_dispatcher_logging_target_for_logger,
+    register_dispatcher_logging_target_for_logger_factory,
     set_dispatcher_component_allow_json,
     set_dispatcher_dependency_allow_json,
 )
@@ -35,6 +37,7 @@ class ClosedArena:
         *,
         log_level: ArenaLogLevel = ArenaLogLevel.INFO,
         logger: Optional[logging.Logger] = None,
+        logger_factory: Optional[Callable[[str], logging.Logger]] = None,
         log_component_ids: Optional[Sequence[str]] = None,
         log_dependency_ids: Optional[Sequence[str]] = None,
     ):
@@ -42,6 +45,7 @@ class ClosedArena:
         self._matches = matches
         self._log_level = log_level
         self._logger = logger
+        self._logger_factory = logger_factory
         self._log_dependency_ids = _normalize_optional_id_seq(log_dependency_ids)
         self._log_component_ids = _normalize_optional_id_seq(log_component_ids)
 
@@ -71,7 +75,14 @@ class ClosedArena:
         )
         await asyncio.to_thread(set_dispatcher_dependency_allow_json, ffi, dep_json)
         await asyncio.to_thread(set_dispatcher_component_allow_json, ffi, comp_json)
-        if self._logger is not None:
+        if self._logger_factory is not None:
+            log_tok = await asyncio.to_thread(
+                register_dispatcher_logging_target_for_logger_factory,
+                ffi,
+                self._logger_factory,
+                arena_log_level=self._log_level,
+            )
+        elif self._logger is not None:
             log_tok = await asyncio.to_thread(
                 register_dispatcher_logging_target_for_logger,
                 ffi,
@@ -96,6 +107,6 @@ class ClosedArena:
             await asyncio.to_thread(
                 close_arena, ffi, 0, dispatcher_logging_target_token=log_tok
             )
-            raise
+            raise as_lifecycle_error(e) from None
 
         return OpenArena(ffi, handle, log_tok)

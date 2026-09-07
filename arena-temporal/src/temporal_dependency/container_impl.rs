@@ -22,6 +22,8 @@ pub(crate) struct TemporalContainerImpl {
     grpc_endpoint: Option<String>,
     ui_url: Option<String>,
     network: Option<String>,
+    container_name: Option<String>,
+    expiry: Option<Duration>,
 }
 
 impl TemporalContainerImpl {
@@ -31,12 +33,18 @@ impl TemporalContainerImpl {
             grpc_endpoint: None,
             ui_url: None,
             network,
+            container_name: None,
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
         }
     }
 }
 
 #[async_trait]
 impl TemporalImpl for TemporalContainerImpl {
+    fn set_expiry(&mut self, expiry: Option<Duration>) {
+        self.expiry = expiry;
+    }
+
     async fn start(
         &mut self,
         grpc_port: u16,
@@ -44,10 +52,13 @@ impl TemporalImpl for TemporalContainerImpl {
         image_name: &str,
         image_tag: &str,
         container_name: &str,
-    ) {
+    ) -> Result<(), String> {
         if self.container.is_some() {
-            return;
+            return Ok(());
         }
+
+        arena_container::expiry::remove_expired_containers_if_enabled(crate::MODULE, self.expiry)
+            .await;
 
         arena_container::container::try_remove_existing_container(container_name).await;
 
@@ -62,6 +73,10 @@ impl TemporalImpl for TemporalContainerImpl {
         let mut request = image
             .with_health_check(tcp_healthcheck(TEMPORAL_GRPC_CONTAINER_PORT))
             .with_container_name(container_name)
+            .with_labels(arena_container::expiry::expiry_labels_for(
+                crate::MODULE,
+                self.expiry,
+            ))
             .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await)
             .with_mapped_port(grpc_port, grpc_container_port)
             .with_mapped_port(ui_port, ui_container_port)
@@ -72,32 +87,34 @@ impl TemporalImpl for TemporalContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request.start().await.unwrap_or_else(|e| {
-            panic!(
-                "{}",
-                arena_container::container::start_failure_message("temporal", &e)
-            )
-        });
+        let container = request.start().await.map_err(|e| {
+            arena_container::container::start_failure_message("temporal", &e)
+        })?;
 
         let (host, grpc_host_port, ui_host_port) = tokio::join!(
             container.get_host(),
             container.get_host_port_ipv4(grpc_container_port),
             container.get_host_port_ipv4(ui_container_port),
         );
-        let host = host.expect("Failed to get host").to_string();
-        let grpc_host_port = grpc_host_port.expect("Failed to get grpc port");
-        let ui_host_port = ui_host_port.expect("Failed to get ui port");
+        let host = host
+            .map_err(|e| format!("temporal container host unavailable: {e}"))?
+            .to_string();
+        let grpc_host_port =
+            grpc_host_port.map_err(|e| format!("temporal grpc port unavailable: {e}"))?;
+        let ui_host_port = ui_host_port.map_err(|e| format!("temporal ui port unavailable: {e}"))?;
 
         self.grpc_endpoint = Some(format!("{host}:{grpc_host_port}"));
         self.ui_url = Some(format!("http://{host}:{ui_host_port}"));
         self.container = Some(container);
+        self.container_name = Some(container_name.to_string());
 
         tracing::debug!(layer = "temporal_container", phase = "container_started");
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         if self.container.take().is_none() {
-            return;
+            return Ok(());
         }
         self.grpc_endpoint = None;
         self.ui_url = None;
@@ -106,6 +123,27 @@ impl TemporalImpl for TemporalContainerImpl {
         if let Some(ref network) = self.network {
             arena_container::network::remove_network(network).await;
         }
+        Ok(())
+    }
+
+    fn release(&mut self) {
+        self.container.take();
+        self.grpc_endpoint = None;
+        self.ui_url = None;
+    }
+
+    async fn force_stop(&mut self) -> bool {
+        self.release();
+
+        let removed = match self.container_name.as_deref() {
+            Some(name) => arena_container::container::force_remove_container(name).await,
+            None => true,
+        };
+
+        if let Some(ref network) = self.network {
+            arena_container::network::remove_network(network).await;
+        }
+        removed
     }
 
     fn grpc_endpoint(&self) -> Option<&str> {

@@ -5,6 +5,83 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.0]
+
+### Breaking
+
+Upgrading from 6.2.1 requires code changes in Rust. The FFI C ABI is unchanged, so existing Python, Java and .NET test suites keep working without edits, though the client libraries themselves gained new methods.
+
+- `RunnableDependency` and `RunnableComponent` lifecycle methods return `Result<(), Fault>` instead of `()`, so every implementation must return a fault rather than panic
+- `RunnableDependency` and `RunnableComponent` gain required `state`, `faults`, `force_stop` and `release` methods
+- `RunnableComponent` gains required `identifier`, `children` and `children_mut` methods
+- `Playbook::run` returns `Result<Box<dyn ActivePlaybook>, Fault>`
+- `MatchTrait::start`/`stop` take a `&LifecycleContext` and return `Result<(), Vec<Fault>>`
+- `ClosedArena::open` returns `Result<OpenArena, ArenaState>` and `OpenArena::close` returns `Result<ClosedArena, ArenaState>`, so callers must handle the error case instead of catching a panic
+- `OpenArena::run_playbook` returns `Option<Result<Box<dyn ActivePlaybook>, Fault>>`
+- `ClosedArena` is identified by `id` rather than `name`
+- `arena-oracledb`: `execute` and `query_scalar` return `Result<_, Fault>`
+- The public `HttpImpl`, `KafkaImpl`, `LocalstackImpl`, `MssqlImpl`, `OracleImpl`, `PostgresImpl`, `SmtpImpl` and `TemporalImpl` traits return `Result<(), String>` from `start`/`stop` and gain required `force_stop` and `release` methods, so an external implementation of any of them must be updated
+- `arena_reset` can report a failure where it previously always reported success, so a reset that was silently failing now surfaces as an error in the clients
+- `arena-http`: `reset_journal` returns `Result<(), Fault>`
+- A dependency identifier whose last segment is six characters (`oracle`, `broker`, `server`) now receives the module prefix and uniqueness suffix it was previously denied, so its container name changes; anything pinning that exact container name must be updated
+- Container dependencies remove their own module's expired containers when they start, so a container left behind by a previous run is removed after five minutes by default; use `without_expiry` to opt out
+
+### Added
+
+- `arena`: `ArenaLifecycleState` lifecycle state machine and `RunnableState` per-subject state
+- `arena`: `ArenaLifecycleObserver` and `ClosedArena::observe` for observing every arena transition
+- `arena`: `ArenaState` snapshot of arena state, per-subject state and recorded faults, available from `ClosedArena::state`/`OpenArena::state`
+- `arena`: `Fault`, a recursive fault type with a UTC timestamp, owned by the subject it describes
+- `arena`: `state` and `faults` on `RunnableDependency` and `RunnableComponent`
+- `arena`: `force_stop` on `RunnableDependency` and `RunnableComponent`, an idempotent forced teardown the Arena runs unconditionally over every subject
+- `arena`: `release` on `RunnableDependency` and `RunnableComponent`, a synchronous best-effort teardown used when a subject or arena is dropped
+- `arena-container`: `force_remove_container` for confirmed forced container removal
+- `arena-pytest`: a `SIGTERM` during a run ends the session so fixture teardown closes the arena
+- `arena-xunit`: open arenas are closed on process exit and on Ctrl-C
+- `arena-container`: containers are stamped with an expiry, and each dependency removes only its own module's expired containers when it starts, so a crashed run's containers are cleaned up; an arena that stays open longer than its expiry can have its own containers removed by a later arena of the same module, so raise the expiry or call `without_expiry` for long-lived arenas
+- Container dependency and containerized component builders take `with_expiry` / `without_expiry`, defaulting to five minutes, exposed through the FFI as `expiry_seconds` and in the Python, Java and .NET clients
+
+### Changed
+
+- `arena`: `RunnableDependency` and `RunnableComponent` lifecycle methods return `Result<(), Fault>` instead of panicking
+- `arena`: `Playbook::run` returns `Result<Box<dyn ActivePlaybook>, Fault>`
+- `MatchTrait::run_playbook` returns `Option<Result<Box<dyn ActivePlaybook>, Fault>>`
+- `RunnableDependency::soft_reset` and `hard_reset` return `Result<(), Fault>`
+- `arena`: `MatchTrait::start`/`stop` take a `&LifecycleContext` and return `Result<(), Vec<Fault>>`
+- `arena`: `ClosedArena::open` returns `Result<OpenArena, ArenaState>` and `OpenArena::close` returns `Result<ClosedArena, ArenaState>`
+- `arena`: `OpenArena::run_playbook` returns `Option<Result<Box<dyn ActivePlaybook>, Fault>>`
+- `arena`: `RunnableComponent` gains `identifier`, `children` and `children_mut`, so components appear by id in the arena state
+- `arena`: `ClosedArena` is identified by `id` rather than `name`
+- `arena`: new `chrono` dependency for UTC fault timestamps
+- `arena-oracledb`: `execute` and `query_scalar` return `Result<_, Fault>`
+- `arena-http`: `reset_journal` returns `Result<(), Fault>`
+- Dependency and component crates report their own lifecycle state and faults instead of panicking
+- The FFI C ABI is unchanged, so existing test suites written against `arena-pytest`, `arena-junit` and `arena-xunit` keep working
+
+### Fixed
+
+- The Arena now tears down every started dependency and component after a fault, in a graceful pass followed by an unconditional forced pass, instead of re-raising the first panic and abandoning the rest
+- A fault in one parallel start no longer discards the faults raised by the others
+- The Arena reports `ArenaFaulted` whenever any dependency or component ends faulted, so no exit path reports success while a subject may still be running
+- A panic escaping a dependency or component `stop` is now reported as a fault instead of only being logged
+- A panicking lifecycle observer can no longer cancel the forced teardown or abort `close`
+- Repeated forced teardown no longer accumulates duplicate faults or downgrades a faulted component to stopped
+- `arena-http`: the managed playbook returns a fault instead of panicking when its dependency is not started
+- `arena-oauth`: a failed `hard_reset` now tears the dependency down instead of leaving its children running
+- `Drop` releases subjects synchronously instead of blocking on async teardown, which previously aborted the process on a stop panic and deadlocked under a current-thread runtime
+- `arena-smtp`, `arena-oauth`: ephemeral TLS certificate generation failure is reported as a fault from `start` instead of panicking while the dependency is built
+- `scripts`: repin and audit report a missing `cargo` with an actionable message instead of a traceback
+- `arena-xunit`: `OpenArena.Dispose` and `ActivePlaybook.Dispose` are safe to call concurrently, which previously double freed the native playbook handle
+- `arena-xunit`: a failure running exec-on-start playbooks closes the arena instead of leaving its containers running
+- `arena-xunit`: the shutdown registry holds arenas weakly, so an arena that is never disposed can still be finalized
+- `arena-container`, `arena-pytest`, `arena-junit`, `arena-xunit`: an identifier whose last segment is six characters (`oracle`, `broker`, `server`) is no longer mistaken for an already-built one, so its container name is unique per process instead of colliding with a parallel arena's container
+- The Arena releases every subject during drop even when one of them panics, instead of skipping the rest
+- `arena-container`: the expired-container sweep runs at most once per module per minute, so a dependency starting many containers at once no longer opens a container runtime connection per container and destabilises startup
+- `arena-xunit`: identifiers are lowercased invariantly, so a non-invariant locale cannot produce an invalid container name
+- `arena-xunit`: identifier building is idempotent, matching the other clients and Rust
+- `examples`: device state transitions are applied through a workflow update instead of a signal and a bounded poll, so a state read after a write no longer races the workflow
+- CI: the pre-release gate only runs for the `pre-release` label and ignores cancelled runs when checking the previous run for the commit
+
 ## [6.2.1]
 
 ### Changed

@@ -143,11 +143,13 @@ public final class DispatcherHostLoggingLifecycleTest {
       cap.list.clear();
 
       PointerByReference err = new PointerByReference();
+      PointerByReference state = new PointerByReference();
       Pointer h =
           ArenaBindings.lib()
               .arena_open(
                   "junit-dispatcher-host-logging-binding",
-                  MATCH_JSON_ARENA_OPEN_BUILD_FAIL_WITH_NO_RUNTIME, err);
+                  MATCH_JSON_ARENA_OPEN_BUILD_FAIL_WITH_NO_RUNTIME, err, state);
+      ArenaBindings.takeOutString(state);
       assertTrue(h == null || Pointer.nativeValue(h) == 0L);
       assertNotNull(ArenaBindings.takeErr(err));
 
@@ -255,11 +257,13 @@ public final class DispatcherHostLoggingLifecycleTest {
       cap.list.clear();
 
       PointerByReference err = new PointerByReference();
+      PointerByReference state = new PointerByReference();
       Pointer h =
           ArenaBindings.lib()
               .arena_open(
                   "junit-dispatcher-host-logging-binding-open-error",
-                  MATCH_JSON_ARENA_OPEN_BUILD_FAIL_WITH_NO_RUNTIME, err);
+                  MATCH_JSON_ARENA_OPEN_BUILD_FAIL_WITH_NO_RUNTIME, err, state);
+      ArenaBindings.takeOutString(state);
       assertTrue(h == null || Pointer.nativeValue(h) == 0L);
       assertNotNull(ArenaBindings.takeErr(err));
 

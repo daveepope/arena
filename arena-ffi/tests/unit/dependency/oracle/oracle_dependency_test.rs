@@ -12,6 +12,7 @@ fn test_password() -> String {
 fn minimal_oracle_config() -> OracleDependencyConfig {
     OracleDependencyConfig {
         identifier: "oracle".to_string(),
+        expiry_seconds: None,
         image_name: None,
         image: None,
         port: None,

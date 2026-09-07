@@ -25,7 +25,7 @@ impl TestContext {
     async fn new() -> Result<Self, String> {
         tracing::info!(suite = "crate_component", crate_under_test = "arena_http", phase = "dependency_start_begin", "starting dependency");
         let mut http_dependency = HttpDependency::builder("").build();
-        http_dependency.start().await;
+        http_dependency.start().await.expect("start should succeed");
 
         let base_url = http_dependency
             .base_url()
@@ -89,7 +89,7 @@ impl TestContext {
     }
 
     async fn stop(mut self) {
-        self.http_dependency.stop().await;
+        self.http_dependency.stop().await.expect("stop should succeed");
     }
 }
 
@@ -1108,7 +1108,7 @@ async fn http_dependency_https_listener_stub_roundtrip_component_test() {
         .done()
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
 
     let https_origin = dep
         .https_base_url()
@@ -1157,5 +1157,5 @@ async fn http_dependency_https_listener_stub_roundtrip_component_test() {
     pb.verify(1, get_requested_for("/api/https-stub-check"))
         .await;
     drop(pb);
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }

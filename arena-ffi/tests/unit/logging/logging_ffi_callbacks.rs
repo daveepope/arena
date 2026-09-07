@@ -127,34 +127,28 @@ fn comps_allow_json_ffi(json_array_utf8: &str) {
     }
 }
 
-fn expect_dispatcher_callback_payload_format(record: &Record) {
-    let msg = &record.message;
+fn expect_dispatcher_callback_payload_format(record: &Record, expected_message: &str) {
     assert!(
-        msg.starts_with('['),
-        "callback message (payload) must start with [tracing-target]: {:?}",
-        msg
+        record.message.starts_with(expected_message),
+        "payload must open with the rendered message: {:?}",
+        record.message
     );
-    let close_bracket = msg
-        .char_indices()
-        .find(|(_, c)| *c == ']')
-        .map(|(i, _)| i)
-        .expect("closing ] for tracing target bracket");
-    let tag = &msg[1..close_bracket];
     assert!(
-        !tag.contains('/') && !tag.contains('\\'),
-        "tracing target tag inside payload must not look like a filesystem path: {tag:?}"
+        !record.message.contains('['),
+        "payload must not carry a bracketed target prefix: {:?}",
+        record.message
     );
 }
 
-fn expect_tracing_target_param_is_module_like(record: &Record) {
+fn expect_tracing_target_param_is_logger_name(record: &Record) {
     assert!(
-        record.target.starts_with("ffi_logging_test"),
-        "tracing target param should use module_path-derived string: {:?}",
+        record.target == "arena" || record.target.starts_with("arena."),
+        "target should be an object logger name rooted at arena: {:?}",
         record.target
     );
     assert!(
         !record.target.contains('/') && !record.target.contains('\\'),
-        "tracing target param must not embed filesystem path segments: {:?}",
+        "target must not embed filesystem path segments: {:?}",
         record.target
     );
 }
@@ -192,18 +186,13 @@ fn arena_add_log_target_tracing_emit_invokes_callback() {
         .find(|r| r.message.contains("dispatcher-roundtrip"))
         .unwrap_or_else(|| panic!("expected captured record, got {captured:?}"));
     assert_eq!(record.level, ArenaLogLevel::Info as i32);
-    expect_tracing_target_param_is_module_like(record);
+    expect_tracing_target_param_is_logger_name(record);
     assert!(
         record.message.contains("dispatcher-roundtrip 42"),
         "message did not render fmt args: {}",
         record.message
     );
-    expect_dispatcher_callback_payload_format(record);
-    assert!(
-        record.message.starts_with("[ffi_logging_test"),
-        "integration test crate should lead payload with [ffi_logging_test…]: {:?}",
-        record.message
-    );
+    expect_dispatcher_callback_payload_format(record, "dispatcher-roundtrip 42");
     expect_caller_field_basename_rs(record);
     assert_eq!(
         record.caller_file.as_deref(),
@@ -235,8 +224,8 @@ fn arena_add_log_target_tracing_structured_kv_fields_follow_message_fragment_in_
         "expected structured field forwarded after message with separator, got {}",
         record.message
     );
-    expect_dispatcher_callback_payload_format(record);
-    expect_tracing_target_param_is_module_like(record);
+    expect_dispatcher_callback_payload_format(record, "kv-probe-msg");
+    expect_tracing_target_param_is_logger_name(record);
     expect_caller_field_basename_rs(record);
 }
 
@@ -271,8 +260,8 @@ fn arena_add_log_target_user_data_plain_passes_through() {
         .find(|r| r.message.contains("user-data-passthrough"))
         .unwrap_or_else(|| panic!("expected captured record, got {captured:?}"));
     assert_eq!(record.user_data, 0xDEAD_BEEFusize);
-    expect_dispatcher_callback_payload_format(record);
-    expect_tracing_target_param_is_module_like(record);
+    expect_dispatcher_callback_payload_format(record, "user-data-passthrough");
+    expect_tracing_target_param_is_logger_name(record);
     expect_caller_field_basename_rs(record);
 }
 
@@ -296,8 +285,8 @@ fn arena_add_log_target_tracing_level_maps_into_ffi_level_int() {
 
     for needle in ["level-probe-error", "level-probe-warn", "level-probe-info"] {
         let r = pick_record(needle);
-        expect_dispatcher_callback_payload_format(r);
-        expect_tracing_target_param_is_module_like(r);
+        expect_dispatcher_callback_payload_format(r, needle);
+        expect_tracing_target_param_is_logger_name(r);
         expect_caller_field_basename_rs(r);
         assert_eq!(r.caller_file.as_deref(), Some("logging_ffi_callbacks.rs"));
     }
@@ -334,8 +323,8 @@ fn arena_add_log_target_many_targets_fan_out_each_receive() {
     let ra = a.iter().find(|r| r.message.contains("fan-out-marker")).expect("fan-out a");
     let rb = b.iter().find(|r| r.message.contains("fan-out-marker")).expect("fan-out b");
     for record in [ra, rb] {
-        expect_dispatcher_callback_payload_format(record);
-        expect_tracing_target_param_is_module_like(record);
+        expect_dispatcher_callback_payload_format(record, "fan-out-marker");
+        expect_tracing_target_param_is_logger_name(record);
         expect_caller_field_basename_rs(record);
     }
 }
@@ -344,7 +333,7 @@ fn arena_add_log_target_many_targets_fan_out_each_receive() {
 fn arena_set_log_level_info_suppresses_debug_until_debug_allowed() {
     let _g = TARGET_API_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     drain(&RECORDED);
-    arena_set_log_level(ArenaLogLevel::Info);
+    arena_set_log_level(ArenaLogLevel::Info as i32);
     let handle = arena_add_log_target(Some(collecting_callback), std::ptr::null_mut());
     assert_ne!(handle, 0);
 
@@ -372,11 +361,11 @@ fn arena_set_log_level_info_suppresses_debug_until_debug_allowed() {
         .iter()
         .find(|r| r.message.contains("level-gate-info-should-reach"))
         .expect("info record");
-    expect_dispatcher_callback_payload_format(info_rec);
-    expect_tracing_target_param_is_module_like(info_rec);
+    expect_dispatcher_callback_payload_format(info_rec, "level-gate-info-should-reach");
+    expect_tracing_target_param_is_logger_name(info_rec);
     expect_caller_field_basename_rs(info_rec);
 
-    arena_set_log_level(ArenaLogLevel::Debug);
+    arena_set_log_level(ArenaLogLevel::Debug as i32);
     drain(&RECORDED);
     tracing::debug!(
         case = "level_gate_debug_after_raise",
@@ -401,12 +390,12 @@ fn arena_set_log_level_info_suppresses_debug_until_debug_allowed() {
         .iter()
         .find(|r| r.message.contains("level-gate-debug-should-reach-after-raise"))
         .expect("debug record after lower");
-    expect_dispatcher_callback_payload_format(dbg_rec);
-    expect_tracing_target_param_is_module_like(dbg_rec);
+    expect_dispatcher_callback_payload_format(dbg_rec, "level-gate-debug-should-reach-after-raise");
+    expect_tracing_target_param_is_logger_name(dbg_rec);
     expect_caller_field_basename_rs(dbg_rec);
 
     arena_remove_log_target(handle);
-    arena_set_log_level(ArenaLogLevel::Info);
+    arena_set_log_level(ArenaLogLevel::Info as i32);
 }
 
 #[test]
@@ -414,7 +403,7 @@ fn arena_dispatcher_default_logging_target_logger_name_utf8_matches_dispatcher_c
     let ptr = arena_dispatcher_default_logging_target_logger_name_utf8();
     assert!(!ptr.is_null());
     let name = unsafe { CStr::from_ptr(ptr).to_string_lossy() };
-    assert_eq!(name.as_ref(), "arena.rust.dispatcher");
+    assert_eq!(name.as_ref(), "arena");
 }
 
 #[test]
@@ -450,7 +439,7 @@ fn arena_dispatcher_dependency_allow_json_cleared_kafka_dep_marker_callbacks_emp
     let _g = TARGET_API_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     reset_dispatcher_allowlists_via_ffi();
     drain(&RECORDED);
-    arena_set_log_level(ArenaLogLevel::Trace);
+    arena_set_log_level(ArenaLogLevel::Trace as i32);
     let handle = arena_add_log_target(Some(collecting_callback), std::ptr::null_mut());
     assert_ne!(handle, 0);
     let dep_ident = format!("arena-kafka-{FFI_LOGGING_SYNTH_DEP_TAIL}-id");
@@ -463,7 +452,7 @@ fn arena_dispatcher_dependency_allow_json_cleared_kafka_dep_marker_callbacks_emp
     let captured = drain(&RECORDED);
     arena_remove_log_target(handle);
     reset_dispatcher_allowlists_via_ffi();
-    arena_set_log_level(ArenaLogLevel::Info);
+    arena_set_log_level(ArenaLogLevel::Info as i32);
     assert!(
         captured
             .iter()
@@ -477,7 +466,7 @@ fn arena_dispatcher_dependency_allow_json_matching_needle_kafka_dep_marker_invok
     let _g = TARGET_API_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     reset_dispatcher_allowlists_via_ffi();
     drain(&RECORDED);
-    arena_set_log_level(ArenaLogLevel::Trace);
+    arena_set_log_level(ArenaLogLevel::Trace as i32);
     let handle = arena_add_log_target(Some(collecting_callback), std::ptr::null_mut());
     assert_ne!(handle, 0);
     deps_allow_json_ffi(r#"["ffi-logging-deps-needle"]"#);
@@ -491,21 +480,21 @@ fn arena_dispatcher_dependency_allow_json_matching_needle_kafka_dep_marker_invok
     let captured = drain(&RECORDED);
     arena_remove_log_target(handle);
     reset_dispatcher_allowlists_via_ffi();
-    arena_set_log_level(ArenaLogLevel::Info);
+    arena_set_log_level(ArenaLogLevel::Info as i32);
 
     let record = captured
         .iter()
         .find(|r| r.message.contains(FFI_ALLOWLIST_SYNTH_KAFKA_DEP_MSG))
         .unwrap_or_else(|| panic!("expected captured record, got {captured:?}"));
     assert_eq!(record.level, ArenaLogLevel::Info as i32);
-    expect_dispatcher_callback_payload_format(record);
+    expect_dispatcher_callback_payload_format(record, FFI_ALLOWLIST_SYNTH_KAFKA_DEP_MSG);
     assert!(
         record.message.contains("dependency=")
             && record.message.contains("ffi-logging-deps-needle"),
         "expected dependency field in payload: {}",
         record.message
     );
-    expect_tracing_target_param_is_module_like(record);
+    expect_tracing_target_param_is_logger_name(record);
     expect_caller_field_basename_rs(record);
 }
 
@@ -514,7 +503,7 @@ fn arena_dispatcher_dependency_allow_json_nonmatching_needle_kafka_dep_marker_ca
     let _g = TARGET_API_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     reset_dispatcher_allowlists_via_ffi();
     drain(&RECORDED);
-    arena_set_log_level(ArenaLogLevel::Trace);
+    arena_set_log_level(ArenaLogLevel::Trace as i32);
     let handle = arena_add_log_target(Some(collecting_callback), std::ptr::null_mut());
     assert_ne!(handle, 0);
     deps_allow_json_ffi(r#"["only-other-substr-present"]"#);
@@ -528,7 +517,7 @@ fn arena_dispatcher_dependency_allow_json_nonmatching_needle_kafka_dep_marker_ca
     let captured = drain(&RECORDED);
     arena_remove_log_target(handle);
     reset_dispatcher_allowlists_via_ffi();
-    arena_set_log_level(ArenaLogLevel::Info);
+    arena_set_log_level(ArenaLogLevel::Info as i32);
     assert!(
         captured
             .iter()
@@ -542,7 +531,7 @@ fn arena_dispatcher_component_allow_json_cleared_exec_comp_marker_callbacks_empt
     let _g = TARGET_API_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     reset_dispatcher_allowlists_via_ffi();
     drain(&RECORDED);
-    arena_set_log_level(ArenaLogLevel::Trace);
+    arena_set_log_level(ArenaLogLevel::Trace as i32);
     let handle = arena_add_log_target(Some(collecting_callback), std::ptr::null_mut());
     assert_ne!(handle, 0);
     let comp_ident = format!("arena-executable-component-{FFI_LOGGING_SYNTH_COMP_TAIL}-zz");
@@ -555,7 +544,7 @@ fn arena_dispatcher_component_allow_json_cleared_exec_comp_marker_callbacks_empt
     let captured = drain(&RECORDED);
     arena_remove_log_target(handle);
     reset_dispatcher_allowlists_via_ffi();
-    arena_set_log_level(ArenaLogLevel::Info);
+    arena_set_log_level(ArenaLogLevel::Info as i32);
     assert!(
         captured
             .iter()
@@ -569,7 +558,7 @@ fn arena_dispatcher_component_allow_json_matching_needle_exec_comp_marker_invoke
     let _g = TARGET_API_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     reset_dispatcher_allowlists_via_ffi();
     drain(&RECORDED);
-    arena_set_log_level(ArenaLogLevel::Trace);
+    arena_set_log_level(ArenaLogLevel::Trace as i32);
     let handle = arena_add_log_target(Some(collecting_callback), std::ptr::null_mut());
     assert_ne!(handle, 0);
     comps_allow_json_ffi(r#"["ffi-logging-comp-needle"]"#);
@@ -583,20 +572,20 @@ fn arena_dispatcher_component_allow_json_matching_needle_exec_comp_marker_invoke
     let captured = drain(&RECORDED);
     arena_remove_log_target(handle);
     reset_dispatcher_allowlists_via_ffi();
-    arena_set_log_level(ArenaLogLevel::Info);
+    arena_set_log_level(ArenaLogLevel::Info as i32);
 
     let record = captured
         .iter()
         .find(|r| r.message.contains(FFI_ALLOWLIST_SYNTH_EXEC_COMP_MSG))
         .unwrap_or_else(|| panic!("expected captured record, got {captured:?}"));
     assert_eq!(record.level, ArenaLogLevel::Info as i32);
-    expect_dispatcher_callback_payload_format(record);
+    expect_dispatcher_callback_payload_format(record, FFI_ALLOWLIST_SYNTH_EXEC_COMP_MSG);
     assert!(
         record.message.contains("component=") && record.message.contains("ffi-logging-comp-needle"),
         "expected component field in payload: {}",
         record.message
     );
-    expect_tracing_target_param_is_module_like(record);
+    expect_tracing_target_param_is_logger_name(record);
     expect_caller_field_basename_rs(record);
 }
 
@@ -605,7 +594,7 @@ fn arena_dispatcher_component_allow_json_nonmatching_needle_exec_comp_marker_cal
     let _g = TARGET_API_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     reset_dispatcher_allowlists_via_ffi();
     drain(&RECORDED);
-    arena_set_log_level(ArenaLogLevel::Trace);
+    arena_set_log_level(ArenaLogLevel::Trace as i32);
     let handle = arena_add_log_target(Some(collecting_callback), std::ptr::null_mut());
     assert_ne!(handle, 0);
     comps_allow_json_ffi(r#"["only-other-comp-substr-present"]"#);
@@ -619,7 +608,7 @@ fn arena_dispatcher_component_allow_json_nonmatching_needle_exec_comp_marker_cal
     let captured = drain(&RECORDED);
     arena_remove_log_target(handle);
     reset_dispatcher_allowlists_via_ffi();
-    arena_set_log_level(ArenaLogLevel::Info);
+    arena_set_log_level(ArenaLogLevel::Info as i32);
     assert!(
         captured
             .iter()

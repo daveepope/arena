@@ -1,3 +1,4 @@
+use std::time::Duration;
 use crate::kafka_dependency::container_impl::{ConfluentKafkaContainerImpl, KafkaContainerImpl};
 use crate::kafka_dependency::{KafkaDependency, KafkaImpl};
 use arena::dependency::RunnableDependency;
@@ -11,6 +12,7 @@ pub enum KafkaFlavor {
 
 pub struct KafkaDependencyBuilder {
     identifier: String,
+    expiry: Option<Duration>,
     kafka_impl: Option<Box<dyn KafkaImpl>>,
     flavor: KafkaFlavor,
     port: Option<u16>,
@@ -35,6 +37,7 @@ impl KafkaDependencyBuilder {
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {
             identifier: identifier.into(),
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
             kafka_impl: None,
             flavor: KafkaFlavor::ApacheNative,
             port: None,
@@ -115,6 +118,16 @@ impl KafkaDependencyBuilder {
         self
     }
 
+    pub fn with_expiry(mut self, expiry: Duration) -> Self {
+        self.expiry = Some(expiry);
+        self
+    }
+
+    pub fn without_expiry(mut self) -> Self {
+        self.expiry = None;
+        self
+    }
+
     pub fn build(self) -> KafkaDependency {
         let KafkaDependencyBuilder {
             identifier,
@@ -126,6 +139,7 @@ impl KafkaDependencyBuilder {
             image_tag,
             container_name,
             network,
+            expiry,
             readiness_check,
             topics,
         } = self;
@@ -143,7 +157,7 @@ impl KafkaDependencyBuilder {
             ),
         };
 
-        let kafka_impl = kafka_impl.unwrap_or_else(|| match flavor {
+        let mut kafka_impl = kafka_impl.unwrap_or_else(|| match flavor {
             KafkaFlavor::ApacheNative => {
                 Box::new(KafkaContainerImpl::new(network)) as Box<dyn KafkaImpl>
             }
@@ -151,13 +165,14 @@ impl KafkaDependencyBuilder {
                 Box::new(ConfluentKafkaContainerImpl::new(network)) as Box<dyn KafkaImpl>
             }
         });
+        kafka_impl.set_expiry(expiry);
 
         let port = port.unwrap_or(default_port);
         let image_name = image_name.unwrap_or_else(|| default_image_name.to_string());
         let image_tag = image_tag.unwrap_or_else(|| default_tag.to_string());
 
         let mut dep = KafkaDependency::new(
-            arena_container::identifier::build("arena-kafka", &identifier),
+            arena_container::identifier::build(crate::MODULE, &identifier),
             kafka_impl,
             port,
             dependencies,

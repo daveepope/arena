@@ -1,3 +1,4 @@
+use std::time::Duration;
 use crate::oracle_dependency::sqlplus;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -13,6 +14,7 @@ pub(crate) const DEFAULT_SERVICE_NAME: &str = "FREEPDB1";
 
 #[async_trait]
 pub trait OracleImpl: Send + Sync {
+    fn set_expiry(&self, _expiry: Option<Duration>) {}
     #[allow(clippy::too_many_arguments)]
     async fn start(
         &self,
@@ -24,8 +26,10 @@ pub trait OracleImpl: Send + Sync {
         image_name: &str,
         image_tag: &str,
         container_name: &str,
-    );
-    async fn stop(&self);
+    ) -> Result<(), String>;
+    async fn stop(&self) -> Result<(), String>;
+    async fn force_stop(&self) -> bool;
+    fn release(&self);
 
     fn connection_string(&self) -> Option<String>;
 
@@ -54,6 +58,8 @@ pub(crate) struct OracleContainerImpl {
     container: AsyncMutex<Option<Arc<testcontainers::core::ContainerAsync<GenericImage>>>>,
     meta: std::sync::Mutex<OracleContainerMeta>,
     network: Option<String>,
+    container_name: std::sync::Mutex<Option<String>>,
+    expiry: std::sync::Mutex<Option<Duration>>,
 }
 
 impl OracleContainerImpl {
@@ -62,12 +68,18 @@ impl OracleContainerImpl {
             container: AsyncMutex::new(None),
             meta: std::sync::Mutex::new(OracleContainerMeta::default()),
             network,
+            container_name: std::sync::Mutex::new(None),
+            expiry: std::sync::Mutex::new(Some(arena_container::expiry::DEFAULT_EXPIRY)),
         }
     }
 }
 
 #[async_trait]
 impl OracleImpl for OracleContainerImpl {
+    fn set_expiry(&self, expiry: Option<Duration>) {
+        *self.expiry.lock().expect("oracle expiry lock") = expiry;
+    }
+
     async fn start(
         &self,
         port: u16,
@@ -78,11 +90,14 @@ impl OracleImpl for OracleContainerImpl {
         image_name: &str,
         image_tag: &str,
         container_name: &str,
-    ) {
+    ) -> Result<(), String> {
         let mut container_guard = self.container.lock().await;
         if container_guard.is_some() {
-            return;
+            return Ok(());
         }
+
+        let expiry = *self.expiry.lock().expect("oracle expiry lock");
+        arena_container::expiry::remove_expired_containers_if_enabled(crate::MODULE, expiry).await;
 
         arena_container::container::try_remove_existing_container(container_name).await;
 
@@ -92,6 +107,10 @@ impl OracleImpl for OracleContainerImpl {
 
         let mut request = image
             .with_container_name(container_name)
+            .with_labels(arena_container::expiry::expiry_labels_for(
+                crate::MODULE,
+                expiry,
+            ))
             .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await)
             .with_mapped_port(port, container_port)
             .with_env_var("ORACLE_PASSWORD", admin_password)
@@ -107,25 +126,23 @@ impl OracleImpl for OracleContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request.start().await.unwrap_or_else(|e| {
-            panic!(
-                "{}",
-                arena_container::container::start_failure_message("oracle", &e)
-            )
-        });
+        let container = request
+            .start()
+            .await
+            .map_err(|e| arena_container::container::start_failure_message("oracle", &e))?;
 
         let host = container
             .get_host()
             .await
-            .expect("Failed to get host")
+            .map_err(|e| format!("oracle container host unavailable: {e}"))?
             .to_string();
         let host_port = container
             .get_host_port_ipv4(container_port)
             .await
-            .expect("Failed to get port");
+            .map_err(|e| format!("oracle port unavailable: {e}"))?;
 
         {
-            let mut meta = self.meta.lock().expect("oracle container meta lock");
+            let mut meta = self.meta.lock().unwrap_or_else(|e| e.into_inner());
             meta.connection_string = Some(format!(
                 "//localhost:{DEFAULT_CONTAINER_PORT}/{database_name}"
             ));
@@ -133,15 +150,58 @@ impl OracleImpl for OracleContainerImpl {
             meta.database_name = Some(database_name.to_string());
         }
         *container_guard = Some(Arc::new(container));
+        *self
+            .container_name
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = Some(container_name.to_string());
 
         tracing::debug!(layer = "oracle_container", phase = "container_started");
+        Ok(())
     }
 
-    async fn stop(&self) {
+    fn release(&self) {
+        if let Ok(mut container_guard) = self.container.try_lock() {
+            container_guard.take();
+        }
+        let mut meta = self.meta.lock().unwrap_or_else(|e| e.into_inner());
+        meta.connection_string = None;
+        meta.host_address = None;
+        meta.database_name = None;
+    }
+
+    async fn force_stop(&self) -> bool {
+        let name = self
+            .container_name
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        {
+            let mut container_guard = self.container.lock().await;
+            container_guard.take();
+        }
+        {
+            let mut meta = self.meta.lock().unwrap_or_else(|e| e.into_inner());
+            meta.connection_string = None;
+            meta.host_address = None;
+            meta.database_name = None;
+        }
+
+        let removed = match name.as_deref() {
+            Some(name) => arena_container::container::force_remove_container(name).await,
+            None => true,
+        };
+
+        if let Some(ref network) = self.network {
+            arena_container::network::remove_network(network).await;
+        }
+        removed
+    }
+
+    async fn stop(&self) -> Result<(), String> {
         let mut container_guard = self.container.lock().await;
         container_guard.take();
         {
-            let mut meta = self.meta.lock().expect("oracle container meta lock");
+            let mut meta = self.meta.lock().unwrap_or_else(|e| e.into_inner());
             meta.connection_string = None;
             meta.host_address = None;
             meta.database_name = None;
@@ -151,12 +211,13 @@ impl OracleImpl for OracleContainerImpl {
         if let Some(ref network) = self.network {
             arena_container::network::remove_network(network).await;
         }
+        Ok(())
     }
 
     fn connection_string(&self) -> Option<String> {
         self.meta
             .lock()
-            .expect("oracle container meta lock")
+            .unwrap_or_else(|e| e.into_inner())
             .connection_string
             .clone()
     }
@@ -164,7 +225,7 @@ impl OracleImpl for OracleContainerImpl {
     fn host_address(&self) -> Option<String> {
         self.meta
             .lock()
-            .expect("oracle container meta lock")
+            .unwrap_or_else(|e| e.into_inner())
             .host_address
             .clone()
     }
@@ -184,7 +245,7 @@ impl OracleImpl for OracleContainerImpl {
         let database_name = {
             self.meta
                 .lock()
-                .expect("oracle container meta lock")
+                .unwrap_or_else(|e| e.into_inner())
                 .database_name
                 .clone()
         }

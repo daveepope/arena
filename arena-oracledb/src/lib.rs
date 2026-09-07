@@ -1,3 +1,5 @@
+pub(crate) const MODULE: &str = "arena-oracledb";
+
 pub mod builder;
 pub mod managed_playbook;
 pub mod oracle_dependency;

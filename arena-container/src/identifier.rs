@@ -3,10 +3,11 @@ use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const SUFFIX_LEN: usize = 6;
+const MODULE_PREFIX: &str = "arena-";
 const BASE36: &[u8; 36] = b"0123456789abcdefghijklmnopqrstuvwxyz";
 
 pub fn build(module: &str, name: &str) -> String {
-    if has_suffix(name) {
+    if is_already_built(name) {
         return name.to_string();
     }
     let slug = slugify(name);
@@ -69,12 +70,15 @@ fn to_base36(mut n: u64) -> String {
     String::from_utf8(buf.to_vec()).expect("base36 digits are ascii")
 }
 
-fn has_suffix(name: &str) -> bool {
-    let Some(last) = name.rsplit('-').next() else {
+fn is_already_built(name: &str) -> bool {
+    let Some(rest) = name.strip_prefix(MODULE_PREFIX) else {
         return false;
     };
-    last.len() == SUFFIX_LEN
-        && last
+    let Some(suffix) = rest.rsplit('-').next() else {
+        return false;
+    };
+    suffix.len() == SUFFIX_LEN
+        && suffix
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
 }

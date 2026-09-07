@@ -20,14 +20,21 @@ impl LocalstackImpl for CountingLocalstackImpl {
         _image_tag: &str,
         _container_name: &str,
         _services: &[String],
-    ) {
+    ) -> Result<(), String> {
         self.endpoint = Some("http://127.0.0.1:4566".to_string());
         self.start_calls.fetch_add(1, Ordering::SeqCst);
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.stop_calls.fetch_add(1, Ordering::SeqCst);
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn endpoint_url(&self) -> Option<&str> {
         self.endpoint.as_deref()
@@ -70,7 +77,7 @@ async fn soft_reset_not_started_returns_without_calling_impl() {
     let stop_calls = Arc::new(AtomicUsize::new(0));
     let dep = build_dep(start_calls.clone(), stop_calls.clone());
 
-    dep.soft_reset().await;
+    dep.soft_reset().await.expect("soft reset should succeed");
 
     assert_eq!(start_calls.load(Ordering::SeqCst), 0);
     assert_eq!(stop_calls.load(Ordering::SeqCst), 0);
@@ -82,9 +89,9 @@ async fn soft_reset_started_no_queues_completes() {
     let stop_calls = Arc::new(AtomicUsize::new(0));
     let mut dep = build_dep(start_calls.clone(), stop_calls.clone());
 
-    dep.start().await;
-    dep.soft_reset().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.soft_reset().await.expect("soft reset should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     assert_eq!(start_calls.load(Ordering::SeqCst), 1);
     assert_eq!(stop_calls.load(Ordering::SeqCst), 1);
@@ -96,7 +103,7 @@ async fn hard_reset_not_started_returns_without_restart() {
     let stop_calls = Arc::new(AtomicUsize::new(0));
     let mut dep = build_dep(start_calls.clone(), stop_calls.clone());
 
-    dep.hard_reset().await;
+    dep.hard_reset().await.expect("hard reset should succeed");
 
     assert_eq!(start_calls.load(Ordering::SeqCst), 0);
     assert_eq!(stop_calls.load(Ordering::SeqCst), 0);
@@ -108,13 +115,13 @@ async fn hard_reset_started_restarts_container() {
     let stop_calls = Arc::new(AtomicUsize::new(0));
     let mut dep = build_dep(start_calls.clone(), stop_calls.clone());
 
-    dep.start().await;
-    dep.hard_reset().await;
+    dep.start().await.expect("start should succeed");
+    dep.hard_reset().await.expect("hard reset should succeed");
 
     assert_eq!(start_calls.load(Ordering::SeqCst), 2);
     assert_eq!(stop_calls.load(Ordering::SeqCst), 1);
     assert_eq!(dep.endpoint_url(), Some("http://127.0.0.1:4566"));
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
     assert_eq!(stop_calls.load(Ordering::SeqCst), 2);
 }

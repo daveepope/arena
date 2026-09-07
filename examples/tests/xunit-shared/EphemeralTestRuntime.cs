@@ -18,7 +18,7 @@ public static class EphemeralTestRuntime
             ["//examples:example-aspnet-xunit-chained-component-test"] = (20750, 20900),
         };
 
-    internal static (int Start, int End) PortRangeForTarget(string target)
+    internal static (int Start, int End) PortRangeForTarget(string? target)
     {
         if (target != null && TargetPortRanges.TryGetValue(target, out var range))
         {

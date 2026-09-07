@@ -102,14 +102,14 @@ impl TestContext {
             .catch_unwind()
             .await;
         if let Err(panic_payload) = start_outcome {
-            localstack.stop().await;
+            localstack.stop().await.expect("stop should succeed");
             std::panic::resume_unwind(panic_payload);
         }
 
         let endpoint = match localstack.endpoint_url() {
             Some(v) => v.to_string(),
             None => {
-                localstack.stop().await;
+                localstack.stop().await.expect("stop should succeed");
                 return Err("localstack endpoint missing after start()".to_string());
             }
         };
@@ -117,7 +117,7 @@ impl TestContext {
         let queue_url = match localstack.queue_url(&queue_name) {
             Some(v) => v.to_string(),
             None => {
-                localstack.stop().await;
+                localstack.stop().await.expect("stop should succeed");
                 return Err(format!("queue url missing for {queue_name}"));
             }
         };
@@ -140,7 +140,7 @@ impl TestContext {
     }
 
     async fn stop(mut self) {
-        self.localstack.stop().await;
+        self.localstack.stop().await.expect("stop should succeed");
     }
 }
 

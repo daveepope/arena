@@ -1,3 +1,4 @@
+pub mod expiry;
 pub mod http;
 pub mod kafka;
 pub mod localstack;

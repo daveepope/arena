@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
+from arena_pytest.support._expiry import _expiry_seconds
+
 import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
@@ -92,6 +96,14 @@ class LocalstackDependencyBuilder:
             "event_rules": [],
         }
         self._children: List[Any] = []
+
+    def with_expiry(self, expiry: timedelta) -> "LocalstackDependencyBuilder":
+        self._config["expiry_seconds"] = _expiry_seconds(expiry)
+        return self
+
+    def without_expiry(self) -> "LocalstackDependencyBuilder":
+        self._config["expiry_seconds"] = 0
+        return self
 
     def with_port(self, port: int) -> "LocalstackDependencyBuilder":
         self._config["port"] = int(port)

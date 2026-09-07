@@ -6,6 +6,8 @@ use serde::Deserialize;
 pub(crate) struct KafkaDependencyConfig {
     pub identifier: String,
     #[serde(default)]
+    pub expiry_seconds: Option<u64>,
+    #[serde(default)]
     pub image_name: Option<String>,
     #[serde(default)]
     pub flavor: Option<String>,
@@ -38,5 +40,15 @@ pub(crate) fn build(config: &KafkaDependencyConfig, network: Option<&str>) -> Re
     for topic in config.topics.as_deref().unwrap_or(&[]) {
         builder = builder.with_topic(topic);
     }
+    match crate::dependency::expiry::expiry_override(config.expiry_seconds) {
+        Some(crate::dependency::expiry::ExpiryOverride::Disabled) => {
+            builder = builder.without_expiry();
+        }
+        Some(crate::dependency::expiry::ExpiryOverride::After(expiry)) => {
+            builder = builder.with_expiry(expiry);
+        }
+        None => {}
+    }
+
     Ok(Box::new(builder.build()))
 }

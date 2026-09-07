@@ -1,3 +1,4 @@
+use std::time::Duration;
 use crate::http_dependency::HttpImpl;
 use async_trait::async_trait;
 use testcontainers_modules::testcontainers;
@@ -21,6 +22,8 @@ pub(crate) struct HttpContainerImpl {
     https_base_url: Option<String>,
     network: Option<String>,
     container_cli: HttpContainerCliConfig,
+    container_name: Option<String>,
+    expiry: Option<Duration>,
 }
 
 impl HttpContainerImpl {
@@ -31,16 +34,31 @@ impl HttpContainerImpl {
             https_base_url: None,
             network,
             container_cli,
+            container_name: None,
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
         }
     }
 }
 
 #[async_trait]
 impl HttpImpl for HttpContainerImpl {
-    async fn start(&mut self, port: u16, image_name: &str, image_tag: &str, container_name: &str) {
+    fn set_expiry(&mut self, expiry: Option<Duration>) {
+        self.expiry = expiry;
+    }
+
+    async fn start(
+        &mut self,
+        port: u16,
+        image_name: &str,
+        image_tag: &str,
+        container_name: &str,
+    ) -> Result<(), String> {
         if self.container.is_some() {
-            return;
+            return Ok(());
         }
+
+        arena_container::expiry::remove_expired_containers_if_enabled(crate::MODULE, self.expiry)
+            .await;
 
         arena_container::container::try_remove_existing_container(container_name).await;
 
@@ -60,6 +78,10 @@ impl HttpImpl for HttpContainerImpl {
 
         let mut request = image
             .with_container_name(container_name)
+            .with_labels(arena_container::expiry::expiry_labels_for(
+                crate::MODULE,
+                self.expiry,
+            ))
             .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await);
 
         if !http_disabled && port > 0 {
@@ -84,24 +106,22 @@ impl HttpImpl for HttpContainerImpl {
             request = request.with_cmd(self.container_cli.cli_args.iter().cloned());
         }
 
-        let container = request.start().await.unwrap_or_else(|e| {
-            panic!(
-                "{}",
-                arena_container::container::start_failure_message("http", &e)
-            )
-        });
+        let container = request
+            .start()
+            .await
+            .map_err(|e| arena_container::container::start_failure_message("http", &e))?;
 
         let host = container
             .get_host()
             .await
-            .expect("Failed to get host")
+            .map_err(|e| format!("http container host unavailable: {e}"))?
             .to_string();
 
         if !http_disabled {
             let http_mapped = container
                 .get_host_port_ipv4(container_port)
                 .await
-                .expect("Failed to get port");
+                .map_err(|e| format!("http port unavailable: {e}"))?;
             self.base_url = Some(format!("http://{host}:{http_mapped}"));
         }
 
@@ -109,7 +129,7 @@ impl HttpImpl for HttpContainerImpl {
             let https_mapped = container
                 .get_host_port_ipv4(https_p.tcp())
                 .await
-                .expect("Failed to get https port");
+                .map_err(|e| format!("https port unavailable: {e}"))?;
             let https_origin = format!("https://{host}:{https_mapped}");
             self.https_base_url = Some(https_origin.clone());
             if http_disabled {
@@ -118,11 +138,13 @@ impl HttpImpl for HttpContainerImpl {
         }
 
         self.container = Some(container);
+        self.container_name = Some(container_name.to_string());
 
         tracing::debug!(layer = "http_stub_container", phase = "dependency_started");
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.container.take();
         self.base_url = None;
         self.https_base_url = None;
@@ -131,6 +153,27 @@ impl HttpImpl for HttpContainerImpl {
         if let Some(ref network) = self.network {
             arena_container::network::remove_network(network).await;
         }
+        Ok(())
+    }
+
+    fn release(&mut self) {
+        self.container.take();
+        self.base_url = None;
+        self.https_base_url = None;
+    }
+
+    async fn force_stop(&mut self) -> bool {
+        self.release();
+
+        let removed = match self.container_name.as_deref() {
+            Some(name) => arena_container::container::force_remove_container(name).await,
+            None => true,
+        };
+
+        if let Some(ref network) = self.network {
+            arena_container::network::remove_network(network).await;
+        }
+        removed
     }
 
     fn base_url(&self) -> Option<&str> {

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -419,7 +420,8 @@ final class ArenaExtensionUnitTest {
           assertThrows(IllegalStateException.class, () -> extension.beforeAll(contextFor(root)));
       Throwable second =
           assertThrows(IllegalStateException.class, () -> extension.beforeAll(contextFor(root)));
-      assertSame(first, second);
+      assertEquals(first.getMessage(), second.getMessage());
+      assertNotSame(first, second);
       assertEquals(1, CountingFailureMatchPiece.forFfiCalls);
     } finally {
       cache().remove(root);
@@ -523,12 +525,38 @@ final class ArenaExtensionUnitTest {
     return ctor.newInstance(openArena, expectedSuiteMembers);
   }
 
+  @org.junit.jupiter.api.Test
+  void beforeAll_cachedLifecycleFailure_rethrowsFreshErrorCarryingState() throws Exception {
+    Class<?> root = AfterAllFailedCacheEntryTopology.class;
+    arena.junit.lifecycle.ArenaState state =
+        arena.junit.lifecycle.ArenaState.parse(
+            "{\"id\":\"cached\",\"state\":\"arena_faulted\",\"at\":\"t\"}");
+    Constructor<?> ctor =
+        cachedArenaClass()
+            .getDeclaredConstructor(
+                String.class, arena.junit.lifecycle.ArenaState.class, Integer.class);
+    ctor.setAccessible(true);
+    cache().put(root, ctor.newInstance("arena 'cached' is arena_faulted", state, null));
+    try {
+      arena.junit.lifecycle.ArenaLifecycleError error =
+          assertThrows(
+              arena.junit.lifecycle.ArenaLifecycleError.class,
+              () -> new ArenaExtension().beforeAll(contextFor(root)));
+      assertEquals("arena 'cached' is arena_faulted", error.getMessage());
+      assertEquals("cached", error.state().id);
+    } finally {
+      cache().remove(root);
+    }
+  }
+
   private static Object newFailedCachedArena(RuntimeException failure, Integer expectedSuiteMembers)
       throws Exception {
     Constructor<?> ctor =
-        cachedArenaClass().getDeclaredConstructor(RuntimeException.class, Integer.class);
+        cachedArenaClass()
+            .getDeclaredConstructor(
+                String.class, arena.junit.lifecycle.ArenaState.class, Integer.class);
     ctor.setAccessible(true);
-    return ctor.newInstance(failure, expectedSuiteMembers);
+    return ctor.newInstance(failure.getMessage(), null, expectedSuiteMembers);
   }
 
   private static Class<?> cachedArenaClass() {

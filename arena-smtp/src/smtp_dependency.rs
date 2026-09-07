@@ -1,9 +1,12 @@
 pub(crate) mod container_impl;
 mod healthcheck;
 
+use arena::lifecycle::message;
+use arena::lifecycle::Subject;
 use crate::builder::SmtpDependencyBuilder;
 use crate::smtp_dependency::healthcheck::DefaultSmtpReadinessCheck;
 use arena::dependency::{Dependency, RunnableDependency};
+use arena::lifecycle::{Fault, RunnableState};
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
 use futures_timer::Delay;
@@ -24,6 +27,7 @@ pub struct SmtpTlsConfig {
 
 #[async_trait]
 pub trait SmtpImpl: Send + Sync {
+    fn set_expiry(&mut self, _expiry: Option<Duration>) {}
     async fn start(
         &mut self,
         smtp_port: u16,
@@ -32,8 +36,10 @@ pub trait SmtpImpl: Send + Sync {
         image_tag: &str,
         container_name: &str,
         tls: Option<&SmtpTlsConfig>,
-    );
-    async fn stop(&mut self);
+    ) -> Result<(), String>;
+    async fn stop(&mut self) -> Result<(), String>;
+    async fn force_stop(&mut self) -> bool;
+    fn release(&mut self);
     fn smtp_address(&self) -> Option<&str>;
     fn http_api_url(&self) -> Option<&str>;
 }
@@ -52,6 +58,9 @@ pub struct SmtpDependency {
     container_name: Option<String>,
     active_tls: Option<SmtpTlsConfig>,
     readiness_check: Box<dyn ReadinessCheck>,
+    state: RunnableState,
+    faults: Vec<Fault>,
+    build_fault: Option<Fault>,
 }
 
 impl SmtpDependency {
@@ -67,21 +76,29 @@ impl SmtpDependency {
         container_name: Option<String>,
         tls_mode: Option<SmtpTlsMode>,
     ) -> Self {
-        let active_tls = tls_mode.map(|mode| {
-            let (certificate_pem, private_key_pem) =
-                arena_cryptography::ephemeral_tls::localhost_self_signed_pem_pair().unwrap_or_else(
-                    |e| panic!("[Smtp-{identifier}] ephemeral TLS certificate generation failed: {e}"),
-                );
-            SmtpTlsConfig {
-                mode,
-                certificate_pem,
-                private_key_pem,
+        let (active_tls, build_fault) = match tls_mode {
+            None => (None, None),
+            Some(mode) => {
+                match arena_cryptography::ephemeral_tls::localhost_self_signed_pem_pair() {
+                    Ok((certificate_pem, private_key_pem)) => (
+                        Some(SmtpTlsConfig {
+                            mode,
+                            certificate_pem,
+                            private_key_pem,
+                        }),
+                        None,
+                    ),
+                    Err(e) => (
+                        None,
+                        Some(Fault::dependency(
+                            &identifier,
+                            format!("ephemeral TLS certificate generation failed: {e}"),
+                        )),
+                    ),
+                }
             }
-        });
-        let implicit_tls = matches!(
-            active_tls.as_ref().map(|tls| tls.mode),
-            Some(SmtpTlsMode::Implicit)
-        );
+        };
+        let implicit_tls = matches!(tls_mode, Some(SmtpTlsMode::Implicit));
         Self {
             identifier,
             smtp_impl,
@@ -96,6 +113,9 @@ impl SmtpDependency {
             needs_teardown: false,
             children_started: false,
             readiness_check: Box::new(DefaultSmtpReadinessCheck::new(implicit_tls)),
+            state: RunnableState::NotStarted,
+            faults: Vec::new(),
+            build_fault,
         }
     }
 
@@ -120,17 +140,14 @@ impl SmtpDependency {
             .ok_or_else(|| "smtp address not available yet".to_string())
     }
 
-    async fn wait_until_ready(&self) {
+    async fn wait_until_ready(&self) -> Result<(), String> {
         let timeout = Duration::from_secs(30);
         let poll_every = Duration::from_millis(100);
         let start = Instant::now();
 
         let address = loop {
             if start.elapsed() >= timeout {
-                panic!(
-                    "[Smtp-{}] smtp did not become ready within {:?}",
-                    self.identifier, timeout
-                );
+                return Err(format!("smtp did not become ready within {timeout:?}"));
             }
 
             match self.smtp_address_on_host() {
@@ -148,20 +165,20 @@ impl SmtpDependency {
 
         let remaining = timeout.saturating_sub(start.elapsed());
         if remaining.is_zero() {
-            panic!(
-                "[Smtp-{}] smtp did not become ready within {:?}",
-                self.identifier, timeout
-            );
+            return Err(format!("smtp did not become ready within {timeout:?}"));
         }
 
-        match self
-            .readiness_check
+        self.readiness_check
             .is_ready(&self.identifier, &address, remaining.as_millis() as u64)
             .await
-        {
-            Ok(()) => {}
-            Err(err) => panic!("[Smtp-{}] readiness check failed: {}", self.identifier, err),
-        }
+            .map_err(message::readiness_failed)
+    }
+
+    async fn fail(&mut self, message: impl Into<String>, causes: Vec<Fault>) -> Fault {
+        let fault = Fault::dependency(&self.identifier, message).caused_by_all(causes);
+        self.faults.push(fault.clone());
+        <Self as RunnableDependency>::force_stop(self).await;
+        fault
     }
 }
 
@@ -179,10 +196,23 @@ impl RunnableDependency for SmtpDependency {
         self
     }
 
-    async fn start(&mut self) {
+    fn state(&self) -> RunnableState {
+        self.state
+    }
+
+    fn faults(&self) -> &[Fault] {
+        &self.faults
+    }
+
+    async fn start(&mut self) -> Result<(), Fault> {
         if self.running {
-            return;
+            return Ok(());
         }
+        if let Some(fault) = self.build_fault.take() {
+            self.faults.push(fault.clone());
+            return Err(fault);
+        }
+        self.state = RunnableState::Starting;
 
         tracing::debug!(dependency = %self.identifier, phase = "start_begin", "starting");
         let sw = Instant::now();
@@ -190,8 +220,14 @@ impl RunnableDependency for SmtpDependency {
         if let Some(children) = self.dependencies.as_mut() {
             if !children.is_empty() {
                 self.children_started = true;
+                let mut child_faults = Vec::new();
                 for dep in children.iter_mut() {
-                    dep.start().await;
+                    if let Err(fault) = arena::dependency::start_child(dep).await {
+                        child_faults.push(fault);
+                    }
+                }
+                if !child_faults.is_empty() {
+                    return Err(self.fail(message::child_start_failed(Subject::Dependency), child_faults).await);
                 }
             }
         }
@@ -205,7 +241,7 @@ impl RunnableDependency for SmtpDependency {
 
         let sw_container = Instant::now();
         self.needs_teardown = true;
-        self.smtp_impl
+        if let Err(message) =         self.smtp_impl
             .start(
                 self.smtp_port,
                 self.ui_port,
@@ -214,7 +250,10 @@ impl RunnableDependency for SmtpDependency {
                 &container_name,
                 self.active_tls.as_ref(),
             )
-            .await;
+            .await
+        {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw_container.elapsed(),
@@ -222,7 +261,10 @@ impl RunnableDependency for SmtpDependency {
         );
 
         let sw_ready = Instant::now();
-        self.wait_until_ready().await;
+        self.state = RunnableState::ReadinessCheck;
+        if let Err(message) = self.wait_until_ready().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw_ready.elapsed(),
@@ -230,41 +272,91 @@ impl RunnableDependency for SmtpDependency {
         );
 
         self.running = true;
+        self.state = RunnableState::Started;
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw.elapsed(),
             "started"
         );
+        Ok(())
     }
 
-    async fn stop(&mut self) {
-        self.smtp_impl.stop().await;
-        self.needs_teardown = false;
+    async fn stop(&mut self) -> Result<(), Fault> {
+        self.state = RunnableState::Stopping;
+        let mut causes = Vec::new();
 
-        if !self.running {
-            if self.children_started {
-                for dep in self.dependencies.iter_mut().flatten().rev() {
-                    dep.stop().await;
-                }
-                self.children_started = false;
-            }
-            return;
+        if let Err(message) = self.smtp_impl.stop().await {
+            causes.push(Fault::dependency(&self.identifier, message));
         }
+        self.needs_teardown = false;
 
         tracing::debug!(dependency = %self.identifier, phase = "stop_begin", "stopping");
         let sw = Instant::now();
 
         for dep in self.dependencies.iter_mut().flatten().rev() {
-            dep.stop().await;
+            if let Err(fault) = arena::dependency::stop_child(dep).await {
+                causes.push(fault);
+            }
         }
 
         self.children_started = false;
         self.running = false;
+
+        if !causes.is_empty() {
+            let fault =
+                Fault::dependency(&self.identifier, message::stop_did_not_complete()).caused_by_all(causes);
+            self.faults.push(fault.clone());
+            self.state = RunnableState::Faulted;
+            return Err(fault);
+        }
+
+        self.state = RunnableState::Stopped;
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw.elapsed(),
             "stopped"
         );
+        Ok(())
+    }
+
+    fn release(&mut self) {
+        self.smtp_impl.release();
+        self.running = false;
+        self.needs_teardown = false;
+        self.children_started = false;
+        for dep in self.dependencies.iter_mut().flatten().rev() {
+            arena::dependency::release_child(dep);
+        }
+        self.state = RunnableState::Stopped;
+    }
+
+    async fn force_stop(&mut self) {
+        let removed = self.smtp_impl.force_stop().await;
+        self.needs_teardown = false;
+        self.running = false;
+        self.children_started = false;
+
+        for dep in self.dependencies.iter_mut().flatten().rev() {
+            arena::dependency::force_stop_child(dep).await;
+        }
+
+        if removed {
+            self.state = RunnableState::Stopped;
+            return;
+        }
+
+        let unconfirmed = Fault::dependency(
+            &self.identifier,
+            message::forced_teardown_unconfirmed(),
+        );
+        if !self
+            .faults
+            .iter()
+            .any(|f| f.message == unconfirmed.message && f.id == unconfirmed.id)
+        {
+            self.faults.push(unconfirmed);
+        }
+        self.state = RunnableState::Faulted;
     }
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
@@ -279,20 +371,21 @@ impl RunnableDependency for SmtpDependency {
         self.dependencies.as_deref_mut().unwrap_or(&mut [])
     }
 
-    async fn soft_reset(&self) {
+    async fn soft_reset(&self) -> Result<(), Fault> {
         if !self.running {
-            return;
+            return Ok(());
         }
 
         tracing::warn!(
             dependency = %self.identifier,
             "soft reset skipped: no reset primitive without an smtp client"
         );
+        Ok(())
     }
 
-    async fn hard_reset(&mut self) {
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
         if !self.running {
-            return;
+            return Ok(());
         }
 
         tracing::debug!(
@@ -308,10 +401,13 @@ impl RunnableDependency for SmtpDependency {
             self.container_name.as_deref(),
         );
 
-        self.smtp_impl.stop().await;
+        if let Err(message) = self.smtp_impl.stop().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         self.running = false;
 
-        self.smtp_impl
+        if let Err(message) = self
+            .smtp_impl
             .start(
                 self.smtp_port,
                 self.ui_port,
@@ -320,22 +416,31 @@ impl RunnableDependency for SmtpDependency {
                 &container_name,
                 self.active_tls.as_ref(),
             )
-            .await;
-        self.wait_until_ready().await;
+            .await
+        {
+            return Err(self.fail(message, Vec::new()).await);
+        }
+        if let Err(message) = self.wait_until_ready().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         self.running = true;
+        self.state = RunnableState::Started;
+        Ok(())
     }
 }
 
 impl Drop for SmtpDependency {
     fn drop(&mut self) {
-        if self.running {
+        if self.running || self.needs_teardown || self.children_started {
             tracing::warn!(
                 dependency = %self.identifier,
-                "drop while running; forcing stop"
+                "drop while running; releasing container"
             );
-            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
-        } else if self.needs_teardown || self.children_started {
-            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
+            self.smtp_impl.release();
+            self.running = false;
+            self.needs_teardown = false;
+            self.children_started = false;
+            self.state = RunnableState::Stopped;
         }
     }
 }

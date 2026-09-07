@@ -17,11 +17,19 @@ impl arena_localstack::LocalstackImpl for FakeLocalstackImpl {
         _image_tag: &str,
         _container_name: &str,
         _services: &[String],
-    ) {
+    ) -> Result<(), String> {
         self.endpoint = Some("http://127.0.0.1:4566".to_string());
+        Ok(())
     }
 
-    async fn stop(&mut self) {}
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn endpoint_url(&self) -> Option<&str> {
         self.endpoint.as_deref()
@@ -122,4 +130,70 @@ fn build_without_port_uses_auto_port() {
         .build();
 
     assert!(dep.identifier().contains("localstack-default-port"));
+}
+
+
+#[derive(Clone, Default)]
+struct ExpiryRecordingImpl {
+    expiry: std::sync::Arc<std::sync::Mutex<Option<Option<std::time::Duration>>>>,
+}
+
+#[async_trait]
+impl arena_localstack::LocalstackImpl for ExpiryRecordingImpl {
+    fn set_expiry(&mut self, expiry: Option<std::time::Duration>) {
+        *self.expiry.lock().unwrap() = Some(expiry);
+    }
+    async fn start(
+        &mut self,
+        _port: u16,
+        _image_name: &str,
+        _image_tag: &str,
+        _container_name: &str,
+        _services: &[String],
+    ) -> Result<(), String> {
+        Ok(())
+    }
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+    fn endpoint_url(&self) -> Option<&str> {
+        None
+    }
+}
+
+#[test]
+fn build_no_expiry_override_uses_default_expiry() {
+    let recorder = ExpiryRecordingImpl::default();
+    let _dep = LocalstackDependency::builder("orders").with_impl(recorder.clone()).build();
+
+    assert_eq!(
+        *recorder.expiry.lock().unwrap(),
+        Some(Some(arena_container::expiry::DEFAULT_EXPIRY))
+    );
+}
+
+#[test]
+fn build_with_expiry_uses_given_expiry() {
+    let recorder = ExpiryRecordingImpl::default();
+    let _dep = LocalstackDependency::builder("orders")
+        .with_impl(recorder.clone())
+        .with_expiry(std::time::Duration::from_secs(30))
+        .build();
+
+    assert_eq!(
+        *recorder.expiry.lock().unwrap(),
+        Some(Some(std::time::Duration::from_secs(30)))
+    );
+}
+
+#[test]
+fn build_without_expiry_disables_expiry() {
+    let recorder = ExpiryRecordingImpl::default();
+    let _dep = LocalstackDependency::builder("orders").with_impl(recorder.clone()).without_expiry().build();
+
+    assert_eq!(*recorder.expiry.lock().unwrap(), Some(None));
 }

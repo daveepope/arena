@@ -62,6 +62,8 @@ pub(crate) struct LocalstackContainerImpl {
     container: Option<testcontainers::core::ContainerAsync<LocalStack>>,
     endpoint: Option<String>,
     network: Option<String>,
+    container_name: Option<String>,
+    expiry: Option<Duration>,
 }
 
 impl LocalstackContainerImpl {
@@ -70,12 +72,18 @@ impl LocalstackContainerImpl {
             container: None,
             endpoint: None,
             network,
+            container_name: None,
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
         }
     }
 }
 
 #[async_trait]
 impl LocalstackImpl for LocalstackContainerImpl {
+    fn set_expiry(&mut self, expiry: Option<Duration>) {
+        self.expiry = expiry;
+    }
+
     async fn start(
         &mut self,
         port: u16,
@@ -83,10 +91,13 @@ impl LocalstackImpl for LocalstackContainerImpl {
         image_tag: &str,
         container_name: &str,
         services: &[String],
-    ) {
+    ) -> Result<(), String> {
         if self.container.is_some() {
-            return;
+            return Ok(());
         }
+
+        arena_container::expiry::remove_expired_containers_if_enabled(crate::MODULE, self.expiry)
+            .await;
 
         arena_container::container::try_remove_existing_container(container_name).await;
 
@@ -103,6 +114,10 @@ impl LocalstackImpl for LocalstackContainerImpl {
             .with_mapped_port(host_port, DEFAULT_CONTAINER_PORT)
             .with_health_check(healthcheck)
             .with_container_name(container_name)
+            .with_labels(arena_container::expiry::expiry_labels_for(
+                crate::MODULE,
+                self.expiry,
+            ))
             .with_platform(arena_container::platform::resolve_platform(image_name, image_tag).await)
             .with_env_var("LS_LOG", "error")
             .with_env_var("DEBUG", "0")
@@ -113,14 +128,12 @@ impl LocalstackImpl for LocalstackContainerImpl {
         }
 
         if services.iter().any(|s| s == "lambda") {
-            let host_sock = host_docker_socket_bind_source().unwrap_or_else(|| {
-                panic!(
-                    "Localstack with the lambda service needs a bind-mountable Docker socket on the host. \
-                     Set ARENA_DOCKER_SOCKET_PATH to that path, or set DOCKER_HOST=unix:///path/to/docker.sock. \
-                     On Windows with Docker Desktop (Linux engine), the client normally accepts //var/run/docker.sock; \
-                     if yours does not, set ARENA_DOCKER_SOCKET_PATH explicitly."
-                );
-            });
+            let host_sock = host_docker_socket_bind_source().ok_or(
+                "Localstack with the lambda service needs a bind-mountable Docker socket on the host. \
+                 Set ARENA_DOCKER_SOCKET_PATH to that path, or set DOCKER_HOST=unix:///path/to/docker.sock. \
+                 On Windows with Docker Desktop (Linux engine), the client normally accepts //var/run/docker.sock; \
+                 if yours does not, set ARENA_DOCKER_SOCKET_PATH explicitly.",
+            )?;
             request = request.with_mount(Mount::bind_mount(host_sock, CONTAINER_DOCKER_SOCK));
         }
 
@@ -129,31 +142,31 @@ impl LocalstackImpl for LocalstackContainerImpl {
             request = request.with_network(network);
         }
 
-        let container = request.start().await.unwrap_or_else(|e| {
-            panic!(
-                "{}",
-                arena_container::container::start_failure_message("localstack", &e)
-            )
-        });
+        let container = request
+            .start()
+            .await
+            .map_err(|e| arena_container::container::start_failure_message("localstack", &e))?;
 
         let host = container
             .get_host()
             .await
-            .expect("Failed to get host")
+            .map_err(|e| format!("localstack container host unavailable: {e}"))?
             .to_string();
 
         let host_port = container
             .get_host_port_ipv4(DEFAULT_CONTAINER_PORT)
             .await
-            .expect("Failed to get port");
+            .map_err(|e| format!("localstack port unavailable: {e}"))?;
 
         self.endpoint = Some(format!("http://{host}:{host_port}"));
         self.container = Some(container);
+        self.container_name = Some(container_name.to_string());
 
         tracing::debug!(layer = "localstack_container", phase = "container_started");
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.container.take();
         self.endpoint = None;
         tracing::debug!(layer = "localstack_container", phase = "container_stopped");
@@ -161,6 +174,26 @@ impl LocalstackImpl for LocalstackContainerImpl {
         if let Some(ref network) = self.network {
             arena_container::network::remove_network(network).await;
         }
+        Ok(())
+    }
+
+    fn release(&mut self) {
+        self.container.take();
+        self.endpoint = None;
+    }
+
+    async fn force_stop(&mut self) -> bool {
+        self.release();
+
+        let removed = match self.container_name.as_deref() {
+            Some(name) => arena_container::container::force_remove_container(name).await,
+            None => true,
+        };
+
+        if let Some(ref network) = self.network {
+            arena_container::network::remove_network(network).await;
+        }
+        removed
     }
 
     fn endpoint_url(&self) -> Option<&str> {

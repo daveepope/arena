@@ -62,7 +62,7 @@ public final class ChainedComponentTestSuite {
 
   static final ObjectMapper MAPPER = new ObjectMapper();
 
-  @ArenaLogger(level = ArenaLogLevel.DEBUG)
+  @ArenaLogger(level = ArenaLogLevel.INFO)
   static final Logger LOG = LoggerFactory.getLogger(ChainedComponentTestSuite.class);
 
   private static final EphemeralTestRuntime RT = EphemeralTestRuntime.get();

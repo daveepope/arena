@@ -8,6 +8,7 @@
 - Always report to the developer if you are adding ANY new 3rd party libraries
 - Never stray away from the plan set out by the developer
 - **NEVER commit code.** Do not run `git commit`, `git add`, `git push`, or any other command that stages or records changes. Leave changes in the working tree; committing is the developer's job. Supply a commit message as text only when asked for one.
+- **NEVER run a repin or a version bump without the developer's explicit permission.** This covers `bazel run //scripts:repin`, `bazel run //scripts:bump_version`, `CARGO_BAZEL_REPIN=1`, and any hand edit of `VERSION`, `workspace.package.version`, the `module()` version in `MODULE.bazel`, or the workspace-member versions in `Cargo.lock` / `Cargo.Bazel.lock`. These rewrite release metadata and every lockfile. Tell the developer the command to run and let them run it.
 - You will function as an informative AI coding agent to ASSIST the developer in adding new features, fixing bugs, increasing test coverage, maintaing the architecture.
 - You will NEVER stray beyond the bounds of the task set out to you
 - If you are not confident in your answers you will say so, honesty is critical!
@@ -60,6 +61,7 @@
 - Prefer **performance, speed, and efficiency** in lifecycle and orchestration code.
 - Keep behavior **testable**, follow **simple SOLID** shaping (single responsibility, small interfaces), and **avoid over-abstraction**.
 - **Follow the established module/crate layout**; do not invent parallel structures without a clear reason.
+- **The Arena owns teardown.** Any dependency or component the Arena has started must be stopped by the Arena, including after a fault and including when the Arena is dropped. **Never leave dangling containers, networks, or processes.** Teardown is aggressive and runs in **two passes**: a graceful stop, then an **unconditional forced stop** over every subject regardless of the state it reports, because a subject claiming to be stopped may still be running. The forced stop must be **idempotent**, **infallible**, and **panic-free**. Neither pass may short-circuit: a failure is recorded and the sweep continues to every remaining subject. A fault path that returns before the forced sweep has run is a **defect**, not a tradeoff. If any dependency or component ends faulted, the Arena is faulted: **no exit path may report success while a subject may still be running.**
 
 ## Tests (unit and component)
 

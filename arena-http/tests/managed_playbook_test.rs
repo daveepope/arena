@@ -1,4 +1,5 @@
 use arena::dependency::{Dependency, RunnableDependency};
+use arena::lifecycle::Subject;
 use arena::playbook::Playbook as PlaybookTrait;
 use arena_http::{HttpDependency, HttpImpl, ManagedHttpPlaybook};
 use async_trait::async_trait;
@@ -9,13 +10,20 @@ struct FakeHttpImpl {
 
 #[async_trait]
 impl HttpImpl for FakeHttpImpl {
-    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) {
+    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) -> Result<(), String> {
         self.base_url = Some("http://127.0.0.1:8080".to_string());
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.base_url = None;
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn base_url(&self) -> Option<&str> {
         self.base_url.as_deref()
@@ -41,7 +49,7 @@ async fn started_http(identifier: &str) -> HttpDependency {
         .with_port(0)
         .with_readiness_check(OkReadinessCheck)
         .build();
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
     dep
 }
 
@@ -62,16 +70,22 @@ async fn run_dependency_present_applies_build_fn() {
 
     let playbook = ManagedHttpPlaybook::new("managed-run", dependency_identifier, |p| p);
 
-    let active = playbook.run(&deps).await;
+    let active = playbook.run(&deps).await.expect("playbook should run");
     assert_eq!(active.identifier(), "managed-run");
 }
 
 #[tokio::test]
-#[should_panic(expected = "not found or is not an HttpDependency")]
-async fn run_dependency_missing_panics() {
+async fn run_dependency_missing_returns_fault() {
     let deps: Vec<Dependency> = Vec::new();
     let playbook = ManagedHttpPlaybook::new("managed-missing", "no-such-dep", |p| p);
-    let _ = playbook.run(&deps).await;
+
+    let Err(fault) = playbook.run(&deps).await else {
+        panic!("playbook should fault");
+    };
+
+    assert_eq!(fault.subject, Subject::Playbook);
+    assert_eq!(fault.id, "managed-missing");
+    assert!(fault.message.contains("not found or is not an HttpDependency"));
 }
 
 #[test]

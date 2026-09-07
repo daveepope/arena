@@ -29,10 +29,18 @@ impl OracleImpl for FakeStartedOracleImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
+        Ok(())
     }
 
-    async fn stop(&self) {}
+    async fn stop(&self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&self) -> bool {
+        true
+    }
+    fn release(&self) {}
+
 
     fn connection_string(&self) -> Option<String> {
         Some("//localhost:1521/FREEPDB1".to_string())
@@ -116,10 +124,18 @@ impl OracleImpl for ScriptAwareOracleImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
+        Ok(())
     }
 
-    async fn stop(&self) {}
+    async fn stop(&self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&self) -> bool {
+        true
+    }
+    fn release(&self) {}
+
 
     fn connection_string(&self) -> Option<String> {
         Some("//localhost:1521/FREEPDB1".to_string())
@@ -198,7 +214,7 @@ async fn run_with_prepopulated_managed_tables_skips_rediscovery() {
         .with_readiness_check(AlwaysReadyCheck)
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
     let user_tables_calls_after_start = fake.call_count_containing("USER_TABLES");
     assert_eq!(user_tables_calls_after_start, 1);
 
@@ -220,5 +236,7 @@ async fn verify_returns_parsed_scalar_from_query() {
     let active = dep.playbook().run().await;
 
     assert_eq!(active.verify("SELECT 1 + 1 FROM dual;").await, 2);
-    assert_eq!(active.identifier(), "oracle-playbook:verify-scalar");
+    assert!(active
+        .identifier()
+        .starts_with("oracle-playbook:arena-oracledb-verify-scalar-"));
 }

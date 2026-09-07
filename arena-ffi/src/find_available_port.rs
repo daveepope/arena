@@ -1,5 +1,4 @@
 use std::os::raw::c_char;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use arena_host::find_available_port::{
     find_available_port as host_find_available_port, PortSearchStrategy,
@@ -7,6 +6,7 @@ use arena_host::find_available_port::{
 
 use crate::error::{clear_error, write_error, ArenaStatus};
 use crate::panic_payload::panic_message;
+use crate::boundary::call_across_boundary;
 
 #[no_mangle]
 pub extern "C" fn arena_find_available_port(
@@ -61,11 +61,11 @@ pub extern "C" fn arena_find_available_port(
     let range_start = range_start as u16;
     let range_end_inclusive = (range_end - 1) as u16;
 
-    let outcome = catch_unwind(AssertUnwindSafe(|| {
+    let outcome = call_across_boundary(|| {
         host_find_available_port(range_start..=range_end_inclusive, strategy).unwrap_or_else(|| {
             panic!("no available port found in range {range_start}..{range_end}")
         })
-    }));
+    });
 
     match outcome {
         Ok(port) => {
@@ -73,7 +73,7 @@ pub extern "C" fn arena_find_available_port(
             ArenaStatus::Ok
         }
         Err(payload) => {
-            let msg = panic_message(&payload);
+            let msg = panic_message(payload.as_ref());
             tracing::error!(
                 panic_message = %msg,
                 op = "arena_find_available_port",

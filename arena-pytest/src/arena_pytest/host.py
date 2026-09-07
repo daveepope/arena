@@ -3,7 +3,7 @@ from __future__ import annotations
 import ctypes
 from enum import IntEnum
 
-from arena_pytest.ffi._ffi import ArenaBindingError, load_ffi, _take_err
+from arena_pytest.ffi._ffi import ArenaBindingError, load_ffi, _take_out_string
 
 _ARENA_STATUS_OK = 0
 _ARENA_STATUS_PANIC = 3
@@ -35,7 +35,7 @@ def find_available_port(
         ctypes.byref(port_out),
         ctypes.byref(err),
     )
-    message = _take_err(err, ffi)
+    message = _take_out_string(err, ffi)
     if status == _ARENA_STATUS_PANIC:
         raise ArenaPortNotFoundError(message or "no available port found")
     if status != _ARENA_STATUS_OK:

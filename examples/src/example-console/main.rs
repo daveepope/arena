@@ -312,7 +312,13 @@ async fn main() {
     ))];
     let closed_arena = ClosedArena::new(String::from("Example Arena"), matches);
 
-    let open_arena = closed_arena.open().await;
+    let open_arena = match closed_arena.open().await {
+        Ok(open) => open,
+        Err(state) => {
+            tracing::error!(arena_state = %state, "arena failed to open");
+            return;
+        }
+    };
 
     let kafka_bootstrap = open_arena
         .dependency(&kafka_id)

@@ -8,6 +8,7 @@ public sealed class PostgresDependency : IArenaDependency
 {
     public string Type => "postgres";
     public string Identifier { get; }
+    public long? ExpirySeconds { get; internal set; }
     public int Port { get; }
     public string? DatabaseName { get; }
     public string? DatabaseUsername { get; }
@@ -52,6 +53,7 @@ public sealed class PostgresDependency : IArenaDependency
 
 public sealed class PostgresDependencyBuilder
 {
+    private long? _expirySeconds;
     private readonly string _name;
     private int _port = 5432;
     private string? _databaseName;
@@ -122,9 +124,32 @@ public sealed class PostgresDependencyBuilder
         return this;
     }
 
+    public PostgresDependencyBuilder WithExpiry(System.TimeSpan expiry)
+    {
+        _expirySeconds = ExpirySeconds(expiry);
+        return this;
+    }
+
+    public PostgresDependencyBuilder WithoutExpiry()
+    {
+        _expirySeconds = 0;
+        return this;
+    }
+
     public PostgresDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-postgres", _name);
-        return new PostgresDependency(identifier, _port, _databaseName, _databaseUsername, _databasePassword, _imageName, _image, _containerName, _startupSqlScripts, _children);
+        var built = new PostgresDependency(identifier, _port, _databaseName, _databaseUsername, _databasePassword, _imageName, _image, _containerName, _startupSqlScripts, _children);
+        built.ExpirySeconds = _expirySeconds;
+        return built;
     }
+
+    private static long ExpirySeconds(System.TimeSpan expiry)
+    {
+        if (expiry < System.TimeSpan.Zero)
+            throw new System.ArgumentOutOfRangeException(nameof(expiry), "expiry must not be negative");
+        var seconds = (long)expiry.TotalSeconds;
+        return seconds == 0 && expiry > System.TimeSpan.Zero ? 1 : seconds;
+    }
+
 }

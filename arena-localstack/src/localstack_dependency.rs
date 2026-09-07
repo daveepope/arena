@@ -4,10 +4,13 @@ pub mod resource_creator;
 
 pub use container_impl::LOCALSTACK_INTERNAL_DOCKER_PORT;
 
+use arena::lifecycle::message;
+use arena::lifecycle::Subject;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use arena::dependency::{Dependency, RunnableDependency};
+use arena::lifecycle::{Fault, RunnableState};
 use arena::healthcheck::ReadinessCheck;
 use async_trait::async_trait;
 use futures_timer::Delay;
@@ -21,6 +24,7 @@ use crate::localstack_dependency::resource_creator::ResourceCreator;
 
 #[async_trait]
 pub trait LocalstackImpl: Send + Sync {
+    fn set_expiry(&mut self, _expiry: Option<Duration>) {}
     async fn start(
         &mut self,
         port: u16,
@@ -28,8 +32,10 @@ pub trait LocalstackImpl: Send + Sync {
         image_tag: &str,
         container_name: &str,
         services: &[String],
-    );
-    async fn stop(&mut self);
+    ) -> Result<(), String>;
+    async fn stop(&mut self) -> Result<(), String>;
+    async fn force_stop(&mut self) -> bool;
+    fn release(&mut self);
     fn endpoint_url(&self) -> Option<&str>;
 }
 
@@ -53,6 +59,8 @@ pub struct LocalstackDependency {
     queue_urls: HashMap<String, String>,
     queue_arns: HashMap<String, String>,
     lambda_arns: HashMap<String, String>,
+    state: RunnableState,
+    faults: Vec<Fault>,
 }
 
 impl LocalstackDependency {
@@ -91,6 +99,8 @@ impl LocalstackDependency {
             queue_urls: HashMap::new(),
             queue_arns: HashMap::new(),
             lambda_arns: HashMap::new(),
+            state: RunnableState::NotStarted,
+            faults: Vec::new(),
         }
     }
 
@@ -134,17 +144,14 @@ impl LocalstackDependency {
             .ok_or_else(|| "localstack endpoint not available yet".to_string())
     }
 
-    async fn wait_until_ready(&self) {
+    async fn wait_until_ready(&self) -> Result<(), String> {
         let timeout = Duration::from_secs(45);
         let poll_every = Duration::from_millis(100);
         let start = Instant::now();
 
         let endpoint = loop {
             if start.elapsed() >= timeout {
-                panic!(
-                    "[Localstack-{}] localstack did not become ready within {:?}",
-                    self.identifier, timeout
-                );
+                return Err(format!("localstack did not become ready within {timeout:?}"));
             }
 
             match self.endpoint_on_host() {
@@ -162,30 +169,24 @@ impl LocalstackDependency {
 
         let remaining = timeout.saturating_sub(start.elapsed());
         if remaining.is_zero() {
-            panic!(
-                "[Localstack-{}] localstack did not become ready within {:?}",
-                self.identifier, timeout
-            );
+            return Err(format!("localstack did not become ready within {timeout:?}"));
         }
 
-        match self
-            .readiness_check
+        self.readiness_check
             .is_ready(&self.identifier, &endpoint, remaining.as_millis() as u64)
             .await
-        {
-            Ok(()) => {}
-            Err(err) => panic!(
-                "[Localstack-{}] readiness check failed: {}",
-                self.identifier, err
-            ),
-        }
+            .map_err(message::readiness_failed)
     }
 
-    async fn provision_resources(&mut self) {
-        let endpoint = self
-            .endpoint_on_host()
-            .expect("endpoint for resource provisioning")
-            .to_string();
+    async fn fail(&mut self, message: impl Into<String>, causes: Vec<Fault>) -> Fault {
+        let fault = Fault::dependency(&self.identifier, message).caused_by_all(causes);
+        self.faults.push(fault.clone());
+        <Self as RunnableDependency>::force_stop(self).await;
+        fault
+    }
+
+    async fn provision_resources(&mut self) -> Result<(), String> {
+        let endpoint = self.endpoint_on_host()?.to_string();
 
         self.queue_urls.clear();
         self.queue_arns.clear();
@@ -194,20 +195,10 @@ impl LocalstackDependency {
         for spec in &self.queues {
             let url = ResourceCreator::create_queue(&endpoint, spec)
                 .await
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "[Localstack-{}] queue create failed for {}: {e}",
-                        self.identifier, spec.name
-                    )
-                });
+                .map_err(|e| format!("queue create failed for {}: {e}", spec.name))?;
             let arn = ResourceCreator::get_queue_arn(&endpoint, &url)
                 .await
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "[Localstack-{}] queue arn lookup failed for {}: {e}",
-                        self.identifier, spec.name
-                    )
-                });
+                .map_err(|e| format!("queue arn lookup failed for {}: {e}", spec.name))?;
             self.queue_urls.insert(spec.name.clone(), url);
             self.queue_arns.insert(spec.name.clone(), arn);
         }
@@ -215,63 +206,43 @@ impl LocalstackDependency {
         for bus in &self.event_buses {
             ResourceCreator::create_event_bus(&endpoint, &bus.name)
                 .await
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "[Localstack-{}] event bus create failed for {}: {e}",
-                        self.identifier, bus.name
-                    )
-                });
+                .map_err(|e| format!("event bus create failed for {}: {e}", bus.name))?;
         }
 
         for spec in &self.lambdas {
             let arn = ResourceCreator::create_lambda(&endpoint, spec)
                 .await
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "[Localstack-{}] lambda create failed for {}: {e}",
-                        self.identifier, spec.name
-                    )
-                });
+                .map_err(|e| format!("lambda create failed for {}: {e}", spec.name))?;
             self.lambda_arns.insert(spec.name.clone(), arn);
         }
 
         for rule in &self.event_rules {
-            let target_arns = rule
-                .targets
-                .iter()
-                .map(|t| {
-                    let arn = match &t.kind {
-                        EventTargetKind::SqsQueue { queue_name } => {
-                            self.queue_arns.get(queue_name).cloned().unwrap_or_else(|| {
-                                panic!(
-                                    "[Localstack-{}] event rule {} references unknown queue {}",
-                                    self.identifier, rule.name, queue_name
-                                )
-                            })
-                        }
-                        EventTargetKind::Lambda { function_name } => self
-                            .lambda_arns
-                            .get(function_name)
-                            .cloned()
-                            .unwrap_or_else(|| {
-                                panic!(
-                                    "[Localstack-{}] event rule {} references unknown lambda {}",
-                                    self.identifier, rule.name, function_name
-                                )
-                            }),
-                    };
-                    (t.target_id.clone(), arn)
-                })
-                .collect();
+            let mut target_arns = Vec::with_capacity(rule.targets.len());
+            for t in &rule.targets {
+                let arn = match &t.kind {
+                    EventTargetKind::SqsQueue { queue_name } => {
+                        self.queue_arns.get(queue_name).cloned().ok_or_else(|| {
+                            format!(
+                                "event rule {} references unknown queue {queue_name}",
+                                rule.name
+                            )
+                        })?
+                    }
+                    EventTargetKind::Lambda { function_name } => {
+                        self.lambda_arns.get(function_name).cloned().ok_or_else(|| {
+                            format!(
+                                "event rule {} references unknown lambda {function_name}",
+                                rule.name
+                            )
+                        })?
+                    }
+                };
+                target_arns.push((t.target_id.clone(), arn));
+            }
 
             ResourceCreator::create_event_rule(&endpoint, rule, target_arns)
                 .await
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "[Localstack-{}] event rule create failed for {}: {e}",
-                        self.identifier, rule.name
-                    )
-                });
+                .map_err(|e| format!("event rule create failed for {}: {e}", rule.name))?;
         }
 
         if !self.queues.is_empty()
@@ -288,6 +259,7 @@ impl LocalstackDependency {
                 "provisioned localstack resources"
             );
         }
+        Ok(())
     }
 }
 
@@ -305,10 +277,19 @@ impl RunnableDependency for LocalstackDependency {
         self
     }
 
-    async fn start(&mut self) {
+    fn state(&self) -> RunnableState {
+        self.state
+    }
+
+    fn faults(&self) -> &[Fault] {
+        &self.faults
+    }
+
+    async fn start(&mut self) -> Result<(), Fault> {
         if self.running {
-            return;
+            return Ok(());
         }
+        self.state = RunnableState::Starting;
 
         tracing::debug!(dependency = %self.identifier, phase = "start_begin", "starting");
         let sw = Instant::now();
@@ -316,8 +297,14 @@ impl RunnableDependency for LocalstackDependency {
         if let Some(children) = self.dependencies.as_mut() {
             if !children.is_empty() {
                 self.children_started = true;
+                let mut child_faults = Vec::new();
                 for dep in children.iter_mut() {
-                    dep.start().await;
+                    if let Err(fault) = arena::dependency::start_child(dep).await {
+                        child_faults.push(fault);
+                    }
+                }
+                if !child_faults.is_empty() {
+                    return Err(self.fail(message::child_start_failed(Subject::Dependency), child_faults).await);
                 }
             }
         }
@@ -332,7 +319,8 @@ impl RunnableDependency for LocalstackDependency {
 
         let sw_container = Instant::now();
         self.needs_teardown = true;
-        self.localstack_impl
+        if let Err(message) = self
+            .localstack_impl
             .start(
                 self.port,
                 &image_name,
@@ -340,7 +328,10 @@ impl RunnableDependency for LocalstackDependency {
                 &container_name,
                 &services,
             )
-            .await;
+            .await
+        {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw_container.elapsed(),
@@ -348,51 +339,106 @@ impl RunnableDependency for LocalstackDependency {
         );
 
         let sw_ready = Instant::now();
-        self.wait_until_ready().await;
+        self.state = RunnableState::ReadinessCheck;
+        if let Err(message) = self.wait_until_ready().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw_ready.elapsed(),
             "readiness wait finished"
         );
 
-        self.provision_resources().await;
+        if let Err(message) = self.provision_resources().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
 
         self.running = true;
+        self.state = RunnableState::Started;
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw.elapsed(),
             "started"
         );
+        Ok(())
     }
 
-    async fn stop(&mut self) {
-        self.localstack_impl.stop().await;
-        self.needs_teardown = false;
+    async fn stop(&mut self) -> Result<(), Fault> {
+        self.state = RunnableState::Stopping;
+        let mut causes = Vec::new();
 
-        if !self.running {
-            if self.children_started {
-                for dep in self.dependencies.iter_mut().flatten().rev() {
-                    dep.stop().await;
-                }
-                self.children_started = false;
-            }
-            return;
+        if let Err(message) = self.localstack_impl.stop().await {
+            causes.push(Fault::dependency(&self.identifier, message));
         }
+        self.needs_teardown = false;
 
         tracing::debug!(dependency = %self.identifier, phase = "stop_begin", "stopping");
         let sw = Instant::now();
 
         for dep in self.dependencies.iter_mut().flatten().rev() {
-            dep.stop().await;
+            if let Err(fault) = arena::dependency::stop_child(dep).await {
+                causes.push(fault);
+            }
         }
 
         self.children_started = false;
         self.running = false;
+
+        if !causes.is_empty() {
+            let fault =
+                Fault::dependency(&self.identifier, message::stop_did_not_complete()).caused_by_all(causes);
+            self.faults.push(fault.clone());
+            self.state = RunnableState::Faulted;
+            return Err(fault);
+        }
+
+        self.state = RunnableState::Stopped;
         tracing::debug!(
             dependency = %self.identifier,
             elapsed = ?sw.elapsed(),
             "stopped"
         );
+        Ok(())
+    }
+
+    fn release(&mut self) {
+        self.localstack_impl.release();
+        self.running = false;
+        self.needs_teardown = false;
+        self.children_started = false;
+        for dep in self.dependencies.iter_mut().flatten().rev() {
+            arena::dependency::release_child(dep);
+        }
+        self.state = RunnableState::Stopped;
+    }
+
+    async fn force_stop(&mut self) {
+        let removed = self.localstack_impl.force_stop().await;
+        self.needs_teardown = false;
+        self.running = false;
+        self.children_started = false;
+
+        for dep in self.dependencies.iter_mut().flatten().rev() {
+            arena::dependency::force_stop_child(dep).await;
+        }
+
+        if removed {
+            self.state = RunnableState::Stopped;
+            return;
+        }
+
+        let unconfirmed = Fault::dependency(
+            &self.identifier,
+            message::forced_teardown_unconfirmed(),
+        );
+        if !self
+            .faults
+            .iter()
+            .any(|f| f.message == unconfirmed.message && f.id == unconfirmed.id)
+        {
+            self.faults.push(unconfirmed);
+        }
+        self.state = RunnableState::Faulted;
     }
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
@@ -407,14 +453,14 @@ impl RunnableDependency for LocalstackDependency {
         self.dependencies.as_deref_mut().unwrap_or(&mut [])
     }
 
-    async fn soft_reset(&self) {
+    async fn soft_reset(&self) -> Result<(), Fault> {
         if !self.running {
-            return;
+            return Ok(());
         }
 
         let endpoint = self
             .endpoint_on_host()
-            .expect("endpoint for soft reset")
+            .map_err(|message| Fault::dependency(&self.identifier, message))?
             .to_string();
 
         for (name, url) in &self.queue_urls {
@@ -433,11 +479,12 @@ impl RunnableDependency for LocalstackDependency {
                 );
             }
         }
+        Ok(())
     }
 
-    async fn hard_reset(&mut self) {
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
         if !self.running {
-            return;
+            return Ok(());
         }
 
         tracing::debug!(
@@ -453,10 +500,13 @@ impl RunnableDependency for LocalstackDependency {
         );
         let services = self.services.clone();
 
-        self.localstack_impl.stop().await;
+        if let Err(message) = self.localstack_impl.stop().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         self.running = false;
 
-        self.localstack_impl
+        if let Err(message) = self
+            .localstack_impl
             .start(
                 self.port,
                 &image_name,
@@ -464,23 +514,34 @@ impl RunnableDependency for LocalstackDependency {
                 &container_name,
                 &services,
             )
-            .await;
-        self.wait_until_ready().await;
-        self.provision_resources().await;
+            .await
+        {
+            return Err(self.fail(message, Vec::new()).await);
+        }
+        if let Err(message) = self.wait_until_ready().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
+        if let Err(message) = self.provision_resources().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         self.running = true;
+        self.state = RunnableState::Started;
+        Ok(())
     }
 }
 
 impl Drop for LocalstackDependency {
     fn drop(&mut self) {
-        if self.running {
+        if self.running || self.needs_teardown || self.children_started {
             tracing::warn!(
                 dependency = %self.identifier,
-                "drop while running; forcing stop"
+                "drop while running; releasing container"
             );
-            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
-        } else if self.needs_teardown || self.children_started {
-            futures::executor::block_on(<Self as RunnableDependency>::stop(self));
+            self.localstack_impl.release();
+            self.running = false;
+            self.needs_teardown = false;
+            self.children_started = false;
+            self.state = RunnableState::Stopped;
         }
     }
 }

@@ -1,3 +1,4 @@
+use arena::lifecycle::{Fault, RunnableState, Subject};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::playbook::Playbook as PlaybookTrait;
 use arena_oracledb::{ManagedOraclePlaybook, OracleDependency, OracleImpl};
@@ -18,10 +19,18 @@ impl OracleImpl for FakeStartedOracleImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
+        Ok(())
     }
 
-    async fn stop(&self) {}
+    async fn stop(&self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&self) -> bool {
+        true
+    }
+    fn release(&self) {}
+
 
     fn connection_string(&self) -> Option<String> {
         Some("//localhost:1521/FREEPDB1".to_string())
@@ -53,9 +62,24 @@ impl RunnableDependency for OtherDependency {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+    fn state(&self) -> RunnableState {
+        RunnableState::NotStarted
+    }
 
-    async fn start(&mut self) {}
-    async fn stop(&mut self) {}
+    fn faults(&self) -> &[Fault] {
+        &[]
+    }
+
+    async fn force_stop(&mut self) {}
+    fn release(&mut self) {}
+
+
+    async fn start(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
+    async fn stop(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
 
@@ -67,26 +91,42 @@ impl RunnableDependency for OtherDependency {
         &mut []
     }
 
-    async fn soft_reset(&self) {}
-    async fn hard_reset(&mut self) {}
+    async fn soft_reset(&self) -> Result<(), Fault> {
+        Ok(())
+    }
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 }
 
 #[tokio::test]
-#[should_panic(expected = "not found or is not an OracleDependency")]
-async fn run_missing_dependency_panics() {
+async fn run_missing_dependency_returns_fault() {
     let managed = ManagedOraclePlaybook::new("managed-1", "does-not-exist");
     let deps: Vec<Dependency> = vec![];
-    let _ = managed.run(&deps).await;
+
+    let Err(fault) = managed.run(&deps).await else {
+        panic!("playbook should fault");
+    };
+
+    assert_eq!(fault.subject, Subject::Playbook);
+    assert_eq!(fault.id, "managed-1");
+    assert!(fault.message.contains("not found or is not an OracleDependency"));
 }
 
 #[tokio::test]
-#[should_panic(expected = "not found or is not an OracleDependency")]
-async fn run_wrong_type_dependency_panics() {
+async fn run_wrong_type_dependency_returns_fault() {
     let managed = ManagedOraclePlaybook::new("managed-2", "other-dep");
     let deps: Vec<Dependency> = vec![Box::new(OtherDependency {
         identifier: "other-dep".to_string(),
     })];
-    let _ = managed.run(&deps).await;
+
+    let Err(fault) = managed.run(&deps).await else {
+        panic!("playbook should fault");
+    };
+
+    assert_eq!(fault.subject, Subject::Playbook);
+    assert_eq!(fault.id, "managed-2");
+    assert!(fault.message.contains("not found or is not an OracleDependency"));
 }
 
 #[tokio::test]
@@ -97,7 +137,7 @@ async fn run_success_delegates_to_oracle_playbook() {
     let deps: Vec<Dependency> = vec![dep];
 
     let managed = ManagedOraclePlaybook::new("managed-playbook-id", dependency_identifier);
-    let active = managed.run(&deps).await;
+    let active = managed.run(&deps).await.expect("playbook should run");
 
     assert_eq!(active.identifier(), "managed-playbook-id");
 }

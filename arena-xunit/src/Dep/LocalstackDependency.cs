@@ -127,6 +127,7 @@ public sealed class LocalstackDependency : IArenaDependency
 {
     public string Type => "localstack";
     public string Identifier { get; }
+    public long? ExpirySeconds { get; internal set; }
     public int Port { get; }
     public string EndpointUrl { get; }
 
@@ -186,6 +187,7 @@ public sealed class LocalstackDependency : IArenaDependency
             Type = Type,
             Identifier = Identifier,
             Port = Port,
+            ExpirySeconds = ExpirySeconds,
         };
 
         if (_services.Count > 0) config.Services = _services;
@@ -217,6 +219,7 @@ public sealed class LocalstackDependency : IArenaDependency
         [JsonProperty("type")] public string Type { get; set; } = default!;
         [JsonProperty("identifier")] public string Identifier { get; set; } = default!;
         [JsonProperty("port")] public int Port { get; set; }
+        [JsonProperty("expiry_seconds")] public long? ExpirySeconds { get; set; }
         [JsonProperty("services")] public List<string>? Services { get; set; }
         [JsonProperty("queues")] public List<LocalstackQueueConfig>? Queues { get; set; }
         [JsonProperty("lambdas")] public List<LocalstackLambdaConfig>? Lambdas { get; set; }
@@ -231,6 +234,7 @@ public sealed class LocalstackDependency : IArenaDependency
 
 public sealed class LocalstackDependencyBuilder
 {
+    private long? _expirySeconds;
     private readonly string _name;
     private int _port = 4566;
     private readonly List<string> _services = new();
@@ -324,6 +328,18 @@ public sealed class LocalstackDependencyBuilder
         return this;
     }
 
+    public LocalstackDependencyBuilder WithExpiry(System.TimeSpan expiry)
+    {
+        _expirySeconds = ExpirySeconds(expiry);
+        return this;
+    }
+
+    public LocalstackDependencyBuilder WithoutExpiry()
+    {
+        _expirySeconds = 0;
+        return this;
+    }
+
     public LocalstackDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-localstack", _name);
@@ -362,7 +378,7 @@ public sealed class LocalstackDependencyBuilder
             eventBuses.Add(new LocalstackEventBusConfig { Name = name });
         }
 
-        return new LocalstackDependency(
+        var built = new LocalstackDependency(
             identifier,
             _port,
             new List<string>(_services),
@@ -374,5 +390,16 @@ public sealed class LocalstackDependencyBuilder
             _imageTag,
             _containerName,
             _children);
+        built.ExpirySeconds = _expirySeconds;
+        return built;
     }
+
+    private static long ExpirySeconds(System.TimeSpan expiry)
+    {
+        if (expiry < System.TimeSpan.Zero)
+            throw new System.ArgumentOutOfRangeException(nameof(expiry), "expiry must not be negative");
+        var seconds = (long)expiry.TotalSeconds;
+        return seconds == 0 && expiry > System.TimeSpan.Zero ? 1 : seconds;
+    }
+
 }

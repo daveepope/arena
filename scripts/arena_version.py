@@ -254,7 +254,16 @@ CARGO_AUDIT_VERSION = "0.22.2"
 CARGO_VET_VERSION = "0.10.2"
 
 
+def require_cargo() -> None:
+    if shutil.which("cargo") is None:
+        raise SystemExit(
+            "cargo not found on PATH. Install rustup (https://rustup.rs), then run:\n"
+            '  . "$HOME/.cargo/env"'
+        )
+
+
 def audit_arena_ffi_binary(root: Path) -> None:
+    require_cargo()
     env = os.environ.copy()
     if shutil.which("cargo-auditable") is None or shutil.which("cargo-audit") is None:
         subprocess.run(
@@ -280,6 +289,7 @@ def audit_arena_ffi_binary(root: Path) -> None:
 
 
 def vet_rust_dependencies(root: Path) -> None:
+    require_cargo()
     env = os.environ.copy()
     if shutil.which("cargo-vet") is None:
         subprocess.run(

@@ -7,11 +7,18 @@ import com.sun.jna.ptr.PointerByReference;
 import java.util.Map;
 
 interface ArenaNativeLib extends Library {
-  void arena_set_log_level(int level);
+  int arena_set_log_level(int level);
 
-  Pointer arena_open(String name, String configJson, PointerByReference errOut);
+  Pointer arena_open(
+      String name, String configJson, PointerByReference errOut, PointerByReference stateOut);
 
-  void arena_close(Pointer handle);
+  int arena_close(Pointer handle, PointerByReference errOut, PointerByReference stateOut);
+
+  int arena_state_json(Pointer handle, PointerByReference errOut, PointerByReference stateOut);
+
+  long arena_add_lifecycle_observer(ArenaLifecycleObserverCallback callback, Pointer userData);
+
+  void arena_remove_lifecycle_observer(long token);
 
   long arena_add_log_target(ArenaLoggingTargetCallback callback, Pointer userData);
 

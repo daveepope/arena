@@ -196,7 +196,7 @@ async fn mssql_dependency_component_test() {
         .to_string()])
         .build();
 
-    mssql.start().await;
+    mssql.start().await.expect("start should succeed");
 
     if let Err(e) = lifecycle_scenario(&mssql).await {
         panic!("lifecycle scenario: {e}");

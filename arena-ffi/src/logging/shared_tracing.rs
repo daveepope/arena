@@ -8,6 +8,7 @@ use tracing::{Event, Subscriber};
 use tracing_subscriber::filter::EnvFilter;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
+use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::reload;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -50,7 +51,6 @@ static DISPATCHER_DEPENDENCY_ALLOW: LazyLock<ArcSwap<Vec<String>>> =
 
 static DISPATCHER_COMPONENT_ALLOW: LazyLock<ArcSwap<Vec<String>>> =
     LazyLock::new(|| ArcSwap::from_pointee(Vec::new()));
-
 
 fn open_slot(recipient: DispatcherLoggingTargetRef) -> SlotKey {
     let key = SlotKey(NEXT_SLOT_KEY.fetch_add(1, Ordering::Relaxed));
@@ -99,7 +99,6 @@ impl Drop for ArenaLogDelivery {
         release_slot(k);
     }
 }
-
 
 fn dispatcher_allow_json_bytes_store(bytes: &[u8]) -> Vec<String> {
     serde_json::from_slice::<Vec<String>>(bytes)
@@ -220,8 +219,29 @@ pub(crate) fn ensure_shared_tracing_installed() {
 
         if registry.try_init().is_ok() {
             env_filter_reload::install_filter_control(Box::new(reload_handle), Level::Info);
+            install_panic_reporter();
         }
     });
+}
+
+fn install_panic_reporter() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        if !crate::boundary::inside_boundary() || snapshot_log_targets().is_empty() {
+            previous(info);
+            return;
+        }
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}", l.file(), l.line()))
+            .unwrap_or_else(|| "unknown".to_string());
+        tracing::error!(
+            target: "arena::ffi",
+            panic_message = %info.payload_as_str().unwrap_or("unknown panic payload"),
+            location = %location,
+            "panic captured at the arena boundary"
+        );
+    }));
 }
 
 fn snapshot_log_targets() -> Arc<Vec<RegisteredTarget>> {
@@ -235,24 +255,6 @@ fn host_dispatcher_accepts_metadata_target(target: &str) -> bool {
         || target.starts_with("ffi_logging_test::")
 }
 
-fn host_dispatcher_payload_for_host(recording_target: &str, message_body: String) -> String {
-    let tag = shorten_tracing_metadata_target_label(recording_target);
-    if message_body.is_empty() {
-        format!("[{tag}]")
-    } else {
-        format!("[{tag}] {message_body}")
-    }
-}
-
-fn shorten_tracing_metadata_target_label(recording_target: &str) -> String {
-    const MAX_TARGET_RUNE_LEN: usize = 72;
-    if recording_target.chars().count() <= MAX_TARGET_RUNE_LEN {
-        return recording_target.to_string();
-    }
-    let shortened: String = recording_target.chars().take(MAX_TARGET_RUNE_LEN).collect();
-    format!("{}…", shortened)
-}
-
 fn level_from_event(level: &tracing::Level) -> Level {
     match *level {
         tracing::Level::ERROR => Level::Error,
@@ -263,14 +265,129 @@ fn level_from_event(level: &tracing::Level) -> Level {
     }
 }
 
+pub(crate) const ROOT_LOGGER_NAME: &str = "arena";
+pub(crate) const ARENA_ID_FIELD: &str = "arena.id";
+pub(crate) const SUBJECT_KIND_FIELD: &str = "arena.subject.kind";
+pub(crate) const SUBJECT_ID_FIELD: &str = "arena.subject.id";
+
+#[derive(Default)]
+struct SubjectIdentity {
+    arena_id: Option<String>,
+    subject_kind: Option<String>,
+    subject_id: Option<String>,
+}
+
+impl Visit for SubjectIdentity {
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        self.assign(field.name(), format!("{value:?}"));
+    }
+
+    fn record_str(&mut self, field: &Field, value: &str) {
+        self.assign(field.name(), value.to_string());
+    }
+}
+
+impl SubjectIdentity {
+    fn assign(&mut self, name: &str, value: String) {
+        match name {
+            ARENA_ID_FIELD => self.arena_id = Some(value),
+            SUBJECT_KIND_FIELD => self.subject_kind = Some(value),
+            SUBJECT_ID_FIELD => self.subject_id = Some(value),
+            _ => {}
+        }
+    }
+}
+
+#[derive(Clone)]
+struct SpanNamespace {
+    arena_id: Option<Arc<str>>,
+    subject: Option<(Arc<str>, Arc<str>)>,
+    logger_name: Arc<str>,
+}
+
+fn logger_name_segment(raw: &str) -> Option<String> {
+    let cleaned: String = raw
+        .trim()
+        .chars()
+        .map(|c| if c == '.' { '_' } else { c })
+        .collect();
+    if cleaned.is_empty() {
+        None
+    } else {
+        Some(cleaned)
+    }
+}
+
+pub(crate) fn logger_name(arena_id: Option<&str>, subject: Option<(&str, &str)>) -> String {
+    let mut name = String::from(ROOT_LOGGER_NAME);
+    if let Some(segment) = arena_id.and_then(logger_name_segment) {
+        name.push('.');
+        name.push_str(&segment);
+    }
+    if let Some((kind, id)) = subject {
+        if let (Some(kind), Some(id)) = (logger_name_segment(kind), logger_name_segment(id)) {
+            name.push('.');
+            name.push_str(&kind);
+            name.push('.');
+            name.push_str(&id);
+        }
+    }
+    name
+}
+
 struct DispatcherLayer;
 
-impl<S: Subscriber> Layer<S> for DispatcherLayer {
+impl<S> Layer<S> for DispatcherLayer
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+{
     fn max_level_hint(&self) -> Option<LevelFilter> {
         Some(LevelFilter::TRACE)
     }
 
-    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+    fn on_new_span(
+        &self,
+        attrs: &tracing::span::Attributes<'_>,
+        id: &tracing::span::Id,
+        ctx: Context<'_, S>,
+    ) {
+        let mut identity = SubjectIdentity::default();
+        attrs.record(&mut identity);
+
+        let Some(span) = ctx.span(id) else {
+            return;
+        };
+        let inherited = span
+            .scope()
+            .skip(1)
+            .find_map(|ancestor| ancestor.extensions().get::<SpanNamespace>().cloned());
+
+        let declares_arena = identity.arena_id.is_some();
+        let arena_id = identity
+            .arena_id
+            .map(Arc::from)
+            .or_else(|| inherited.as_ref().and_then(|ns| ns.arena_id.clone()));
+        let subject = match (identity.subject_kind, identity.subject_id) {
+            (Some(kind), Some(subject_id)) => Some((Arc::from(kind), Arc::from(subject_id))),
+            _ if declares_arena => None,
+            _ => inherited.as_ref().and_then(|ns| ns.subject.clone()),
+        };
+        if arena_id.is_none() && subject.is_none() {
+            return;
+        }
+
+        let composed = logger_name(
+            arena_id.as_deref(),
+            subject.as_ref().map(|(kind, id)| (&**kind, &**id)),
+        );
+        span.extensions_mut().insert(SpanNamespace {
+            arena_id,
+            subject,
+            logger_name: Arc::from(composed.as_str()),
+        });
+    }
+
+    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
         let targets = snapshot_log_targets();
         if targets.is_empty() {
             return;
@@ -282,11 +399,17 @@ impl<S: Subscriber> Layer<S> for DispatcherLayer {
         }
 
         let severity = level_from_event(event.metadata().level());
-        let emitted_at = event
-            .metadata()
-            .module_path()
-            .unwrap_or(metadata_target)
-            .to_owned();
+        let emitted_at = ctx
+            .event_scope(event)
+            .and_then(|mut scope| {
+                scope.find_map(|span| {
+                    span.extensions()
+                        .get::<SpanNamespace>()
+                        .map(|ns| ns.logger_name.clone())
+                })
+            })
+            .map(|name| name.to_string())
+            .unwrap_or_else(|| ROOT_LOGGER_NAME.to_string());
 
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
@@ -295,7 +418,7 @@ impl<S: Subscriber> Layer<S> for DispatcherLayer {
 
         let mut coll = StructuredPayloadCollector::new();
         event.record(&mut coll);
-        let payload = host_dispatcher_payload_for_host(metadata_target, coll.into_body());
+        let payload = coll.into_body();
 
         let (caller_file_utf8, caller_line) =
             match (event.metadata().file(), event.metadata().line()) {

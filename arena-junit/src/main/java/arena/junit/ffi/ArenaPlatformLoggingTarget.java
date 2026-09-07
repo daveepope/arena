@@ -73,7 +73,7 @@ final class ArenaPlatformLoggingTarget implements ArenaLoggingTargetCallback {
       Pointer callerFileUtf8,
       int callerLine,
       Pointer ignoredUser) {
-    Logger jul = jvmJulLoggerForDispatcherDefaultLoggingTarget();
+    Logger jul = loggerForRecordTarget(targetUtf8);
     int publishCode =
         ArenaBindings.lib().arena_dispatcher_default_logging_target_publish_level(level);
     Level julPublish = julPublishLevelForDispatcherLoggingTarget(publishCode);
@@ -87,6 +87,17 @@ final class ArenaPlatformLoggingTarget implements ArenaLoggingTargetCallback {
     record.setSourceClassName(jul.getName());
     record.setSourceMethodName("publish");
     jul.log(record);
+  }
+
+  private static Logger loggerForRecordTarget(Pointer targetUtf8) {
+    if (targetUtf8 == null) {
+      return jvmJulLoggerForDispatcherDefaultLoggingTarget();
+    }
+    String target = targetUtf8.getString(0, java.nio.charset.StandardCharsets.UTF_8.name());
+    if (target == null || target.isEmpty()) {
+      return jvmJulLoggerForDispatcherDefaultLoggingTarget();
+    }
+    return Logger.getLogger(target);
   }
 
   private static Logger jvmJulLoggerForDispatcherDefaultLoggingTarget() {
@@ -109,7 +120,7 @@ final class ArenaPlatformLoggingTarget implements ArenaLoggingTargetCallback {
     String name =
         np != null
             ? np.getString(0, java.nio.charset.StandardCharsets.UTF_8.name())
-            : "arena.rust.dispatcher";
+            : "arena";
     cached = Logger.getLogger(name);
     dispatcherJvmLogger = cached;
     return cached;

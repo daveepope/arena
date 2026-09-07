@@ -10,9 +10,9 @@ internal static class ArenaNativeLib
     private static bool _initialized = false;
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate IntPtr arena_open_fn(string name, string configJson, out IntPtr errOut);
+    private delegate IntPtr arena_open_fn(string name, string configJson, out IntPtr errOut, out IntPtr stateOut);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void arena_close_fn(IntPtr handle);
+    private delegate int arena_close_fn(IntPtr handle, out IntPtr errOut, out IntPtr stateOut);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_soft_reset_fn(IntPtr handle, string dependencyIdentifier, out IntPtr errOut);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -20,7 +20,7 @@ internal static class ArenaNativeLib
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_find_available_port_fn(int rangeStart, int rangeEnd, int strategy, out int portOut, out IntPtr errOut);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    private delegate void arena_set_log_level_fn(int level);
+    private delegate int arena_set_log_level_fn(int level);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate ulong arena_add_log_target_fn(ArenaLogCallback callback, IntPtr userData);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -203,11 +203,11 @@ internal static class ArenaNativeLib
     [DllImport("kernel32", SetLastError = true, CharSet = CharSet.Ansi)]
     private static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
 
-    internal static IntPtr arena_open(string name, string configJson, out IntPtr errOut) =>
-        _arena_open!.Invoke(name, configJson, out errOut);
+    internal static IntPtr arena_open(string name, string configJson, out IntPtr errOut, out IntPtr stateOut) =>
+        _arena_open!.Invoke(name, configJson, out errOut, out stateOut);
 
-    internal static void arena_close(IntPtr handle) =>
-        _arena_close!.Invoke(handle);
+    internal static int arena_close(IntPtr handle, out IntPtr errOut, out IntPtr stateOut) =>
+        _arena_close!.Invoke(handle, out errOut, out stateOut);
 
     internal static int arena_soft_reset(IntPtr handle, string dependencyIdentifier, out IntPtr errOut) =>
         _arena_soft_reset!.Invoke(handle, dependencyIdentifier, out errOut);
@@ -218,7 +218,7 @@ internal static class ArenaNativeLib
     internal static int arena_find_available_port(int rangeStart, int rangeEnd, int strategy, out int portOut, out IntPtr errOut) =>
         _arena_find_available_port!.Invoke(rangeStart, rangeEnd, strategy, out portOut, out errOut);
 
-    internal static void arena_set_log_level(int level) =>
+    internal static int arena_set_log_level(int level) =>
         _arena_set_log_level!.Invoke(level);
 
     internal static ulong arena_add_log_target(ArenaLogCallback callback, IntPtr userData) =>

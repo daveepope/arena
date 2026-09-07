@@ -11,7 +11,9 @@ path = "src/lib.rs"
 
 [dependencies]
 async-trait = { workspace = true }
+chrono = { workspace = true }
 futures = { workspace = true }
+serde = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
@@ -19,3 +21,4 @@ mockall = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
 tracing-subscriber = { workspace = true }
 futures-timer = { workspace = true }
+serde_json = { workspace = true }

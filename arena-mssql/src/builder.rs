@@ -8,6 +8,7 @@ use std::time::Duration;
 
 pub struct MssqlDependencyBuilder {
     identifier: String,
+    expiry: Option<Duration>,
     mssql_impl: Option<Box<dyn MssqlImpl>>,
     port: Option<u16>,
     database_name: Option<String>,
@@ -35,6 +36,7 @@ impl MssqlDependencyBuilder {
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {
             identifier: identifier.into(),
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
             mssql_impl: None,
             port: None,
             database_name: None,
@@ -144,11 +146,22 @@ impl MssqlDependencyBuilder {
         self.with_image_tag(image_tag)
     }
 
+    pub fn with_expiry(mut self, expiry: Duration) -> Self {
+        self.expiry = Some(expiry);
+        self
+    }
+
+    pub fn without_expiry(mut self) -> Self {
+        self.expiry = None;
+        self
+    }
+
     pub fn build(self) -> MssqlDependency {
         let encryption = self.encryption.unwrap_or_default();
-        let mssql_impl = self
+        let mut mssql_impl = self
             .mssql_impl
             .unwrap_or_else(|| Box::new(MssqlContainerImpl::new(self.network, encryption)));
+        mssql_impl.set_expiry(self.expiry);
 
         let port = self.port.unwrap_or(Self::DEFAULT_PORT);
         let database_name = self
@@ -172,7 +185,7 @@ impl MssqlDependencyBuilder {
         let readiness_check = self.readiness_check;
 
         let mut dep = MssqlDependency::new(
-            arena_container::identifier::build("arena-mssql", &self.identifier),
+            arena_container::identifier::build(crate::MODULE, &self.identifier),
             mssql_impl,
             port,
             database_name,

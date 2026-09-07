@@ -19,6 +19,16 @@ public final class SmtpDependencyBuilder {
     config.put("identifier", ArenaIdentifiers.build("arena-smtp", name));
   }
 
+  public SmtpDependencyBuilder withExpiry(java.time.Duration expiry) {
+    config.put("expiry_seconds", expirySeconds(expiry));
+    return this;
+  }
+
+  public SmtpDependencyBuilder withoutExpiry() {
+    config.put("expiry_seconds", 0);
+    return this;
+  }
+
   public SmtpDependencyBuilder withImageName(String imageName) {
     config.put("image_name", imageName);
     return this;
@@ -66,4 +76,13 @@ public final class SmtpDependencyBuilder {
     }
     return new SmtpDependency(cfg);
   }
+
+  private static long expirySeconds(java.time.Duration expiry) {
+    if (expiry.isNegative()) {
+      throw new IllegalArgumentException("expiry must not be negative: " + expiry);
+    }
+    long seconds = expiry.toSeconds();
+    return seconds == 0 && !expiry.isZero() ? 1 : seconds;
+  }
+
 }

@@ -59,7 +59,7 @@ public final class ComponentTestSuite {
   static final ObjectMapper MAPPER = new ObjectMapper();
   static final String CALIBRATION_VALIDATE_PATH = "/api/v1/validate";
 
-  @ArenaLogger(level = ArenaLogLevel.DEBUG)
+  @ArenaLogger(level = ArenaLogLevel.INFO)
   static final Logger LOG = LoggerFactory.getLogger(ComponentTestSuite.class);
 
   private static final EphemeralTestRuntime RT = EphemeralTestRuntime.get();
