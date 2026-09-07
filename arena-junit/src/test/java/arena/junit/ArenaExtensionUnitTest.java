@@ -534,9 +534,12 @@ final class ArenaExtensionUnitTest {
     Constructor<?> ctor =
         cachedArenaClass()
             .getDeclaredConstructor(
-                String.class, arena.junit.lifecycle.ArenaState.class, Integer.class);
+                String.class,
+                arena.junit.lifecycle.ArenaState.class,
+                Throwable.class,
+                Integer.class);
     ctor.setAccessible(true);
-    cache().put(root, ctor.newInstance("arena 'cached' is arena_faulted", state, null));
+    cache().put(root, ctor.newInstance("arena 'cached' is arena_faulted", state, null, null));
     try {
       arena.junit.lifecycle.ArenaLifecycleError error =
           assertThrows(
@@ -554,9 +557,32 @@ final class ArenaExtensionUnitTest {
     Constructor<?> ctor =
         cachedArenaClass()
             .getDeclaredConstructor(
-                String.class, arena.junit.lifecycle.ArenaState.class, Integer.class);
+                String.class,
+                arena.junit.lifecycle.ArenaState.class,
+                Throwable.class,
+                Integer.class);
     ctor.setAccessible(true);
-    return ctor.newInstance(failure.getMessage(), null, expectedSuiteMembers);
+    return ctor.newInstance(failure.getMessage(), null, failure.getCause(), expectedSuiteMembers);
+  }
+
+  @org.junit.jupiter.api.Test
+  void beforeAll_cachedFailureWithCause_rethrowsWithSameCause() throws Exception {
+    Class<?> root = AfterAllFailedCacheEntryTopology.class;
+    RuntimeException underlying = new RuntimeException("afterOpen blew up");
+    cache()
+        .put(
+            root,
+            newFailedCachedArena(
+                new IllegalStateException("@Arena: failed to open", underlying), null));
+    try {
+      IllegalStateException error =
+          assertThrows(
+              IllegalStateException.class, () -> new ArenaExtension().beforeAll(contextFor(root)));
+      assertEquals("@Arena: failed to open", error.getMessage());
+      assertSame(underlying, error.getCause());
+    } finally {
+      cache().remove(root);
+    }
   }
 
   private static Class<?> cachedArenaClass() {

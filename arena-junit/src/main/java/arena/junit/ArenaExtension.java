@@ -72,7 +72,7 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
       if (cached.failureState != null) {
         throw new ArenaLifecycleError(cached.failureMessage, cached.failureState);
       }
-      throw new IllegalStateException(cached.failureMessage);
+      throw new IllegalStateException(cached.failureMessage, cached.failureCause);
     }
   }
 
@@ -319,9 +319,9 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
     try {
       return buildAndOpen(root);
     } catch (ArenaLifecycleError e) {
-      return new CachedArena(e.getMessage(), e.state(), expectedSuiteMembers(root));
+      return new CachedArena(e.getMessage(), e.state(), null, expectedSuiteMembers(root));
     } catch (RuntimeException e) {
-      return new CachedArena(e.getMessage(), null, expectedSuiteMembers(root));
+      return new CachedArena(e.getMessage(), null, e.getCause(), expectedSuiteMembers(root));
     }
   }
 
@@ -453,6 +453,7 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
     final OpenArena openArena;
     final String failureMessage;
     final ArenaState failureState;
+    final Throwable failureCause;
     final Integer expectedSuiteMembers;
     int refs;
     int completed;
@@ -461,13 +462,19 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
       this.openArena = openArena;
       this.failureMessage = null;
       this.failureState = null;
+      this.failureCause = null;
       this.expectedSuiteMembers = expectedSuiteMembers;
     }
 
-    CachedArena(String failureMessage, ArenaState failureState, Integer expectedSuiteMembers) {
+    CachedArena(
+        String failureMessage,
+        ArenaState failureState,
+        Throwable failureCause,
+        Integer expectedSuiteMembers) {
       this.openArena = null;
       this.failureMessage = failureMessage;
       this.failureState = failureState;
+      this.failureCause = failureCause;
       this.expectedSuiteMembers = expectedSuiteMembers;
     }
   }
