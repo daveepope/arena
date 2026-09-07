@@ -1,6 +1,7 @@
 package arena.junit;
 
 import arena.junit.ffi.ArenaBindingError;
+import arena.junit.lifecycle.ArenaLifecycleError;
 import arena.junit.ffi.ArenaBindings;
 import arena.junit.ffi.ArenaLogLevel;
 import arena.junit.match.Match;
@@ -97,7 +98,7 @@ public final class ClosedArena {
       return new OpenArena(h, logTok, matches);
     } catch (ArenaBindingError e) {
       ArenaBindings.unregisterDispatcherLoggingTarget(logTok);
-      throw e;
+      throw ArenaLifecycleError.from(e);
     }
   }
 }

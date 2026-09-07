@@ -58,10 +58,11 @@ public final class ArenaBindings {
     PointerByReference err = new PointerByReference();
     PointerByReference state = new PointerByReference();
     Pointer h = lib.arena_open(name, configJson, err, state);
-    takeOutString(state);
+    String stateDocument = takeOutString(state);
     if (h == null || Pointer.nativeValue(h) == 0) {
       String msg = takeErr(err);
-      throw new ArenaBindingError(msg != null ? msg : "arena_open returned null");
+      throw new ArenaBindingError(
+          msg != null ? msg : "arena_open returned null", null, stateDocument);
     }
     return h;
   }
@@ -157,15 +158,76 @@ public final class ArenaBindings {
     return arenaOpen(name, configJson, ArenaLogLevel.INFO);
   }
 
-  public static void arenaClose(Pointer handle) {
+  public static String arenaClose(Pointer handle) {
     if (handle == null || Pointer.nativeValue(handle) == 0) {
-      return;
+      return null;
     }
     PointerByReference err = new PointerByReference();
     PointerByReference state = new PointerByReference();
-    ArenaNativeHolder.LIB.arena_close(handle, err, state);
-    takeOutString(err);
-    takeOutString(state);
+    int status = ArenaNativeHolder.LIB.arena_close(handle, err, state);
+    String message = takeOutString(err);
+    String stateDocument = takeOutString(state);
+    if (status != 0) {
+      throw new ArenaBindingError(
+          message != null ? message : "arena_close (status_code=" + status + ")",
+          ArenaStatus.fromInt(status),
+          stateDocument);
+    }
+    return stateDocument;
+  }
+
+  public static String arenaStateJson(Pointer handle) {
+    if (handle == null || Pointer.nativeValue(handle) == 0) {
+      throw new ArenaBindingError("arena_state_json called on closed arena");
+    }
+    PointerByReference err = new PointerByReference();
+    PointerByReference state = new PointerByReference();
+    int status = ArenaNativeHolder.LIB.arena_state_json(handle, err, state);
+    String message = takeOutString(err);
+    String stateDocument = takeOutString(state);
+    if (status != 0) {
+      throw new ArenaBindingError(
+          message != null ? message : "arena_state_json (status_code=" + status + ")",
+          ArenaStatus.fromInt(status));
+    }
+    return stateDocument != null ? stateDocument : "{}";
+  }
+
+  private static final Map<Long, ArenaLifecycleObserverCallback> LIFECYCLE_OBSERVERS =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+  public static long addLifecycleObserver(java.util.function.Consumer<String> onStateDocument) {
+    if (onStateDocument == null) {
+      throw new ArenaBindingError("lifecycle observer consumer is null");
+    }
+    ArenaLifecycleObserverCallback callback =
+        (stateJsonUtf8, ignoredUserData) -> {
+          if (stateJsonUtf8 == null) {
+            return;
+          }
+          String document =
+              stateJsonUtf8.getString(0, java.nio.charset.StandardCharsets.UTF_8.name());
+          if (document != null && !document.isEmpty()) {
+            onStateDocument.accept(document);
+          }
+        };
+    long token = lib().arena_add_lifecycle_observer(callback, Pointer.NULL);
+    if (token == 0L) {
+      throw new ArenaBindingError("arena_add_lifecycle_observer rejected callback");
+    }
+    LIFECYCLE_OBSERVERS.put(token, callback);
+    return token;
+  }
+
+  public static void removeLifecycleObserver(long token) {
+    if (token == 0L) {
+      return;
+    }
+    ArenaLifecycleObserverCallback callback = LIFECYCLE_OBSERVERS.remove(token);
+    if (callback == null) {
+      return;
+    }
+    lib().arena_remove_lifecycle_observer(token);
   }
 
   public static ArenaStatus softReset(Pointer arena, String dependencyIdentifier) {

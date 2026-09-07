@@ -1,6 +1,11 @@
 package arena.junit;
 
+import arena.junit.ffi.ArenaBindingError;
+import arena.junit.ffi.ArenaBindings;
 import arena.junit.ffi.ArenaLogLevel;
+import arena.junit.lifecycle.ArenaLifecycleError;
+import arena.junit.lifecycle.ArenaState;
+import arena.junit.lifecycle.LifecycleLog;
 import arena.junit.match.ArenaRunnableComponent;
 import arena.junit.match.ArenaRunnableDependency;
 import arena.junit.match.Match;
@@ -40,6 +45,7 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
   private static final Set<Class<?>> WARNED_MISSING_SELECT_CLASSES =
       ConcurrentHashMap.newKeySet();
   private static final AtomicBoolean SHUTDOWN_HOOK_REGISTERED = new AtomicBoolean(false);
+  private static final AtomicBoolean LIFECYCLE_OBSERVER_REGISTERED = new AtomicBoolean(false);
   private static final Class<? extends Annotation> SELECT_CLASSES_ANNOTATION_TYPE =
       resolveSelectClassesAnnotationType();
 
@@ -62,14 +68,19 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
               }
               return current;
             });
-    if (cached.failure != null) {
-      throw cached.failure;
+    if (cached.failureMessage != null) {
+      if (cached.failureState != null) {
+        throw new ArenaLifecycleError(cached.failureMessage, cached.failureState);
+      }
+      throw new IllegalStateException(cached.failureMessage);
     }
   }
 
   @Override
   public void afterAll(ExtensionContext context) {
     Class<?> root = topologyRoot(context.getRequiredTestClass());
+    java.util.concurrent.atomic.AtomicReference<OpenArena> toClose =
+        new java.util.concurrent.atomic.AtomicReference<>();
     CACHE.compute(
         root,
         (key, existing) -> {
@@ -87,13 +98,17 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
           if (!shouldClose) {
             return existing;
           }
-          if (existing.failure == null) {
-            invokeLifecycleMethod(root, ArenaBeforeClose.class, existing.openArena);
-            existing.openArena.close();
-            SHUTDOWN_ARENAS.remove(root);
+          if (existing.failureMessage == null) {
+            toClose.set(existing.openArena);
           }
           return null;
         });
+    OpenArena openArena = toClose.get();
+    if (openArena != null) {
+      SHUTDOWN_ARENAS.remove(root);
+      invokeLifecycleMethod(root, ArenaBeforeClose.class, openArena);
+      openArena.close();
+    }
   }
 
   private static void warnIfExplicitRootMissingSelectClasses(Class<?> testClass, Class<?> root) {
@@ -303,18 +318,35 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
   private static CachedArena buildOrCacheFailure(Class<?> root) {
     try {
       return buildAndOpen(root);
+    } catch (ArenaLifecycleError e) {
+      return new CachedArena(e.getMessage(), e.state(), expectedSuiteMembers(root));
     } catch (RuntimeException e) {
-      return new CachedArena(e, expectedSuiteMembers(root));
+      return new CachedArena(e.getMessage(), null, expectedSuiteMembers(root));
+    }
+  }
+
+  private static void registerLifecycleObserverOnce() {
+    if (!LIFECYCLE_OBSERVER_REGISTERED.compareAndSet(false, true)) {
+      return;
+    }
+    try {
+      ArenaBindings.addLifecycleObserver(LifecycleLog::logTransitionDocument);
+    } catch (ArenaBindingError e) {
+      LIFECYCLE_OBSERVER_REGISTERED.set(false);
+      LOG.debug("lifecycle transition logging unavailable", e);
     }
   }
 
   private static CachedArena buildAndOpen(Class<?> root) {
+    registerLifecycleObserverOnce();
     MatchBuild matchBuild = buildMatchBuilder(root);
     Match match = matchBuild.matchBuilder().build();
     ClosedArena closedArena = closedArenaFor(root, match, matchBuild.logIdentifiers());
     OpenArena openArena;
     try {
       openArena = closedArena.open();
+    } catch (ArenaLifecycleError e) {
+      throw e;
     } catch (Exception e) {
       throw new IllegalStateException("@Arena: failed to open arena for " + root.getName(), e);
     }
@@ -403,8 +435,13 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
             new Thread(
                 () -> {
                   for (OpenArena openArena : SHUTDOWN_ARENAS.values()) {
-                    if (openArena != null) {
+                    if (openArena == null) {
+                      continue;
+                    }
+                    try {
                       openArena.close();
+                    } catch (RuntimeException e) {
+                      LOG.error("arena close failed during shutdown", e);
                     }
                   }
                   SHUTDOWN_ARENAS.clear();
@@ -414,20 +451,23 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
 
   private static final class CachedArena {
     final OpenArena openArena;
-    final RuntimeException failure;
+    final String failureMessage;
+    final ArenaState failureState;
     final Integer expectedSuiteMembers;
     int refs;
     int completed;
 
     CachedArena(OpenArena openArena, Integer expectedSuiteMembers) {
       this.openArena = openArena;
-      this.failure = null;
+      this.failureMessage = null;
+      this.failureState = null;
       this.expectedSuiteMembers = expectedSuiteMembers;
     }
 
-    CachedArena(RuntimeException failure, Integer expectedSuiteMembers) {
+    CachedArena(String failureMessage, ArenaState failureState, Integer expectedSuiteMembers) {
       this.openArena = null;
-      this.failure = failure;
+      this.failureMessage = failureMessage;
+      this.failureState = failureState;
       this.expectedSuiteMembers = expectedSuiteMembers;
     }
   }

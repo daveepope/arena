@@ -14,6 +14,12 @@ interface ArenaNativeLib extends Library {
 
   int arena_close(Pointer handle, PointerByReference errOut, PointerByReference stateOut);
 
+  int arena_state_json(Pointer handle, PointerByReference errOut, PointerByReference stateOut);
+
+  long arena_add_lifecycle_observer(ArenaLifecycleObserverCallback callback, Pointer userData);
+
+  void arena_remove_lifecycle_observer(long token);
+
   long arena_add_log_target(ArenaLoggingTargetCallback callback, Pointer userData);
 
   void arena_remove_log_target(long token);

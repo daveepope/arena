@@ -1461,3 +1461,143 @@ java_test(
     data = ["//arena-ffi:arena_ffi_shared"],
     jvm_flags = ["-Djna.nosys=true"],
 )
+
+java_test(
+    name = "arena_junit_arena_state_unit_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/lifecycle/ArenaStateUnitTest.java"],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.lifecycle.ArenaStateUnitTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+)
+
+java_test(
+    name = "arena_junit_arena_lifecycle_error_unit_test",
+    size = "small",
+    srcs = [
+        "src/test/java/arena/junit/lifecycle/ArenaLifecycleErrorUnitTest.java",
+        "src/test/java/arena/junit/lifecycle/ArenaStateUnitTest.java",
+    ],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.lifecycle.ArenaLifecycleErrorUnitTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+)
+
+java_test(
+    name = "arena_junit_lifecycle_log_unit_test",
+    size = "small",
+    srcs = [
+        "src/test/java/arena/junit/lifecycle/ArenaStateUnitTest.java",
+        "src/test/java/arena/junit/lifecycle/LifecycleLogUnitTest.java",
+    ],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.lifecycle.LifecycleLogUnitTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:ch_qos_logback_logback_classic",
+        "@arena_java_maven//:ch_qos_logback_logback_core",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_params",
+        "@arena_java_maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+java_test(
+    name = "arena_junit_lifecycle_observer_unit_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/ffi/ArenaLifecycleObserverUnitTest.java"],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.ffi.ArenaLifecycleObserverUnitTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:net_java_dev_jna_jna",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+    data = ["//arena-ffi:arena_ffi_shared"],
+    jvm_flags = ["-Djna.nosys=true"],
+)
+
+java_test(
+    name = "arena_junit_open_arena_lifecycle_unit_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/OpenArenaLifecycleUnitTest.java"],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.OpenArenaLifecycleUnitTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+    data = ["//arena-ffi:arena_ffi_shared"],
+    jvm_flags = ["-Djna.nosys=true"],
+)
