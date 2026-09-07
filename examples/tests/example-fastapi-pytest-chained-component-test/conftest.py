@@ -349,7 +349,7 @@ def closed_arena() -> ClosedArena:
     return ClosedArena(
         CLOSED_ARENA_NAME,
         [a_match],
-        log_level=ArenaLogLevel.WARN,
+        log_level=ArenaLogLevel.INFO,
         log_component_ids=(web_app_name,),
         log_dependency_ids=(
             oauth.identifier,

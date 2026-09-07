@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import signal
 from typing import Any, List, Optional, Type
 
@@ -10,10 +11,20 @@ import pytest_asyncio
 from arena_pytest.ffi._ffi import (
     ArenaBindingError,
     ArenaNativeLib,
+    arena_state_document,
     close_arena,
     hard_reset as ffi_hard_reset,
     load_ffi,
+    register_lifecycle_observer,
     soft_reset as ffi_soft_reset,
+    unregister_lifecycle_observer,
+)
+from arena_pytest.lifecycle import (
+    ARENA_ROOT_LOGGER_NAME,
+    ArenaState,
+    as_lifecycle_error,
+    log_closing_summary_document,
+    log_transition_document,
 )
 from arena_pytest.playbook import (
     PLAYBOOK_MARKER,
@@ -49,15 +60,28 @@ class OpenArena:
         return self._ffi
 
     async def close(self) -> None:
-        if self._handle:
+        if not self._handle:
+            return
+        handle = self._handle
+        token = self._dispatcher_logging_target_token
+        self._handle = 0
+        self._dispatcher_logging_target_token = 0
+        try:
             await asyncio.to_thread(
                 close_arena,
                 self._ffi,
-                self._handle,
-                dispatcher_logging_target_token=self._dispatcher_logging_target_token,
+                handle,
+                dispatcher_logging_target_token=token,
+                on_state_document=log_closing_summary_document,
             )
-            self._handle = 0
-            self._dispatcher_logging_target_token = 0
+        except ArenaBindingError as e:
+            raise as_lifecycle_error(e) from None
+
+    async def state(self) -> ArenaState:
+        document = await asyncio.to_thread(
+            arena_state_document, self._ffi, self._handle
+        )
+        return ArenaState.parse_json(document)
 
     async def soft_reset(self, dependency_identifier: str) -> None:
         await asyncio.to_thread(
@@ -87,12 +111,10 @@ def closed_arena() -> Optional[Any]:
 
 @pytest_asyncio.fixture(scope="session")
 async def arena(closed_arena) -> OpenArena:
+    __tracebackhide__ = True
     if closed_arena is None:
         pytest.skip("closed_arena fixture not overridden (no arena to open)")
-    try:
-        open_arena_obj = await closed_arena.open()
-    except ArenaBindingError as e:
-        pytest.fail(str(e), pytrace=False)
+    open_arena_obj = await closed_arena.open()
     yield open_arena_obj
     await open_arena_obj.close()
 
@@ -101,6 +123,9 @@ _previous_sigterm_handler: Any = None
 
 
 def _exit_session_on_sigterm(signum: int, _frame: Any) -> None:
+    logging.getLogger(ARENA_ROOT_LOGGER_NAME).info(
+        "terminated by signal %d; closing arenas via session teardown", signum
+    )
     pytest.exit(f"arena: terminated by signal {signum}", returncode=128 + signum)
 
 
@@ -143,12 +168,42 @@ def _restore_sigterm_handler() -> None:
     _previous_sigterm_handler = None
 
 
+_lifecycle_observer_token: int = 0
+_lifecycle_observer_sessions: int = 0
+
+
+def _register_transition_logging() -> None:
+    global _lifecycle_observer_token, _lifecycle_observer_sessions
+    _lifecycle_observer_sessions += 1
+    if _lifecycle_observer_token:
+        return
+    ffi = load_ffi()
+    if ffi is None:
+        return
+    _lifecycle_observer_token = register_lifecycle_observer(
+        ffi, log_transition_document
+    )
+
+
+def _unregister_transition_logging() -> None:
+    global _lifecycle_observer_token, _lifecycle_observer_sessions
+    _lifecycle_observer_sessions = max(0, _lifecycle_observer_sessions - 1)
+    if _lifecycle_observer_sessions or not _lifecycle_observer_token:
+        return
+    ffi = load_ffi()
+    if ffi is not None:
+        unregister_lifecycle_observer(ffi, _lifecycle_observer_token)
+    _lifecycle_observer_token = 0
+
+
 def pytest_unconfigure(config: pytest.Config) -> None:
+    _unregister_transition_logging()
     _restore_sigterm_handler()
 
 
 def pytest_configure(config: pytest.Config) -> None:
     _install_sigterm_teardown()
+    _register_transition_logging()
     config.addinivalue_line(
         "markers",
         f"{PLAYBOOK_MARKER}(klass): open one playbook identified by its Playbook "

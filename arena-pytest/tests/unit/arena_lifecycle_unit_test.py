@@ -74,7 +74,7 @@ def test_open_arena_close_clears_handle(monkeypatch):
     monkeypatch.setattr(
         arena_mod,
         "close_arena",
-        lambda ffi, handle, dispatcher_logging_target_token=0: None,
+        lambda ffi, handle, dispatcher_logging_target_token=0, on_state_document=None: None,
     )
 
     async def run():
@@ -234,3 +234,188 @@ def test_arena_ffi_fixture_skips_when_library_missing(monkeypatch):
 
     with pytest.raises(Skipped):
         ffi_fn()
+
+
+pytest_plugins = ["pytester"]
+
+
+def test_arena_fixture_faulted_open_errors_with_rendered_state(pytester):
+    pytester.makeconftest(
+        """
+import pytest
+
+from arena_pytest.closed_arena import ClosedArena
+
+
+class _BrokenExecMatch:
+    def _for_ffi(self):
+        return {
+            "components": [
+                {
+                    "type": "exec",
+                    "identifier": "fixture-missing-binary",
+                    "executable_path": "/nonexistent/fixture-probe",
+                }
+            ]
+        }
+
+
+@pytest.fixture(scope="session")
+def closed_arena():
+    return ClosedArena("fixture-faulted-arena", [_BrokenExecMatch()])
+"""
+    )
+    pytester.makepyfile(
+        """
+def test_never_runs(arena):
+    raise AssertionError("the test body must not run when the arena faults")
+"""
+    )
+
+    result = pytester.runpytest_inprocess("-p", "arena_pytest.arena")
+
+    result.assert_outcomes(errors=1)
+    output = result.stdout.str() + result.stderr.str()
+    assert "ArenaLifecycleError" in output
+    assert "is arena_faulted" in output
+    assert "fixture-missing-binary" in output
+    assert "panicked at" not in output
+
+
+def test_pytest_configure_registers_transition_logging(monkeypatch):
+    arena_mod = _arena_module()
+    monkeypatch.setattr(arena_mod, "_install_sigterm_teardown", lambda: None)
+    monkeypatch.setattr(arena_mod, "_lifecycle_observer_token", 0)
+    monkeypatch.setattr(arena_mod, "_lifecycle_observer_sessions", 0)
+    registered = []
+    monkeypatch.setattr(arena_mod, "load_ffi", lambda: object())
+    monkeypatch.setattr(
+        arena_mod,
+        "register_lifecycle_observer",
+        lambda ffi, on_state: registered.append(on_state) or 7,
+    )
+    config = MagicMock()
+    config.getini = lambda key: {
+        "asyncio_mode": "auto",
+        "asyncio_default_fixture_loop_scope": "session",
+    }.get(key)
+    config._inicache = {}
+
+    arena_mod.pytest_configure(config)
+
+    assert registered == [arena_mod.log_transition_document]
+    assert arena_mod._lifecycle_observer_token == 7
+
+
+def test_pytest_unconfigure_last_session_unregisters_transition_logging(monkeypatch):
+    arena_mod = _arena_module()
+    monkeypatch.setattr(arena_mod, "_restore_sigterm_handler", lambda: None)
+    monkeypatch.setattr(arena_mod, "_lifecycle_observer_token", 7)
+    monkeypatch.setattr(arena_mod, "_lifecycle_observer_sessions", 1)
+    removed = []
+    monkeypatch.setattr(arena_mod, "load_ffi", lambda: object())
+    monkeypatch.setattr(
+        arena_mod,
+        "unregister_lifecycle_observer",
+        lambda ffi, token: removed.append(token),
+    )
+
+    arena_mod.pytest_unconfigure(MagicMock())
+
+    assert removed == [7]
+    assert arena_mod._lifecycle_observer_token == 0
+
+
+def test_pytest_unconfigure_nested_session_keeps_the_observer(monkeypatch):
+    arena_mod = _arena_module()
+    monkeypatch.setattr(arena_mod, "_restore_sigterm_handler", lambda: None)
+    monkeypatch.setattr(arena_mod, "_lifecycle_observer_token", 7)
+    monkeypatch.setattr(arena_mod, "_lifecycle_observer_sessions", 2)
+    removed = []
+    monkeypatch.setattr(arena_mod, "load_ffi", lambda: object())
+    monkeypatch.setattr(
+        arena_mod,
+        "unregister_lifecycle_observer",
+        lambda ffi, token: removed.append(token),
+    )
+
+    arena_mod.pytest_unconfigure(MagicMock())
+
+    assert removed == []
+    assert arena_mod._lifecycle_observer_token == 7
+
+
+def test_pytest_configure_missing_lib_leaves_token_unset(monkeypatch):
+    arena_mod = _arena_module()
+    monkeypatch.setattr(arena_mod, "_install_sigterm_teardown", lambda: None)
+    monkeypatch.setattr(arena_mod, "_lifecycle_observer_token", 0)
+    monkeypatch.setattr(arena_mod, "_lifecycle_observer_sessions", 0)
+    monkeypatch.setattr(arena_mod, "load_ffi", lambda: None)
+    config = MagicMock()
+    config.getini = lambda key: {
+        "asyncio_mode": "auto",
+        "asyncio_default_fixture_loop_scope": "session",
+    }.get(key)
+    config._inicache = {}
+
+    arena_mod.pytest_configure(config)
+
+    assert arena_mod._lifecycle_observer_token == 0
+    assert arena_mod._lifecycle_observer_sessions == 1
+
+
+def test_open_arena_close_called_twice_closes_once(monkeypatch):
+    arena_mod = _arena_module()
+    calls = []
+
+    async def fake_to_thread(fn, *args, **kwargs):
+        return fn(*args, **kwargs)
+
+    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
+    monkeypatch.setattr(
+        arena_mod,
+        "close_arena",
+        lambda ffi, handle, dispatcher_logging_target_token=0, on_state_document=None: calls.append(
+            handle
+        ),
+    )
+
+    async def run():
+        arena = OpenArena(object(), 42)
+        await arena.close()
+        await arena.close()
+
+    asyncio.run(run())
+    assert calls == [42]
+
+
+def test_open_arena_close_faulted_raises_lifecycle_error_with_state(monkeypatch):
+    import json
+
+    from arena_pytest.ffi._ffi import ArenaBindingError
+    from arena_pytest.lifecycle import ArenaLifecycleError
+
+    arena_mod = _arena_module()
+
+    async def fake_to_thread(fn, *args, **kwargs):
+        return fn(*args, **kwargs)
+
+    def failing_close(ffi, handle, dispatcher_logging_target_token=0, on_state_document=None):
+        error = ArenaBindingError("arena close faulted")
+        error.state_document = json.dumps(
+            {"id": "close-faulted", "state": "arena_faulted", "at": "t"}
+        )
+        raise error
+
+    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
+    monkeypatch.setattr(arena_mod, "close_arena", failing_close)
+
+    async def run():
+        arena = OpenArena(object(), 42)
+        with pytest.raises(ArenaLifecycleError) as raised:
+            await arena.close()
+        assert raised.value.state.id == "close-faulted"
+        assert raised.value.state.is_faulted()
+        assert arena.handle() == 0
+
+    asyncio.run(run())

@@ -6,6 +6,7 @@ import logging
 from typing import Callable, List, Optional, Sequence
 
 from arena_pytest.arena import OpenArena
+from arena_pytest.lifecycle import as_lifecycle_error
 from arena_pytest.ffi._ffi import (
     ArenaBindingError,
     ArenaLogLevel,
@@ -106,6 +107,6 @@ class ClosedArena:
             await asyncio.to_thread(
                 close_arena, ffi, 0, dispatcher_logging_target_token=log_tok
             )
-            raise
+            raise as_lifecycle_error(e) from None
 
         return OpenArena(ffi, handle, log_tok)

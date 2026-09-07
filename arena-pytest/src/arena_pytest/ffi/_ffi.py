@@ -21,7 +21,7 @@ logging.addLevelName(_LOG_DISPATCHER_TRACE_NUM, "TRACE")
 
 
 class ArenaBindingError(RuntimeError):
-    pass
+    state_document: Optional[str] = None
 
 
 def _ffi_expect_ok(raw: int, message: Optional[str], what_failed: str) -> None:
@@ -42,6 +42,12 @@ _ARENA_LOG_TARGET_CALLBACK_ABI = ctypes.CFUNCTYPE(
     ctypes.c_void_p,
     ctypes.c_void_p,
     ctypes.c_uint32,
+    ctypes.c_void_p,
+)
+
+_ARENA_LIFECYCLE_OBSERVER_ABI = ctypes.CFUNCTYPE(
+    None,
+    ctypes.c_void_p,
     ctypes.c_void_p,
 )
 
@@ -158,6 +164,8 @@ class _UserDispatcherLoggerBridge:
         "_logger_factory",
         "_loggers_by_name",
         "_saved_logger_level",
+        "_owns_root_emitter",
+        "_saved_root_level",
         "_closure",
     )
 
@@ -175,6 +183,13 @@ class _UserDispatcherLoggerBridge:
         self._saved_logger_level = lg.level if lg is not None else None
         if lg is not None:
             _install_dispatcher_direct_stderr_emitter(lg, arena_log_level)
+        root = logging.getLogger(_ARENA_ROOT_LOGGER_NAME)
+        self._owns_root_emitter = not any(
+            _arena_dispatcher_stderr_handler_predicate(h) for h in root.handlers
+        )
+        self._saved_root_level = root.level
+        if self._owns_root_emitter:
+            _install_dispatcher_direct_stderr_emitter(root, arena_log_level)
         self._closure = _ARENA_LOG_TARGET_CALLBACK_ABI(self._invoke)
 
     def _logger_for(self, logger_name: str) -> logging.Logger:
@@ -222,6 +237,10 @@ class _UserDispatcherLoggerBridge:
         return self._closure
 
     def restore_logger_configuration(self) -> None:
+        if self._owns_root_emitter:
+            root = logging.getLogger(_ARENA_ROOT_LOGGER_NAME)
+            _remove_dispatcher_direct_stderr_emitter(root)
+            root.setLevel(self._saved_root_level)
         if self._logger is None:
             return
         _remove_dispatcher_direct_stderr_emitter(self._logger)
@@ -485,6 +504,22 @@ def load_ffi() -> Optional[ArenaNativeLib]:
     ]
     lib.arena_close.restype = ctypes.c_int
 
+    lib.arena_state_json.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_void_p),
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    lib.arena_state_json.restype = ctypes.c_int
+
+    lib.arena_add_lifecycle_observer.argtypes = [
+        _ARENA_LIFECYCLE_OBSERVER_ABI,
+        ctypes.c_void_p,
+    ]
+    lib.arena_add_lifecycle_observer.restype = ctypes.c_uint64
+
+    lib.arena_remove_lifecycle_observer.argtypes = [ctypes.c_uint64]
+    lib.arena_remove_lifecycle_observer.restype = None
+
     lib.arena_soft_reset.argtypes = [
         ctypes.c_void_p,
         ctypes.c_char_p,
@@ -624,10 +659,12 @@ def open_arena(
     err = ctypes.c_void_p()
     state = ctypes.c_void_p()
     handle = ffi.lib.arena_open(name, config_ptr, ctypes.byref(err), ctypes.byref(state))
-    _take_out_string(state, ffi)
+    state_document = _take_out_string(state, ffi)
     if not handle:
         message = _take_out_string(err, ffi) or "arena_open returned null"
-        raise ArenaBindingError(message)
+        error = ArenaBindingError(message)
+        error.state_document = state_document
+        raise error
     return handle
 
 
@@ -636,22 +673,82 @@ def close_arena(
     handle: int,
     *,
     dispatcher_logging_target_token: int = 0,
-) -> None:
-    if handle:
-        err = ctypes.c_void_p()
-        state = ctypes.c_void_p()
-        ffi.lib.arena_close(handle, ctypes.byref(err), ctypes.byref(state))
-        _take_out_string(err, ffi)
-        _take_out_string(state, ffi)
-    flush_lg = _dispatcher_default_logger(ffi.lib)
-    if dispatcher_logging_target_token:
-        bridge = _custom_dispatcher_logging_targets.get(dispatcher_logging_target_token)
-        if bridge is not None:
-            flush_lg = bridge._logger
-        _flush_handlers_for_logger(flush_lg)
-        unregister_dispatcher_logging_target(ffi, dispatcher_logging_target_token)
-    else:
-        _flush_handlers_for_logger(flush_lg)
+    on_state_document: Optional[Callable[[str], None]] = None,
+) -> Optional[str]:
+    status = 0
+    message: Optional[str] = None
+    state_document: Optional[str] = None
+    try:
+        if handle:
+            err = ctypes.c_void_p()
+            state = ctypes.c_void_p()
+            status = int(
+                ffi.lib.arena_close(handle, ctypes.byref(err), ctypes.byref(state))
+            )
+            message = _take_out_string(err, ffi)
+            state_document = _take_out_string(state, ffi)
+            if status == 0 and state_document and on_state_document is not None:
+                on_state_document(state_document)
+    finally:
+        flush_lg = _dispatcher_default_logger(ffi.lib)
+        if dispatcher_logging_target_token:
+            bridge = _custom_dispatcher_logging_targets.get(dispatcher_logging_target_token)
+            if bridge is not None and bridge._logger is not None:
+                flush_lg = bridge._logger
+            _flush_handlers_for_logger(flush_lg)
+            unregister_dispatcher_logging_target(ffi, dispatcher_logging_target_token)
+        else:
+            _flush_handlers_for_logger(flush_lg)
+    if status != 0:
+        error = ArenaBindingError(message or f"arena_close (status_code={status})")
+        error.state_document = state_document
+        raise error
+    return state_document
+
+
+def arena_state_document(ffi: ArenaNativeLib, handle: int) -> str:
+    if not handle:
+        raise ArenaBindingError("arena_state_json called on closed arena")
+    err = ctypes.c_void_p()
+    state = ctypes.c_void_p()
+    raw = int(ffi.lib.arena_state_json(handle, ctypes.byref(err), ctypes.byref(state)))
+    message = _take_out_string(err, ffi)
+    state_document = _take_out_string(state, ffi)
+    _ffi_expect_ok(raw, message, "arena_state_json")
+    return state_document or "{}"
+
+
+_lifecycle_observers: dict[int, Any] = {}
+
+
+def register_lifecycle_observer(
+    ffi: ArenaNativeLib, on_state_document: Callable[[str], None]
+) -> int:
+    def _invoke(state_ptr, _ignored_user_data) -> None:
+        gil_state = _ARENA_PY_GIL_ENSURE()
+        try:
+            addr = _ffi_ptr_addr(state_ptr)
+            document = _utf8_zterm_at(addr) if addr else ""
+            if document:
+                on_state_document(document)
+        finally:
+            _ARENA_PY_GIL_RELEASE(gil_state)
+
+    closure = _ARENA_LIFECYCLE_OBSERVER_ABI(_invoke)
+    token = int(ffi.lib.arena_add_lifecycle_observer(closure, ctypes.c_void_p()))
+    if token == 0:
+        raise ArenaBindingError("arena_add_lifecycle_observer rejected callback")
+    _lifecycle_observers[token] = closure
+    return token
+
+
+def unregister_lifecycle_observer(ffi: ArenaNativeLib, token: int) -> None:
+    if not token:
+        return
+    closure = _lifecycle_observers.pop(token, None)
+    if closure is None:
+        return
+    ffi.lib.arena_remove_lifecycle_observer(ctypes.c_uint64(token))
 
 
 def _reset(

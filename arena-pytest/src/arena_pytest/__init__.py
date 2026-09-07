@@ -6,6 +6,13 @@ from arena_pytest.ffi._ffi import (
     register_dispatcher_logging_target_for_logger_factory,
     unregister_dispatcher_logging_target,
 )
+from arena_pytest.lifecycle import (
+    ArenaLifecycleError,
+    ArenaState,
+    ComponentState,
+    DependencyState,
+    Fault,
+)
 from arena_pytest.arena import (
     OpenArena,
     arena,
@@ -118,6 +125,11 @@ __all__ = [
     "PortSearchStrategy",
     "find_available_port",
     "ClosedArena",
+    "ArenaLifecycleError",
+    "ArenaState",
+    "ComponentState",
+    "DependencyState",
+    "Fault",
     "register_dispatcher_logging_target_for_logger",
     "register_dispatcher_logging_target_for_logger_factory",
     "unregister_dispatcher_logging_target",
