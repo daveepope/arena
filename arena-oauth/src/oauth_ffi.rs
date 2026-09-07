@@ -123,5 +123,5 @@ pub fn build_oauth_dependency_from_config(
             }
         };
     }
-    Ok(Box::new(builder.build()))
+    Ok(Box::new(builder.build().map_err(|fault| fault.to_string())?))
 }

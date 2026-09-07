@@ -24,7 +24,7 @@ struct TestContext {
 impl TestContext {
     async fn new() -> Result<Self, String> {
         tracing::info!(suite = "crate_component", crate_under_test = "arena_http", phase = "dependency_start_begin", "starting dependency");
-        let mut http_dependency = HttpDependency::builder("").build();
+        let mut http_dependency = HttpDependency::builder("").build().expect("build http dependency");
         http_dependency.start().await.expect("start should succeed");
 
         let base_url = http_dependency
@@ -1106,7 +1106,7 @@ async fn http_dependency_https_listener_stub_roundtrip_component_test() {
         .listener_container_port(8443)
         .host_port(https_host_port)
         .done()
-        .build();
+        .build().expect("build http dependency");
 
     dep.start().await.expect("start should succeed");
 

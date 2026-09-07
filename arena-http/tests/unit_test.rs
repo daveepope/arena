@@ -149,7 +149,7 @@ async fn start_stop_happy_path_records_events() {
         .with_readiness_check(FakeReadinessCheck {
             events: events.clone(),
         })
-        .build();
+        .build().expect("build http dependency");
 
     dep.start().await.expect("start should succeed");
     assert_eq!(dep.base_url(), Some("http://127.0.0.1:8080"));
@@ -174,7 +174,7 @@ async fn start_readiness_err_panics_after_impl_start() {
         })
         .with_port(0)
         .with_readiness_check(FailingReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
 
     let outcome = std::panic::AssertUnwindSafe(async {
         dep.start().await.expect("start should succeed");
@@ -201,7 +201,7 @@ async fn identifier_as_any_and_children_reflect_dependency_state() {
         .with_readiness_check(FakeReadinessCheck {
             events: events.clone(),
         })
-        .build();
+        .build().expect("build http dependency");
 
     assert!(dep.identifier().contains("http-accessors"));
     assert!(dep.as_any().downcast_ref::<HttpDependency>().is_some());
@@ -276,7 +276,7 @@ async fn wait_until_ready_retries_until_impl_reports_admin_url() {
         })
         .with_port(0)
         .with_readiness_check(ImmediateReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
 
     dep.start().await.expect("start should succeed");
     assert_eq!(dep.admin_url(), Some("http://127.0.0.1:8081".to_string()));
@@ -319,7 +319,7 @@ fn https_base_url_default_trait_impl_returns_none() {
         .with_impl(DefaultHttpsUrlImpl { base_url: None })
         .with_port(0)
         .with_readiness_check(ImmediateReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
 
     assert_eq!(dep.https_base_url(), None);
 }
@@ -330,7 +330,7 @@ async fn reset_journal_not_running_returns_without_panic() {
         .with_impl(DefaultHttpsUrlImpl { base_url: None })
         .with_port(0)
         .with_readiness_check(ImmediateReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
 
     dep.reset_journal()
         .await
@@ -343,7 +343,7 @@ async fn soft_reset_not_running_returns_without_panic() {
         .with_impl(DefaultHttpsUrlImpl { base_url: None })
         .with_port(0)
         .with_readiness_check(ImmediateReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
 
     dep.soft_reset().await.expect("soft reset should succeed");
 }
@@ -354,7 +354,7 @@ async fn hard_reset_not_running_returns_without_panic() {
         .with_impl(DefaultHttpsUrlImpl { base_url: None })
         .with_port(0)
         .with_readiness_check(ImmediateReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
 
     dep.hard_reset().await.expect("hard reset should succeed");
 }
@@ -365,7 +365,7 @@ async fn hard_reset_running_restarts_impl_stays_ready() {
         .with_impl(DefaultHttpsUrlImpl { base_url: None })
         .with_port(0)
         .with_readiness_check(ImmediateReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
 
     dep.start().await.expect("start should succeed");
     assert_eq!(dep.base_url(), Some("http://127.0.0.1:8080"));

@@ -42,6 +42,11 @@ class LifecycleLogUnitTest {
   }
 
   @Test
+  void arenaLoggerNameUnicodeWhitespaceIdentifierFallsBackToRoot() {
+    assertEquals("arena", LifecycleLog.arenaLoggerName("\u00A0\u2007"));
+  }
+
+  @Test
   void logTransitionCleanStateLogsInfoUnderArenaLogger() {
     ArenaState state =
         ArenaState.parse(
@@ -86,7 +91,7 @@ class LifecycleLogUnitTest {
     }
 
     assertEquals(
-        "closing summary | state=arena_closed, faults=0",
+        "closing summary | state=arena_closed | faults=0",
         capture.list.get(0).getFormattedMessage());
   }
 
@@ -114,7 +119,7 @@ class LifecycleLogUnitTest {
     }
 
     assertEquals(
-        "closing summary | state=arena_closed, faults=0",
+        "closing summary | state=arena_closed | faults=0",
         capture.list.get(0).getFormattedMessage());
   }
 

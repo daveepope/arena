@@ -29,3 +29,21 @@ rust_test(
         proc_macro_dev = True,
     ),
 )
+
+rust_test(
+    name = "builder_unit_test",
+    srcs = ["tests/unit/builder_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_executable_component",
+        "//arena",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)

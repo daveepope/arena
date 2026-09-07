@@ -68,11 +68,15 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
               }
               return current;
             });
-    if (cached.failureMessage != null) {
+    if (cached.openArena == null) {
+      String message =
+          cached.failureMessage != null
+              ? cached.failureMessage
+              : "@Arena: failed to open arena for " + root.getName();
       if (cached.failureState != null) {
-        throw new ArenaLifecycleError(cached.failureMessage, cached.failureState);
+        throw new ArenaLifecycleError(message, cached.failureState);
       }
-      throw new IllegalStateException(cached.failureMessage, cached.failureCause);
+      throw new IllegalStateException(message, cached.failureCause);
     }
   }
 
@@ -98,7 +102,7 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
           if (!shouldClose) {
             return existing;
           }
-          if (existing.failureMessage == null) {
+          if (existing.openArena != null) {
             toClose.set(existing.openArena);
           }
           return null;
@@ -106,7 +110,16 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
     OpenArena openArena = toClose.get();
     if (openArena != null) {
       SHUTDOWN_ARENAS.remove(root);
-      invokeLifecycleMethod(root, ArenaBeforeClose.class, openArena);
+      try {
+        invokeLifecycleMethod(root, ArenaBeforeClose.class, openArena);
+      } catch (RuntimeException e) {
+        try {
+          openArena.close();
+        } catch (RuntimeException closeError) {
+          e.addSuppressed(closeError);
+        }
+        throw e;
+      }
       openArena.close();
     }
   }
@@ -331,7 +344,7 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
     }
     try {
       ArenaBindings.addLifecycleObserver(LifecycleLog::logTransitionDocument);
-    } catch (ArenaBindingError e) {
+    } catch (ArenaBindingError | UnsatisfiedLinkError e) {
       LIFECYCLE_OBSERVER_REGISTERED.set(false);
       LOG.debug("lifecycle transition logging unavailable", e);
     }

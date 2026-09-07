@@ -14,6 +14,12 @@ internal static class ArenaNativeLib
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_close_fn(IntPtr handle, out IntPtr errOut, out IntPtr stateOut);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate int arena_state_json_fn(IntPtr handle, out IntPtr errOut, out IntPtr stateOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate ulong arena_add_lifecycle_observer_fn(ArenaLifecycleObserverCallback callback, IntPtr userData);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void arena_remove_lifecycle_observer_fn(ulong token);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_soft_reset_fn(IntPtr handle, string dependencyIdentifier, out IntPtr errOut);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_hard_reset_fn(IntPtr handle, string dependencyIdentifier, out IntPtr errOut);
@@ -56,6 +62,9 @@ internal static class ArenaNativeLib
 
     private static arena_open_fn? _arena_open;
     private static arena_close_fn? _arena_close;
+    private static arena_state_json_fn? _arena_state_json;
+    private static arena_add_lifecycle_observer_fn? _arena_add_lifecycle_observer;
+    private static arena_remove_lifecycle_observer_fn? _arena_remove_lifecycle_observer;
     private static arena_soft_reset_fn? _arena_soft_reset;
     private static arena_hard_reset_fn? _arena_hard_reset;
     private static arena_find_available_port_fn? _arena_find_available_port;
@@ -111,6 +120,9 @@ internal static class ArenaNativeLib
 
             LoadFunction(out _arena_open, "arena_open");
             LoadFunction(out _arena_close, "arena_close");
+            LoadFunction(out _arena_state_json, "arena_state_json");
+            LoadFunction(out _arena_add_lifecycle_observer, "arena_add_lifecycle_observer");
+            LoadFunction(out _arena_remove_lifecycle_observer, "arena_remove_lifecycle_observer");
             LoadFunction(out _arena_soft_reset, "arena_soft_reset");
             LoadFunction(out _arena_hard_reset, "arena_hard_reset");
             LoadFunction(out _arena_find_available_port, "arena_find_available_port");
@@ -208,6 +220,15 @@ internal static class ArenaNativeLib
 
     internal static int arena_close(IntPtr handle, out IntPtr errOut, out IntPtr stateOut) =>
         _arena_close!.Invoke(handle, out errOut, out stateOut);
+
+    internal static int arena_state_json(IntPtr handle, out IntPtr errOut, out IntPtr stateOut) =>
+        _arena_state_json!.Invoke(handle, out errOut, out stateOut);
+
+    internal static ulong arena_add_lifecycle_observer(ArenaLifecycleObserverCallback callback, IntPtr userData) =>
+        _arena_add_lifecycle_observer!.Invoke(callback, userData);
+
+    internal static void arena_remove_lifecycle_observer(ulong token) =>
+        _arena_remove_lifecycle_observer!.Invoke(token);
 
     internal static int arena_soft_reset(IntPtr handle, string dependencyIdentifier, out IntPtr errOut) =>
         _arena_soft_reset!.Invoke(handle, dependencyIdentifier, out errOut);

@@ -23,7 +23,7 @@ fn generate_pkcs8_pem() -> String {
 fn build_with_ephemeral_server_tls_exposes_certificate() {
     let dep = OauthDependency::builder("oauth-builder-ephemeral")
         .with_ephemeral_server_tls()
-        .build();
+        .build().expect("build oauth dependency");
     assert!(dep.server_tls_certificate_pem().is_some());
 }
 
@@ -33,7 +33,7 @@ fn build_with_port_and_listen_ip_does_not_panic() {
         .with_http()
         .with_port(0)
         .with_listen_ip(IpAddr::V4(Ipv4Addr::LOCALHOST))
-        .build();
+        .build().expect("build oauth dependency");
     assert!(dep.server_tls_certificate_pem().is_none());
 }
 
@@ -43,16 +43,18 @@ fn build_with_valid_rsa_pkcs8_pem_succeeds() {
     let dep = OauthDependency::builder("oauth-builder-rsa")
         .with_http()
         .with_rsa_pkcs8_pem(pem)
-        .build();
+        .build().expect("build oauth dependency");
     assert!(dep.server_tls_certificate_pem().is_none());
 }
 
 #[test]
-#[should_panic(expected = "invalid PKCS#8 PEM")]
-fn build_with_invalid_rsa_pkcs8_pem_panics() {
-    OauthDependency::builder("oauth-builder-bad-rsa")
+fn build_with_invalid_rsa_pkcs8_pem_returns_fault() {
+    let fault = OauthDependency::builder("oauth-builder-bad-rsa")
         .with_rsa_pkcs8_pem("not a pem")
-        .build();
+        .build()
+        .err()
+        .expect("invalid PEM must fault");
+    assert!(fault.message.contains("invalid PKCS#8 PEM"));
 }
 
 #[test]
@@ -62,23 +64,36 @@ fn build_with_scopes_token_ttl_and_metadata_base_url_does_not_panic() {
         .with_scopes_supported(vec!["read".into(), "write".into()])
         .with_token_ttl_secs(120)
         .with_metadata_base_url("https://issuer.example")
-        .build();
+        .build().expect("build oauth dependency");
     assert!(dep.server_tls_certificate_pem().is_none());
 }
 
 #[test]
-#[should_panic(expected = "must be non-empty")]
-fn build_with_empty_server_tls_pem_panics() {
-    OauthDependency::builder("oauth-builder-empty-pem")
+fn build_with_invalid_issuer_rsa_pkcs8_pem_returns_fault() {
+    let fault = OauthDependency::builder("oauth-builder-bad-issuer-rsa")
+        .with_http()
+        .with_issuer(IssuerConfig::new().with_rsa_pkcs8_pem("not a pem"))
+        .build()
+        .err()
+        .expect("invalid issuer PEM must fault");
+    assert!(fault.message.contains("invalid PKCS#8 PEM"));
+}
+
+#[test]
+fn build_with_empty_server_tls_pem_returns_fault() {
+    let fault = OauthDependency::builder("oauth-builder-empty-pem")
         .with_server_tls_pem("", "")
-        .build();
+        .build()
+        .err()
+        .expect("empty PEM must fault");
+    assert!(fault.message.contains("must be non-empty"));
 }
 
 #[test]
 fn build_with_no_issuers_defaults_to_root_jwks_path() {
     let dep = OauthDependency::builder("oauth-builder-default-issuer")
         .with_http()
-        .build();
+        .build().expect("build oauth dependency");
     assert_eq!(dep.issuer_count(), 1);
     assert_eq!(dep.issuer_path_at(0), Some(""));
     assert_eq!(dep.jwks_path_at(0), Some("/.well-known/jwks.json"));
@@ -92,7 +107,7 @@ fn build_with_issuer_and_provider_registers_distinct_jwks_routes() {
             pool_id: "pool-a".to_string(),
         })
         .with_issuer(IssuerConfig::new().with_jwks_path("/custom/keys"))
-        .build();
+        .build().expect("build oauth dependency");
     assert_eq!(dep.issuer_count(), 2);
     assert_eq!(dep.jwks_path_at(0), Some("/pool-a/.well-known/jwks.json"));
     assert_eq!(dep.jwks_path_at(1), Some("/custom/keys"));
@@ -105,7 +120,7 @@ fn build_with_provider_cognito_resolves_pool_id_path() {
         .with_provider(Provider::Cognito {
             pool_id: "us-east-1_abc123".to_string(),
         })
-        .build();
+        .build().expect("build oauth dependency");
     assert_eq!(dep.issuer_path_at(0), Some("/us-east-1_abc123"));
     assert_eq!(
         dep.jwks_path_at(0),
@@ -120,7 +135,7 @@ fn build_with_provider_entra_id_resolves_tenant_path() {
         .with_provider(Provider::EntraId {
             tenant_id: "my-tenant".to_string(),
         })
-        .build();
+        .build().expect("build oauth dependency");
     assert_eq!(dep.issuer_path_at(0), Some("/my-tenant/v2.0"));
     assert_eq!(
         dep.jwks_path_at(0),
@@ -129,9 +144,8 @@ fn build_with_provider_entra_id_resolves_tenant_path() {
 }
 
 #[test]
-#[should_panic(expected = "duplicate JWKS path")]
-fn build_with_duplicate_jwks_path_panics() {
-    OauthDependency::builder("oauth-builder-duplicate-jwks-path")
+fn build_with_duplicate_jwks_path_returns_fault() {
+    let fault = OauthDependency::builder("oauth-builder-duplicate-jwks-path")
         .with_http()
         .with_provider(Provider::Okta)
         .with_issuer(
@@ -139,41 +153,50 @@ fn build_with_duplicate_jwks_path_panics() {
                 .with_issuer_path("/other")
                 .with_jwks_path("/v1/keys"),
         )
-        .build();
+        .build()
+        .err()
+        .expect("duplicate JWKS path must fault");
+    assert!(fault.message.contains("duplicate JWKS path"));
 }
 
 #[test]
-#[should_panic(expected = "mutually exclusive")]
-fn build_with_global_pem_and_issuer_panics() {
+fn build_with_global_pem_and_issuer_returns_fault() {
     let pem = generate_pkcs8_pem();
-    OauthDependency::builder("oauth-builder-global-pem-and-issuer")
+    let fault = OauthDependency::builder("oauth-builder-global-pem-and-issuer")
         .with_http()
         .with_rsa_pkcs8_pem(pem)
         .with_provider(Provider::Okta)
-        .build();
+        .build()
+        .err()
+        .expect("global pem with issuer must fault");
+    assert!(fault.message.contains("mutually exclusive"));
 }
 
 #[test]
-#[should_panic(expected = "duplicate issuer path")]
-fn build_with_duplicate_issuer_path_panics() {
-    OauthDependency::builder("oauth-builder-duplicate-issuer-path")
+fn build_with_duplicate_issuer_path_returns_fault() {
+    let fault = OauthDependency::builder("oauth-builder-duplicate-issuer-path")
         .with_http()
         .with_provider(Provider::Okta)
         .with_issuer(IssuerConfig::new().with_jwks_path("/other/keys"))
-        .build();
+        .build()
+        .err()
+        .expect("duplicate issuer path must fault");
+    assert!(fault.message.contains("duplicate issuer path"));
 }
 
 #[test]
-#[should_panic(expected = "duplicate JWKS path")]
-fn build_with_jwks_path_colliding_with_reserved_route_panics() {
-    OauthDependency::builder("oauth-builder-reserved-route-collision")
+fn build_with_jwks_path_colliding_with_reserved_route_returns_fault() {
+    let fault = OauthDependency::builder("oauth-builder-reserved-route-collision")
         .with_http()
         .with_issuer(
             IssuerConfig::new()
                 .with_issuer_path("/custom")
                 .with_jwks_path("/oauth/token"),
         )
-        .build();
+        .build()
+        .err()
+        .expect("reserved route collision must fault");
+    assert!(fault.message.contains("duplicate JWKS path"));
 }
 
 #[test]
@@ -182,7 +205,7 @@ fn build_with_issuer_path_and_no_jwks_path_scopes_default_jwks_path_to_issuer() 
         .with_http()
         .with_issuer(IssuerConfig::new().with_issuer_path("/tenant-a"))
         .with_issuer(IssuerConfig::new().with_issuer_path("/tenant-b"))
-        .build();
+        .build().expect("build oauth dependency");
     assert_eq!(dep.issuer_count(), 2);
     assert_eq!(
         dep.jwks_path_at(0),
@@ -199,7 +222,7 @@ fn build_with_server_tls_pem_exposes_that_certificate() {
     let pair = arena_oauth::localhost_self_signed_pem_pair().expect("certificate pair");
     let dep = OauthDependency::builder("oauth-custom-tls")
         .with_server_tls_pem(pair.0.clone(), pair.1)
-        .build();
+        .build().expect("build oauth dependency");
 
     assert_eq!(dep.server_tls_certificate_pem(), Some(pair.0.as_str()));
 }

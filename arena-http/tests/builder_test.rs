@@ -62,7 +62,7 @@ fn build_with_impl_ignores_container_cli_config() {
         .with_container_tag("legacy-container-tag")
         .with_network("custom-network")
         .with_readiness_check(OkReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
 
     assert!(dep.identifier().contains("http-with-impl"));
 }
@@ -77,7 +77,7 @@ async fn https_listener_port_only_starts_reads_base_url() {
         .host_port(0)
         .done()
         .with_readiness_check(OkReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
 
     dep.start().await.expect("start should succeed");
     assert_eq!(dep.base_url(), Some("http://127.0.0.1:8080"));
@@ -98,7 +98,7 @@ async fn https_full_keystore_config_starts_successfully() {
         .http_listener_disabled(false)
         .done()
         .with_readiness_check(OkReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
 
     dep.start().await.expect("start should succeed");
     dep.stop().await.expect("stop should succeed");
@@ -118,7 +118,7 @@ fn build_without_impl_builds_container_cli_config() {
         .keystore_type("JKS")
         .http_listener_disabled(true)
         .done()
-        .build();
+        .build().expect("build http dependency");
 
     assert!(dep.identifier().contains("http-container-cli"));
 }
@@ -127,42 +127,54 @@ fn build_without_impl_builds_container_cli_config() {
 fn build_without_impl_default_https_builds_container_impl() {
     let dep = HttpDependency::builder("http-container-default")
         .with_port(0)
-        .build();
+        .build().expect("build http dependency");
 
     assert!(dep.identifier().contains("http-container-default"));
 }
 
 #[test]
-#[should_panic(expected = "http_listener_disabled(true) requires https().listener_container_port")]
-fn https_disabled_without_listener_port_panics() {
-    let _dep = HttpDependency::builder("http-https-bad-disable")
+fn build_https_disabled_without_listener_port_returns_fault() {
+    let fault = HttpDependency::builder("http-https-bad-disable")
         .with_port(0)
         .https()
         .http_listener_disabled(true)
         .done()
-        .build();
+        .build()
+        .err()
+        .expect("https misconfiguration must fault");
+    assert!(fault
+        .message
+        .contains("http_listener_disabled(true) requires https().listener_container_port"));
 }
 
 #[test]
-#[should_panic(expected = "keystore password / key password / keystore type require")]
-fn https_keystore_password_without_path_panics() {
-    let _dep = HttpDependency::builder("http-https-bad-keystore-pw")
+fn build_https_keystore_password_without_path_returns_fault() {
+    let fault = HttpDependency::builder("http-https-bad-keystore-pw")
         .with_port(0)
         .https()
         .keystore_password(test_password())
         .done()
-        .build();
+        .build()
+        .err()
+        .expect("https misconfiguration must fault");
+    assert!(fault
+        .message
+        .contains("keystore password / key password / keystore type require"));
 }
 
 #[test]
-#[should_panic(expected = "https().keystore_path(...) requires https().listener_container_port")]
-fn https_keystore_path_without_listener_port_panics() {
-    let _dep = HttpDependency::builder("http-https-bad-keystore-path")
+fn build_https_keystore_path_without_listener_port_returns_fault() {
+    let fault = HttpDependency::builder("http-https-bad-keystore-path")
         .with_port(0)
         .https()
         .keystore_path("/keystore.jks")
         .done()
-        .build();
+        .build()
+        .err()
+        .expect("https misconfiguration must fault");
+    assert!(fault
+        .message
+        .contains("https().keystore_path(...) requires https().listener_container_port"));
 }
 
 
@@ -203,7 +215,7 @@ impl HttpImpl for ExpiryRecordingImpl {
 #[test]
 fn build_no_expiry_override_uses_default_expiry() {
     let recorder = ExpiryRecordingImpl::default();
-    let _dep = HttpDependency::builder("orders").with_impl(recorder.clone()).build();
+    let _dep = HttpDependency::builder("orders").with_impl(recorder.clone()).build().expect("build http dependency");
 
     assert_eq!(
         *recorder.expiry.lock().unwrap(),
@@ -217,7 +229,7 @@ fn build_with_expiry_uses_given_expiry() {
     let _dep = HttpDependency::builder("orders")
         .with_impl(recorder.clone())
         .with_expiry(std::time::Duration::from_secs(30))
-        .build();
+        .build().expect("build http dependency");
 
     assert_eq!(
         *recorder.expiry.lock().unwrap(),
@@ -228,7 +240,7 @@ fn build_with_expiry_uses_given_expiry() {
 #[test]
 fn build_without_expiry_disables_expiry() {
     let recorder = ExpiryRecordingImpl::default();
-    let _dep = HttpDependency::builder("orders").with_impl(recorder.clone()).without_expiry().build();
+    let _dep = HttpDependency::builder("orders").with_impl(recorder.clone()).without_expiry().build().expect("build http dependency");
 
     assert_eq!(*recorder.expiry.lock().unwrap(), Some(None));
 }

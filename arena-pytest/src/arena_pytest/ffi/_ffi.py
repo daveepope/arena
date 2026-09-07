@@ -228,7 +228,7 @@ class _UserDispatcherLoggerBridge:
             cf_addr = _ffi_ptr_addr(caller_file_ptr)
             text = _dispatcher_log_append_caller_suffix(text, cf_addr, int(caller_line))
             if self._logger_factory is None and logger_name:
-                text = f"{logger_name}  {text}"
+                text = f"{logger_name} | {text}"
             lg.log(publish_py, "%s", text)
         finally:
             _ARENA_PY_GIL_RELEASE(gil_state)

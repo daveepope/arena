@@ -12,9 +12,6 @@ import arena.junit.lifecycle.ArenaLifecycleError;
 import arena.junit.lifecycle.ComponentState;
 import arena.junit.match.Match;
 import arena.junit.match.MatchBuilder;
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -34,15 +31,8 @@ class OpenArenaLifecycleUnitTest {
   @Test
   void openFaultedComponentRaisesLifecycleErrorWithState() {
     ClosedArena closed = closedArenaWithMissingBinary("junit-lifecycle-faulted");
-    PrintStream previous = System.err;
-    ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-    ArenaLifecycleError error;
-    try {
-      System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
-      error = assertThrows(ArenaLifecycleError.class, closed::open);
-    } finally {
-      System.setErr(previous);
-    }
+
+    ArenaLifecycleError error = assertThrows(ArenaLifecycleError.class, closed::open);
 
     assertTrue(error.getMessage().contains("is arena_faulted"));
     assertNotNull(error.state());
@@ -54,9 +44,7 @@ class OpenArenaLifecycleUnitTest {
             .findFirst()
             .orElse(null);
     assertNotNull(component);
-    assertFalse(
-        stderr.toString(StandardCharsets.UTF_8).contains("panicked at"),
-        "panic text must not reach stderr");
+    assertFalse(error.getMessage().contains("panicked at"));
   }
 
   @Test

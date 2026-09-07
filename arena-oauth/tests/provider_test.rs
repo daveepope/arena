@@ -4,7 +4,7 @@ fn builder_with_provider(name: &str, provider: arena_oauth::Provider) -> OauthDe
     OauthDependency::builder(name)
         .with_http()
         .with_provider(provider)
-        .build()
+        .build().expect("build oauth dependency")
 }
 
 #[test]

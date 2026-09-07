@@ -115,6 +115,5 @@ class ArenaLifecycleObserverUnitTest {
     ArenaState state = ArenaState.parse(document);
     assertEquals("junit-close-terminal", state.id);
     assertEquals("arena_closed", state.state);
-    assertNotEquals("arena_faulted", state.state);
   }
 }

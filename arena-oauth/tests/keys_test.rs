@@ -24,7 +24,7 @@ fn decoding_key_for(dep: &OauthDependency, provider: &Provider) -> DecodingKey {
 fn sign_claims_with_arbitrary_claims_produces_verifiable_token() {
     let dep = OauthDependency::builder("keys-sign-claims-verifiable")
         .with_http()
-        .build();
+        .build().expect("build oauth dependency");
     let claims = json!({
         "iss": "https://issuer.example",
         "sub": "test-subject",
@@ -46,7 +46,7 @@ fn sign_claims_with_arbitrary_claims_produces_verifiable_token() {
 fn sign_claims_with_claims_omitting_iss_still_signs() {
     let dep = OauthDependency::builder("keys-sign-claims-no-iss")
         .with_http()
-        .build();
+        .build().expect("build oauth dependency");
     let claims = json!({ "sub": "test-subject", "exp": 9_999_999_999u64 });
     let token = dep
         .sign_claims(&default_provider(), &claims)
@@ -62,7 +62,7 @@ fn sign_claims_with_claims_omitting_iss_still_signs() {
 fn sign_claims_unregistered_provider_returns_err() {
     let dep = OauthDependency::builder("keys-sign-claims-unregistered-provider")
         .with_http()
-        .build();
+        .build().expect("build oauth dependency");
     let claims = json!({ "sub": "test-subject" });
     let err = dep
         .sign_claims(&Provider::Okta, &claims)
@@ -74,7 +74,7 @@ fn sign_claims_unregistered_provider_returns_err() {
 fn private_key_pkcs8_pem_roundtrips_through_from_pkcs8_pem() {
     let original = OauthDependency::builder("keys-pem-roundtrip-source")
         .with_http()
-        .build();
+        .build().expect("build oauth dependency");
     let pem = original
         .signing_key_pem_for(&default_provider())
         .expect("signing key pem");
@@ -82,7 +82,7 @@ fn private_key_pkcs8_pem_roundtrips_through_from_pkcs8_pem() {
     let roundtripped = OauthDependency::builder("keys-pem-roundtrip-target")
         .with_http()
         .with_issuer(IssuerConfig::new().with_rsa_pkcs8_pem(pem.clone()))
-        .build();
+        .build().expect("build oauth dependency");
     let pem_again = roundtripped
         .signing_key_pem_for(&default_provider())
         .expect("signing key pem again");

@@ -50,7 +50,7 @@ async fn started_http(identifier: &str) -> HttpDependency {
         .with_impl(FakeHttpImpl { base_url: None })
         .with_port(0)
         .with_readiness_check(OkReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
     dep.start().await.expect("start should succeed");
     dep
 }
@@ -61,7 +61,7 @@ fn playbook_with_unstarted_dep_panics() {
         .with_impl(FakeHttpImpl { base_url: None })
         .with_port(0)
         .with_readiness_check(OkReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
 
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let _ = dep.playbook();

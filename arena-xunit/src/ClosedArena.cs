@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ArenaDotnet.Xunit.Ffi;
+using ArenaDotnet.Xunit.Lifecycle;
 using ArenaDotnet.Xunit.Playbook;
 using ArenaDotnet.Xunit.Support;
 using Microsoft.Extensions.Logging;
@@ -66,9 +67,21 @@ public sealed class ClosedArena
             _logComponentIds != null && _logComponentIds.Count > 0
                 ? ArenaJson.Serialize(_logComponentIds) : null);
 
-        ulong logToken = _loggerFactory != null
-            ? ArenaLogTarget.RegisterForLoggerFactory(_loggerFactory)
-            : ArenaLogTarget.RegisterForLogger(_logger ?? CreateDefaultLogger());
+        var routing = _loggerFactory != null
+            ? new ArenaLogRouting(_loggerFactory)
+            : new ArenaLogRouting(_logger ?? CreateDefaultLogger());
+        ulong logToken = ArenaLogTarget.Register(routing);
+        ulong observerToken;
+        try
+        {
+            observerToken = ArenaLifecycleObservers.Register(
+                document => LifecycleLog.LogTransitionDocument(_name, routing, document));
+        }
+        catch
+        {
+            ArenaLogTarget.Unregister(logToken);
+            throw;
+        }
 
         ArenaShutdown.EnsureHooksRegistered();
 
@@ -77,8 +90,15 @@ public sealed class ClosedArena
         {
             handle = ArenaBindings.OpenArena(_name, json, _logLevel);
         }
+        catch (ArenaBindingError e)
+        {
+            ArenaLifecycleObservers.Unregister(observerToken);
+            ArenaLogTarget.Unregister(logToken);
+            throw ArenaLifecycleError.From(e);
+        }
         catch
         {
+            ArenaLifecycleObservers.Unregister(observerToken);
             ArenaLogTarget.Unregister(logToken);
             throw;
         }
@@ -91,11 +111,13 @@ public sealed class ClosedArena
         catch
         {
             CloseArenaQuietly(handle);
+            ArenaLifecycleObservers.Unregister(observerToken);
             ArenaLogTarget.Unregister(logToken);
             throw;
         }
 
-        return System.Threading.Tasks.Task.FromResult(new OpenArena(handle, logToken, _match, playbooks));
+        return System.Threading.Tasks.Task.FromResult(
+            new OpenArena(handle, logToken, observerToken, routing, _match, playbooks));
     }
 
     private static void CloseArenaQuietly(IntPtr handle)

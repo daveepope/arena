@@ -2,6 +2,7 @@ use crate::executable_component::ExecutableComponent;
 use crate::platform::resolve_executable_extension;
 use arena::healthcheck::ReadinessCheck;
 use arena::Component;
+use arena::Fault;
 use std::path::PathBuf;
 
 pub enum BuildTool {
@@ -95,7 +96,7 @@ impl ExecutableComponentBuilder {
         self
     }
 
-    pub fn build(self) -> ExecutableComponent {
+    pub fn build(self) -> Result<ExecutableComponent, Fault> {
         if let (Some(ref source_path), Some(ref build_tool)) = (&self.source_path, &self.build_tool)
         {
             tracing::debug!(
@@ -109,7 +110,7 @@ impl ExecutableComponentBuilder {
                 source_path.clone()
             } else {
                 // Walk up to find a directory where source_path exists
-                let current_dir = std::env::current_dir().expect("get current directory");
+                let current_dir = current_dir_fault(&self.identifier)?;
 
                 current_dir
                     .ancestors()
@@ -121,17 +122,25 @@ impl ExecutableComponentBuilder {
                             None
                         }
                     })
-                    .expect(&format!(
-                        "could not find source path '{}' from current directory or any parent",
-                        source_path.display()
-                    ))
+                    .ok_or_else(|| {
+                        Fault::component(
+                            self.identifier.clone(),
+                            format!(
+                                "could not find source path '{}' from current directory or any parent",
+                                source_path.display()
+                            ),
+                        )
+                    })?
             };
 
-            let output = Self::execute_build(build_tool, &source_dir);
+            let output = Self::execute_build(&self.identifier, build_tool, &source_dir)?;
 
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                panic!("build failed: {}", stderr);
+                return Err(Fault::component(
+                    self.identifier.clone(),
+                    format!("build failed: {}", stderr),
+                ));
             }
 
             tracing::debug!(
@@ -141,26 +150,29 @@ impl ExecutableComponentBuilder {
             );
         }
 
-        let executable_path = self.executable_path.map(|path| {
-            let resolved = if path.is_absolute() {
-                path
-            } else {
-                let current_dir = std::env::current_dir().expect("get current directory");
+        let executable_path = match self.executable_path {
+            Some(path) => {
+                let resolved = if path.is_absolute() {
+                    path
+                } else {
+                    let current_dir = current_dir_fault(&self.identifier)?;
 
-                current_dir
-                    .ancestors()
-                    .find_map(|ancestor| {
-                        let candidate = ancestor.join(&path);
-                        if candidate.exists() {
-                            Some(candidate)
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap_or_else(|| current_dir.join(&path))
-            };
-            resolve_executable_extension(resolved)
-        });
+                    current_dir
+                        .ancestors()
+                        .find_map(|ancestor| {
+                            let candidate = ancestor.join(&path);
+                            if candidate.exists() {
+                                Some(candidate)
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_else(|| current_dir.join(&path))
+                };
+                Some(resolve_executable_extension(resolved))
+            }
+            None => None,
+        };
 
         let mut component = ExecutableComponent::new(self.identifier);
         component.children = self.children;
@@ -168,45 +180,44 @@ impl ExecutableComponentBuilder {
         component.env_vars = self.env_vars;
         component.runtime_args = self.runtime_args;
         component.readiness_checks = self.readiness_checks;
-        component
+        Ok(component)
     }
 
-    fn execute_build(build_tool: &BuildTool, source_dir: &PathBuf) -> std::process::Output {
-        match build_tool {
-            BuildTool::Cargo => std::process::Command::new("cargo")
-                .args(&["build", "--release"])
-                .current_dir(source_dir)
-                .output()
-                .expect("failed to run cargo build"),
-            BuildTool::Maven => std::process::Command::new("mvn")
-                .args(&["clean", "package"])
-                .current_dir(source_dir)
-                .output()
-                .expect("failed to run mvn"),
-            BuildTool::Gradle => std::process::Command::new("gradle")
-                .args(&["build"])
-                .current_dir(source_dir)
-                .output()
-                .expect("failed to run gradle"),
-            BuildTool::Dotnet => std::process::Command::new("dotnet")
-                .args(&["build", "--configuration", "Release"])
-                .current_dir(source_dir)
-                .output()
-                .expect("failed to run dotnet build"),
-            BuildTool::Make => std::process::Command::new("make")
-                .current_dir(source_dir)
-                .output()
-                .expect("failed to run make"),
-            BuildTool::CMake => std::process::Command::new("cmake")
-                .args(&["--build", ".", "--config", "Release"])
-                .current_dir(source_dir)
-                .output()
-                .expect("failed to run cmake"),
-            BuildTool::Custom { command, args } => std::process::Command::new(command)
-                .args(args)
-                .current_dir(source_dir)
-                .output()
-                .expect(&format!("failed to run custom build command: {}", command)),
-        }
+    fn execute_build(
+        identifier: &str,
+        build_tool: &BuildTool,
+        source_dir: &PathBuf,
+    ) -> Result<std::process::Output, Fault> {
+        let (command, args): (&str, &[&str]) = match build_tool {
+            BuildTool::Cargo => ("cargo", &["build", "--release"]),
+            BuildTool::Maven => ("mvn", &["clean", "package"]),
+            BuildTool::Gradle => ("gradle", &["build"]),
+            BuildTool::Dotnet => ("dotnet", &["build", "--configuration", "Release"]),
+            BuildTool::Make => ("make", &[]),
+            BuildTool::CMake => ("cmake", &["--build", ".", "--config", "Release"]),
+            BuildTool::Custom { command, args } => {
+                return std::process::Command::new(command)
+                    .args(args)
+                    .current_dir(source_dir)
+                    .output()
+                    .map_err(|e| {
+                        Fault::component(
+                            identifier,
+                            format!("failed to run custom build command {command}: {e}"),
+                        )
+                    });
+            }
+        };
+        std::process::Command::new(command)
+            .args(args)
+            .current_dir(source_dir)
+            .output()
+            .map_err(|e| Fault::component(identifier, format!("failed to run {command}: {e}")))
     }
+}
+
+fn current_dir_fault(identifier: &str) -> Result<PathBuf, Fault> {
+    std::env::current_dir().map_err(|e| {
+        Fault::component(identifier, format!("failed to read current directory: {e}"))
+    })
 }

@@ -1,6 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 
 use arena::dependency::RunnableDependency;
+use arena::Fault;
 
 use crate::keys::{IssuerKeys, RsaKeyPair};
 use crate::oauth_common::{IssuerRegistration, OauthListenAddr};
@@ -151,21 +152,24 @@ impl OauthDependencyBuilder {
         self
     }
 
-    pub fn build(self) -> OauthDependency {
+    pub fn build(self) -> Result<OauthDependency, Fault> {
         if !self.issuers.is_empty() && self.rsa_pkcs8_pem.is_some() {
-            panic!(
-                "[Oauth-{}] with_rsa_pkcs8_pem and with_issuer/with_provider are mutually exclusive; set the key per issuer",
-                self.identifier
-            );
+            return Err(Fault::dependency(
+                self.identifier.clone(),
+                "with_rsa_pkcs8_pem and with_issuer/with_provider are mutually exclusive; set the key per issuer",
+            ));
         }
 
         let issuers: Vec<IssuerRegistration> = if self.issuers.is_empty() {
             let keys = match &self.rsa_pkcs8_pem {
                 Some(pem) => {
                     IssuerKeys::from_pkcs8_pem(&self.identifier, pem, RsaKeyPair::DEFAULT_KID)
-                        .unwrap_or_else(|e| {
-                            panic!("[Oauth-{}] invalid PKCS#8 PEM: {e}", self.identifier)
-                        })
+                        .map_err(|e| {
+                            Fault::dependency(
+                                self.identifier.clone(),
+                                format!("invalid PKCS#8 PEM: {e}"),
+                            )
+                        })?
                 }
                 None => IssuerKeys::deferred(&self.identifier, RsaKeyPair::DEFAULT_KID),
             };
@@ -193,10 +197,10 @@ impl OauthDependencyBuilder {
                         issuer_path: Some(issuer_path.clone()),
                     });
                     if !seen_issuer_paths.insert(issuer_path.clone()) {
-                        panic!(
-                            "[Oauth-{}] duplicate issuer path registered: {issuer_path:?}",
-                            self.identifier
-                        );
+                        return Err(Fault::dependency(
+                            self.identifier.clone(),
+                            format!("duplicate issuer path registered: {issuer_path:?}"),
+                        ));
                     }
                     let jwks_path = config.jwks_path.unwrap_or_else(|| {
                         if issuer_path.is_empty() {
@@ -206,27 +210,31 @@ impl OauthDependencyBuilder {
                         }
                     });
                     if !seen_jwks_paths.insert(jwks_path.clone()) {
-                        panic!(
-                            "[Oauth-{}] duplicate JWKS path registered: {jwks_path}",
-                            self.identifier
-                        );
+                        return Err(Fault::dependency(
+                            self.identifier.clone(),
+                            format!("duplicate JWKS path registered: {jwks_path}"),
+                        ));
                     }
                     let kid = format!("arena-oauth-{}", i + 1);
                     let keys = match &config.rsa_pkcs8_pem {
-                        Some(pem) => IssuerKeys::from_pkcs8_pem(&self.identifier, pem, kid)
-                            .unwrap_or_else(|e| {
-                                panic!("[Oauth-{}] invalid PKCS#8 PEM: {e}", self.identifier)
-                            }),
+                        Some(pem) => {
+                            IssuerKeys::from_pkcs8_pem(&self.identifier, pem, kid).map_err(|e| {
+                                Fault::dependency(
+                                    self.identifier.clone(),
+                                    format!("invalid PKCS#8 PEM: {e}"),
+                                )
+                            })?
+                        }
                         None => IssuerKeys::deferred(&self.identifier, kid),
                     };
-                    IssuerRegistration {
+                    Ok(IssuerRegistration {
                         provider,
                         issuer_path,
                         jwks_path,
                         keys,
-                    }
+                    })
                 })
-                .collect()
+                .collect::<Result<Vec<_>, Fault>>()?
         };
 
         let port = self.port.unwrap_or(0);
@@ -237,15 +245,15 @@ impl OauthDependencyBuilder {
             InboundTransport::EphemeralTls => OauthTlsPlan::EphemeralOnStart,
             InboundTransport::CustomTls { cert_pem, key_pem } => {
                 if cert_pem.trim().is_empty() || key_pem.trim().is_empty() {
-                    panic!(
-                        "[Oauth-{}] TLS certificate PEM and private key PEM must be non-empty",
-                        self.identifier
-                    );
+                    return Err(Fault::dependency(
+                        self.identifier.clone(),
+                        "TLS certificate PEM and private key PEM must be non-empty",
+                    ));
                 }
                 OauthTlsPlan::CustomPem { cert_pem, key_pem }
             }
         };
-        OauthDependency::new(
+        Ok(OauthDependency::new(
             arena_container::identifier::build("arena-oauth", &self.identifier),
             issuers,
             OauthListenAddr {
@@ -257,6 +265,6 @@ impl OauthDependencyBuilder {
             token_ttl_secs,
             tls_plan,
             self.metadata_base_url,
-        )
+        ))
     }
 }

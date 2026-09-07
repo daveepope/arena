@@ -566,6 +566,20 @@ final class ArenaExtensionUnitTest {
   }
 
   @org.junit.jupiter.api.Test
+  void beforeAll_cachedFailureNullMessage_throwsIllegalStateException() throws Exception {
+    Class<?> root = AfterAllFailedCacheEntryTopology.class;
+    cache().put(root, newFailedCachedArena(new IllegalStateException((String) null), null));
+    try {
+      IllegalStateException error =
+          assertThrows(
+              IllegalStateException.class, () -> new ArenaExtension().beforeAll(contextFor(root)));
+      assertTrue(error.getMessage().contains(root.getName()));
+    } finally {
+      cache().remove(root);
+    }
+  }
+
+  @org.junit.jupiter.api.Test
   void beforeAll_cachedFailureWithCause_rethrowsWithSameCause() throws Exception {
     Class<?> root = AfterAllFailedCacheEntryTopology.class;
     RuntimeException underlying = new RuntimeException("afterOpen blew up");

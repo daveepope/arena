@@ -226,7 +226,7 @@ def test_log_closing_summary_state_logs_token_and_fault_count():
         log_closing_summary(state)
 
     assert capture.lines == [
-        (logging.INFO, "closing summary | state=arena_closed, faults=0")
+        (logging.INFO, "closing summary | state=arena_closed | faults=0")
     ]
 
 
@@ -254,7 +254,7 @@ def test_log_closing_summary_document_valid_document_logs_the_summary():
         )
 
     assert capture.lines == [
-        (logging.INFO, "closing summary | state=arena_closed, faults=0")
+        (logging.INFO, "closing summary | state=arena_closed | faults=0")
     ]
 
 

@@ -139,6 +139,8 @@ rust_test(
         normal_dev = True,
     ) + [
         ":arena_ffi",
+        "//arena",
+        "//arena-http:arena_http",
     ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,

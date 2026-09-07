@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use crate::http_dependency::HttpDependency;
 use crate::playbook::Playbook;
 
-type BuildFn = dyn Fn(Playbook) -> Playbook + Send + Sync;
+type BuildFn = dyn Fn(Playbook) -> Result<Playbook, Fault> + Send + Sync;
 
 pub struct ManagedHttpPlaybook {
     identifier: String,
@@ -21,7 +21,7 @@ impl ManagedHttpPlaybook {
         build: F,
     ) -> Self
     where
-        F: Fn(Playbook) -> Playbook + Send + Sync + 'static,
+        F: Fn(Playbook) -> Result<Playbook, Fault> + Send + Sync + 'static,
     {
         Self {
             identifier: identifier.into(),
@@ -64,7 +64,7 @@ impl PlaybookTrait for ManagedHttpPlaybook {
             ));
         }
 
-        let playbook = (self.build)(http.playbook()).with_identifier(&self.identifier);
+        let playbook = (self.build)(http.playbook())?.with_identifier(&self.identifier);
         Ok(Box::new(playbook.run().await))
     }
 }

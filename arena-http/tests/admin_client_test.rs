@@ -58,7 +58,7 @@ async fn reset_journal_malformed_pem_returns_fault_before_network_call() {
             "-----BEGIN CERTIFICATE-----\nbm90LWEtcmVhbC1jZXJ0\n-----END CERTIFICATE-----",
         )
         .with_readiness_check(OkReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
     dep.start().await.expect("start should succeed");
 
     let fault = dep
@@ -82,7 +82,7 @@ async fn soft_reset_malformed_pem_returns_fault_before_network_call() {
             "-----BEGIN CERTIFICATE-----\nbm90LWEtcmVhbC1jZXJ0\n-----END CERTIFICATE-----",
         )
         .with_readiness_check(OkReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
     dep.start().await.expect("start should succeed");
 
     let fault = dep.soft_reset().await.expect_err("soft reset should fault");
@@ -101,7 +101,7 @@ async fn reset_journal_blank_pem_treated_as_absent_fails_over_network() {
         .with_port(0)
         .with_trusted_certificate_pem("   ")
         .with_readiness_check(OkReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
     dep.start().await.expect("start should succeed");
 
     let fault = dep
@@ -118,7 +118,7 @@ async fn reset_journal_remote_tls_host_without_pem_returns_fault() {
         .with_impl(setup_fake_impl("https://198.51.100.7:8443"))
         .with_port(0)
         .with_readiness_check(OkReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
     dep.start().await.expect("start should succeed");
 
     let fault = dep
@@ -135,7 +135,7 @@ async fn reset_journal_loopback_tls_host_without_pem_reaches_network() {
         .with_impl(setup_fake_impl("https://localhost:8443"))
         .with_port(0)
         .with_readiness_check(OkReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
     dep.start().await.expect("start should succeed");
 
     let fault = dep
@@ -153,7 +153,7 @@ async fn reset_journal_remote_ipv6_tls_host_without_pem_returns_fault() {
         .with_impl(setup_fake_impl("https://[2001:db8::1]:8443"))
         .with_port(0)
         .with_readiness_check(OkReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
     dep.start().await.expect("start should succeed");
 
     let fault = dep
@@ -170,7 +170,7 @@ async fn reset_journal_loopback_ipv6_tls_host_without_pem_reaches_network() {
         .with_impl(setup_fake_impl("https://[::1]:8443"))
         .with_port(0)
         .with_readiness_check(OkReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
     dep.start().await.expect("start should succeed");
 
     let fault = dep

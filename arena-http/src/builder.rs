@@ -3,6 +3,7 @@ use crate::http_dependency::container_impl::{HttpContainerCliConfig, HttpContain
 use crate::http_dependency::{HttpDependency, HttpImpl};
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
+use arena::Fault;
 
 const DEFAULT_CONTAINER_HTTP_PORT: u16 = 8080;
 
@@ -175,10 +176,10 @@ impl HttpDependencyBuilder {
         self
     }
 
-    pub fn build(self) -> HttpDependency {
+    pub fn build(self) -> Result<HttpDependency, Fault> {
         let https = self.https;
         let container_cli_cfg = match &self.http_impl {
-            None => build_http_container_cli_config(&self.identifier, https),
+            None => build_http_container_cli_config(&self.identifier, https)?,
             Some(_) => HttpContainerCliConfig::default(),
         };
 
@@ -210,14 +211,14 @@ impl HttpDependencyBuilder {
             dep.set_readiness_check(check);
         }
 
-        dep
+        Ok(dep)
     }
 }
 
 fn build_http_container_cli_config(
     identifier: &str,
     s: HttpsListenerSettings,
-) -> HttpContainerCliConfig {
+) -> Result<HttpContainerCliConfig, Fault> {
     let https_listener_port = s.listener_port;
     let https_host_port = s.host_port;
     let keystore_path = s.keystore_path;
@@ -227,23 +228,26 @@ fn build_http_container_cli_config(
     let http_disabled = s.http_disabled;
 
     if http_disabled && https_listener_port.is_none() {
-        panic!(
-            "[Http-{identifier}] https().http_listener_disabled(true) requires https().listener_container_port(...)"
-        );
+        return Err(Fault::dependency(
+            identifier,
+            "https().http_listener_disabled(true) requires https().listener_container_port(...)",
+        ));
     }
 
     if keystore_path.is_none()
         && (keystore_password.is_some() || key_password.is_some() || keystore_type.is_some())
     {
-        panic!(
-            "[Http-{identifier}] keystore password / key password / keystore type require https().keystore_path(...)"
-        );
+        return Err(Fault::dependency(
+            identifier,
+            "keystore password / key password / keystore type require https().keystore_path(...)",
+        ));
     }
 
     if keystore_path.is_some() && https_listener_port.is_none() {
-        panic!(
-            "[Http-{identifier}] https().keystore_path(...) requires https().listener_container_port(...)"
-        );
+        return Err(Fault::dependency(
+            identifier,
+            "https().keystore_path(...) requires https().listener_container_port(...)",
+        ));
     }
 
     let needs_https_cli = https_listener_port.is_some()
@@ -291,10 +295,10 @@ fn build_http_container_cli_config(
 
     let https_listener_host_port_map = https_host_port.and_then(|p| (p > 0).then_some(p));
 
-    HttpContainerCliConfig {
+    Ok(HttpContainerCliConfig {
         cli_args,
         https_listener_container_port: https_listener_port,
         https_listener_host_port_map,
         http_disabled,
-    }
+    })
 }

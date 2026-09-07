@@ -167,6 +167,147 @@ fn on_event_payload_carries_no_bracketed_target_prefix() {
 }
 
 #[test]
+fn on_event_string_field_matching_subject_id_is_dropped_from_payload() {
+    let arena_id = String::from("orders");
+    let subject_id = String::from("orders-postgres");
+    let record = record_emitted_within("suppress-subject-field", || {
+        let arena = tracing::info_span!("arena", arena.id = %arena_id);
+        let _arena = arena.enter();
+        let subject = tracing::info_span!(
+            "subject",
+            arena.subject.kind = "dependency",
+            arena.subject.id = %subject_id
+        );
+        let _subject = subject.enter();
+        tracing::info!(
+            target: "arena::ffi",
+            dependency = %subject_id,
+            phase = "start_begin",
+            "suppress-subject-field"
+        );
+    });
+
+    assert_eq!(
+        record.message,
+        "suppress-subject-field | phase=\"start_begin\""
+    );
+}
+
+#[test]
+fn on_event_string_field_matching_arena_id_is_dropped_from_payload() {
+    let arena_id = String::from("orders");
+    let record = record_emitted_within("suppress-arena-field", || {
+        let arena = tracing::info_span!("arena", arena.id = %arena_id);
+        let _arena = arena.enter();
+        tracing::info!(
+            target: "arena::ffi",
+            match_name = %arena_id,
+            dependency = "orders-postgres",
+            "suppress-arena-field"
+        );
+    });
+
+    assert_eq!(
+        record.message,
+        "suppress-arena-field | dependency=\"orders-postgres\""
+    );
+}
+
+#[test]
+fn on_event_numeric_field_matching_arena_id_text_stays_in_payload() {
+    let arena_id = String::from("7");
+    let record = record_emitted_within("suppress-numeric-kept", || {
+        let arena = tracing::info_span!("arena", arena.id = %arena_id);
+        let _arena = arena.enter();
+        tracing::info!(target: "arena::ffi", dependency_count = 7u64, "suppress-numeric-kept");
+    });
+
+    assert_eq!(record.message, "suppress-numeric-kept | dependency_count=7");
+}
+
+#[test]
+fn on_event_field_outside_any_arena_span_stays_in_payload() {
+    let record = record_emitted_within("suppress-outside-span", || {
+        tracing::info!(target: "arena::ffi", dependency = "orders-postgres", "suppress-outside-span");
+    });
+
+    assert_eq!(
+        record.message,
+        "suppress-outside-span | dependency=\"orders-postgres\""
+    );
+}
+
+#[test]
+fn on_event_multiple_fields_join_with_pipe_separators() {
+    let record = record_emitted_within("separator-probe", || {
+        tracing::info!(
+            target: "arena::ffi",
+            dependency_count = 8u64,
+            phase = "dependencies_start_begin",
+            "separator-probe"
+        );
+    });
+
+    assert_eq!(
+        record.message,
+        "separator-probe | dependency_count=8 | phase=\"dependencies_start_begin\""
+    );
+}
+
+#[test]
+fn on_event_duration_field_rounds_to_three_significant_figures() {
+    let cases = [
+        (std::time::Duration::from_nanos(1_210_379_343), "1.21s"),
+        (std::time::Duration::from_nanos(89_031_125), "89ms"),
+        (std::time::Duration::from_nanos(555_139_312), "555ms"),
+        (std::time::Duration::from_nanos(2_191), "2.19µs"),
+    ];
+
+    for (index, (duration, expected)) in cases.into_iter().enumerate() {
+        let marker = format!("duration-probe-{index}");
+        let record = record_emitted_within(&marker, || {
+            tracing::info!(target: "arena::ffi", elapsed = ?duration, "{}", marker);
+        });
+
+        assert_eq!(record.message, format!("{marker} | elapsed={expected}"));
+    }
+}
+
+#[test]
+fn on_event_dependency_allowlist_matches_before_field_suppression() {
+    let allow = std::ffi::CString::new("[\"orders-postgres\"]").expect("allow json");
+    unsafe {
+        arena_ffi::arena_dispatcher_dependency_allow_json_set(allow.as_ptr());
+    }
+    let arena_id = String::from("orders");
+    let subject_id = String::from("orders-postgres");
+    let record = record_emitted_within("suppress-allowlist-probe", || {
+        let arena = tracing::info_span!("arena", arena.id = %arena_id);
+        let _arena = arena.enter();
+        let subject = tracing::info_span!(
+            "subject",
+            arena.subject.kind = "dependency",
+            arena.subject.id = %subject_id
+        );
+        let _subject = subject.enter();
+        tracing::info!(
+            target: "arena_oauth::oauth_dependency",
+            dependency = %subject_id,
+            phase = "start_begin",
+            "suppress-allowlist-probe"
+        );
+    });
+    unsafe {
+        arena_ffi::arena_dispatcher_dependency_allow_json_set(std::ptr::null());
+    }
+
+    assert_eq!(
+        record.message,
+        "suppress-allowlist-probe | phase=\"start_begin\""
+    );
+}
+
+#[test]
 fn install_panic_reporter_panic_inside_boundary_delivers_a_log_record() {
     let captured = records_emitted_within(|| {
         let outcome = call_across_boundary(|| panic!("boundary-panic-probe"));

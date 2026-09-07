@@ -48,14 +48,14 @@ async fn started_http(identifier: &str) -> HttpDependency {
         .with_impl(FakeHttpImpl { base_url: None })
         .with_port(0)
         .with_readiness_check(OkReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
     dep.start().await.expect("start should succeed");
     dep
 }
 
 #[test]
 fn identifier_returns_configured_value() {
-    let playbook = ManagedHttpPlaybook::new("managed-id", "http-dep", |p| p);
+    let playbook = ManagedHttpPlaybook::new("managed-id", "http-dep", |p| Ok(p));
     assert_eq!(
         arena::playbook::Playbook::identifier(&playbook),
         "managed-id"
@@ -68,16 +68,37 @@ async fn run_dependency_present_applies_build_fn() {
     let dependency_identifier = dep.identifier().to_string();
     let deps: Vec<Dependency> = vec![Box::new(dep)];
 
-    let playbook = ManagedHttpPlaybook::new("managed-run", dependency_identifier, |p| p);
+    let playbook = ManagedHttpPlaybook::new("managed-run", dependency_identifier, |p| Ok(p));
 
     let active = playbook.run(&deps).await.expect("playbook should run");
     assert_eq!(active.identifier(), "managed-run");
 }
 
 #[tokio::test]
+async fn run_build_fn_fails_returns_that_fault() {
+    let dep = started_http("http-managed-buildfail").await;
+    let dependency_identifier = dep.identifier().to_string();
+    let deps: Vec<Dependency> = vec![Box::new(dep)];
+
+    let playbook = ManagedHttpPlaybook::new("managed-buildfail", dependency_identifier, |_| {
+        Err(arena::Fault::playbook(
+            "managed-buildfail",
+            "http playbook registration failed: mappings must not be empty",
+        ))
+    });
+
+    let Err(fault) = playbook.run(&deps).await else {
+        panic!("playbook should fault");
+    };
+
+    assert_eq!(fault.id, "managed-buildfail");
+    assert!(fault.message.contains("http playbook registration failed"));
+}
+
+#[tokio::test]
 async fn run_dependency_missing_returns_fault() {
     let deps: Vec<Dependency> = Vec::new();
-    let playbook = ManagedHttpPlaybook::new("managed-missing", "no-such-dep", |p| p);
+    let playbook = ManagedHttpPlaybook::new("managed-missing", "no-such-dep", |p| Ok(p));
 
     let Err(fault) = playbook.run(&deps).await else {
         panic!("playbook should fault");
@@ -90,7 +111,7 @@ async fn run_dependency_missing_returns_fault() {
 
 #[test]
 fn into_box_produces_trait_object() {
-    let playbook = ManagedHttpPlaybook::new("boxed", "http-dep", |p| p);
+    let playbook = ManagedHttpPlaybook::new("boxed", "http-dep", |p| Ok(p));
     let boxed: Box<dyn PlaybookTrait> = playbook.into_box();
     assert_eq!(boxed.identifier(), "boxed");
 }

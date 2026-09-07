@@ -8,17 +8,49 @@ internal static class ArenaBindings
     {
         ArenaNativeLib.arena_set_log_level((int)level);
         IntPtr handle = ArenaNativeLib.arena_open(name, configJson, out var errOut, out var stateOut);
-        ReleaseOutString(stateOut);
+        var stateDocument = TakeOutString(stateOut);
         if (handle == IntPtr.Zero)
-            throw TakeErr(errOut, "arena_open failed");
+        {
+            var message = TakeOutString(errOut);
+            throw new ArenaBindingError(
+                string.IsNullOrEmpty(message) ? "arena_open returned null" : message!, stateDocument);
+        }
+        ReleaseOutString(errOut);
         return handle;
     }
 
-    internal static void CloseArena(IntPtr handle)
+    internal static string? CloseArena(IntPtr handle)
     {
-        ArenaNativeLib.arena_close(handle, out var errOut, out var stateOut);
-        ReleaseOutString(errOut);
-        ReleaseOutString(stateOut);
+        var status = ArenaNativeLib.arena_close(handle, out var errOut, out var stateOut);
+        var message = TakeOutString(errOut);
+        var stateDocument = TakeOutString(stateOut);
+        if (status != 0)
+            throw new ArenaBindingError(
+                string.IsNullOrEmpty(message) ? $"arena_close (status_code={status})" : message!,
+                stateDocument);
+        return stateDocument;
+    }
+
+    internal static string StateJson(IntPtr handle)
+    {
+        if (handle == IntPtr.Zero)
+            throw new ArenaBindingError("arena_state_json called on closed arena");
+        var status = ArenaNativeLib.arena_state_json(handle, out var errOut, out var stateOut);
+        var message = TakeOutString(errOut);
+        var stateDocument = TakeOutString(stateOut);
+        if (status != 0)
+            throw new ArenaBindingError(
+                string.IsNullOrEmpty(message) ? $"arena_state_json (status_code={status})" : message!);
+        return string.IsNullOrEmpty(stateDocument) ? "{}" : stateDocument!;
+    }
+
+    private static string? TakeOutString(IntPtr value)
+    {
+        if (value == IntPtr.Zero)
+            return null;
+        var raw = ArenaNativeStrings.FromUtf8Ptr(value);
+        ArenaNativeLib.arena_free_string(value);
+        return raw;
     }
 
     private static void ReleaseOutString(IntPtr value)

@@ -113,7 +113,7 @@ fn build_http(events: Arc<Mutex<Vec<Event>>>) -> HttpDependency {
         .with_port(0)
         .with_image_tag("x")
         .with_readiness_check(OkReadinessCheck)
-        .build()
+        .build().expect("build http dependency")
 }
 
 fn build_http_with_failing_readiness(events: Arc<Mutex<Vec<Event>>>) -> HttpDependency {
@@ -125,7 +125,7 @@ fn build_http_with_failing_readiness(events: Arc<Mutex<Vec<Event>>>) -> HttpDepe
         .with_port(0)
         .with_image_tag("x")
         .with_readiness_check(FailingHttpReadinessCheck)
-        .build()
+        .build().expect("build http dependency")
 }
 
 #[test]

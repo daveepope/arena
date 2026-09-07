@@ -153,7 +153,7 @@ async fn start_called_once_starts_the_container() {
     let mut dep = OracleDependency::builder("start-once")
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
-        .build();
+        .build().expect("build oracle dependency");
 
     dep.start().await.expect("start should succeed");
 
@@ -212,7 +212,7 @@ async fn start_container_removed_during_sql_readiness_panics() {
         .with_impl(RemovedContainerOracleImpl)
         .with_readiness_check(AlwaysReadyCheck)
         .with_sql_readiness_timeout(std::time::Duration::from_secs(600))
-        .build();
+        .build().expect("build oracle dependency");
 
     dep.start().await.expect("start should succeed");
 }
@@ -224,7 +224,7 @@ async fn start_sql_readiness_check_failure_panics() {
         .with_impl(FailingSqlReadinessOracleImpl)
         .with_readiness_check(AlwaysReadyCheck)
         .with_sql_readiness_timeout(std::time::Duration::from_millis(50))
-        .build();
+        .build().expect("build oracle dependency");
 
     dep.start().await.expect("start should succeed");
 }
@@ -235,7 +235,7 @@ async fn start_called_twice_only_starts_container_once() {
     let mut dep = OracleDependency::builder("start-twice")
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
-        .build();
+        .build().expect("build oracle dependency");
 
     dep.start().await.expect("start should succeed");
     dep.start().await.expect("start should succeed");
@@ -251,7 +251,7 @@ async fn start_with_startup_scripts_runs_them_as_app_user() {
         .with_readiness_check(AlwaysReadyCheck)
         .with_database_username("app_owner")
         .with_startup_sql_scripts(vec!["CREATE TABLE widgets (id NUMBER);".to_string()])
-        .build();
+        .build().expect("build oracle dependency");
 
     dep.start().await.expect("start should succeed");
 
@@ -265,7 +265,7 @@ async fn start_snapshots_managed_tables_via_user_tables_query() {
     let mut dep = OracleDependency::builder("start-snapshot")
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
-        .build();
+        .build().expect("build oracle dependency");
 
     dep.start().await.expect("start should succeed");
 
@@ -279,7 +279,7 @@ async fn soft_reset_without_startup_scripts_does_not_touch_admin_user() {
     let mut dep = OracleDependency::builder("soft-reset-noop")
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
-        .build();
+        .build().expect("build oracle dependency");
 
     dep.start().await.expect("start should succeed");
     dep.soft_reset().await.expect("soft reset should succeed");
@@ -294,7 +294,7 @@ async fn soft_reset_with_startup_scripts_recreates_app_user_as_admin() {
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
         .with_startup_sql_scripts(vec!["CREATE TABLE widgets (id NUMBER);".to_string()])
-        .build();
+        .build().expect("build oracle dependency");
 
     dep.start().await.expect("start should succeed");
     dep.soft_reset().await.expect("soft reset should succeed");
@@ -311,7 +311,7 @@ async fn soft_reset_before_start_is_noop() {
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
         .with_startup_sql_scripts(vec!["CREATE TABLE widgets (id NUMBER);".to_string()])
-        .build();
+        .build().expect("build oracle dependency");
 
     dep.soft_reset().await.expect("soft reset should succeed");
 
@@ -325,7 +325,7 @@ async fn hard_reset_restarts_container_and_reruns_startup_scripts() {
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
         .with_startup_sql_scripts(vec!["CREATE TABLE widgets (id NUMBER);".to_string()])
-        .build();
+        .build().expect("build oracle dependency");
 
     dep.start().await.expect("start should succeed");
     dep.hard_reset().await.expect("hard reset should succeed");
@@ -340,7 +340,7 @@ async fn hard_reset_before_start_is_noop() {
     let mut dep = OracleDependency::builder("hard-reset-before-start")
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
-        .build();
+        .build().expect("build oracle dependency");
 
     dep.hard_reset().await.expect("hard reset should succeed");
 
@@ -354,7 +354,7 @@ async fn stop_before_start_does_not_panic() {
     let mut dep = OracleDependency::builder("stop-before-start")
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
-        .build();
+        .build().expect("build oracle dependency");
 
     dep.stop().await.expect("stop should succeed");
 
@@ -363,14 +363,14 @@ async fn stop_before_start_does_not_panic() {
 
 #[test]
 fn identifier_includes_builder_prefix_and_given_name() {
-    let dep = OracleDependency::builder("my-oracle-dep").build();
+    let dep = OracleDependency::builder("my-oracle-dep").build().expect("build oracle dependency");
 
     assert!(dep.identifier().starts_with("arena-oracledb-my-oracle-dep-"));
 }
 
 #[test]
 fn as_any_downcasts_to_oracle_dependency() {
-    let dep = OracleDependency::builder("downcast-test").build();
+    let dep = OracleDependency::builder("downcast-test").build().expect("build oracle dependency");
 
     let any_ref = dep.as_any();
     assert!(any_ref.downcast_ref::<OracleDependency>().is_some());
@@ -378,7 +378,7 @@ fn as_any_downcasts_to_oracle_dependency() {
 
 #[test]
 fn children_empty_by_default() {
-    let dep = OracleDependency::builder("no-children").build();
+    let dep = OracleDependency::builder("no-children").build().expect("build oracle dependency");
 
     assert!(dep.children().is_empty());
 }
@@ -441,7 +441,7 @@ impl RunnableDependency for RecordingChildDependency {
 
 #[test]
 fn add_child_reflects_in_children_and_children_mut() {
-    let mut dep = OracleDependency::builder("add-child").build();
+    let mut dep = OracleDependency::builder("add-child").build().expect("build oracle dependency");
 
     dep.add_child(Box::new(RecordingChildDependency::default()));
 
@@ -456,7 +456,7 @@ async fn start_with_children_starts_children_before_container() {
     let mut dep = OracleDependency::builder("start-with-children")
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
-        .build();
+        .build().expect("build oracle dependency");
     dep.add_child(Box::new(RecordingChildDependency { log: log.clone() }));
 
     dep.start().await.expect("start should succeed");
@@ -472,7 +472,7 @@ async fn stop_running_with_children_stops_children_in_reverse_order() {
     let mut dep = OracleDependency::builder("stop-with-children")
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
-        .build();
+        .build().expect("build oracle dependency");
     dep.add_child(Box::new(RecordingChildDependency { log: log.clone() }));
 
     dep.start().await.expect("start should succeed");
@@ -490,7 +490,7 @@ async fn execute_runs_sql_as_database_user() {
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
         .with_database_username("app_owner")
-        .build();
+        .build().expect("build oracle dependency");
     dep.start().await.expect("start should succeed");
 
     dep.execute("CREATE TABLE widgets (id NUMBER);")
@@ -507,7 +507,7 @@ async fn query_scalar_returns_parsed_value() {
     let mut dep = OracleDependency::builder("query-scalar")
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
-        .build();
+        .build().expect("build oracle dependency");
     dep.start().await.expect("start should succeed");
 
     let value = dep

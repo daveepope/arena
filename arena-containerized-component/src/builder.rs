@@ -143,13 +143,17 @@ impl ContainerizedComponentBuilder {
         self
     }
 
-    pub fn resolve_path(path: PathBuf) -> PathBuf {
+    pub fn resolve_path(path: PathBuf) -> Result<PathBuf, ContainerizedComponentBuildError> {
         if path.is_absolute() {
-            path
+            Ok(path)
         } else {
-            let current_dir = std::env::current_dir().expect("get current directory");
+            let current_dir = std::env::current_dir().map_err(|e| {
+                ContainerizedComponentBuildError::InvalidConfiguration(format!(
+                    "failed to read current directory: {e}"
+                ))
+            })?;
 
-            current_dir
+            Ok(current_dir
                 .ancestors()
                 .find_map(|ancestor| {
                     let candidate = ancestor.join(&path);
@@ -159,7 +163,7 @@ impl ContainerizedComponentBuilder {
                         None
                     }
                 })
-                .unwrap_or_else(|| current_dir.join(&path))
+                .unwrap_or_else(|| current_dir.join(&path)))
         }
     }
 
@@ -176,7 +180,7 @@ impl ContainerizedComponentBuilder {
         identifier: &str,
         containerfile: &str,
         build_context: &Option<PathBuf>,
-    ) -> Vec<u8> {
+    ) -> Result<Vec<u8>, ContainerizedComponentBuildError> {
         let buf = Vec::new();
         let mut tar = tar::Builder::new(buf);
 
@@ -186,13 +190,20 @@ impl ContainerizedComponentBuilder {
         header.set_mode(0o644);
         header.set_cksum();
         tar.append_data(&mut header, ".arena.Dockerfile", containerfile_bytes)
-            .expect("add containerfile to image build context");
+            .map_err(|e| ContainerizedComponentBuildError::ImageBuild {
+                identifier: identifier.to_string(),
+                message: format!("failed to add containerfile to image build context: {e}"),
+            })?;
 
         if let Some(ref context_path) = build_context {
             Self::append_dir_recursive(&mut tar, context_path, context_path, identifier);
         }
 
-        tar.into_inner().expect("finalize tar archive")
+        tar.into_inner()
+            .map_err(|e| ContainerizedComponentBuildError::ImageBuild {
+                identifier: identifier.to_string(),
+                message: format!("failed to finalize image build context archive: {e}"),
+            })
     }
 
     fn append_dir_recursive(
@@ -293,7 +304,7 @@ impl ContainerizedComponentBuilder {
             "building container image",
         );
 
-        let tar_body = Self::create_build_context_tar(identifier, containerfile, build_context);
+        let tar_body = Self::create_build_context_tar(identifier, containerfile, build_context)?;
 
         let options = BuildImageOptionsBuilder::default()
             .dockerfile(".arena.Dockerfile")
@@ -399,7 +410,7 @@ impl ContainerizedComponentBuilder {
                 image
             }
             ImageSource::Containerfile(containerfile) => {
-                let build_context = self.build_context.map(Self::resolve_path);
+                let build_context = self.build_context.map(Self::resolve_path).transpose()?;
                 let image_tag = self.image_tag.unwrap_or_else(|| {
                     arena_container::identifier::sanitize_for_container(&self.identifier)
                 });

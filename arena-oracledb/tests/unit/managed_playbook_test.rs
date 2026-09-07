@@ -131,7 +131,7 @@ async fn run_wrong_type_dependency_returns_fault() {
 
 #[tokio::test]
 async fn run_success_delegates_to_oracle_playbook() {
-    let dependency = OracleDependency::builder("managed-success").with_impl(FakeStartedOracleImpl).build();
+    let dependency = OracleDependency::builder("managed-success").with_impl(FakeStartedOracleImpl).build().expect("build oracle dependency");
     let dependency_identifier = dependency.identifier.clone();
     let dep: Box<dyn RunnableDependency> = Box::new(dependency);
     let deps: Vec<Dependency> = vec![dep];

@@ -27,6 +27,6 @@ internal sealed class ArenaLogRouting
     {
         if (_loggerFactory != null || string.IsNullOrEmpty(loggerName))
             return message;
-        return $"{loggerName}  {message}";
+        return $"{loggerName} | {message}";
     }
 }

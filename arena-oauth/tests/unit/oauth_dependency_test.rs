@@ -87,7 +87,7 @@ impl RunnableDependency for FakeChildDependency {
 }
 
 fn setup_dependency(identifier: &str) -> OauthDependency {
-    OauthDependency::builder(identifier).build()
+    OauthDependency::builder(identifier).build().expect("build oauth dependency")
 }
 
 fn setup_dependency_with_child(

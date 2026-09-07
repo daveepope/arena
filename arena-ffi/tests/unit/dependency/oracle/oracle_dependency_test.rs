@@ -50,11 +50,11 @@ fn build_image_and_credential_overrides_apply() {
 }
 
 #[test]
-fn build_custom_database_name_without_full_build_setup_mode_panics() {
+fn build_custom_database_name_without_full_build_setup_mode_returns_err() {
     let mut config = minimal_oracle_config();
     config.database_name = Some("CUSTOMPDB".to_string());
-    let result = std::panic::catch_unwind(|| build(&config, None));
-    assert!(result.is_err());
+    let error = build(&config, None).err().expect("named database without full_build must fail");
+    assert!(error.contains("requires .full_build()"));
 }
 
 #[test]

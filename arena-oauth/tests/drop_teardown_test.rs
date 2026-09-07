@@ -5,13 +5,13 @@ use futures::FutureExt;
 
 #[test]
 fn drop_unstarted_dep_does_not_panic() {
-    let dep = OauthDependency::builder("oauth-drop").build();
+    let dep = OauthDependency::builder("oauth-drop").build().expect("build oauth dependency");
     drop(dep);
 }
 
 #[tokio::test]
 async fn stop_then_drop_does_not_panic() {
-    let mut dep = OauthDependency::builder("oauth-drop").build();
+    let mut dep = OauthDependency::builder("oauth-drop").build().expect("build oauth dependency");
     dep.start().await.expect("start should succeed");
     dep.stop().await.expect("stop should succeed");
     drop(dep);
@@ -21,7 +21,7 @@ async fn stop_then_drop_does_not_panic() {
 fn drop_running_dep_stops_server() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        let mut dep = OauthDependency::builder("oauth-drop").build();
+        let mut dep = OauthDependency::builder("oauth-drop").build().expect("build oauth dependency");
         dep.start().await.expect("start should succeed");
         assert!(dep.base_url().is_some());
         drop(dep);
@@ -83,7 +83,7 @@ impl RunnableDependency for PanickingOauthChild {
 async fn start_child_panic_then_drop_does_not_panic() {
     let mut dep = OauthDependency::builder("oauth-drop")
         .with_child_dependencies(vec![Box::new(PanickingOauthChild)])
-        .build();
+        .build().expect("build oauth dependency");
 
     let start_outcome = std::panic::AssertUnwindSafe(async {
         dep.start().await.expect("start should succeed");

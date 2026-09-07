@@ -223,11 +223,8 @@ public final class ArenaBindings {
     if (token == 0L) {
       return;
     }
-    ArenaLifecycleObserverCallback callback = LIFECYCLE_OBSERVERS.remove(token);
-    if (callback == null) {
-      return;
-    }
     lib().arena_remove_lifecycle_observer(token);
+    LIFECYCLE_OBSERVERS.remove(token);
   }
 
   public static ArenaStatus softReset(Pointer arena, String dependencyIdentifier) {

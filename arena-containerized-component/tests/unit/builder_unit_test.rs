@@ -181,7 +181,8 @@ fn tar_file_entries(bytes: &[u8]) -> Vec<(String, String)> {
 #[test]
 fn create_build_context_tar_no_build_context_includes_only_containerfile() {
     let bytes =
-        ContainerizedComponentBuilder::create_build_context_tar("probe", "FROM alpine:3.20", &None);
+        ContainerizedComponentBuilder::create_build_context_tar("probe", "FROM alpine:3.20", &None)
+            .expect("build context tar");
 
     assert_eq!(
         tar_file_entries(&bytes),
@@ -205,7 +206,8 @@ fn create_build_context_tar_with_build_context_includes_nested_files_skips_hidde
         "probe",
         "FROM alpine:3.20",
         &Some(context.path().to_path_buf()),
-    );
+    )
+    .expect("build context tar");
 
     assert_eq!(
         tar_file_entries(&bytes),
@@ -224,7 +226,7 @@ fn resolve_path_absolute_path_returns_unchanged() {
         .join("Cargo.toml");
 
     assert_eq!(
-        ContainerizedComponentBuilder::resolve_path(absolute.clone()),
+        ContainerizedComponentBuilder::resolve_path(absolute.clone()).expect("resolve path"),
         absolute
     );
 }
@@ -234,7 +236,7 @@ fn resolve_path_relative_dot_resolves_via_ancestor_search() {
     let expected = std::env::current_dir().expect("current dir").join(".");
 
     assert_eq!(
-        ContainerizedComponentBuilder::resolve_path(PathBuf::from(".")),
+        ContainerizedComponentBuilder::resolve_path(PathBuf::from(".")).expect("resolve path"),
         expected
     );
 }
@@ -245,7 +247,7 @@ fn resolve_path_missing_relative_path_falls_back_to_current_dir_join() {
     let expected = std::env::current_dir().expect("current dir").join(&missing);
 
     assert_eq!(
-        ContainerizedComponentBuilder::resolve_path(missing),
+        ContainerizedComponentBuilder::resolve_path(missing).expect("resolve path"),
         expected
     );
 }
@@ -266,7 +268,8 @@ fn create_build_context_tar_with_build_context_skips_git_and_node_modules_dirs()
         "probe",
         "FROM alpine:3.20",
         &Some(context.path().to_path_buf()),
-    );
+    )
+    .expect("build context tar");
 
     assert_eq!(
         tar_file_entries(&bytes),
@@ -295,7 +298,8 @@ fn create_build_context_tar_with_unreadable_nested_dir_skips_it_without_failing(
         "probe",
         "FROM alpine:3.20",
         &Some(context.path().to_path_buf()),
-    );
+    )
+    .expect("build context tar");
 
     let mut restore_perms = std::fs::metadata(&locked_dir)
         .expect("read locked dir metadata")
@@ -326,7 +330,8 @@ fn create_build_context_tar_with_unreadable_nested_file_skips_it_without_failing
         "probe",
         "FROM alpine:3.20",
         &Some(context.path().to_path_buf()),
-    );
+    )
+    .expect("build context tar");
 
     let mut restore_perms = std::fs::metadata(&locked_file)
         .expect("read locked file metadata")

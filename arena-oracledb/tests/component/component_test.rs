@@ -142,7 +142,7 @@ async fn oracle_dependency_component_test() {
              );"
                 .to_string(),
         ])
-        .build();
+        .build().expect("build oracle dependency");
 
     oracle.start().await.expect("oracle should start");
 

@@ -169,7 +169,7 @@ def log_transition(state: ArenaState) -> None:
 
 def log_closing_summary(state: ArenaState) -> None:
     lg = logging.getLogger(arena_logger_name(state.id))
-    lg.info("closing summary | state=%s, faults=%d", state.state, len(state.faults))
+    lg.info("closing summary | state=%s | faults=%d", state.state, len(state.faults))
 
 
 def log_closing_summary_document(document: str) -> None:

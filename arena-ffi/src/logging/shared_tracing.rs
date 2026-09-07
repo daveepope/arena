@@ -140,24 +140,6 @@ pub(super) unsafe fn dispatcher_component_allowlist_set_ptr(json_utf8: *const c_
     dispatcher_component_allowlist_store_bytes(bytes);
 }
 
-fn dispatcher_field_kv_tail(payload: &str) -> &str {
-    payload
-        .rsplit_once('|')
-        .map(|(_, rhs)| rhs.trim())
-        .unwrap_or("")
-}
-
-fn collect_equals_field_values<'a>(tail: &'a str, key_eq: &'a str) -> Vec<&'a str> {
-    let mut out = Vec::new();
-    for part in tail.split(',') {
-        let p = part.trim();
-        if let Some(rest) = p.strip_prefix(key_eq) {
-            out.push(rest.trim().trim_matches('"'));
-        }
-    }
-    out
-}
-
 fn dispatcher_allowlist_always_admits(metadata_target: &str) -> bool {
     metadata_target.starts_with("arena::")
         || metadata_target.starts_with("arena_container::")
@@ -174,7 +156,8 @@ fn allowlist_needles_hit_values<'a>(needles: &[String], vals: &[&'a str]) -> boo
 
 fn dispatcher_impl_allowlists_allows_delivery(
     metadata_target: &str,
-    payload: &str,
+    deps: &[&str],
+    comps: &[&str],
     dependency_allowlist: &[String],
     component_allowlist: &[String],
 ) -> bool {
@@ -184,9 +167,6 @@ fn dispatcher_impl_allowlists_allows_delivery(
     if !metadata_target.starts_with("arena_") {
         return true;
     }
-    let tail = dispatcher_field_kv_tail(payload);
-    let deps = collect_equals_field_values(tail, "dependency=");
-    let comps = collect_equals_field_values(tail, "component=");
     if deps.is_empty() && comps.is_empty() {
         return false;
     }
@@ -399,16 +379,12 @@ where
         }
 
         let severity = level_from_event(event.metadata().level());
-        let emitted_at = ctx
-            .event_scope(event)
-            .and_then(|mut scope| {
-                scope.find_map(|span| {
-                    span.extensions()
-                        .get::<SpanNamespace>()
-                        .map(|ns| ns.logger_name.clone())
-                })
-            })
-            .map(|name| name.to_string())
+        let namespace = ctx.event_scope(event).and_then(|mut scope| {
+            scope.find_map(|span| span.extensions().get::<SpanNamespace>().cloned())
+        });
+        let emitted_at = namespace
+            .as_ref()
+            .map(|ns| ns.logger_name.to_string())
             .unwrap_or_else(|| ROOT_LOGGER_NAME.to_string());
 
         let ts = std::time::SystemTime::now()
@@ -418,7 +394,29 @@ where
 
         let mut coll = StructuredPayloadCollector::new();
         event.record(&mut coll);
-        let payload = coll.into_body();
+
+        let dep_allow = DISPATCHER_DEPENDENCY_ALLOW.load_full();
+        let comp_allow = DISPATCHER_COMPONENT_ALLOW.load_full();
+        if !dispatcher_impl_allowlists_allows_delivery(
+            metadata_target,
+            &coll.field_values("dependency"),
+            &coll.field_values("component"),
+            dep_allow.as_slice(),
+            comp_allow.as_slice(),
+        ) {
+            return;
+        }
+
+        let mut suppress: Vec<&str> = Vec::new();
+        if let Some(ns) = namespace.as_ref() {
+            if let Some(arena_id) = ns.arena_id.as_deref() {
+                suppress.push(arena_id);
+            }
+            if let Some((_, subject_id)) = ns.subject.as_ref() {
+                suppress.push(subject_id);
+            }
+        }
+        let payload = coll.body(&suppress);
 
         let (caller_file_utf8, caller_line) =
             match (event.metadata().file(), event.metadata().line()) {
@@ -442,26 +440,21 @@ where
             caller_line,
         };
 
-        let dep_allow = DISPATCHER_DEPENDENCY_ALLOW.load_full();
-        let comp_allow = DISPATCHER_COMPONENT_ALLOW.load_full();
-        if !dispatcher_impl_allowlists_allows_delivery(
-            metadata_target,
-            &record.payload,
-            dep_allow.as_slice(),
-            comp_allow.as_slice(),
-        ) {
-            return;
-        }
-
         for entry in targets.iter() {
             entry.recipient.deliver(record.clone());
         }
     }
 }
 
+struct PayloadField {
+    name: String,
+    rendered: String,
+    suppressible: bool,
+}
+
 struct StructuredPayloadCollector {
     message: Option<String>,
-    fields: Vec<String>,
+    fields: Vec<PayloadField>,
 }
 
 impl StructuredPayloadCollector {
@@ -486,19 +479,81 @@ impl StructuredPayloadCollector {
     }
 
     fn push_kv(&mut self, name: &str, formatted: impl std::fmt::Display) {
-        self.fields.push(format!("{}={}", name, formatted));
+        self.push_field(name, formatted, false);
     }
 
-    fn into_body(self) -> String {
-        let message = self.message.unwrap_or_default();
-        let tail = self.fields.join(", ");
+    fn push_kv_suppressible(&mut self, name: &str, formatted: impl std::fmt::Display) {
+        self.push_field(name, formatted, true);
+    }
+
+    fn push_field(&mut self, name: &str, formatted: impl std::fmt::Display, suppressible: bool) {
+        let rendered = format!("{formatted}");
+        let rendered = rounded_duration_value(&rendered).unwrap_or(rendered);
+        self.fields.push(PayloadField {
+            name: name.to_string(),
+            rendered,
+            suppressible,
+        });
+    }
+
+    fn field_values(&self, name: &str) -> Vec<&str> {
+        self.fields
+            .iter()
+            .filter(|field| field.name == name)
+            .map(|field| field.rendered.trim_matches('"'))
+            .collect()
+    }
+
+    fn body(&self, suppress: &[&str]) -> String {
+        let message = self.message.as_deref().unwrap_or_default();
+        let tail = self
+            .fields
+            .iter()
+            .filter(|field| {
+                if !field.suppressible {
+                    return true;
+                }
+                let bare = field.rendered.trim_matches('"');
+                !suppress.iter().any(|value| *value == bare)
+            })
+            .map(|field| format!("{}={}", field.name, field.rendered))
+            .collect::<Vec<_>>()
+            .join(" | ");
         if message.is_empty() {
             tail
         } else if tail.is_empty() {
-            message
+            message.to_string()
         } else {
-            format!("{} | {}", message, tail)
+            format!("{message} | {tail}")
         }
+    }
+}
+
+fn rounded_duration_value(rendered: &str) -> Option<String> {
+    let (number_part, unit) = ["ns", "µs", "ms", "s"]
+        .iter()
+        .find_map(|unit| rendered.strip_suffix(unit).map(|rest| (rest, *unit)))?;
+    if number_part.is_empty() || !number_part.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        return None;
+    }
+    let value: f64 = number_part.parse().ok()?;
+    Some(format!("{}{}", three_significant_figures(value), unit))
+}
+
+fn three_significant_figures(value: f64) -> String {
+    if value == 0.0 {
+        return String::from("0");
+    }
+    let magnitude = value.abs().log10().floor() as i32;
+    let decimals = (2 - magnitude).max(0) as usize;
+    let formatted = format!("{value:.decimals$}");
+    if formatted.contains('.') {
+        formatted
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string()
+    } else {
+        formatted
     }
 }
 
@@ -555,7 +610,7 @@ impl Visit for StructuredPayloadCollector {
         if field.name() == "message" {
             self.append_message_fragment_raw(value);
         } else {
-            self.push_kv(field.name(), format_args!("{value:?}"));
+            self.push_kv_suppressible(field.name(), format_args!("{value:?}"));
         }
     }
 
@@ -571,7 +626,7 @@ impl Visit for StructuredPayloadCollector {
         if field.name() == "message" {
             self.append_message_fragment_debug(value);
         } else {
-            self.push_kv(field.name(), format_args!("{:?}", value));
+            self.push_kv_suppressible(field.name(), format_args!("{:?}", value));
         }
     }
 

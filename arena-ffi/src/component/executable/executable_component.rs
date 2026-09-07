@@ -55,7 +55,7 @@ pub fn build(config: &ExecutableComponentConfig) -> Result<Component, String> {
     }
     builder = apply_readiness_checks(builder, &readiness_checks_for(config));
 
-    Ok(Box::new(builder.build()))
+    Ok(Box::new(builder.build().map_err(|fault| fault.to_string())?))
 }
 
 fn readiness_checks_for(config: &ExecutableComponentConfig) -> Vec<ReadinessCheckConfig> {

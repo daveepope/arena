@@ -58,7 +58,7 @@ impl OracleImpl for FakeStartedOracleImpl {
 #[test]
 #[should_panic(expected = "must be started before configuring a Playbook")]
 fn with_dependency_not_started_panics() {
-    let dep = OracleDependency::builder("playbook-not-started").build();
+    let dep = OracleDependency::builder("playbook-not-started").build().expect("build oracle dependency");
     let _ = dep.playbook();
 }
 
@@ -66,7 +66,7 @@ fn with_dependency_not_started_panics() {
 fn with_dependency_started_constructs_without_panicking() {
     let dep = OracleDependency::builder("playbook-started")
         .with_impl(FakeStartedOracleImpl)
-        .build();
+        .build().expect("build oracle dependency");
 
     let _playbook = dep.playbook();
 }
@@ -75,7 +75,7 @@ fn with_dependency_started_constructs_without_panicking() {
 fn with_identifier_overrides_default_identifier() {
     let dep = OracleDependency::builder("playbook-custom-id")
         .with_impl(FakeStartedOracleImpl)
-        .build();
+        .build().expect("build oracle dependency");
 
     let playbook = dep.playbook().with_identifier("custom-playbook-id");
 
@@ -183,7 +183,7 @@ impl ScriptAwareOracleImpl {
 #[tokio::test]
 async fn run_delete_failure_still_reenables_constraints() {
     let fake = ScriptAwareOracleImpl::new(true);
-    let dep = OracleDependency::builder("reset-delete-fails").with_impl(fake.clone()).build();
+    let dep = OracleDependency::builder("reset-delete-fails").with_impl(fake.clone()).build().expect("build oracle dependency");
 
     let outcome = std::panic::AssertUnwindSafe(dep.playbook().run()).catch_unwind().await;
 
@@ -197,7 +197,7 @@ async fn run_delete_failure_still_reenables_constraints() {
 #[tokio::test]
 async fn run_table_name_with_space_is_quoted_in_generated_sql() {
     let fake = ScriptAwareOracleImpl::new(false);
-    let dep = OracleDependency::builder("reset-quoting").with_impl(fake.clone()).build();
+    let dep = OracleDependency::builder("reset-quoting").with_impl(fake.clone()).build().expect("build oracle dependency");
 
     let _active = dep.playbook().run().await;
 
@@ -212,7 +212,7 @@ async fn run_with_prepopulated_managed_tables_skips_rediscovery() {
     let mut dep = OracleDependency::builder("prepopulated-tables")
         .with_impl(fake.clone())
         .with_readiness_check(AlwaysReadyCheck)
-        .build();
+        .build().expect("build oracle dependency");
 
     dep.start().await.expect("start should succeed");
     let user_tables_calls_after_start = fake.call_count_containing("USER_TABLES");
@@ -231,7 +231,7 @@ async fn run_with_prepopulated_managed_tables_skips_rediscovery() {
 #[tokio::test]
 async fn verify_returns_parsed_scalar_from_query() {
     let fake = ScriptAwareOracleImpl::new(false);
-    let dep = OracleDependency::builder("verify-scalar").with_impl(fake.clone()).build();
+    let dep = OracleDependency::builder("verify-scalar").with_impl(fake.clone()).build().expect("build oracle dependency");
 
     let active = dep.playbook().run().await;
 

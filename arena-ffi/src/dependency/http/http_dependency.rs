@@ -42,5 +42,5 @@ pub(crate) fn build(config: &HttpDependencyConfig, network: Option<&str>) -> Res
         None => {}
     }
 
-    Ok(Box::new(builder.build()))
+    Ok(Box::new(builder.build().map_err(|fault| fault.to_string())?))
 }

@@ -114,7 +114,7 @@ fn drop_without_start_does_not_tear_down() {
         let _dep = OracleDependency::builder("drop-unstarted")
             .with_impl(recorder.clone())
             .with_readiness_check(AlwaysReadyCheck)
-            .build();
+            .build().expect("build oracle dependency");
     }
 
     assert_eq!(recorder.stop_call_count(), 0);
@@ -128,7 +128,7 @@ async fn drop_after_explicit_stop_does_not_call_stop_again() {
         let mut dep = OracleDependency::builder("drop-after-stop")
             .with_impl(recorder.clone())
             .with_readiness_check(AlwaysReadyCheck)
-            .build();
+            .build().expect("build oracle dependency");
         dep.start().await.expect("start should succeed");
         dep.stop().await.expect("stop should succeed");
     }
@@ -143,7 +143,7 @@ async fn drop_while_running_releases_container() {
         let mut dep = OracleDependency::builder("drop-while-running")
             .with_impl(recorder.clone())
             .with_readiness_check(AlwaysReadyCheck)
-            .build();
+            .build().expect("build oracle dependency");
         dep.start().await.expect("start should succeed");
     }
 
@@ -156,7 +156,7 @@ async fn start_failure_returns_fault_and_forces_stop() {
     let mut dep = OracleDependency::builder("drop-start-fault")
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
-        .build();
+        .build().expect("build oracle dependency");
 
     let fault = dep.start().await.expect_err("dependency should fault");
 
@@ -173,7 +173,7 @@ async fn start_failure_then_drop_does_not_force_stop_twice() {
         let mut dep = OracleDependency::builder("drop-start-fault")
             .with_impl(recorder.clone())
             .with_readiness_check(AlwaysReadyCheck)
-            .build();
+            .build().expect("build oracle dependency");
         let _fault = dep.start().await.expect_err("dependency should fault");
     }
 
@@ -186,7 +186,7 @@ async fn force_stop_called_twice_is_indistinguishable_from_once() {
     let mut dep = OracleDependency::builder("force-stop-twice")
         .with_impl(recorder.clone())
         .with_readiness_check(AlwaysReadyCheck)
-        .build();
+        .build().expect("build oracle dependency");
 
     dep.start().await.expect("start should succeed");
     dep.force_stop().await;

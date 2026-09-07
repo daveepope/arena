@@ -9,11 +9,27 @@ public final class LifecycleLog {
   private LifecycleLog() {}
 
   public static String arenaLoggerName(String arenaId) {
-    String segment = arenaId == null ? "" : arenaId.trim().replace('.', '_');
+    String segment = arenaId == null ? "" : stripWhitespace(arenaId).replace('.', '_');
     if (segment.isEmpty()) {
       return ARENA_ROOT_LOGGER_NAME;
     }
     return ARENA_ROOT_LOGGER_NAME + "." + segment;
+  }
+
+  private static String stripWhitespace(String value) {
+    int start = 0;
+    int end = value.length();
+    while (start < end && isWhitespace(value.charAt(start))) {
+      start++;
+    }
+    while (end > start && isWhitespace(value.charAt(end - 1))) {
+      end--;
+    }
+    return value.substring(start, end);
+  }
+
+  private static boolean isWhitespace(char c) {
+    return Character.isWhitespace(c) || Character.isSpaceChar(c);
   }
 
   public static void logTransition(ArenaState state) {
@@ -41,7 +57,7 @@ public final class LifecycleLog {
 
   public static void logClosingSummary(ArenaState state) {
     LoggerFactory.getLogger(arenaLoggerName(state.id))
-        .info("closing summary | state={}, faults={}", state.state, state.faults.size());
+        .info("closing summary | state={} | faults={}", state.state, state.faults.size());
   }
 
   public static void logClosingSummaryDocument(String document) {

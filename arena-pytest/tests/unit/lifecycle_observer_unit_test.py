@@ -150,7 +150,7 @@ def test_open_arena_close_logs_the_closing_summary(arena_ffi):
         lg.removeHandler(capture)
         lg.setLevel(previous_level)
 
-    assert "closing summary | state=arena_closed, faults=0" in lines
+    assert "closing summary | state=arena_closed | faults=0" in lines
 
 
 def test_arena_state_document_closed_handle_raises_binding_error(arena_ffi):

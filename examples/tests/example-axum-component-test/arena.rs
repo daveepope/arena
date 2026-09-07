@@ -151,7 +151,8 @@ pub fn setup_dependencies() -> Vec<Dependency> {
 
     let calibration_service = HttpDependency::builder("example-api-calibration")
         .with_port(rt.calibration_http_port)
-        .build();
+        .build()
+        .expect("build calibration dependency");
     CALIBRATION_ID
         .set(calibration_service.identifier.clone())
         .expect("calibration id set once");
@@ -178,7 +179,8 @@ pub fn setup_dependencies() -> Vec<Dependency> {
         .with_provider(Provider::Cognito {
             pool_id: OAUTH_COGNITO_POOL_ID.to_string(),
         })
-        .build();
+        .build()
+        .expect("build oauth dependency");
     OAUTH_SERVER_TLS_CERT_PEM
         .set(
             oauth
@@ -247,7 +249,7 @@ pub fn setup_exec_component() -> Component {
             .with_build_tool(arena_executable_component::BuildTool::Cargo);
     }
 
-    Box::new(builder.build())
+    Box::new(builder.build().expect("build web app component"))
 }
 
 use crate::playbooks::{

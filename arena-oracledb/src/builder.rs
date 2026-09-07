@@ -7,6 +7,7 @@ use crate::oracle_dependency::{
 };
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
+use arena::Fault;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -168,7 +169,7 @@ impl OracleDependencyBuilder {
         self
     }
 
-    pub fn build(self) -> OracleDependency {
+    pub fn build(self) -> Result<OracleDependency, Fault> {
         let oracle_impl = self
             .oracle_impl
             .unwrap_or_else(|| Arc::new(OracleContainerImpl::new(self.network)));
@@ -179,14 +180,17 @@ impl OracleDependencyBuilder {
             .database_name
             .unwrap_or_else(|| DEFAULT_SERVICE_NAME.to_string());
         if database_name != DEFAULT_SERVICE_NAME && self.setup_mode != OracleSetupMode::FullBuild {
-            panic!(
-                "OracleDependencyBuilder: database_name {database_name:?} requires \
-                 .full_build() -- a non-default database name forces Oracle to build a new \
-                 pluggable database from scratch on startup (several minutes), instead of \
-                 reusing the image's pre-built fast-start database. Call `.full_build()` if \
-                 you need a named database; otherwise drop `.with_database_name(...)` and use \
-                 the default {DEFAULT_SERVICE_NAME:?} for fast startup."
-            );
+            return Err(Fault::dependency(
+                self.identifier.clone(),
+                format!(
+                    "database_name {database_name:?} requires .full_build() -- a non-default \
+                     database name forces Oracle to build a new pluggable database from scratch \
+                     on startup (several minutes), instead of reusing the image's pre-built \
+                     fast-start database. Call `.full_build()` if you need a named database; \
+                     otherwise drop `.with_database_name(...)` and use the default \
+                     {DEFAULT_SERVICE_NAME:?} for fast startup."
+                ),
+            ));
         }
         let database_username = self
             .database_username
@@ -232,6 +236,6 @@ impl OracleDependencyBuilder {
         });
         dep.set_sql_readiness_timeout(sql_readiness_timeout);
 
-        dep
+        Ok(dep)
     }
 }

@@ -62,7 +62,7 @@ public class ArenaLogRoutingTest
     {
         var routing = new ArenaLogRouting(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
 
-        Assert.Equal("arena.orders  started", routing.MessageFor("arena.orders", "started"));
+        Assert.Equal("arena.orders | started", routing.MessageFor("arena.orders", "started"));
     }
 
     [Fact]

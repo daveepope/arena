@@ -62,7 +62,7 @@ class ArenaSlf4jLoggingTargetUnitTest {
   void messageForBareLoggerPrefixesTheLoggerName() {
     ArenaSlf4jLoggingTarget loggingTarget = new ArenaSlf4jLoggingTarget(NOPLogger.NOP_LOGGER);
 
-    assertEquals("arena.orders  started", loggingTarget.messageFor("arena.orders", "started"));
+    assertEquals("arena.orders | started", loggingTarget.messageFor("arena.orders", "started"));
   }
 
   @Test

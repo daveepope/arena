@@ -58,7 +58,7 @@ impl RunnableDependency for NoopChildDependency {
 fn identifier_as_any_and_children_reflect_dependency_state() {
     let mut dep = OauthDependency::builder("oauth-accessors")
         .with_http()
-        .build();
+        .build().expect("build oauth dependency");
 
     assert!(dep.identifier().contains("oauth-accessors"));
     assert!(dep.as_any().downcast_ref::<OauthDependency>().is_some());
@@ -97,7 +97,7 @@ fn ephemeral_tls_hosts_loopback_and_unspecified_listen_ips_stay_localhost_only()
 
 #[tokio::test]
 async fn build_ephemeral_tls_exposes_certificate_before_start() {
-    let dep = OauthDependency::builder("oauth-tls-available").build();
+    let dep = OauthDependency::builder("oauth-tls-available").build().expect("build oauth dependency");
 
     assert!(
         dep.server_tls_certificate_pem().is_some(),
@@ -109,7 +109,7 @@ async fn build_ephemeral_tls_exposes_certificate_before_start() {
 
 #[tokio::test]
 async fn build_http_transport_records_no_certificate_and_no_fault() {
-    let dep = OauthDependency::builder("oauth-http-no-tls").with_http().build();
+    let dep = OauthDependency::builder("oauth-http-no-tls").with_http().build().expect("build oauth dependency");
 
     assert!(dep.server_tls_certificate_pem().is_none());
     assert!(dep.faults().is_empty());

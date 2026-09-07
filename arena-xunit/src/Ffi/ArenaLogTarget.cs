@@ -19,17 +19,7 @@ internal static class ArenaLogTarget
 {
     private static readonly ConcurrentDictionary<ulong, LogEntry> Entries = new();
 
-    public static ulong RegisterForLogger(ILogger logger)
-    {
-        return Register(new ArenaLogRouting(logger));
-    }
-
-    public static ulong RegisterForLoggerFactory(ILoggerFactory loggerFactory)
-    {
-        return Register(new ArenaLogRouting(loggerFactory));
-    }
-
-    private static ulong Register(ArenaLogRouting context)
+    public static ulong Register(ArenaLogRouting context)
     {
         var userDataHandle = GCHandle.Alloc(context);
         var callback = new ArenaLogCallback(Invoke);

@@ -43,7 +43,7 @@ public final class ArenaSlf4jLoggingTarget implements ArenaLoggingTargetCallback
     if (loggerFactory != null || loggerName.isEmpty()) {
       return message;
     }
-    return loggerName + "  " + message;
+    return loggerName + " | " + message;
   }
 
   Logger loggerFor(String loggerName) {
