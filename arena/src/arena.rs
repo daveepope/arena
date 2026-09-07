@@ -189,7 +189,7 @@ impl ClosedArena {
     }
 
     async fn open_within_span(mut self) -> Result<OpenArena, ArenaState> {
-        tracing::info!(arena = %self.id, phase = "open_begin", "opening");
+        tracing::debug!(arena = %self.id, phase = "open_begin", "opening");
         let sw = Instant::now();
 
         let context = Arc::new(LifecycleContext::new(
@@ -215,7 +215,7 @@ impl ClosedArena {
         let mut started = Vec::with_capacity(outcomes.len());
         for (i, arena_id, sw_one, m, outcome) in outcomes {
             match outcome {
-                Ok(Ok(())) => tracing::info!(
+                Ok(Ok(())) => tracing::debug!(
                     arena = %arena_id,
                     match_index = i,
                     elapsed = ?sw_one.elapsed(),
@@ -253,7 +253,7 @@ impl ClosedArena {
         }
 
         emit(&context, ArenaLifecycleState::ArenaOpen, &matches);
-        tracing::info!(
+        tracing::debug!(
             arena = %self.id,
             elapsed = ?sw.elapsed(),
             phase = "open_end",
@@ -394,7 +394,7 @@ impl OpenArena {
             return self.state();
         }
 
-        tracing::info!(arena = %self.id, phase = "close_begin", "closing");
+        tracing::debug!(arena = %self.id, phase = "close_begin", "closing");
         let sw = Instant::now();
 
         let context = Arc::clone(&self.context);
@@ -406,7 +406,7 @@ impl OpenArena {
             let sw_one = Instant::now();
             let outcome = AssertUnwindSafe(m.stop(&context)).catch_unwind().await;
             match outcome {
-                Ok(Ok(())) => tracing::info!(
+                Ok(Ok(())) => tracing::debug!(
                     arena = %self.id,
                     match_index = i,
                     elapsed = ?sw_one.elapsed(),
@@ -432,7 +432,7 @@ impl OpenArena {
         let state = finish(&context, &self.matches);
         self.closed = true;
 
-        tracing::info!(
+        tracing::debug!(
             arena = %self.id,
             elapsed = ?sw.elapsed(),
             terminal_state = %state.state,

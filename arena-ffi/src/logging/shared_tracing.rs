@@ -158,6 +158,7 @@ fn dispatcher_impl_allowlists_allows_delivery(
     metadata_target: &str,
     deps: &[&str],
     comps: &[&str],
+    span_subject: Option<(&str, &str)>,
     dependency_allowlist: &[String],
     component_allowlist: &[String],
 ) -> bool {
@@ -167,9 +168,23 @@ fn dispatcher_impl_allowlists_allows_delivery(
     if !metadata_target.starts_with("arena_") {
         return true;
     }
-    if deps.is_empty() && comps.is_empty() {
-        return false;
-    }
+    let from_span: [&str; 1];
+    let (deps, comps) = if deps.is_empty() && comps.is_empty() {
+        match span_subject {
+            Some((arena::matches::SUBJECT_KIND_DEPENDENCY, id)) => {
+                from_span = [id];
+                (&from_span[..], &[][..])
+            }
+            Some((arena::matches::SUBJECT_KIND_COMPONENT, id)) => {
+                from_span = [id];
+                (&[][..], &from_span[..])
+            }
+            Some((arena::matches::SUBJECT_KIND_PLAYBOOK, _)) => return true,
+            _ => return false,
+        }
+    } else {
+        (deps, comps)
+    };
     match (!deps.is_empty(), !comps.is_empty()) {
         (true, false) => {
             !dependency_allowlist.is_empty()
@@ -401,6 +416,10 @@ where
             metadata_target,
             &coll.field_values("dependency"),
             &coll.field_values("component"),
+            namespace
+                .as_ref()
+                .and_then(|ns| ns.subject.as_ref())
+                .map(|(kind, id)| (&**kind, &**id)),
             dep_allow.as_slice(),
             comp_allow.as_slice(),
         ) {

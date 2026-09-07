@@ -46,7 +46,7 @@ async fn run_with_retry(
     let overall = Duration::from_millis(overall_timeout_ms);
     let poll_every = Duration::from_millis(250);
 
-    tracing::info!(
+    tracing::debug!(
         subsystem = "mssql",
         dependency = identifier,
         overall = ?overall,
@@ -78,7 +78,7 @@ async fn run_with_retry(
 
         match attempt_result {
             Ok(()) => {
-                tracing::info!(
+                tracing::debug!(
                     subsystem = "mssql",
                     dependency = identifier,
                     attempts = attempt,

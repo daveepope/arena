@@ -5,6 +5,16 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.1]
+
+### Fixed
+
+- Subject-scoped records carrying no `dependency`/`component` field are matched against the log identifier lists by their span
+- Playbook-scoped records reach registered log targets instead of being dropped by the dispatcher
+- Faults and panics are logged where they occur, naming the subject and the cause chain
+- Timing and phase records moved to DEBUG, leaving lifecycle transitions at INFO
+- arena-pytest keeps its own frames out of pytest tracebacks
+
 ## [7.0.0]
 
 ### Added

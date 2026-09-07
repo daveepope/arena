@@ -230,10 +230,10 @@ public final class ComponentTestSuite {
   static final ResetWeatherDbPlaybook RESET_WEATHER_DB =
       new ResetWeatherDbPlaybook(ORACLE.identifier());
 
-  @ArenaComponent(logs = true)
+  @ArenaComponent(logs = false)
   static final ExecutableComponent WEB_APP = buildWebApp("example-api-web-app", WEB_APP_PORT);
 
-  @ArenaComponent(logs = true)
+  @ArenaComponent(logs = false)
   static final ExecutableComponent WEB_APP_2 = buildWebApp("example-api-web-app-2", WEB_APP_2_PORT);
 
   @ArenaAfterOpen

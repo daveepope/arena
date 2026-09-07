@@ -226,6 +226,7 @@ def active_playbooks_for_item(item: pytest.Item) -> List[ActivePlaybook]:
 
 
 def _item_request(item: pytest.Item) -> pytest.FixtureRequest:
+    __tracebackhide__ = True
     request = getattr(item, "_request", None)
     if request is None:
         raise pytest.UsageError(
@@ -237,6 +238,7 @@ def _item_request(item: pytest.Item) -> pytest.FixtureRequest:
 
 @pytest.hookimpl(trylast=True)
 def pytest_runtest_setup(item: pytest.Item) -> None:
+    __tracebackhide__ = True
     classes = _own_marker_classes(item)
     if not classes:
         return
@@ -253,6 +255,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_runtest_teardown(item: pytest.Item, nextitem: Optional[pytest.Item]) -> None:
+    __tracebackhide__ = True
     actives: Optional[List[ActivePlaybook]] = getattr(item, _FUNCTION_ACTIVES_ATTR, None)
     if actives:
         setattr(item, _FUNCTION_ACTIVES_ATTR, None)
@@ -271,6 +274,7 @@ def pytest_runtest_teardown(item: pytest.Item, nextitem: Optional[pytest.Item]) 
 
 @pytest.fixture(scope="class", autouse=True)
 def _playbook_class_scope(request: pytest.FixtureRequest):
+    __tracebackhide__ = True
     cls = getattr(request, "cls", None)
     classes = _class_marker_classes(cls)
     if not classes:
@@ -289,6 +293,7 @@ def _playbook_class_scope(request: pytest.FixtureRequest):
 
 @pytest.fixture(scope="module", autouse=True)
 def _playbook_module_scope(request: pytest.FixtureRequest):
+    __tracebackhide__ = True
     module = getattr(request, "module", None)
     classes = _module_marker_classes(module)
     if not classes:

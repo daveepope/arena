@@ -18,6 +18,7 @@ pub enum Behaviour {
     FailStart,
     PanicStart,
     FailStop,
+    FailStopWithCause,
     PanicStop,
     PanicForceStop,
     FailReset,
@@ -172,6 +173,14 @@ impl RunnableDependency for ProbeDependency {
         self.state = RunnableState::Stopping;
         if self.behaviour == Behaviour::PanicStop {
             panic!("dependency '{}' stop failed", self.identifier);
+        }
+        if self.behaviour == Behaviour::FailStopWithCause {
+            let fault = Fault::dependency(&self.identifier, "stop did not complete").caused_by(
+                Fault::dependency(&self.identifier, "connection pool never drained"),
+            );
+            self.faults.push(fault.clone());
+            self.state = RunnableState::Faulted;
+            return Err(fault);
         }
         if matches!(self.behaviour, Behaviour::FailStop | Behaviour::ResistTeardown) {
             let fault = Fault::dependency(&self.identifier, "stop did not complete");

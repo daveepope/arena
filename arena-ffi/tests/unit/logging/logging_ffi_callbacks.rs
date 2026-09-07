@@ -27,7 +27,11 @@ static RECORDED_B: Mutex<Vec<Record>> = Mutex::new(Vec::new());
 const FFI_ALLOWLIST_SYNTH_KAFKA_DEP_MSG: &str = "ffi-dep-dispatcher-allow-carrier-marker";
 const FFI_ALLOWLIST_SYNTH_EXEC_COMP_MSG: &str = "ffi-comp-dispatcher-allow-carrier-marker";
 const FFI_LOGGING_SYNTH_DEP_TAIL: &str = "ffi-logging-deps-needle-xq";
+const FFI_SPAN_ONLY_SYNTH_DEP_MSG: &str = "ffi-span-only-dep-carrier-marker";
 const FFI_LOGGING_SYNTH_COMP_TAIL: &str = "ffi-logging-comp-needle-yq";
+const FFI_SPAN_ONLY_SYNTH_COMP_MSG: &str = "ffi-span-only-comp-carrier-marker";
+const FFI_SPAN_ONLY_SYNTH_PLAYBOOK_MSG: &str = "ffi-span-only-playbook-carrier-marker";
+const FFI_SPAN_ONLY_UNLISTED_DEP_MSG: &str = "ffi-span-only-unlisted-dep-carrier-marker";
 
 unsafe extern "C" fn collecting_callback(
     level: i32,
@@ -523,6 +527,171 @@ fn arena_dispatcher_dependency_allow_json_nonmatching_needle_kafka_dep_marker_ca
             .iter()
             .all(|r| !r.message.contains(FFI_ALLOWLIST_SYNTH_KAFKA_DEP_MSG)),
         "expected allowlist mismatch to drop synthetic dep event: {captured:?}"
+    );
+}
+
+#[test]
+fn arena_add_log_target_span_only_playbook_marker_invokes_callback() {
+    let _g = TARGET_API_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    reset_dispatcher_allowlists_via_ffi();
+    drain(&RECORDED);
+    arena_set_log_level(ArenaLogLevel::Trace as i32);
+    let handle = arena_add_log_target(Some(collecting_callback), std::ptr::null_mut());
+    assert_ne!(handle, 0);
+    let playbook_ident = "arena-oracledb-reset-weather-db";
+    {
+        let arena = tracing::info_span!("arena", arena.id = "ffi-span-only-playbook-arena");
+        let _arena = arena.enter();
+        let subject = tracing::info_span!(
+            "subject",
+            arena.subject.kind = "playbook",
+            arena.subject.id = %playbook_ident
+        );
+        let _subject = subject.enter();
+        tracing::warn!(
+            target: "arena_oracledb::playbook",
+            phase = "reset_constraints_failed",
+            "{}",
+            FFI_SPAN_ONLY_SYNTH_PLAYBOOK_MSG
+        );
+    }
+    let captured = drain(&RECORDED);
+    arena_remove_log_target(handle);
+    arena_set_log_level(ArenaLogLevel::Info as i32);
+
+    let record = captured
+        .iter()
+        .find(|r| r.message.contains(FFI_SPAN_ONLY_SYNTH_PLAYBOOK_MSG))
+        .unwrap_or_else(|| panic!("expected captured record, got {captured:?}"));
+    assert_eq!(record.level, ArenaLogLevel::Warn as i32);
+    assert!(
+        record.target.ends_with(&format!("playbook.{playbook_ident}")),
+        "expected subject logger name, got {}",
+        record.target
+    );
+}
+
+#[test]
+fn arena_dispatcher_component_allow_json_matching_needle_span_only_comp_marker_invokes_callback() {
+    let _g = TARGET_API_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    reset_dispatcher_allowlists_via_ffi();
+    drain(&RECORDED);
+    arena_set_log_level(ArenaLogLevel::Trace as i32);
+    let handle = arena_add_log_target(Some(collecting_callback), std::ptr::null_mut());
+    assert_ne!(handle, 0);
+    comps_allow_json_ffi(r#"["ffi-logging-comp-needle"]"#);
+    let comp_ident = format!("arena-executable-component-{FFI_LOGGING_SYNTH_COMP_TAIL}-zz");
+    {
+        let arena = tracing::info_span!("arena", arena.id = "ffi-span-only-comp-arena");
+        let _arena = arena.enter();
+        let subject = tracing::info_span!(
+            "subject",
+            arena.subject.kind = "component",
+            arena.subject.id = %comp_ident
+        );
+        let _subject = subject.enter();
+        tracing::debug!(
+            target: "arena_ffi_exec::runner",
+            phase = "process_spawned",
+            "{}",
+            FFI_SPAN_ONLY_SYNTH_COMP_MSG
+        );
+    }
+    let captured = drain(&RECORDED);
+    arena_remove_log_target(handle);
+    reset_dispatcher_allowlists_via_ffi();
+    arena_set_log_level(ArenaLogLevel::Info as i32);
+
+    let record = captured
+        .iter()
+        .find(|r| r.message.contains(FFI_SPAN_ONLY_SYNTH_COMP_MSG))
+        .unwrap_or_else(|| panic!("expected captured record, got {captured:?}"));
+    assert!(
+        record.target.ends_with(&format!("component.{comp_ident}")),
+        "expected subject logger name, got {}",
+        record.target
+    );
+}
+
+#[test]
+fn arena_dispatcher_dependency_allow_json_nonmatching_needle_span_only_dep_marker_callbacks_empty() {
+    let _g = TARGET_API_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    reset_dispatcher_allowlists_via_ffi();
+    drain(&RECORDED);
+    arena_set_log_level(ArenaLogLevel::Trace as i32);
+    let handle = arena_add_log_target(Some(collecting_callback), std::ptr::null_mut());
+    assert_ne!(handle, 0);
+    deps_allow_json_ffi(r#"["not-the-dependency-under-test"]"#);
+    {
+        let arena = tracing::info_span!("arena", arena.id = "ffi-span-only-unlisted-arena");
+        let _arena = arena.enter();
+        let subject = tracing::info_span!(
+            "subject",
+            arena.subject.kind = "dependency",
+            arena.subject.id = "arena-postgres-span-only-unlisted"
+        );
+        let _subject = subject.enter();
+        tracing::debug!(
+            target: "arena_postgres::postgres_container_impl",
+            phase = "container_started",
+            "{}",
+            FFI_SPAN_ONLY_UNLISTED_DEP_MSG
+        );
+    }
+    let captured = drain(&RECORDED);
+    arena_remove_log_target(handle);
+    reset_dispatcher_allowlists_via_ffi();
+    arena_set_log_level(ArenaLogLevel::Info as i32);
+
+    assert!(
+        captured
+            .iter()
+            .all(|r| !r.message.contains(FFI_SPAN_ONLY_UNLISTED_DEP_MSG)),
+        "unlisted subject must stay filtered: {captured:?}"
+    );
+}
+
+#[test]
+fn arena_dispatcher_dependency_allow_json_matching_needle_span_only_dep_marker_invokes_callback() {
+    let _g = TARGET_API_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    reset_dispatcher_allowlists_via_ffi();
+    drain(&RECORDED);
+    arena_set_log_level(ArenaLogLevel::Trace as i32);
+    let handle = arena_add_log_target(Some(collecting_callback), std::ptr::null_mut());
+    assert_ne!(handle, 0);
+    deps_allow_json_ffi(r#"["ffi-logging-deps-needle"]"#);
+    let dep_ident = format!("arena-postgres-{FFI_LOGGING_SYNTH_DEP_TAIL}-id");
+    {
+        let arena = tracing::info_span!("arena", arena.id = "ffi-span-only-arena");
+        let _arena = arena.enter();
+        let subject = tracing::info_span!(
+            "subject",
+            arena.subject.kind = "dependency",
+            arena.subject.id = %dep_ident
+        );
+        let _subject = subject.enter();
+        tracing::debug!(
+            target: "arena_postgres::postgres_container_impl",
+            layer = "postgres_container",
+            phase = "container_started",
+            "{}",
+            FFI_SPAN_ONLY_SYNTH_DEP_MSG
+        );
+    }
+    let captured = drain(&RECORDED);
+    arena_remove_log_target(handle);
+    reset_dispatcher_allowlists_via_ffi();
+    arena_set_log_level(ArenaLogLevel::Info as i32);
+
+    let record = captured
+        .iter()
+        .find(|r| r.message.contains(FFI_SPAN_ONLY_SYNTH_DEP_MSG))
+        .unwrap_or_else(|| panic!("expected captured record, got {captured:?}"));
+    assert_eq!(record.level, ArenaLogLevel::Debug as i32);
+    assert!(
+        record.target.ends_with(&format!("dependency.{dep_ident}")),
+        "expected subject logger name, got {}",
+        record.target
     );
 }
 

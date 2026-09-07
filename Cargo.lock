@@ -73,7 +73,7 @@ dependencies = [
 
 [[package]]
 name = "arena"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -89,7 +89,7 @@ dependencies = [
 
 [[package]]
 name = "arena-container"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "base64 0.22.1",
  "bollard",
@@ -102,7 +102,7 @@ dependencies = [
 
 [[package]]
 name = "arena-containerized-component"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -118,14 +118,14 @@ dependencies = [
 
 [[package]]
 name = "arena-cryptography"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "rcgen",
 ]
 
 [[package]]
 name = "arena-examples"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "arena",
  "arena-containerized-component",
@@ -156,7 +156,7 @@ dependencies = [
 
 [[package]]
 name = "arena-executable-component"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -170,7 +170,7 @@ dependencies = [
 
 [[package]]
 name = "arena-ffi"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "arc-swap",
  "arena",
@@ -198,7 +198,7 @@ dependencies = [
 
 [[package]]
 name = "arena-ffi-bench"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "arena-ffi",
  "criterion",
@@ -206,11 +206,11 @@ dependencies = [
 
 [[package]]
 name = "arena-host"
-version = "7.0.0"
+version = "7.0.1"
 
 [[package]]
 name = "arena-http"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -229,7 +229,7 @@ dependencies = [
 
 [[package]]
 name = "arena-kafka"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -246,7 +246,7 @@ dependencies = [
 
 [[package]]
 name = "arena-localstack"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -272,7 +272,7 @@ dependencies = [
 
 [[package]]
 name = "arena-mssql"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -289,7 +289,7 @@ dependencies = [
 
 [[package]]
 name = "arena-oauth"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -314,7 +314,7 @@ dependencies = [
 
 [[package]]
 name = "arena-oracledb"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -330,7 +330,7 @@ dependencies = [
 
 [[package]]
 name = "arena-postgres"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -346,7 +346,7 @@ dependencies = [
 
 [[package]]
 name = "arena-smtp"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "arena",
  "arena-container",
@@ -363,7 +363,7 @@ dependencies = [
 
 [[package]]
 name = "arena-temporal"
-version = "7.0.0"
+version = "7.0.1"
 dependencies = [
  "arena",
  "arena-container",

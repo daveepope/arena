@@ -45,7 +45,7 @@ impl ReadinessCheck for HttpReadinessCheck {
         while start.elapsed() < timeout {
             match reqwest::get(target).await {
                 Ok(_) => {
-                    tracing::info!(
+                    tracing::debug!(
                         identifier = %identifier,
                         target = %target,
                         "http readiness passed"
@@ -94,7 +94,7 @@ impl ReadinessCheck for TcpReadinessCheck {
         while start.elapsed() < timeout {
             match tokio::net::TcpStream::connect(target).await {
                 Ok(_) => {
-                    tracing::info!(
+                    tracing::debug!(
                         identifier = %identifier,
                         target = %target,
                         "tcp readiness passed"
