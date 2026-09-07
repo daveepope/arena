@@ -386,18 +386,7 @@ def closed_arena() -> ClosedArena:
         CLOSED_ARENA_NAME,
         [a_match],
         log_level=ArenaLogLevel.INFO,
-        logger=_LOG,
-        log_component_ids=(COMPONENT_NAME_EXECUTABLE,),
-        log_dependency_ids=(
-            oauth.identifier,
-            postgres.identifier,
-            mssql.identifier,
-            oracle.identifier,
-            calibration.identifier,
-            localstack.identifier,
-            temporal.identifier,
-            smtp.identifier,
-        ),
+        logger=_LOG
     )
 
 

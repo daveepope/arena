@@ -580,3 +580,248 @@ async fn force_stop_all_healthy_subjects_returns_no_faults() {
 
     assert!(faults.is_empty());
 }
+
+#[derive(Clone)]
+struct CapturedEvent {
+    level: tracing::Level,
+    fields: String,
+}
+
+static CAPTURED_EVENTS: Mutex<Vec<CapturedEvent>> = Mutex::new(Vec::new());
+
+#[derive(Default)]
+struct FieldText {
+    text: String,
+}
+
+impl tracing::field::Visit for FieldText {
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        self.text
+            .push_str(&format!("{}={:?} ", field.name(), value));
+    }
+
+    fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+        self.text.push_str(&format!("{}={} ", field.name(), value));
+    }
+}
+
+struct EventRecorder;
+
+impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for EventRecorder {
+    fn on_event(
+        &self,
+        event: &tracing::Event<'_>,
+        _ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        let mut fields = FieldText::default();
+        event.record(&mut fields);
+        CAPTURED_EVENTS
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(CapturedEvent {
+                level: *event.metadata().level(),
+                fields: fields.text,
+            });
+    }
+}
+
+fn start_recording_events() {
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        let _ = tracing_subscriber::registry().with(EventRecorder).try_init();
+    });
+}
+
+fn recorded_events_mentioning(needle: &str) -> Vec<CapturedEvent> {
+    CAPTURED_EVENTS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .filter(|e| e.fields.contains(needle))
+        .cloned()
+        .collect()
+}
+
+fn only_event_with_phase(needle: &str, phase: &str) -> CapturedEvent {
+    let matched: Vec<CapturedEvent> = recorded_events_mentioning(needle)
+        .into_iter()
+        .filter(|e| e.fields.contains(&format!("phase={phase} ")))
+        .collect();
+    assert_eq!(matched.len(), 1, "expected one {phase} event for {needle}");
+    matched.into_iter().next().expect("event")
+}
+
+#[tokio::test]
+async fn start_faulting_dependency_logs_error_naming_the_reason() {
+    start_recording_events();
+    let id = "logged-fault-postgres";
+    let mut a_match = Match::new(
+        "faulting",
+        vec![probe_dependency(id)
+            .behaving(Behaviour::FailStart)
+            .into_dependency()],
+        vec![],
+    );
+    let (ctx, _recorder) = context();
+
+    let _ = a_match.start(&ctx).await;
+
+    let event = only_event_with_phase(id, "dependency_start_faulted");
+    assert_eq!(event.level, tracing::Level::ERROR);
+    assert!(
+        event.fields.contains("readiness check never passed"),
+        "expected the fault message in {}",
+        event.fields
+    );
+}
+
+#[tokio::test]
+async fn start_faulting_component_logs_error_naming_the_reason() {
+    start_recording_events();
+    let id = "logged-fault-api";
+    let mut a_match = Match::new(
+        "faulting",
+        vec![],
+        vec![probe_component(id)
+            .behaving(Behaviour::FailStart)
+            .into_component()],
+    );
+    let (ctx, _recorder) = context();
+
+    let _ = a_match.start(&ctx).await;
+
+    let event = only_event_with_phase(id, "component_start_faulted");
+    assert_eq!(event.level, tracing::Level::ERROR);
+}
+
+#[tokio::test]
+async fn stop_faulting_dependency_logs_error_naming_the_reason() {
+    start_recording_events();
+    let id = "logged-stop-fault-postgres";
+    let mut a_match = Match::new(
+        "faulting",
+        vec![probe_dependency(id)
+            .behaving(Behaviour::FailStop)
+            .into_dependency()],
+        vec![],
+    );
+    let (ctx, _recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    let _ = a_match.stop(&ctx).await;
+
+    let event = only_event_with_phase(id, "dependency_stop_faulted");
+    assert_eq!(event.level, tracing::Level::ERROR);
+    assert!(
+        event.fields.contains("stop did not complete"),
+        "expected the fault message in {}",
+        event.fields
+    );
+}
+
+#[tokio::test]
+async fn stop_faulting_component_logs_error_naming_the_reason() {
+    start_recording_events();
+    let id = "logged-stop-fault-api";
+    let mut a_match = Match::new(
+        "faulting",
+        vec![],
+        vec![probe_component(id)
+            .behaving(Behaviour::FailStop)
+            .into_component()],
+    );
+    let (ctx, _recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    let _ = a_match.stop(&ctx).await;
+
+    let event = only_event_with_phase(id, "component_stop_faulted");
+    assert_eq!(event.level, tracing::Level::ERROR);
+}
+
+#[tokio::test]
+async fn start_healthy_dependency_logs_completion_below_info() {
+    start_recording_events();
+    let id = "quiet-postgres";
+    let mut a_match = Match::new("healthy", vec![probe_dependency(id).into_dependency()], vec![]);
+    let (ctx, _recorder) = context();
+
+    a_match.start(&ctx).await.expect("match should start");
+
+    let event = only_event_with_phase(id, "dependency_start_complete");
+    assert_eq!(event.level, tracing::Level::DEBUG);
+}
+
+
+#[tokio::test]
+async fn start_faulting_playbook_logs_error_naming_the_reason() {
+    start_recording_events();
+    let id = "logged-fault-seed";
+    let mut a_match = Match::new(
+        "faulting",
+        vec![probe_dependency("logged-fault-seed-postgres").into_dependency()],
+        vec![],
+    )
+    .register_playbook(
+        probe_playbook(id)
+            .behaving(Behaviour::FailStart)
+            .into_playbook(),
+        true,
+    );
+    let (ctx, _recorder) = context();
+
+    let _ = a_match.start(&ctx).await;
+
+    let event = only_event_with_phase(id, "playbook_run_faulted");
+    assert_eq!(event.level, tracing::Level::ERROR);
+    assert!(
+        event.fields.contains("seed data rejected"),
+        "expected the fault message in {}",
+        event.fields
+    );
+}
+
+#[tokio::test]
+async fn start_panicking_dependency_logs_error_naming_the_panic() {
+    start_recording_events();
+    let id = "logged-panic-postgres";
+    let mut a_match = Match::new(
+        "panicking",
+        vec![probe_dependency(id)
+            .behaving(Behaviour::PanicStart)
+            .into_dependency()],
+        vec![],
+    );
+    let (ctx, _recorder) = context();
+
+    let _ = a_match.start(&ctx).await;
+
+    let event = only_event_with_phase(id, "dependency_start_panic");
+    assert_eq!(event.level, tracing::Level::ERROR);
+}
+
+#[tokio::test]
+async fn stop_faulting_dependency_logs_error_naming_the_cause() {
+    start_recording_events();
+    let parent_id = "logged-cause-postgres";
+    let mut a_match = Match::new(
+        "faulting",
+        vec![probe_dependency(parent_id)
+            .behaving(Behaviour::FailStopWithCause)
+            .into_dependency()],
+        vec![],
+    );
+    let (ctx, _recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    let _ = a_match.stop(&ctx).await;
+
+    let event = only_event_with_phase(parent_id, "dependency_stop_faulted");
+    assert!(
+        event.fields.contains("caused by"),
+        "expected the cause chain in {}",
+        event.fields
+    );
+}

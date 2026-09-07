@@ -57,6 +57,7 @@ class ClosedArena:
         return json.dumps(config)
 
     async def open(self) -> OpenArena:
+        __tracebackhide__ = True
         ffi = load_ffi()
         if ffi is None:
             raise ArenaBindingError(

@@ -37,7 +37,7 @@ public sealed class ExampleFixture : ArenaCollectionFixture
     private const string OauthCognitoPoolId = "us-east-1_exampleUsers";
     public static string OauthProviderIssuer { get; } = $"https://127.0.0.1:{OauthPort}/{OauthCognitoPoolId}";
 
-    [ArenaLogger(Level = ArenaLogLevel.Debug)]
+    [ArenaLogger(Level = ArenaLogLevel.Info)]
     private static readonly ILogger Log =
         LoggerFactory.Create(builder => builder.SetMinimumLevel(LogLevel.Debug).AddConsole())
             .CreateLogger(nameof(ExampleFixture));

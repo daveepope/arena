@@ -311,6 +311,7 @@ def _activate_classes(
     matches: List["Match"],
     classes: List[Type[Playbook]],
 ) -> List[ActivePlaybook]:
+    __tracebackhide__ = True
     actives: List[ActivePlaybook] = []
     try:
         for klass in classes:
@@ -323,6 +324,7 @@ def _activate_classes(
 
 
 def _drop_actives(actives: List[ActivePlaybook]) -> None:
+    __tracebackhide__ = True
     while actives:
         a = actives.pop()
         try:
@@ -336,6 +338,7 @@ def _run_managed_classes(
     matches: List["Match"],
     classes: List[Type[Playbook]],
 ) -> None:
+    __tracebackhide__ = True
     first_error: Optional[BaseException] = None
     for klass in classes:
         try:
@@ -355,5 +358,6 @@ def _finish_playbook_scope(
     actives: List[ActivePlaybook],
     managed_classes: List[Type[Playbook]],
 ) -> None:
+    __tracebackhide__ = True
     _drop_actives(actives)
     _run_managed_classes(arena, matches, managed_classes)
