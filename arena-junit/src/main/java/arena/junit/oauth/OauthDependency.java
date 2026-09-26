@@ -1,4 +1,6 @@
 package arena.junit.oauth;
+import arena.junit.OpenArena;
+import arena.junit.ffi.ArenaBindings;
 import arena.junit.match.ArenaRunnableDependency;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -17,5 +19,9 @@ public final class OauthDependency implements ArenaRunnableDependency {
 
   public String identifier() {
     return config.get("identifier").asText();
+  }
+
+  public String signClaims(OpenArena arena, Provider provider, String claimsJson) {
+    return ArenaBindings.oauthSignClaims(arena.handle(), identifier(), provider.toJson(), claimsJson);
   }
 }

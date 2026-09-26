@@ -1,11 +1,12 @@
 use arena::dependency::{find_dependency, Dependency};
+use arena::lifecycle::Fault;
 use arena::playbook::{ActivePlaybook, Playbook as PlaybookTrait};
 use async_trait::async_trait;
 
 use crate::http_dependency::HttpDependency;
 use crate::playbook::Playbook;
 
-type BuildFn = dyn Fn(Playbook) -> Playbook + Send + Sync;
+type BuildFn = dyn Fn(Playbook) -> Result<Playbook, Fault> + Send + Sync;
 
 pub struct ManagedHttpPlaybook {
     identifier: String,
@@ -20,7 +21,7 @@ impl ManagedHttpPlaybook {
         build: F,
     ) -> Self
     where
-        F: Fn(Playbook) -> Playbook + Send + Sync + 'static,
+        F: Fn(Playbook) -> Result<Playbook, Fault> + Send + Sync + 'static,
     {
         Self {
             identifier: identifier.into(),
@@ -40,17 +41,30 @@ impl PlaybookTrait for ManagedHttpPlaybook {
         &self.identifier
     }
 
-    async fn run(&self, dependencies: &[Dependency]) -> Box<dyn ActivePlaybook> {
+    async fn run(&self, dependencies: &[Dependency]) -> Result<Box<dyn ActivePlaybook>, Fault> {
         let http = find_dependency(dependencies, &self.dependency_identifier)
             .and_then(|d| d.as_any().downcast_ref::<HttpDependency>())
-            .unwrap_or_else(|| {
-                panic!(
-                    "ManagedHttpPlaybook '{}': dependency '{}' not found or is not an HttpDependency",
-                    self.identifier, self.dependency_identifier
+            .ok_or_else(|| {
+                Fault::playbook(
+                    &self.identifier,
+                    format!(
+                        "dependency '{}' not found or is not an HttpDependency",
+                        self.dependency_identifier
+                    ),
                 )
-            });
+            })?;
 
-        let playbook = (self.build)(http.playbook()).with_identifier(&self.identifier);
-        Box::new(playbook.run().await)
+        if http.admin_url().is_none() {
+            return Err(Fault::playbook(
+                &self.identifier,
+                format!(
+                    "dependency '{}' is not started",
+                    self.dependency_identifier
+                ),
+            ));
+        }
+
+        let playbook = (self.build)(http.playbook())?.with_identifier(&self.identifier);
+        Ok(Box::new(playbook.run().await))
     }
 }

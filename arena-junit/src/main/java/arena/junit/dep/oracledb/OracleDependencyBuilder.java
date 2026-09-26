@@ -21,6 +21,16 @@ public final class OracleDependencyBuilder {
     config.put("identifier", ArenaIdentifiers.build("arena-oracle", name));
   }
 
+  public OracleDependencyBuilder withExpiry(java.time.Duration expiry) {
+    config.put("expiry_seconds", expirySeconds(expiry));
+    return this;
+  }
+
+  public OracleDependencyBuilder withoutExpiry() {
+    config.put("expiry_seconds", 0);
+    return this;
+  }
+
   public OracleDependencyBuilder withImageName(String imageName) {
     config.put("image_name", imageName);
     return this;
@@ -92,4 +102,13 @@ public final class OracleDependencyBuilder {
     }
     return new OracleDependency(cfg);
   }
+
+  private static long expirySeconds(java.time.Duration expiry) {
+    if (expiry.isNegative()) {
+      throw new IllegalArgumentException("expiry must not be negative: " + expiry);
+    }
+    long seconds = expiry.toSeconds();
+    return seconds == 0 && !expiry.isZero() ? 1 : seconds;
+  }
+
 }

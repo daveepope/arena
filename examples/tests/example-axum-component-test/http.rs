@@ -4,12 +4,10 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 use std::time::Duration;
-use tokio::sync::OnceCell;
 
-use crate::arena::{oauth_issuer, oauth_server_tls_cert_pem};
+use crate::arena::{oauth_server_tls_cert_pem, shared_arena, signed_token_with_scope};
 
 static OAUTH_HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
-static ACCESS_TOKEN: OnceCell<String> = OnceCell::const_new();
 
 const KAFKA_CONSUME_FETCH_MAX_WAIT_MS: i32 = 100;
 
@@ -48,18 +46,7 @@ pub struct ReadingCreatedEvent {
 }
 
 pub async fn fetch_example_access_token() -> String {
-    ACCESS_TOKEN
-        .get_or_init(|| async {
-            arena_examples::oauth_client_credentials::fetch_client_credentials_access_token(
-                oauth_http_client(),
-                oauth_issuer(),
-                Some("openid profile readings"),
-            )
-            .await
-            .expect("fetch client_credentials access token")
-        })
-        .await
-        .clone()
+    signed_token_with_scope(shared_arena().await, "readings")
 }
 
 pub async fn get_readings(port: u16) -> Vec<Reading> {
@@ -113,6 +100,29 @@ pub async fn consume_reading_created_event(
     .await?;
 
     found.ok_or_else(|| "did not receive expected ReadingCreatedEvent before timeout".to_string())
+}
+
+pub async fn get_readings_without_token(port: u16) -> u16 {
+    let url = format!("http://127.0.0.1:{}/readings", port);
+    oauth_http_client()
+        .get(&url)
+        .send()
+        .await
+        .expect("GET /readings failed to send")
+        .status()
+        .as_u16()
+}
+
+pub async fn get_readings_with_bearer_token(port: u16, token: &str) -> u16 {
+    let url = format!("http://127.0.0.1:{}/readings", port);
+    oauth_http_client()
+        .get(&url)
+        .bearer_auth(token)
+        .send()
+        .await
+        .expect("GET /readings failed to send")
+        .status()
+        .as_u16()
 }
 
 pub async fn post_reading_raw(

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
+from arena_pytest.support._expiry import _expiry_seconds
+
 import json
 import warnings
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Union
@@ -147,6 +151,14 @@ class HttpDependencyBuilder:
             "identifier": _build_identifier("arena-http", name),
         }
         self._children: List[Any] = []
+
+    def with_expiry(self, expiry: timedelta) -> "HttpDependencyBuilder":
+        self._config["expiry_seconds"] = _expiry_seconds(expiry)
+        return self
+
+    def without_expiry(self) -> "HttpDependencyBuilder":
+        self._config["expiry_seconds"] = 0
+        return self
 
     def with_port(self, port: int) -> "HttpDependencyBuilder":
         self._config["port"] = port

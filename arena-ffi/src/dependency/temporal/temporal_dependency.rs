@@ -6,6 +6,8 @@ use serde::Deserialize;
 pub struct TemporalDependencyConfig {
     pub identifier: String,
     #[serde(default)]
+    pub expiry_seconds: Option<u64>,
+    #[serde(default)]
     pub image_name: Option<String>,
     #[serde(default)]
     pub image: Option<String>,
@@ -37,5 +39,15 @@ pub fn build(config: &TemporalDependencyConfig, network: Option<&str>) -> Result
     if let Some(ref container_name) = config.container_name {
         builder = builder.with_container_name(container_name);
     }
+    match crate::dependency::expiry::expiry_override(config.expiry_seconds) {
+        Some(crate::dependency::expiry::ExpiryOverride::Disabled) => {
+            builder = builder.without_expiry();
+        }
+        Some(crate::dependency::expiry::ExpiryOverride::After(expiry)) => {
+            builder = builder.with_expiry(expiry);
+        }
+        None => {}
+    }
+
     Ok(Box::new(builder.build()))
 }

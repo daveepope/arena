@@ -33,9 +33,16 @@ impl TestContext {
         let start_outcome = std::panic::AssertUnwindSafe(async { temporal.start().await })
             .catch_unwind()
             .await;
-        if let Err(panic_payload) = start_outcome {
-            temporal.stop().await;
-            std::panic::resume_unwind(panic_payload);
+        match start_outcome {
+            Ok(Ok(())) => {}
+            Ok(Err(fault)) => {
+                let _ = temporal.stop().await;
+                return Err(format!("temporal failed to start: {fault}"));
+            }
+            Err(panic_payload) => {
+                let _ = temporal.stop().await;
+                std::panic::resume_unwind(panic_payload);
+            }
         }
 
         let grpc_endpoint = temporal
@@ -56,7 +63,7 @@ impl TestContext {
     }
 
     async fn stop(mut self) {
-        self.temporal.stop().await;
+        self.temporal.stop().await.expect("temporal should stop");
     }
 }
 

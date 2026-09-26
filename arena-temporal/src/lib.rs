@@ -1,3 +1,5 @@
+pub(crate) const MODULE: &str = "arena-temporal";
+
 pub mod builder;
 pub mod temporal_dependency;
 

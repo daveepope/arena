@@ -71,12 +71,12 @@ impl TestContext {
             .with_flavor(KafkaFlavor::ApacheNative)
             .build();
 
-        kafka.start().await;
+        kafka.start().await.expect("start should succeed");
 
         let bootstrap = match kafka.bootstrap_servers() {
             Some(v) => v.to_string(),
             None => {
-                kafka.stop().await;
+                kafka.stop().await.expect("stop should succeed");
                 return Err("kafka bootstrap servers missing after start()".to_string());
             }
         };
@@ -91,7 +91,7 @@ impl TestContext {
         let client = match connect_client(&bootstrap).await {
             Ok(v) => v,
             Err(e) => {
-                kafka.stop().await;
+                kafka.stop().await.expect("stop should succeed");
                 return Err(e);
             }
         };
@@ -123,7 +123,7 @@ impl TestContext {
     }
 
     async fn stop(mut self) {
-        self.kafka.stop().await;
+        self.kafka.stop().await.expect("stop should succeed");
     }
 }
 

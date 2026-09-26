@@ -34,17 +34,18 @@ public class DeviceLifecycleWorkflow
         StartToCloseTimeout = TimeSpan.FromMilliseconds(100),
     };
 
-    [WorkflowSignal]
-    public async Task RequestTransition(string target)
+    [WorkflowUpdate]
+    public async Task<string> RequestTransition(string target)
     {
         if (_currentState == target)
-            return;
+            return QuerySnapshot();
 
         await Workflow.ExecuteActivityAsync(
             () => DeviceActivities.Transition(_currentState, target),
             TransitionActivityOptions);
         _currentState = target;
         _transitionCount++;
+        return QuerySnapshot();
     }
 
     [WorkflowSignal]

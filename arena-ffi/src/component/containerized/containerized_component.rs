@@ -21,6 +21,8 @@ pub struct VolumeMappingConfig {
 #[derive(Debug, Deserialize)]
 pub struct ContainerizedComponentConfig {
     pub identifier: String,
+    #[serde(default)]
+    pub expiry_seconds: Option<u64>,
     #[serde(alias = "dockerfile", default)]
     pub containerfile: Option<String>,
     #[serde(default)]
@@ -123,6 +125,16 @@ pub async fn build(config: &ContainerizedComponentConfig) -> Result<Component, S
             };
         }
     }
+    match crate::dependency::expiry::expiry_override(config.expiry_seconds) {
+        Some(crate::dependency::expiry::ExpiryOverride::Disabled) => {
+            builder = builder.without_expiry();
+        }
+        Some(crate::dependency::expiry::ExpiryOverride::After(expiry)) => {
+            builder = builder.with_expiry(expiry);
+        }
+        None => {}
+    }
+
     builder
         .build()
         .await

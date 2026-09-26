@@ -100,20 +100,7 @@ public class DevicesService : IDevicesService
         if (!valid)
             return null;
 
-        var signaled = await _workflowService.SignalTransitionAsync(deviceId, target);
-        if (!signaled)
-            return null;
-
-        var deadline = DateTime.UtcNow.AddMilliseconds(500);
-        while (DateTime.UtcNow < deadline)
-        {
-            var state = await _workflowService.GetStateAsync(deviceId);
-            if (state != null && state.State == target)
-                return state;
-            await Task.Delay(50);
-        }
-
-        return await _workflowService.GetStateAsync(deviceId);
+        return await _workflowService.RequestTransitionAsync(deviceId, target);
     }
 
     public Task<bool> DeleteAsync(int deviceId)

@@ -1,3 +1,4 @@
+use arena::lifecycle::{Fault, RunnableState};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_smtp::{SmtpDependency, SmtpImpl, SmtpTlsConfig, SmtpTlsMode};
@@ -30,7 +31,7 @@ impl SmtpImpl for RecordingSmtpImpl {
         image_tag: &str,
         container_name: &str,
         tls: Option<&SmtpTlsConfig>,
-    ) {
+    ) -> Result<(), String> {
         *self.recorded.lock().unwrap() = Some(StartArgs {
             smtp_port,
             ui_port,
@@ -41,12 +42,19 @@ impl SmtpImpl for RecordingSmtpImpl {
         });
         self.smtp_address = Some("127.0.0.1:1025".to_string());
         self.http_api_url = Some("http://127.0.0.1:8025".to_string());
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.smtp_address = None;
         self.http_api_url = None;
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn smtp_address(&self) -> Option<&str> {
         self.smtp_address.as_deref()
@@ -94,18 +102,35 @@ impl RunnableDependency for RecordingChildDependency {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+    fn state(&self) -> RunnableState {
+        RunnableState::NotStarted
+    }
 
-    async fn start(&mut self) {
+    fn faults(&self) -> &[Fault] {
+        &[]
+    }
+
+    async fn force_stop(&mut self) {}
+    fn release(&mut self) {}
+
+
+    async fn start(&mut self) -> Result<(), Fault> {
         self.events.lock().unwrap().push(ChildEvent::Start);
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), Fault> {
         self.events.lock().unwrap().push(ChildEvent::Stop);
+        Ok(())
     }
 
-    async fn soft_reset(&self) {}
+    async fn soft_reset(&self) -> Result<(), Fault> {
+        Ok(())
+    }
 
-    async fn hard_reset(&mut self) {}
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
     fn children(&self) -> &[Dependency] {
@@ -130,8 +155,8 @@ async fn with_port_and_ui_port_propagate_to_impl_start() {
         .with_readiness_check(OkReadinessCheck)
         .build();
 
-    dep.start().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     let args = recorded
         .lock()
@@ -156,8 +181,8 @@ async fn with_image_name_and_tag_propagate_to_impl_start() {
         .with_readiness_check(OkReadinessCheck)
         .build();
 
-    dep.start().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     let args = recorded
         .lock()
@@ -181,8 +206,8 @@ async fn with_image_alias_sets_same_tag_as_with_image_tag() {
         .with_readiness_check(OkReadinessCheck)
         .build();
 
-    dep.start().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     let args = recorded
         .lock()
@@ -205,8 +230,8 @@ async fn with_container_tag_alias_sets_same_tag_as_with_image_tag() {
         .with_readiness_check(OkReadinessCheck)
         .build();
 
-    dep.start().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     let args = recorded
         .lock()
@@ -229,8 +254,8 @@ async fn with_container_name_propagates_to_impl_start() {
         .with_readiness_check(OkReadinessCheck)
         .build();
 
-    dep.start().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     let args = recorded
         .lock()
@@ -255,8 +280,8 @@ async fn with_child_dependencies_starts_and_stops_children() {
         .with_readiness_check(OkReadinessCheck)
         .build();
 
-    dep.start().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     assert_eq!(
         events.lock().unwrap().as_slice(),
@@ -277,8 +302,8 @@ async fn with_starttls_passes_generated_tls_to_impl_start() {
         .with_readiness_check(OkReadinessCheck)
         .build();
 
-    dep.start().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     let tls = recorded
         .lock()
@@ -305,8 +330,8 @@ async fn without_starttls_passes_no_tls_to_impl_start() {
         .with_readiness_check(OkReadinessCheck)
         .build();
 
-    dep.start().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     let args = recorded
         .lock()
@@ -329,8 +354,8 @@ async fn with_implicit_tls_passes_generated_tls_to_impl_start() {
         .with_readiness_check(OkReadinessCheck)
         .build();
 
-    dep.start().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     let tls = recorded
         .lock()
@@ -343,4 +368,74 @@ async fn with_implicit_tls_passes_generated_tls_to_impl_start() {
     assert!(!tls.certificate_pem.is_empty());
     assert!(!tls.private_key_pem.is_empty());
     assert_ne!(tls.private_key_pem, tls.certificate_pem);
+}
+
+
+#[derive(Clone, Default)]
+struct ExpiryRecordingImpl {
+    expiry: std::sync::Arc<std::sync::Mutex<Option<Option<std::time::Duration>>>>,
+}
+
+#[async_trait]
+impl SmtpImpl for ExpiryRecordingImpl {
+    fn set_expiry(&mut self, expiry: Option<std::time::Duration>) {
+        *self.expiry.lock().unwrap() = Some(expiry);
+    }
+    async fn start(
+        &mut self,
+        _smtp_port: u16,
+        _ui_port: u16,
+        _image_name: &str,
+        _image_tag: &str,
+        _container_name: &str,
+        _tls: Option<&SmtpTlsConfig>,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+    fn smtp_address(&self) -> Option<&str> {
+        None
+    }
+    fn http_api_url(&self) -> Option<&str> {
+        None
+    }
+}
+
+#[test]
+fn build_no_expiry_override_uses_default_expiry() {
+    let recorder = ExpiryRecordingImpl::default();
+    let _dep = SmtpDependency::builder("orders").with_impl(recorder.clone()).build();
+
+    assert_eq!(
+        *recorder.expiry.lock().unwrap(),
+        Some(Some(arena_container::expiry::DEFAULT_EXPIRY))
+    );
+}
+
+#[test]
+fn build_with_expiry_uses_given_expiry() {
+    let recorder = ExpiryRecordingImpl::default();
+    let _dep = SmtpDependency::builder("orders")
+        .with_impl(recorder.clone())
+        .with_expiry(std::time::Duration::from_secs(30))
+        .build();
+
+    assert_eq!(
+        *recorder.expiry.lock().unwrap(),
+        Some(Some(std::time::Duration::from_secs(30)))
+    );
+}
+
+#[test]
+fn build_without_expiry_disables_expiry() {
+    let recorder = ExpiryRecordingImpl::default();
+    let _dep = SmtpDependency::builder("orders").with_impl(recorder.clone()).without_expiry().build();
+
+    assert_eq!(*recorder.expiry.lock().unwrap(), Some(None));
 }

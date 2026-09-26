@@ -3,6 +3,7 @@ use arena_ffi::dependency::temporal::temporal_dependency::{build, TemporalDepend
 fn minimal_temporal_config() -> TemporalDependencyConfig {
     TemporalDependencyConfig {
         identifier: "temporal".to_string(),
+        expiry_seconds: None,
         image_name: None,
         image: None,
         port: None,

@@ -2,6 +2,7 @@ use crate::executable_component::{CpuProfileConfig, ExecutableComponent};
 use crate::platform::resolve_executable_extension;
 use arena::healthcheck::ReadinessCheck;
 use arena::Component;
+use arena::Fault;
 use std::path::PathBuf;
 
 pub enum BuildTool {
@@ -117,7 +118,7 @@ impl ExecutableComponentBuilder {
         self
     }
 
-    pub fn build(self) -> ExecutableComponent {
+    pub fn build(self) -> Result<ExecutableComponent, Fault> {
         if let (Some(ref source_path), Some(ref build_tool)) = (&self.source_path, &self.build_tool)
         {
             tracing::debug!(
@@ -131,7 +132,7 @@ impl ExecutableComponentBuilder {
                 source_path.clone()
             } else {
                 // Walk up to find a directory where source_path exists
-                let current_dir = std::env::current_dir().expect("get current directory");
+                let current_dir = current_dir_fault(&self.identifier)?;
 
                 current_dir
                     .ancestors()
@@ -143,18 +144,26 @@ impl ExecutableComponentBuilder {
                             None
                         }
                     })
-                    .expect(&format!(
-                        "could not find source path '{}' from current directory or any parent",
-                        source_path.display()
-                    ))
+                    .ok_or_else(|| {
+                        Fault::component(
+                            self.identifier.clone(),
+                            format!(
+                                "could not find source path '{}' from current directory or any parent",
+                                source_path.display()
+                            ),
+                        )
+                    })?
             };
 
             if !matches!(build_tool, BuildTool::Python) {
-                let output = Self::execute_build(build_tool, &source_dir);
+                let output = Self::execute_build(&self.identifier, build_tool, &source_dir)?;
 
                 if !output.status.success() {
                     let stderr = String::from_utf8_lossy(&output.stderr);
-                    panic!("build failed: {}", stderr);
+                    return Err(Fault::component(
+                        self.identifier.clone(),
+                        format!("build failed: {}", stderr),
+                    ));
                 }
             }
 
@@ -165,64 +174,39 @@ impl ExecutableComponentBuilder {
             );
         }
 
-        let executable_path = self.executable_path.map(|path| {
-            let resolved = if path.is_absolute() {
-                path
-            } else {
-                let current_dir = std::env::current_dir().expect("get current directory");
+        let executable_path = match self.executable_path {
+            Some(path) => {
+                let resolved = if path.is_absolute() {
+                    path
+                } else {
+                    let current_dir = current_dir_fault(&self.identifier)?;
 
-                current_dir
-                    .ancestors()
-                    .find_map(|ancestor| {
-                        let candidate = ancestor.join(&path);
-                        if candidate.exists() {
-                            Some(candidate)
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap_or_else(|| current_dir.join(&path))
-            };
-            resolve_executable_extension(resolved)
-        });
-
-        let cpu_profile_auto_open = self.cpu_profile_auto_open;
-        let cpu_profile_hotspots = self.cpu_profile_hotspots;
-        let cpu_profile = self.cpu_profile_output.map(|output_path| {
-            let backend = match &self.build_tool {
-                Some(BuildTool::Cargo) => arena_profile::CpuProfilerBackend::Perf,
-                Some(BuildTool::Maven) | Some(BuildTool::Gradle) => {
-                    arena_profile::CpuProfilerBackend::AsyncProfiler
-                }
-                Some(BuildTool::Python) => arena_profile::CpuProfilerBackend::PySpy,
-                Some(BuildTool::Dotnet) => panic!(
-                    "{}: .with_cpu_profile() is not supported for BuildTool::Dotnet",
-                    self.identifier
-                ),
-                Some(BuildTool::Make) => panic!(
-                    "{}: .with_cpu_profile() is not supported for BuildTool::Make",
-                    self.identifier
-                ),
-                Some(BuildTool::CMake) => panic!(
-                    "{}: .with_cpu_profile() is not supported for BuildTool::CMake",
-                    self.identifier
-                ),
-                Some(BuildTool::Custom { command, .. }) => panic!(
-                    "{}: .with_cpu_profile() is not supported for BuildTool::Custom(\"{}\")",
-                    self.identifier, command
-                ),
-                None => panic!(
-                    "{}: .with_cpu_profile() requires a build_tool of Cargo, Maven, Gradle, or Python",
-                    self.identifier
-                ),
-            };
-            CpuProfileConfig {
-                backend,
-                output_path,
-                auto_open: cpu_profile_auto_open,
-                include_hotspots: cpu_profile_hotspots,
+                    current_dir
+                        .ancestors()
+                        .find_map(|ancestor| {
+                            let candidate = ancestor.join(&path);
+                            if candidate.exists() {
+                                Some(candidate)
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_else(|| current_dir.join(&path))
+                };
+                Some(resolve_executable_extension(resolved))
             }
-        });
+            None => None,
+        };
+
+        let cpu_profile = match self.cpu_profile_output {
+            Some(output_path) => Some(CpuProfileConfig {
+                backend: cpu_profiler_backend(&self.identifier, self.build_tool.as_ref())?,
+                output_path,
+                auto_open: self.cpu_profile_auto_open,
+                include_hotspots: self.cpu_profile_hotspots,
+            }),
+            None => None,
+        };
 
         let mut component = ExecutableComponent::new(self.identifier);
         component.children = self.children;
@@ -231,174 +215,81 @@ impl ExecutableComponentBuilder {
         component.runtime_args = self.runtime_args;
         component.readiness_checks = self.readiness_checks;
         component.cpu_profile = cpu_profile;
-        component
+        Ok(component)
     }
 
-    fn execute_build(build_tool: &BuildTool, source_dir: &PathBuf) -> std::process::Output {
-        match build_tool {
-            BuildTool::Cargo => std::process::Command::new("cargo")
-                .args(&["build", "--release"])
-                .current_dir(source_dir)
-                .output()
-                .expect("failed to run cargo build"),
-            BuildTool::Maven => std::process::Command::new("mvn")
-                .args(&["clean", "package"])
-                .current_dir(source_dir)
-                .output()
-                .expect("failed to run mvn"),
-            BuildTool::Gradle => std::process::Command::new("gradle")
-                .args(&["build"])
-                .current_dir(source_dir)
-                .output()
-                .expect("failed to run gradle"),
-            BuildTool::Dotnet => std::process::Command::new("dotnet")
-                .args(&["build", "--configuration", "Release"])
-                .current_dir(source_dir)
-                .output()
-                .expect("failed to run dotnet build"),
-            BuildTool::Make => std::process::Command::new("make")
-                .current_dir(source_dir)
-                .output()
-                .expect("failed to run make"),
-            BuildTool::CMake => std::process::Command::new("cmake")
-                .args(&["--build", ".", "--config", "Release"])
-                .current_dir(source_dir)
-                .output()
-                .expect("failed to run cmake"),
-            BuildTool::Custom { command, args } => std::process::Command::new(command)
-                .args(args)
-                .current_dir(source_dir)
-                .output()
-                .expect(&format!("failed to run custom build command: {}", command)),
-            BuildTool::Python => unreachable!("build() skips execute_build for BuildTool::Python"),
-        }
+    fn execute_build(
+        identifier: &str,
+        build_tool: &BuildTool,
+        source_dir: &PathBuf,
+    ) -> Result<std::process::Output, Fault> {
+        let (command, args): (&str, &[&str]) = match build_tool {
+            BuildTool::Cargo => ("cargo", &["build", "--release"]),
+            BuildTool::Maven => ("mvn", &["clean", "package"]),
+            BuildTool::Gradle => ("gradle", &["build"]),
+            BuildTool::Dotnet => ("dotnet", &["build", "--configuration", "Release"]),
+            BuildTool::Make => ("make", &[]),
+            BuildTool::CMake => ("cmake", &["--build", ".", "--config", "Release"]),
+            BuildTool::Python => {
+                return Err(Fault::component(
+                    identifier,
+                    "python executable components are launched directly, not built from source",
+                ));
+            }
+            BuildTool::Custom { command, args } => {
+                return std::process::Command::new(command)
+                    .args(args)
+                    .current_dir(source_dir)
+                    .output()
+                    .map_err(|e| {
+                        Fault::component(
+                            identifier,
+                            format!("failed to run custom build command {command}: {e}"),
+                        )
+                    });
+            }
+        };
+        std::process::Command::new(command)
+            .args(args)
+            .current_dir(source_dir)
+            .output()
+            .map_err(|e| Fault::component(identifier, format!("failed to run {command}: {e}")))
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+fn current_dir_fault(identifier: &str) -> Result<PathBuf, Fault> {
+    std::env::current_dir().map_err(|e| {
+        Fault::component(identifier, format!("failed to read current directory: {e}"))
+    })
+}
 
-    #[test]
-    fn build_cargo_with_cpu_profile_selects_perf_backend() {
-        let component = ExecutableComponentBuilder::new("builder-test")
-            .with_build_tool(BuildTool::Cargo)
-            .with_executable_path("/bin/true")
-            .with_cpu_profile("/tmp/does-not-matter.html")
-            .build();
-
-        let cfg = component.cpu_profile.expect("cpu profile configured");
-        assert_eq!(cfg.backend, arena_profile::CpuProfilerBackend::Perf);
-        assert!(!cfg.auto_open);
-        assert!(!cfg.include_hotspots);
-    }
-
-    #[test]
-    fn build_maven_or_gradle_with_cpu_profile_selects_async_profiler_backend() {
-        for build_tool in [BuildTool::Maven, BuildTool::Gradle] {
-            let component = ExecutableComponentBuilder::new("builder-test")
-                .with_build_tool(build_tool)
-                .with_executable_path("/bin/true")
-                .with_cpu_profile("/tmp/does-not-matter.html")
-                .build();
-
-            let cfg = component.cpu_profile.expect("cpu profile configured");
-            assert_eq!(cfg.backend, arena_profile::CpuProfilerBackend::AsyncProfiler);
+fn cpu_profiler_backend(
+    identifier: &str,
+    build_tool: Option<&BuildTool>,
+) -> Result<arena_profile::CpuProfilerBackend, Fault> {
+    match build_tool {
+        Some(BuildTool::Cargo) => Ok(arena_profile::CpuProfilerBackend::Perf),
+        Some(BuildTool::Maven) | Some(BuildTool::Gradle) => {
+            Ok(arena_profile::CpuProfilerBackend::AsyncProfiler)
         }
+        Some(BuildTool::Python) => Ok(arena_profile::CpuProfilerBackend::PySpy),
+        Some(BuildTool::Dotnet) => Err(cpu_profile_unsupported(identifier, "BuildTool::Dotnet")),
+        Some(BuildTool::Make) => Err(cpu_profile_unsupported(identifier, "BuildTool::Make")),
+        Some(BuildTool::CMake) => Err(cpu_profile_unsupported(identifier, "BuildTool::CMake")),
+        Some(BuildTool::Custom { command, .. }) => Err(cpu_profile_unsupported(
+            identifier,
+            &format!("BuildTool::Custom(\"{command}\")"),
+        )),
+        None => Err(Fault::component(
+            identifier,
+            ".with_cpu_profile() requires a build_tool of Cargo, Maven, Gradle, or Python",
+        )),
     }
+}
 
-    #[test]
-    fn build_python_with_cpu_profile_selects_pyspy_backend() {
-        let component = ExecutableComponentBuilder::new("builder-test")
-            .with_build_tool(BuildTool::Python)
-            .with_executable_path("/bin/true")
-            .with_cpu_profile("/tmp/does-not-matter.html")
-            .with_cpu_profile_auto_open()
-            .build();
-
-        let cfg = component.cpu_profile.expect("cpu profile configured");
-        assert_eq!(cfg.backend, arena_profile::CpuProfilerBackend::PySpy);
-        assert!(cfg.auto_open);
-    }
-
-    #[test]
-    fn build_with_hotspots_enables_include_hotspots() {
-        let component = ExecutableComponentBuilder::new("builder-test")
-            .with_build_tool(BuildTool::Cargo)
-            .with_executable_path("/bin/true")
-            .with_cpu_profile("/tmp/does-not-matter.html")
-            .with_hotspots()
-            .build();
-
-        let cfg = component.cpu_profile.expect("cpu profile configured");
-        assert!(cfg.include_hotspots);
-    }
-
-    #[test]
-    #[should_panic(expected = "is not supported for BuildTool::Dotnet")]
-    fn build_dotnet_with_cpu_profile_panics() {
-        ExecutableComponentBuilder::new("builder-test")
-            .with_build_tool(BuildTool::Dotnet)
-            .with_cpu_profile("/tmp/does-not-matter.html")
-            .build();
-    }
-
-    #[test]
-    #[should_panic(expected = "is not supported for BuildTool::Make")]
-    fn build_make_with_cpu_profile_panics() {
-        ExecutableComponentBuilder::new("builder-test")
-            .with_build_tool(BuildTool::Make)
-            .with_cpu_profile("/tmp/does-not-matter.html")
-            .build();
-    }
-
-    #[test]
-    #[should_panic(expected = "is not supported for BuildTool::CMake")]
-    fn build_cmake_with_cpu_profile_panics() {
-        ExecutableComponentBuilder::new("builder-test")
-            .with_build_tool(BuildTool::CMake)
-            .with_cpu_profile("/tmp/does-not-matter.html")
-            .build();
-    }
-
-    #[test]
-    #[should_panic(expected = "is not supported for BuildTool::Custom")]
-    fn build_custom_with_cpu_profile_panics() {
-        ExecutableComponentBuilder::new("builder-test")
-            .with_build_tool(BuildTool::Custom {
-                command: "make-it-so".to_string(),
-                args: vec![],
-            })
-            .with_cpu_profile("/tmp/does-not-matter.html")
-            .build();
-    }
-
-    #[test]
-    #[should_panic(expected = "requires a build_tool of Cargo, Maven, Gradle, or Python")]
-    fn build_no_build_tool_with_cpu_profile_panics() {
-        ExecutableComponentBuilder::new("builder-test")
-            .with_cpu_profile("/tmp/does-not-matter.html")
-            .build();
-    }
-
-    #[test]
-    fn build_absolute_executable_path_kept_as_is() {
-        let component = ExecutableComponentBuilder::new("builder-test")
-            .with_executable_path("/bin/true")
-            .build();
-
-        assert_eq!(component.executable_path, Some(PathBuf::from("/bin/true")));
-    }
-
-    #[test]
-    fn build_relative_executable_path_not_found_falls_back_to_current_dir_join() {
-        let relative = PathBuf::from("arena-executable-component-nonexistent-binary");
-
-        let component = ExecutableComponentBuilder::new("builder-test")
-            .with_executable_path(relative.clone())
-            .build();
-
-        let expected = std::env::current_dir().unwrap().join(&relative);
-        assert_eq!(component.executable_path, Some(expected));
-    }
+fn cpu_profile_unsupported(identifier: &str, build_tool: &str) -> Fault {
+    Fault::component(
+        identifier,
+        format!(".with_cpu_profile() is not supported for {build_tool}"),
+    )
 }

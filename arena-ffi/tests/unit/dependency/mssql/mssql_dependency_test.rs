@@ -3,6 +3,7 @@ use arena_ffi::dependency::mssql::mssql_dependency::{build, EncryptionConfig, Ms
 fn minimal_mssql_config() -> MssqlDependencyConfig {
     MssqlDependencyConfig {
         identifier: "mssql".to_string(),
+        expiry_seconds: None,
         image_name: None,
         image: None,
         port: None,

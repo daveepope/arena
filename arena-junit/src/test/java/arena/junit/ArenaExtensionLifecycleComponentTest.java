@@ -126,6 +126,18 @@ final class ArenaExtensionLifecycleComponentTest {
     static void second() {}
   }
 
+  static final class ThrowingBeforeCloseTopology {
+    @ArenaDependency
+    static final OauthDependency oauth =
+        buildOauth(
+            "arena-extension-throwing-beforeclose-oauth", EphemeralTestRuntime.ephemeralTcpPort());
+
+    @ArenaBeforeClose
+    static void beforeClose() {
+      throw new RuntimeException("beforeClose boom");
+    }
+  }
+
   static final class DependencyLogsEnabledTopology {
     static final String OAUTH_IDENTIFIER = "arena-extension-dependency-logs-enabled-oauth";
 
@@ -252,6 +264,20 @@ final class ArenaExtensionLifecycleComponentTest {
             IllegalStateException.class,
             () -> extension.beforeAll(contextFor(ThrowingAfterOpenTopology.class)));
     assertNotNull(error.getCause());
+  }
+
+  @Test
+  void afterAll_beforeCloseThrows_stillClosesArena() {
+    ArenaExtension extension = new ArenaExtension();
+    extension.beforeAll(contextFor(ThrowingBeforeCloseTopology.class));
+    OpenArena arena = ArenaExtension.openArenaFor(ThrowingBeforeCloseTopology.class);
+    assertNotNull(arena.handle());
+
+    assertThrows(
+        IllegalStateException.class,
+        () -> extension.afterAll(contextFor(ThrowingBeforeCloseTopology.class)));
+
+    assertNull(arena.handle());
   }
 
   @Test

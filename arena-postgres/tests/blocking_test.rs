@@ -17,10 +17,18 @@ impl PostgresImpl for RefusedPortPostgresImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
+        Ok(())
     }
 
-    async fn stop(&mut self) {}
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn connection_string(&self) -> Option<&str> {
         Some("postgres://u:p@127.0.0.1:1/db")
@@ -50,7 +58,7 @@ async fn start_startup_script_connect_failure_panics_on_blocking_thread() {
         .build();
 
     let outcome = std::panic::AssertUnwindSafe(async {
-        dep.start().await;
+        dep.start().await.expect("start should succeed");
     })
     .catch_unwind()
     .await;
@@ -65,7 +73,7 @@ async fn playbook_run_connect_failure_panics_on_blocking_thread() {
         .with_readiness_check(AlwaysOkReadinessCheck)
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
 
     let outcome = std::panic::AssertUnwindSafe(async { dep.playbook().run().await })
         .catch_unwind()

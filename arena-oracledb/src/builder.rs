@@ -1,3 +1,4 @@
+use std::time::Duration;
 use crate::oracle_dependency::oracle_container_impl::{
     OracleContainerImpl, OracleImpl, DEFAULT_SERVICE_NAME,
 };
@@ -6,6 +7,7 @@ use crate::oracle_dependency::{
 };
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
+use arena::Fault;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -17,6 +19,7 @@ pub enum OracleSetupMode {
 
 pub struct OracleDependencyBuilder {
     identifier: String,
+    expiry: Option<Duration>,
     oracle_impl: Option<Arc<dyn OracleImpl>>,
     port: Option<u16>,
     database_name: Option<String>,
@@ -45,6 +48,7 @@ impl OracleDependencyBuilder {
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {
             identifier: identifier.into(),
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
             oracle_impl: None,
             port: None,
             database_name: None,
@@ -155,24 +159,38 @@ impl OracleDependencyBuilder {
         self.with_image_tag(image_tag)
     }
 
-    pub fn build(self) -> OracleDependency {
+    pub fn with_expiry(mut self, expiry: Duration) -> Self {
+        self.expiry = Some(expiry);
+        self
+    }
+
+    pub fn without_expiry(mut self) -> Self {
+        self.expiry = None;
+        self
+    }
+
+    pub fn build(self) -> Result<OracleDependency, Fault> {
         let oracle_impl = self
             .oracle_impl
             .unwrap_or_else(|| Arc::new(OracleContainerImpl::new(self.network)));
+        oracle_impl.set_expiry(self.expiry);
 
         let port = self.port.unwrap_or(Self::DEFAULT_PORT);
         let database_name = self
             .database_name
             .unwrap_or_else(|| DEFAULT_SERVICE_NAME.to_string());
         if database_name != DEFAULT_SERVICE_NAME && self.setup_mode != OracleSetupMode::FullBuild {
-            panic!(
-                "OracleDependencyBuilder: database_name {database_name:?} requires \
-                 .full_build() -- a non-default database name forces Oracle to build a new \
-                 pluggable database from scratch on startup (several minutes), instead of \
-                 reusing the image's pre-built fast-start database. Call `.full_build()` if \
-                 you need a named database; otherwise drop `.with_database_name(...)` and use \
-                 the default {DEFAULT_SERVICE_NAME:?} for fast startup."
-            );
+            return Err(Fault::dependency(
+                self.identifier.clone(),
+                format!(
+                    "database_name {database_name:?} requires .full_build() -- a non-default \
+                     database name forces Oracle to build a new pluggable database from scratch \
+                     on startup (several minutes), instead of reusing the image's pre-built \
+                     fast-start database. Call `.full_build()` if you need a named database; \
+                     otherwise drop `.with_database_name(...)` and use the default \
+                     {DEFAULT_SERVICE_NAME:?} for fast startup."
+                ),
+            ));
         }
         let database_username = self
             .database_username
@@ -195,7 +213,7 @@ impl OracleDependencyBuilder {
         let readiness_check = self.readiness_check;
 
         let mut dep = OracleDependency::new(
-            arena_container::identifier::build("arena-oracledb", &self.identifier),
+            arena_container::identifier::build(crate::MODULE, &self.identifier),
             oracle_impl,
             port,
             database_name,
@@ -218,6 +236,6 @@ impl OracleDependencyBuilder {
         });
         dep.set_sql_readiness_timeout(sql_readiness_timeout);
 
-        dep
+        Ok(dep)
     }
 }

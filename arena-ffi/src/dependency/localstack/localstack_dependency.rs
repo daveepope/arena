@@ -10,6 +10,8 @@ use serde::Deserialize;
 pub(crate) struct LocalstackDependencyConfig {
     pub identifier: String,
     #[serde(default)]
+    pub expiry_seconds: Option<u64>,
+    #[serde(default)]
     pub port: Option<u16>,
     #[serde(default)]
     pub image_name: Option<String>,
@@ -147,6 +149,16 @@ pub(crate) fn build(
             event_pattern: rule.event_pattern.clone(),
             targets,
         });
+    }
+
+    match crate::dependency::expiry::expiry_override(config.expiry_seconds) {
+        Some(crate::dependency::expiry::ExpiryOverride::Disabled) => {
+            builder = builder.without_expiry();
+        }
+        Some(crate::dependency::expiry::ExpiryOverride::After(expiry)) => {
+            builder = builder.with_expiry(expiry);
+        }
+        None => {}
     }
 
     Ok(Box::new(builder.build()))

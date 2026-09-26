@@ -1,4 +1,5 @@
 use arena::dependency::{find_dependency, Dependency};
+use arena::lifecycle::Fault;
 use arena::playbook::{ActivePlaybook, Playbook as PlaybookTrait};
 use async_trait::async_trait;
 
@@ -28,17 +29,30 @@ impl PlaybookTrait for ManagedPostgresPlaybook {
         &self.identifier
     }
 
-    async fn run(&self, dependencies: &[Dependency]) -> Box<dyn ActivePlaybook> {
+    async fn run(&self, dependencies: &[Dependency]) -> Result<Box<dyn ActivePlaybook>, Fault> {
         let postgres = find_dependency(dependencies, &self.dependency_identifier)
             .and_then(|d| d.as_any().downcast_ref::<PostgresDependency>())
-            .unwrap_or_else(|| {
-                panic!(
-                    "ManagedPostgresPlaybook '{}': dependency '{}' not found or is not a PostgresDependency",
-                    self.identifier, self.dependency_identifier
+            .ok_or_else(|| {
+                Fault::playbook(
+                    &self.identifier,
+                    format!(
+                        "dependency '{}' not found or is not a PostgresDependency",
+                        self.dependency_identifier
+                    ),
                 )
-            });
+            })?;
+
+        if postgres.connection_string().is_none() {
+            return Err(Fault::playbook(
+                &self.identifier,
+                format!(
+                    "dependency '{}' is not started",
+                    self.dependency_identifier
+                ),
+            ));
+        }
 
         let playbook = postgres.playbook().with_identifier(&self.identifier);
-        Box::new(playbook.run().await)
+        Ok(Box::new(playbook.run().await))
     }
 }

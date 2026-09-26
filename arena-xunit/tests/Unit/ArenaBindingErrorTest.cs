@@ -26,4 +26,11 @@ public class ArenaBindingErrorTest
         var ex = new ArenaBindingError("test");
         Assert.IsAssignableFrom<System.Exception>(ex);
     }
+
+    [Fact]
+    public void Constructor_WithStateDocument_ExposesStateDocument()
+    {
+        var ex = new ArenaBindingError("msg", "{\"id\":\"x\"}");
+        Assert.Equal("{\"id\":\"x\"}", ex.StateDocument);
+    }
 }

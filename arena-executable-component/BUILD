@@ -15,17 +15,11 @@ rust_library(
 )
 
 rust_test(
-    name = "arena_executable_component_lib_unit_test",
-    crate = ":arena_executable_component",
-    size = "small",
-    edition = "2021",
-)
-
-rust_test(
     name = "lifecycle_test",
-    srcs = ["tests/lifecycle_test.rs"],
+    srcs = ["tests/component/lifecycle_test.rs"],
     size = "small",
     edition = "2021",
+    tags = ["component_test"],
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,
@@ -41,10 +35,14 @@ rust_test(
 
 rust_test(
     name = "cpu_profile_component_test",
-    srcs = ["tests/cpu_profile_component_test.rs"],
+    srcs = ["tests/component/cpu_profile_component_test.rs"],
     size = "small",
     edition = "2021",
     tags = ["component_test"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,
@@ -69,6 +67,43 @@ rust_test(
         normal_dev = True,
     ) + [
         ":arena_executable_component",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "builder_unit_test",
+    srcs = ["tests/unit/builder_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_executable_component",
+        "//arena",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "executable_component_unit_test",
+    srcs = ["tests/unit/executable_component_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_executable_component",
+        "//arena",
+        "//arena-profile:arena_profile",
     ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,

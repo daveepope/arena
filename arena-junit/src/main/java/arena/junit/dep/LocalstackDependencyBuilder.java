@@ -26,6 +26,16 @@ public final class LocalstackDependencyBuilder {
     this.config = c;
   }
 
+  public LocalstackDependencyBuilder withExpiry(java.time.Duration expiry) {
+    config.put("expiry_seconds", expirySeconds(expiry));
+    return this;
+  }
+
+  public LocalstackDependencyBuilder withoutExpiry() {
+    config.put("expiry_seconds", 0);
+    return this;
+  }
+
   public LocalstackDependencyBuilder withPort(int port) {
     config.put("port", port);
     return this;
@@ -145,4 +155,13 @@ public final class LocalstackDependencyBuilder {
     }
     return new LocalstackDependency(cfg);
   }
+
+  private static long expirySeconds(java.time.Duration expiry) {
+    if (expiry.isNegative()) {
+      throw new IllegalArgumentException("expiry must not be negative: " + expiry);
+    }
+    long seconds = expiry.toSeconds();
+    return seconds == 0 && !expiry.isZero() ? 1 : seconds;
+  }
+
 }

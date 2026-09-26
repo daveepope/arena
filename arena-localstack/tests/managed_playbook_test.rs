@@ -1,3 +1,4 @@
+use arena::lifecycle::{Fault, RunnableState, Subject};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena::Playbook as _;
@@ -17,11 +18,19 @@ impl LocalstackImpl for FakeLocalstackImpl {
         _image_tag: &str,
         _container_name: &str,
         _services: &[String],
-    ) {
+    ) -> Result<(), String> {
         self.endpoint = Some("http://127.0.0.1:4566".to_string());
+        Ok(())
     }
 
-    async fn stop(&mut self) {}
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn endpoint_url(&self) -> Option<&str> {
         self.endpoint.as_deref()
@@ -57,9 +66,24 @@ impl RunnableDependency for OtherDependency {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+    fn state(&self) -> RunnableState {
+        RunnableState::NotStarted
+    }
 
-    async fn start(&mut self) {}
-    async fn stop(&mut self) {}
+    fn faults(&self) -> &[Fault] {
+        &[]
+    }
+
+    async fn force_stop(&mut self) {}
+    fn release(&mut self) {}
+
+
+    async fn start(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
+    async fn stop(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
     fn children(&self) -> &[Dependency] {
         &[]
@@ -67,8 +91,12 @@ impl RunnableDependency for OtherDependency {
     fn children_mut(&mut self) -> &mut [Dependency] {
         &mut []
     }
-    async fn soft_reset(&self) {}
-    async fn hard_reset(&mut self) {}
+    async fn soft_reset(&self) -> Result<(), Fault> {
+        Ok(())
+    }
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 }
 
 async fn started_localstack(identifier: &str) -> LocalstackDependency {
@@ -78,7 +106,7 @@ async fn started_localstack(identifier: &str) -> LocalstackDependency {
         .with_image_tag("x")
         .with_readiness_check(OkReadinessCheck)
         .build();
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
     dep
 }
 
@@ -90,34 +118,36 @@ async fn run_dependency_found_returns_active_playbook_with_identifier() {
 
     let managed = ManagedLocalstackPlaybook::new("managed-playbook-id", dep_identifier);
 
-    let active = managed.run(&deps).await;
+    let active = managed.run(&deps).await.expect("playbook should run");
 
     assert_eq!(active.identifier(), "managed-playbook-id");
     assert!(active.as_any().is::<arena_localstack::ActivePlaybook>());
 }
 
 #[tokio::test]
-async fn run_dependency_missing_panics() {
+async fn run_dependency_missing_returns_fault() {
     let deps: Vec<Dependency> = vec![Box::new(OtherDependency)];
     let managed = ManagedLocalstackPlaybook::new("managed-playbook-id", "does-not-exist");
 
-    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        futures::executor::block_on(managed.run(&deps));
-    }));
+    let Err(fault) = managed.run(&deps).await else {
+        panic!("playbook should fault");
+    };
 
-    assert!(outcome.is_err());
+    assert_eq!(fault.subject, Subject::Playbook);
+    assert_eq!(fault.id, managed.identifier());
 }
 
 #[tokio::test]
-async fn run_dependency_wrong_type_panics() {
+async fn run_dependency_wrong_type_returns_fault() {
     let deps: Vec<Dependency> = vec![Box::new(OtherDependency)];
     let managed = ManagedLocalstackPlaybook::new("managed-playbook-id", "not-a-localstack");
 
-    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        futures::executor::block_on(managed.run(&deps));
-    }));
+    let Err(fault) = managed.run(&deps).await else {
+        panic!("playbook should fault");
+    };
 
-    assert!(outcome.is_err());
+    assert_eq!(fault.subject, Subject::Playbook);
+    assert_eq!(fault.id, managed.identifier());
 }
 
 #[test]

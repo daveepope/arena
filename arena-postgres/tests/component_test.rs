@@ -12,12 +12,19 @@ fn init_test_logging() {
         .try_init();
 }
 
+const EPHEMERAL_PORT_RANGE: std::ops::RangeInclusive<u16> = 21200..=21249;
+
 fn ephemeral_tcp_port() -> u16 {
-    std::net::TcpListener::bind("127.0.0.1:0")
-        .expect("bind ephemeral tcp port")
-        .local_addr()
-        .expect("local_addr")
-        .port()
+    arena_host::find_available_port::find_available_port(
+        EPHEMERAL_PORT_RANGE,
+        arena_host::find_available_port::PortSearchStrategy::Random,
+    )
+    .unwrap_or_else(|| {
+        panic!(
+            "no available port found in range {}..={}",
+            EPHEMERAL_PORT_RANGE.start(), EPHEMERAL_PORT_RANGE.end()
+        )
+    })
 }
 
 fn with_client<F, T>(conn_str: &str, f: F) -> Result<T, String>
@@ -46,7 +53,7 @@ impl TestContext {
         let mut pg = PostgresDependency::builder("")
             .with_port(ephemeral_tcp_port())
             .build();
-        pg.start().await;
+        pg.start().await.expect("start should succeed");
 
         let conn_str = pg
             .connection_string()
@@ -120,7 +127,7 @@ impl TestContext {
     }
 
     async fn stop(mut self) {
-        self.pg.stop().await;
+        self.pg.stop().await.expect("stop should succeed");
     }
 }
 
@@ -254,7 +261,7 @@ async fn postgres_dependency_playbook_component_test() {
         .to_string()])
         .build();
 
-    pg.start().await;
+    pg.start().await.expect("start should succeed");
 
     let outcome = std::panic::AssertUnwindSafe(playbook_scenario(&pg))
         .catch_unwind()
@@ -262,7 +269,8 @@ async fn postgres_dependency_playbook_component_test() {
 
     tokio::time::timeout(Duration::from_secs(10), pg.stop())
         .await
-        .unwrap_or_else(|_| panic!("postgres stop timed out"));
+        .unwrap_or_else(|_| panic!("postgres stop timed out"))
+        .expect("postgres should stop");
 
     match outcome {
         Ok(Ok(())) => {}

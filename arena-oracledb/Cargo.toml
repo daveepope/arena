@@ -17,5 +17,6 @@ futures-timer = { workspace = true }
 tokio = { workspace = true, features = ["macros", "net", "io-util", "time", "sync", "rt"] }
 
 [dev-dependencies]
+arena-host = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "net", "io-util", "sync"] }
 tracing-subscriber = { workspace = true }

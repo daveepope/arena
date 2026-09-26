@@ -3,6 +3,7 @@ use arena_ffi::dependency::smtp::smtp_dependency::{build, SmtpDependencyConfig};
 fn minimal_smtp_config() -> SmtpDependencyConfig {
     SmtpDependencyConfig {
         identifier: "smtp".to_string(),
+        expiry_seconds: None,
         image_name: None,
         image: None,
         port: None,

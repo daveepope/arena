@@ -19,6 +19,16 @@ public final class TemporalDependencyBuilder {
     config.put("identifier", ArenaIdentifiers.build("arena-temporal", name));
   }
 
+  public TemporalDependencyBuilder withExpiry(java.time.Duration expiry) {
+    config.put("expiry_seconds", expirySeconds(expiry));
+    return this;
+  }
+
+  public TemporalDependencyBuilder withoutExpiry() {
+    config.put("expiry_seconds", 0);
+    return this;
+  }
+
   public TemporalDependencyBuilder withImageName(String imageName) {
     config.put("image_name", imageName);
     return this;
@@ -56,4 +66,13 @@ public final class TemporalDependencyBuilder {
     }
     return new TemporalDependency(cfg);
   }
+
+  private static long expirySeconds(java.time.Duration expiry) {
+    if (expiry.isNegative()) {
+      throw new IllegalArgumentException("expiry must not be negative: " + expiry);
+    }
+    long seconds = expiry.toSeconds();
+    return seconds == 0 && !expiry.isZero() ? 1 : seconds;
+  }
+
 }

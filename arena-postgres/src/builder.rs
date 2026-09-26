@@ -2,6 +2,7 @@ use crate::postgres_dependency::postgres_container_impl::{PostgresContainerImpl,
 use crate::postgres_dependency::PostgresDependency;
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
+use std::time::Duration;
 
 pub struct PostgresDependencyBuilder {
     identifier: String,
@@ -16,6 +17,7 @@ pub struct PostgresDependencyBuilder {
     image_tag: Option<String>,
     container_name: Option<String>,
     network: Option<String>,
+    expiry: Option<Duration>,
     readiness_check: Option<Box<dyn ReadinessCheck>>,
 }
 
@@ -39,6 +41,7 @@ impl PostgresDependencyBuilder {
             image_tag: None,
             container_name: None,
             network: None,
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
             readiness_check: None,
         }
     }
@@ -108,6 +111,16 @@ impl PostgresDependencyBuilder {
         self
     }
 
+    pub fn with_expiry(mut self, expiry: Duration) -> Self {
+        self.expiry = Some(expiry);
+        self
+    }
+
+    pub fn without_expiry(mut self) -> Self {
+        self.expiry = None;
+        self
+    }
+
     pub fn with_readiness_check<W>(mut self, check: W) -> Self
     where
         W: ReadinessCheck + 'static,
@@ -121,9 +134,10 @@ impl PostgresDependencyBuilder {
     }
 
     pub fn build(self) -> PostgresDependency {
-        let postgres_impl = self
+        let mut postgres_impl = self
             .postgres_impl
             .unwrap_or_else(|| Box::new(PostgresContainerImpl::new(self.network)));
+        postgres_impl.set_expiry(self.expiry);
 
         let port = self.port.unwrap_or(Self::DEFAULT_PORT);
         let database_name = self
@@ -147,7 +161,7 @@ impl PostgresDependencyBuilder {
         let readiness_check = self.readiness_check;
 
         let mut dep = PostgresDependency::new(
-            arena_container::identifier::build("arena-postgres", &self.identifier),
+            arena_container::identifier::build(crate::MODULE, &self.identifier),
             postgres_impl,
             port,
             database_name,

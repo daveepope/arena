@@ -37,10 +37,18 @@ impl OracleImpl for FakeOracleImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
+        Ok(())
     }
 
-    async fn stop(&self) {}
+    async fn stop(&self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&self) -> bool {
+        true
+    }
+    fn release(&self) {}
+
 
     fn connection_string(&self) -> Option<String> {
         None

@@ -1,3 +1,4 @@
+use std::time::Duration;
 use std::path::PathBuf;
 
 use crate::localstack_dependency::container_impl::LocalstackContainerImpl;
@@ -47,6 +48,7 @@ pub struct EventRuleSpec {
 
 pub struct LocalstackDependencyBuilder {
     identifier: String,
+    expiry: Option<Duration>,
     localstack_impl: Option<Box<dyn LocalstackImpl>>,
     port: Option<u16>,
     dependencies: Option<Vec<Box<dyn RunnableDependency>>>,
@@ -70,6 +72,7 @@ impl LocalstackDependencyBuilder {
     pub(crate) fn new(identifier: impl Into<String>) -> Self {
         Self {
             identifier: identifier.into(),
+            expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
             localstack_impl: None,
             port: None,
             dependencies: None,
@@ -193,6 +196,16 @@ impl LocalstackDependencyBuilder {
         self
     }
 
+    pub fn with_expiry(mut self, expiry: Duration) -> Self {
+        self.expiry = Some(expiry);
+        self
+    }
+
+    pub fn without_expiry(mut self) -> Self {
+        self.expiry = None;
+        self
+    }
+
     pub fn build(self) -> LocalstackDependency {
         let LocalstackDependencyBuilder {
             identifier,
@@ -203,6 +216,7 @@ impl LocalstackDependencyBuilder {
             image_tag,
             container_name,
             network,
+            expiry,
             readiness_check,
             services,
             queues,
@@ -211,16 +225,17 @@ impl LocalstackDependencyBuilder {
             event_rules,
         } = self;
 
-        let localstack_impl = localstack_impl.unwrap_or_else(|| {
+        let mut localstack_impl = localstack_impl.unwrap_or_else(|| {
             Box::new(LocalstackContainerImpl::new(network)) as Box<dyn LocalstackImpl>
         });
+        localstack_impl.set_expiry(expiry);
 
         let port = port.unwrap_or(Self::AUTO_HOST_PORT);
         let image_name = image_name.unwrap_or_else(|| Self::DEFAULT_IMAGE_NAME.to_string());
         let image_tag = image_tag.unwrap_or_else(|| Self::DEFAULT_IMAGE_TAG.to_string());
 
         let mut dep = LocalstackDependency::new(
-            arena_container::identifier::build("arena-localstack", &identifier),
+            arena_container::identifier::build(crate::MODULE, &identifier),
             localstack_impl,
             port,
             dependencies,

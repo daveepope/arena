@@ -2,15 +2,23 @@ package arena.junit.ffi;
 import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
+import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 import java.util.Map;
 
 interface ArenaNativeLib extends Library {
-  void arena_set_log_level(int level);
+  int arena_set_log_level(int level);
 
-  Pointer arena_open(String name, String configJson, PointerByReference errOut);
+  Pointer arena_open(
+      String name, String configJson, PointerByReference errOut, PointerByReference stateOut);
 
-  void arena_close(Pointer handle);
+  int arena_close(Pointer handle, PointerByReference errOut, PointerByReference stateOut);
+
+  int arena_state_json(Pointer handle, PointerByReference errOut, PointerByReference stateOut);
+
+  long arena_add_lifecycle_observer(ArenaLifecycleObserverCallback callback, Pointer userData);
+
+  void arena_remove_lifecycle_observer(long token);
 
   long arena_add_log_target(ArenaLoggingTargetCallback callback, Pointer userData);
 
@@ -28,9 +36,19 @@ interface ArenaNativeLib extends Library {
 
   int arena_hard_reset(Pointer handle, String dependencyIdentifier, PointerByReference errOut);
 
+  int arena_find_available_port(
+      int rangeStart, int rangeEnd, int strategy, IntByReference portOut, PointerByReference errOut);
+
   void arena_free_string(Pointer p);
 
   Pointer arena_oauth_loopback_tls_pem_json(PointerByReference errOut);
+
+  Pointer arena_oauth_sign_claims(
+      Pointer handle,
+      String dependencyIdentifier,
+      String providerJson,
+      String claimsJson,
+      PointerByReference errOut);
 
   Pointer arena_match_playbook_run(Pointer arena, String identifier, PointerByReference errOut);
 

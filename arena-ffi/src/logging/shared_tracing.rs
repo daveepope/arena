@@ -8,6 +8,7 @@ use tracing::{Event, Subscriber};
 use tracing_subscriber::filter::EnvFilter;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
+use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::reload;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -50,7 +51,6 @@ static DISPATCHER_DEPENDENCY_ALLOW: LazyLock<ArcSwap<Vec<String>>> =
 
 static DISPATCHER_COMPONENT_ALLOW: LazyLock<ArcSwap<Vec<String>>> =
     LazyLock::new(|| ArcSwap::from_pointee(Vec::new()));
-
 
 fn open_slot(recipient: DispatcherLoggingTargetRef) -> SlotKey {
     let key = SlotKey(NEXT_SLOT_KEY.fetch_add(1, Ordering::Relaxed));
@@ -100,7 +100,6 @@ impl Drop for ArenaLogDelivery {
     }
 }
 
-
 fn dispatcher_allow_json_bytes_store(bytes: &[u8]) -> Vec<String> {
     serde_json::from_slice::<Vec<String>>(bytes)
         .unwrap_or_default()
@@ -141,24 +140,6 @@ pub(super) unsafe fn dispatcher_component_allowlist_set_ptr(json_utf8: *const c_
     dispatcher_component_allowlist_store_bytes(bytes);
 }
 
-fn dispatcher_field_kv_tail(payload: &str) -> &str {
-    payload
-        .rsplit_once('|')
-        .map(|(_, rhs)| rhs.trim())
-        .unwrap_or("")
-}
-
-fn collect_equals_field_values<'a>(tail: &'a str, key_eq: &'a str) -> Vec<&'a str> {
-    let mut out = Vec::new();
-    for part in tail.split(',') {
-        let p = part.trim();
-        if let Some(rest) = p.strip_prefix(key_eq) {
-            out.push(rest.trim().trim_matches('"'));
-        }
-    }
-    out
-}
-
 fn dispatcher_allowlist_always_admits(metadata_target: &str) -> bool {
     metadata_target.starts_with("arena::")
         || metadata_target.starts_with("arena_container::")
@@ -175,7 +156,9 @@ fn allowlist_needles_hit_values<'a>(needles: &[String], vals: &[&'a str]) -> boo
 
 fn dispatcher_impl_allowlists_allows_delivery(
     metadata_target: &str,
-    payload: &str,
+    deps: &[&str],
+    comps: &[&str],
+    span_subject: Option<(&str, &str)>,
     dependency_allowlist: &[String],
     component_allowlist: &[String],
 ) -> bool {
@@ -185,12 +168,23 @@ fn dispatcher_impl_allowlists_allows_delivery(
     if !metadata_target.starts_with("arena_") {
         return true;
     }
-    let tail = dispatcher_field_kv_tail(payload);
-    let deps = collect_equals_field_values(tail, "dependency=");
-    let comps = collect_equals_field_values(tail, "component=");
-    if deps.is_empty() && comps.is_empty() {
-        return false;
-    }
+    let from_span: [&str; 1];
+    let (deps, comps) = if deps.is_empty() && comps.is_empty() {
+        match span_subject {
+            Some((arena::matches::SUBJECT_KIND_DEPENDENCY, id)) => {
+                from_span = [id];
+                (&from_span[..], &[][..])
+            }
+            Some((arena::matches::SUBJECT_KIND_COMPONENT, id)) => {
+                from_span = [id];
+                (&[][..], &from_span[..])
+            }
+            Some((arena::matches::SUBJECT_KIND_PLAYBOOK, _)) => return true,
+            _ => return false,
+        }
+    } else {
+        (deps, comps)
+    };
     match (!deps.is_empty(), !comps.is_empty()) {
         (true, false) => {
             !dependency_allowlist.is_empty()
@@ -220,8 +214,29 @@ pub(crate) fn ensure_shared_tracing_installed() {
 
         if registry.try_init().is_ok() {
             env_filter_reload::install_filter_control(Box::new(reload_handle), Level::Info);
+            install_panic_reporter();
         }
     });
+}
+
+fn install_panic_reporter() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        if !crate::boundary::inside_boundary() || snapshot_log_targets().is_empty() {
+            previous(info);
+            return;
+        }
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}", l.file(), l.line()))
+            .unwrap_or_else(|| "unknown".to_string());
+        tracing::error!(
+            target: "arena::ffi",
+            panic_message = %info.payload_as_str().unwrap_or("unknown panic payload"),
+            location = %location,
+            "panic captured at the arena boundary"
+        );
+    }));
 }
 
 fn snapshot_log_targets() -> Arc<Vec<RegisteredTarget>> {
@@ -235,24 +250,6 @@ fn host_dispatcher_accepts_metadata_target(target: &str) -> bool {
         || target.starts_with("ffi_logging_test::")
 }
 
-fn host_dispatcher_payload_for_host(recording_target: &str, message_body: String) -> String {
-    let tag = shorten_tracing_metadata_target_label(recording_target);
-    if message_body.is_empty() {
-        format!("[{tag}]")
-    } else {
-        format!("[{tag}] {message_body}")
-    }
-}
-
-fn shorten_tracing_metadata_target_label(recording_target: &str) -> String {
-    const MAX_TARGET_RUNE_LEN: usize = 72;
-    if recording_target.chars().count() <= MAX_TARGET_RUNE_LEN {
-        return recording_target.to_string();
-    }
-    let shortened: String = recording_target.chars().take(MAX_TARGET_RUNE_LEN).collect();
-    format!("{}…", shortened)
-}
-
 fn level_from_event(level: &tracing::Level) -> Level {
     match *level {
         tracing::Level::ERROR => Level::Error,
@@ -263,14 +260,129 @@ fn level_from_event(level: &tracing::Level) -> Level {
     }
 }
 
+pub(crate) const ROOT_LOGGER_NAME: &str = "arena";
+pub(crate) const ARENA_ID_FIELD: &str = "arena.id";
+pub(crate) const SUBJECT_KIND_FIELD: &str = "arena.subject.kind";
+pub(crate) const SUBJECT_ID_FIELD: &str = "arena.subject.id";
+
+#[derive(Default)]
+struct SubjectIdentity {
+    arena_id: Option<String>,
+    subject_kind: Option<String>,
+    subject_id: Option<String>,
+}
+
+impl Visit for SubjectIdentity {
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        self.assign(field.name(), format!("{value:?}"));
+    }
+
+    fn record_str(&mut self, field: &Field, value: &str) {
+        self.assign(field.name(), value.to_string());
+    }
+}
+
+impl SubjectIdentity {
+    fn assign(&mut self, name: &str, value: String) {
+        match name {
+            ARENA_ID_FIELD => self.arena_id = Some(value),
+            SUBJECT_KIND_FIELD => self.subject_kind = Some(value),
+            SUBJECT_ID_FIELD => self.subject_id = Some(value),
+            _ => {}
+        }
+    }
+}
+
+#[derive(Clone)]
+struct SpanNamespace {
+    arena_id: Option<Arc<str>>,
+    subject: Option<(Arc<str>, Arc<str>)>,
+    logger_name: Arc<str>,
+}
+
+fn logger_name_segment(raw: &str) -> Option<String> {
+    let cleaned: String = raw
+        .trim()
+        .chars()
+        .map(|c| if c == '.' { '_' } else { c })
+        .collect();
+    if cleaned.is_empty() {
+        None
+    } else {
+        Some(cleaned)
+    }
+}
+
+pub(crate) fn logger_name(arena_id: Option<&str>, subject: Option<(&str, &str)>) -> String {
+    let mut name = String::from(ROOT_LOGGER_NAME);
+    if let Some(segment) = arena_id.and_then(logger_name_segment) {
+        name.push('.');
+        name.push_str(&segment);
+    }
+    if let Some((kind, id)) = subject {
+        if let (Some(kind), Some(id)) = (logger_name_segment(kind), logger_name_segment(id)) {
+            name.push('.');
+            name.push_str(&kind);
+            name.push('.');
+            name.push_str(&id);
+        }
+    }
+    name
+}
+
 struct DispatcherLayer;
 
-impl<S: Subscriber> Layer<S> for DispatcherLayer {
+impl<S> Layer<S> for DispatcherLayer
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+{
     fn max_level_hint(&self) -> Option<LevelFilter> {
         Some(LevelFilter::TRACE)
     }
 
-    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+    fn on_new_span(
+        &self,
+        attrs: &tracing::span::Attributes<'_>,
+        id: &tracing::span::Id,
+        ctx: Context<'_, S>,
+    ) {
+        let mut identity = SubjectIdentity::default();
+        attrs.record(&mut identity);
+
+        let Some(span) = ctx.span(id) else {
+            return;
+        };
+        let inherited = span
+            .scope()
+            .skip(1)
+            .find_map(|ancestor| ancestor.extensions().get::<SpanNamespace>().cloned());
+
+        let declares_arena = identity.arena_id.is_some();
+        let arena_id = identity
+            .arena_id
+            .map(Arc::from)
+            .or_else(|| inherited.as_ref().and_then(|ns| ns.arena_id.clone()));
+        let subject = match (identity.subject_kind, identity.subject_id) {
+            (Some(kind), Some(subject_id)) => Some((Arc::from(kind), Arc::from(subject_id))),
+            _ if declares_arena => None,
+            _ => inherited.as_ref().and_then(|ns| ns.subject.clone()),
+        };
+        if arena_id.is_none() && subject.is_none() {
+            return;
+        }
+
+        let composed = logger_name(
+            arena_id.as_deref(),
+            subject.as_ref().map(|(kind, id)| (&**kind, &**id)),
+        );
+        span.extensions_mut().insert(SpanNamespace {
+            arena_id,
+            subject,
+            logger_name: Arc::from(composed.as_str()),
+        });
+    }
+
+    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
         let targets = snapshot_log_targets();
         if targets.is_empty() {
             return;
@@ -282,11 +394,13 @@ impl<S: Subscriber> Layer<S> for DispatcherLayer {
         }
 
         let severity = level_from_event(event.metadata().level());
-        let emitted_at = event
-            .metadata()
-            .module_path()
-            .unwrap_or(metadata_target)
-            .to_owned();
+        let namespace = ctx.event_scope(event).and_then(|mut scope| {
+            scope.find_map(|span| span.extensions().get::<SpanNamespace>().cloned())
+        });
+        let emitted_at = namespace
+            .as_ref()
+            .map(|ns| ns.logger_name.to_string())
+            .unwrap_or_else(|| ROOT_LOGGER_NAME.to_string());
 
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::SystemTime::UNIX_EPOCH)
@@ -295,7 +409,33 @@ impl<S: Subscriber> Layer<S> for DispatcherLayer {
 
         let mut coll = StructuredPayloadCollector::new();
         event.record(&mut coll);
-        let payload = host_dispatcher_payload_for_host(metadata_target, coll.into_body());
+
+        let dep_allow = DISPATCHER_DEPENDENCY_ALLOW.load_full();
+        let comp_allow = DISPATCHER_COMPONENT_ALLOW.load_full();
+        if !dispatcher_impl_allowlists_allows_delivery(
+            metadata_target,
+            &coll.field_values("dependency"),
+            &coll.field_values("component"),
+            namespace
+                .as_ref()
+                .and_then(|ns| ns.subject.as_ref())
+                .map(|(kind, id)| (&**kind, &**id)),
+            dep_allow.as_slice(),
+            comp_allow.as_slice(),
+        ) {
+            return;
+        }
+
+        let mut suppress: Vec<&str> = Vec::new();
+        if let Some(ns) = namespace.as_ref() {
+            if let Some(arena_id) = ns.arena_id.as_deref() {
+                suppress.push(arena_id);
+            }
+            if let Some((_, subject_id)) = ns.subject.as_ref() {
+                suppress.push(subject_id);
+            }
+        }
+        let payload = coll.body(&suppress);
 
         let (caller_file_utf8, caller_line) =
             match (event.metadata().file(), event.metadata().line()) {
@@ -319,26 +459,21 @@ impl<S: Subscriber> Layer<S> for DispatcherLayer {
             caller_line,
         };
 
-        let dep_allow = DISPATCHER_DEPENDENCY_ALLOW.load_full();
-        let comp_allow = DISPATCHER_COMPONENT_ALLOW.load_full();
-        if !dispatcher_impl_allowlists_allows_delivery(
-            metadata_target,
-            &record.payload,
-            dep_allow.as_slice(),
-            comp_allow.as_slice(),
-        ) {
-            return;
-        }
-
         for entry in targets.iter() {
             entry.recipient.deliver(record.clone());
         }
     }
 }
 
+struct PayloadField {
+    name: String,
+    rendered: String,
+    suppressible: bool,
+}
+
 struct StructuredPayloadCollector {
     message: Option<String>,
-    fields: Vec<String>,
+    fields: Vec<PayloadField>,
 }
 
 impl StructuredPayloadCollector {
@@ -363,19 +498,81 @@ impl StructuredPayloadCollector {
     }
 
     fn push_kv(&mut self, name: &str, formatted: impl std::fmt::Display) {
-        self.fields.push(format!("{}={}", name, formatted));
+        self.push_field(name, formatted, false);
     }
 
-    fn into_body(self) -> String {
-        let message = self.message.unwrap_or_default();
-        let tail = self.fields.join(", ");
+    fn push_kv_suppressible(&mut self, name: &str, formatted: impl std::fmt::Display) {
+        self.push_field(name, formatted, true);
+    }
+
+    fn push_field(&mut self, name: &str, formatted: impl std::fmt::Display, suppressible: bool) {
+        let rendered = format!("{formatted}");
+        let rendered = rounded_duration_value(&rendered).unwrap_or(rendered);
+        self.fields.push(PayloadField {
+            name: name.to_string(),
+            rendered,
+            suppressible,
+        });
+    }
+
+    fn field_values(&self, name: &str) -> Vec<&str> {
+        self.fields
+            .iter()
+            .filter(|field| field.name == name)
+            .map(|field| field.rendered.trim_matches('"'))
+            .collect()
+    }
+
+    fn body(&self, suppress: &[&str]) -> String {
+        let message = self.message.as_deref().unwrap_or_default();
+        let tail = self
+            .fields
+            .iter()
+            .filter(|field| {
+                if !field.suppressible {
+                    return true;
+                }
+                let bare = field.rendered.trim_matches('"');
+                !suppress.iter().any(|value| *value == bare)
+            })
+            .map(|field| format!("{}={}", field.name, field.rendered))
+            .collect::<Vec<_>>()
+            .join(" | ");
         if message.is_empty() {
             tail
         } else if tail.is_empty() {
-            message
+            message.to_string()
         } else {
-            format!("{} | {}", message, tail)
+            format!("{message} | {tail}")
         }
+    }
+}
+
+fn rounded_duration_value(rendered: &str) -> Option<String> {
+    let (number_part, unit) = ["ns", "µs", "ms", "s"]
+        .iter()
+        .find_map(|unit| rendered.strip_suffix(unit).map(|rest| (rest, *unit)))?;
+    if number_part.is_empty() || !number_part.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        return None;
+    }
+    let value: f64 = number_part.parse().ok()?;
+    Some(format!("{}{}", three_significant_figures(value), unit))
+}
+
+fn three_significant_figures(value: f64) -> String {
+    if value == 0.0 {
+        return String::from("0");
+    }
+    let magnitude = value.abs().log10().floor() as i32;
+    let decimals = (2 - magnitude).max(0) as usize;
+    let formatted = format!("{value:.decimals$}");
+    if formatted.contains('.') {
+        formatted
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string()
+    } else {
+        formatted
     }
 }
 
@@ -432,7 +629,7 @@ impl Visit for StructuredPayloadCollector {
         if field.name() == "message" {
             self.append_message_fragment_raw(value);
         } else {
-            self.push_kv(field.name(), format_args!("{value:?}"));
+            self.push_kv_suppressible(field.name(), format_args!("{value:?}"));
         }
     }
 
@@ -448,7 +645,7 @@ impl Visit for StructuredPayloadCollector {
         if field.name() == "message" {
             self.append_message_fragment_debug(value);
         } else {
-            self.push_kv(field.name(), format_args!("{:?}", value));
+            self.push_kv_suppressible(field.name(), format_args!("{:?}", value));
         }
     }
 

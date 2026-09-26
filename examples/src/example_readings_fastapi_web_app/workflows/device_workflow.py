@@ -1,9 +1,11 @@
+import asyncio
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import StrEnum
 from typing import Optional
 
 from temporalio import workflow
+from temporalio.exceptions import ApplicationError
 
 from example_readings_fastapi_web_app.workflows.device_activities import (
     enter_error,
@@ -12,6 +14,7 @@ from example_readings_fastapi_web_app.workflows.device_activities import (
 )
 
 ACTIVITY_TIMEOUT = timedelta(seconds=10)
+TRANSITION_TIMEOUT = timedelta(seconds=30)
 
 
 class DeviceState(StrEnum):
@@ -47,9 +50,27 @@ class DeviceLifecycleWorkflow:
             self._state = await self._apply_transition(device_id, target)
             self._transition_count += 1
 
-    @workflow.signal
-    def request_transition(self, target: DeviceState) -> None:
+    @workflow.update
+    async def request_transition(self, target: DeviceState) -> DeviceSnapshot:
+        await workflow.wait_condition(
+            lambda: self._requested is None or self._stop_requested
+        )
+        if self._stop_requested:
+            raise ApplicationError("device is stopping", non_retryable=True)
+        count_before = self._transition_count
         self._requested = target
+        try:
+            await workflow.wait_condition(
+                lambda: self._transition_count != count_before,
+                timeout=TRANSITION_TIMEOUT,
+            )
+        except asyncio.TimeoutError as exc:
+            raise ApplicationError(
+                f"device transition to {target} was not applied within"
+                f" {TRANSITION_TIMEOUT}",
+                non_retryable=True,
+            ) from exc
+        return self.snapshot()
 
     @workflow.signal
     def stop(self) -> None:

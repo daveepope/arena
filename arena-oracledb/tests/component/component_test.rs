@@ -2,12 +2,19 @@ use arena::dependency::RunnableDependency;
 use arena_oracledb::OracleDependency;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+const EPHEMERAL_PORT_RANGE: std::ops::RangeInclusive<u16> = 21400..=21449;
+
 fn ephemeral_tcp_port() -> u16 {
-    std::net::TcpListener::bind("127.0.0.1:0")
-        .expect("bind ephemeral tcp port")
-        .local_addr()
-        .expect("local_addr")
-        .port()
+    arena_host::find_available_port::find_available_port(
+        EPHEMERAL_PORT_RANGE,
+        arena_host::find_available_port::PortSearchStrategy::Random,
+    )
+    .unwrap_or_else(|| {
+        panic!(
+            "no available port found in range {}..={}",
+            EPHEMERAL_PORT_RANGE.start(), EPHEMERAL_PORT_RANGE.end()
+        )
+    })
 }
 
 fn init_test_logging() {
@@ -39,16 +46,24 @@ async fn lifecycle_scenario(oracle: &OracleDependency) {
         .execute(&format!(
             "CREATE TABLE {table} (id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, v NUMBER NOT NULL);"
         ))
-        .await;
+        .await
+        .expect("execute should succeed");
 
-    oracle.execute(&format!("INSERT INTO {table} (v) VALUES (123);")).await;
+    oracle
+        .execute(&format!("INSERT INTO {table} (v) VALUES (123);"))
+        .await
+        .expect("execute should succeed");
 
     let count = oracle
         .query_scalar(&format!("SELECT COUNT(*) FROM {table};"))
-        .await;
+        .await
+        .expect("query should succeed");
     assert!(count >= 1, "expected count >= 1, got {count}");
 
-    oracle.execute(&format!("DROP TABLE {table};")).await;
+    oracle
+        .execute(&format!("DROP TABLE {table};"))
+        .await
+        .expect("execute should succeed");
 
     tracing::info!(
         suite = "crate_component",
@@ -70,13 +85,16 @@ async fn playbook_scenario(oracle: &OracleDependency) {
 
     oracle
         .execute("INSERT INTO widgets (name) VALUES ('alpha');")
-        .await;
+        .await
+        .expect("execute should succeed");
     oracle
         .execute("INSERT INTO widgets (name) VALUES ('beta');")
-        .await;
+        .await
+        .expect("execute should succeed");
     oracle
         .execute("INSERT INTO widgets (name) VALUES ('gamma');")
-        .await;
+        .await
+        .expect("execute should succeed");
 
     let playbook = oracle.playbook().run().await;
 
@@ -85,10 +103,12 @@ async fn playbook_scenario(oracle: &OracleDependency) {
 
     oracle
         .execute("INSERT INTO widgets (name) VALUES ('delta');")
-        .await;
+        .await
+        .expect("execute should succeed");
     oracle
         .execute("INSERT INTO widgets (name) VALUES ('epsilon');")
-        .await;
+        .await
+        .expect("execute should succeed");
 
     let playbook = oracle.playbook().run().await;
     let count = playbook.verify("SELECT COUNT(*) FROM widgets;").await;
@@ -122,9 +142,9 @@ async fn oracle_dependency_component_test() {
              );"
                 .to_string(),
         ])
-        .build();
+        .build().expect("build oracle dependency");
 
-    oracle.start().await;
+    oracle.start().await.expect("oracle should start");
 
     lifecycle_scenario(&oracle).await;
     playbook_scenario(&oracle).await;

@@ -5,6 +5,86 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.1]
+
+### Fixed
+
+- Subject-scoped records carrying no `dependency`/`component` field are matched against the log identifier lists by their span
+- Playbook-scoped records reach registered log targets instead of being dropped by the dispatcher
+- Faults and panics are logged where they occur, naming the subject and the cause chain
+- Timing and phase records moved to DEBUG, leaving lifecycle transitions at INFO
+- arena-pytest keeps its own frames out of pytest tracebacks
+
+## [7.0.0]
+
+### Added
+
+- Arena lifecycle: a full state machine (`ArenaLifecycleState`, `RunnableState`) with recursive `Fault`s and an `ArenaState` snapshot covering every dependency, component, child and recorded fault
+- Lifecycle observation: `ClosedArena::observe` in Rust and `arena_add_lifecycle_observer` / `arena_remove_lifecycle_observer` / `arena_state_json` over the FFI, streaming one state document per transition
+- Python, Java and .NET clients: an `ArenaState` model, `ArenaLifecycleError` carrying the parsed state, a state accessor on the open arena, and identical lifecycle transition plus `closing summary` log lines
+- Guaranteed teardown: a graceful stop followed by an unconditional, idempotent forced stop over every subject (`force_stop`, `release`), plus container expiry so crashed runs are cleaned up
+- Object-namespaced logging: every line under `arena.<id>`, `arena.<id>.dependency.<id>` or `arena.<id>.component.<id>` with ` | ` separated fields
+
+### Changed
+
+- Every lifecycle API returns `Result` with `Fault`s instead of panicking: core dependency/component/playbook traits, open/close, resets, and the oauth, http, oracledb and executable-component builders
+- FFI: `arena_open` and `arena_close` hand back the arena state document; a faulted open or close surfaces as a typed lifecycle error in all three clients instead of panic text
+- Log output shape: `[arena::module]` prefixes removed, fields pipe separated, ids already in the logger namespace dropped from messages, durations rounded to three significant figures, default dispatcher logger renamed to `arena`
+- CI: the OracleDB component test runs in its own job on the Linux runners
+
+### Fixed
+
+- No exit path reports success while a subject may still be running: faults during parallel starts, stops, forced teardown, observers and drop are all recorded and teardown always completes
+- Panics no longer escape to client consoles; they are contained at the FFI boundary and recorded as faults in the arena state
+- Container name collisions from six-character identifier segments, non-invariant lowercasing, and double-free/finalizer races in the .NET client
+- `arena-oauth` hard reset teardown, TLS generation failures reported as faults, and the expired-container sweep throttled to once per module per minute
+
+## [6.2.1]
+
+### Changed
+
+- `arena-oauth`: issuer signing keys are generated when the dependency starts instead of when it is built
+- `rsa` and `num-bigint-dig` build with optimizations in unoptimized builds, so RSA key generation no longer dominates test time
+
+### Fixed
+
+- Dependencies and containerized components now request a platform the image actually publishes, falling back to `linux/amd64` for amd64-only images, so arenas start on arm64 hosts
+- `arena-oauth`: the HTTPS readiness probe now verifies the server certificate Arena generated instead of accepting any certificate
+- `arena-http`: the admin client only skips certificate verification for loopback hosts, and directs callers to `with_trusted_certificate_pem` otherwise
+- Platform resolution no longer caches a failed registry lookup, keys the cache by host platform, and falls back to the platform of the locally present image when the registry cannot be reached
+- Container start failures report the exit code as a plain number instead of Rust debug formatting
+- `arena-oauth`: the ephemeral server certificate covers the configured listen address, so a non-default listen IP passes the readiness probe
+
+## [6.2.0]
+
+### Added
+
+- `arena-oauth`: multi-issuer support on `OauthDependency` via `with_issuer`/`with_provider` (#218)
+- `arena-oauth`: `Provider` presets for Cognito, Okta, and Entra ID (#218)
+- `arena-oauth`: `sign_claims`/`signing_key_pem`/`issuer_at`/`issuer_count` on `OauthDependency` (#218)
+- `arena-ffi`: `arena_oauth_sign_claims` (#218)
+- `arena-pytest`, `arena-junit`, `arena-xunit`: `with_issuer_cognito`/`with_issuer_okta`/`with_issuer_entra_id`/`with_issuer`/`sign_claims` bindings (#218)
+- Example apps (Rust, Spring Boot, ASP.NET): Cognito-shaped OAuth provider in test fixtures (#218)
+- `arena-junit`: `OauthSigner`/`@ArenaOauthSigner` for injecting a per-test OAuth signer (#218)
+- `arena-xunit`: `ArenaCollectionFixture.Signer`/`GetDependency<T>()` for injecting a per-fixture OAuth signer (#218)
+- `arena-pytest`: `oauth_signer_fixture` for wiring an `OauthSigner` pytest fixture (#218)
+- `arena-host`: new crate providing `find_available_port`/`PortSearchStrategy` for zero-dependency, process-safe free TCP port discovery (#202)
+- `arena-ffi`: `arena_find_available_port` (#202)
+- `arena-pytest`, `arena-junit`, `arena-xunit`: `find_available_port`/`ArenaHost` bindings, `PortSearchStrategy`, `ArenaPortNotFoundError`/`ArenaPortNotFoundException` (#202)
+- `--config=stream` for streamed test output with a detailed summary
+- mold linker for Rust targets on Linux, installed by CI and required for local builds
+
+### Changed
+
+- `bazel test` now defaults to `--test_output=errors`; use `--config=stream` for streamed output
+
+### Fixed
+
+- `arena-junit`: `ArenaExtension` now makes the arena queryable during `@ArenaAfterOpen`, not just after
+- `arena-oracledb`: SQL readiness fails immediately when the container has stopped or been removed, instead of retrying it for the full timeout
+- FastAPI example component tests: dependency containers get run-unique names, so parallel targets no longer force-remove each other's containers
+- Example test runtimes (pytest, junit, xunit): ephemeral port ranges partitioned per test target to stop parallel targets drawing colliding host ports (#220)
+
 ## [6.1.0]
 
 ### Added

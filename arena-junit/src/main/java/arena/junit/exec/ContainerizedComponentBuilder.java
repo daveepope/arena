@@ -39,6 +39,16 @@ public final class ContainerizedComponentBuilder {
     return builder;
   }
 
+  public ContainerizedComponentBuilder withExpiry(java.time.Duration expiry) {
+    config.put("expiry_seconds", expirySeconds(expiry));
+    return this;
+  }
+
+  public ContainerizedComponentBuilder withoutExpiry() {
+    config.put("expiry_seconds", 0);
+    return this;
+  }
+
   public ContainerizedComponentBuilder withPlatform(String platform) {
     config.put("platform", platform);
     return this;
@@ -114,4 +124,13 @@ public final class ContainerizedComponentBuilder {
   public ContainerizedComponent build() {
     return new ContainerizedComponent(config.deepCopy(), readiness, children);
   }
+
+  private static long expirySeconds(java.time.Duration expiry) {
+    if (expiry.isNegative()) {
+      throw new IllegalArgumentException("expiry must not be negative: " + expiry);
+    }
+    long seconds = expiry.toSeconds();
+    return seconds == 0 && !expiry.isZero() ? 1 : seconds;
+  }
+
 }

@@ -12,13 +12,20 @@ struct FakeHttpImpl {
 
 #[async_trait]
 impl HttpImpl for FakeHttpImpl {
-    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) {
+    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) -> Result<(), String> {
         self.base_url = Some("http://127.0.0.1:8080".to_string());
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.base_url = None;
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn base_url(&self) -> Option<&str> {
         self.base_url.as_deref()
@@ -43,8 +50,8 @@ async fn started_http(identifier: &str) -> HttpDependency {
         .with_impl(FakeHttpImpl { base_url: None })
         .with_port(0)
         .with_readiness_check(OkReadinessCheck)
-        .build();
-    dep.start().await;
+        .build().expect("build http dependency");
+    dep.start().await.expect("start should succeed");
     dep
 }
 
@@ -54,7 +61,7 @@ fn playbook_with_unstarted_dep_panics() {
         .with_impl(FakeHttpImpl { base_url: None })
         .with_port(0)
         .with_readiness_check(OkReadinessCheck)
-        .build();
+        .build().expect("build http dependency");
 
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let _ = dep.playbook();

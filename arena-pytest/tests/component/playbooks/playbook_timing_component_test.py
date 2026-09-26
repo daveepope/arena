@@ -14,6 +14,13 @@ from arena_pytest import playbook
 from probe_playbooks import CALL_ORDER, ResetProbePlaybook, SeedProbePlaybook
 
 
+@pytest.fixture(autouse=True, scope="module")
+def reset_call_order():
+    CALL_ORDER.clear()
+    yield
+    CALL_ORDER.clear()
+
+
 class TestUnmanagedAndManagedPlaybooksStackedOnSameTest:
     @playbook(SeedProbePlaybook)
     @playbook(ResetProbePlaybook)

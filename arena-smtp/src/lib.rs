@@ -1,3 +1,5 @@
+pub(crate) const MODULE: &str = "arena-smtp";
+
 pub mod builder;
 pub mod smtp_dependency;
 

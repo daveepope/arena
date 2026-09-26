@@ -1,3 +1,4 @@
+use arena::lifecycle::{Fault, RunnableState};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_postgres::{PostgresDependency, PostgresImpl};
@@ -28,15 +29,22 @@ impl PostgresImpl for FakePostgresImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
         self.conn_str = Some("postgres://127.0.0.1:5432/fake".to_string());
         self.events.lock().unwrap().push(Event::PostgresStart);
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.conn_str = None;
         self.events.lock().unwrap().push(Event::PostgresStop);
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn connection_string(&self) -> Option<&str> {
         self.conn_str.as_deref()
@@ -101,8 +109,8 @@ async fn start_stop_happy_path_records_events() {
         .build();
 
     let outcome = std::panic::AssertUnwindSafe(async {
-        pg.start().await;
-        pg.stop().await;
+        pg.start().await.expect("start should succeed");
+        pg.stop().await.expect("stop should succeed");
     })
     .catch_unwind()
     .await;
@@ -142,7 +150,7 @@ async fn start_readiness_err_panics_after_impl_start() {
         .build();
 
     let outcome = std::panic::AssertUnwindSafe(async {
-        dep.start().await;
+        dep.start().await.expect("start should succeed");
     })
     .catch_unwind()
     .await;
@@ -169,10 +177,25 @@ impl RunnableDependency for NoopChildDependency {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+    fn state(&self) -> RunnableState {
+        RunnableState::NotStarted
+    }
 
-    async fn start(&mut self) {}
+    fn faults(&self) -> &[Fault] {
+        &[]
+    }
 
-    async fn stop(&mut self) {}
+    async fn force_stop(&mut self) {}
+    fn release(&mut self) {}
+
+
+    async fn start(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
+
+    async fn stop(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
     fn children(&self) -> &[Dependency] {
@@ -182,9 +205,13 @@ impl RunnableDependency for NoopChildDependency {
         &mut []
     }
 
-    async fn soft_reset(&self) {}
+    async fn soft_reset(&self) -> Result<(), Fault> {
+        Ok(())
+    }
 
-    async fn hard_reset(&mut self) {}
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 }
 
 #[test]
@@ -233,8 +260,8 @@ async fn playbook_after_start_uses_connection_string() {
         .with_readiness_check(AlwaysOkReadinessCheck)
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
     assert_eq!(dep.connection_string(), Some("postgres://127.0.0.1:5432/fake"));
     let _playbook = dep.playbook();
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }

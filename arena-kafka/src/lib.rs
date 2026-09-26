@@ -1,3 +1,5 @@
+pub(crate) const MODULE: &str = "arena-kafka";
+
 pub mod builder;
 pub mod kafka_dependency;
 

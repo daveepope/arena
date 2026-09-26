@@ -1,14 +1,16 @@
 use arena::dependency::RunnableDependency;
 use arena::healthcheck::ReadinessCheck;
+use arena::lifecycle::RunnableState;
 use arena_smtp::{SmtpDependency, SmtpImpl, SmtpTlsConfig};
 use async_trait::async_trait;
-use futures::FutureExt;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Event {
     SmtpStart,
     SmtpStop,
+    SmtpForceStop,
+    SmtpRelease,
 }
 
 struct FakeSmtpImpl {
@@ -27,17 +29,29 @@ impl SmtpImpl for FakeSmtpImpl {
         _image_tag: &str,
         _container_name: &str,
         _tls: Option<&SmtpTlsConfig>,
-    ) {
+    ) -> Result<(), String> {
         self.smtp_address = Some("127.0.0.1:1025".to_string());
         self.http_api_url = Some("http://127.0.0.1:8025".to_string());
         self.events.lock().unwrap().push(Event::SmtpStart);
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.smtp_address = None;
         self.http_api_url = None;
         self.events.lock().unwrap().push(Event::SmtpStop);
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        self.smtp_address = None;
+        self.http_api_url = None;
+        self.events.lock().unwrap().push(Event::SmtpForceStop);
+        true
+    }
+    fn release(&mut self) {
+        self.events.lock().unwrap().push(Event::SmtpRelease);
+    }
+
 
     fn smtp_address(&self) -> Option<&str> {
         self.smtp_address.as_deref()
@@ -62,25 +76,22 @@ impl ReadinessCheck for OkReadinessCheck {
     }
 }
 
-struct PanickingSmtpReadinessCheck;
+struct FailingSmtpReadinessCheck;
 
 #[async_trait]
-impl ReadinessCheck for PanickingSmtpReadinessCheck {
+impl ReadinessCheck for FailingSmtpReadinessCheck {
     async fn is_ready(
         &self,
         _identifier: &str,
         _smtp_address: &str,
         _timeout_ms: u64,
     ) -> Result<(), String> {
-        panic!("readiness probe failed");
+        Err("readiness probe failed".to_string())
     }
 }
 
-fn smtp_stop_count(events: &[Event]) -> usize {
-    events
-        .iter()
-        .filter(|event| matches!(event, Event::SmtpStop))
-        .count()
+fn count_of(events: &[Event], wanted: Event) -> usize {
+    events.iter().filter(|event| **event == wanted).count()
 }
 
 fn build_smtp(events: Arc<Mutex<Vec<Event>>>) -> SmtpDependency {
@@ -94,53 +105,110 @@ fn build_smtp(events: Arc<Mutex<Vec<Event>>>) -> SmtpDependency {
         .build()
 }
 
-#[test]
-fn drop_unstarted_dep_skips_impl_stop() {
-    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
-    let dep = build_smtp(events.clone());
-    drop(dep);
-    assert_eq!(smtp_stop_count(&events.lock().unwrap()), 0);
-}
-
-#[tokio::test]
-async fn stop_then_drop_single_impl_stop() {
-    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
-    let mut dep = build_smtp(events.clone());
-    dep.start().await;
-    dep.stop().await;
-    drop(dep);
-    assert_eq!(smtp_stop_count(&events.lock().unwrap()), 1);
-}
-
-#[tokio::test]
-async fn drop_running_dep_invokes_full_stop() {
-    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
-    let mut dep = build_smtp(events.clone());
-    dep.start().await;
-    drop(dep);
-    assert_eq!(smtp_stop_count(&events.lock().unwrap()), 1);
-}
-
-#[tokio::test]
-async fn start_panic_then_drop_impl_stop() {
-    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
-    let mut dep = SmtpDependency::builder("smtp-drop")
+fn build_smtp_with_failing_readiness(events: Arc<Mutex<Vec<Event>>>) -> SmtpDependency {
+    SmtpDependency::builder("smtp-drop")
         .with_impl(FakeSmtpImpl {
             smtp_address: None,
             http_api_url: None,
-            events: events.clone(),
+            events,
         })
-        .with_readiness_check(PanickingSmtpReadinessCheck)
-        .build();
+        .with_readiness_check(FailingSmtpReadinessCheck)
+        .build()
+}
 
-    let start_outcome = std::panic::AssertUnwindSafe(async {
-        dep.start().await;
-    })
-    .catch_unwind()
-    .await;
-    assert!(start_outcome.is_err());
-    assert_eq!(events.lock().unwrap().as_slice(), &[Event::SmtpStart]);
+#[test]
+fn drop_unstarted_dependency_skips_teardown() {
+    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
+    let dep = build_smtp(events.clone());
 
     drop(dep);
-    assert_eq!(smtp_stop_count(&events.lock().unwrap()), 1);
+
+    assert!(events.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn start_healthy_dependency_returns_started() {
+    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
+    let mut dep = build_smtp(events.clone());
+
+    dep.start().await.expect("dependency should start");
+
+    assert_eq!(dep.state(), RunnableState::Started);
+    assert_eq!(count_of(&events.lock().unwrap(), Event::SmtpStart), 1);
+}
+
+#[tokio::test]
+async fn stop_started_dependency_returns_stopped() {
+    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
+    let mut dep = build_smtp(events.clone());
+
+    dep.start().await.expect("dependency should start");
+    dep.stop().await.expect("dependency should stop");
+
+    assert_eq!(dep.state(), RunnableState::Stopped);
+    assert_eq!(count_of(&events.lock().unwrap(), Event::SmtpStop), 1);
+}
+
+#[tokio::test]
+async fn stop_then_drop_does_not_stop_twice() {
+    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
+    let mut dep = build_smtp(events.clone());
+
+    dep.start().await.expect("dependency should start");
+    dep.stop().await.expect("dependency should stop");
+    drop(dep);
+
+    assert_eq!(count_of(&events.lock().unwrap(), Event::SmtpStop), 1);
+    assert_eq!(count_of(&events.lock().unwrap(), Event::SmtpForceStop), 0);
+}
+
+#[tokio::test]
+async fn drop_running_dependency_releases_container() {
+    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
+    let mut dep = build_smtp(events.clone());
+
+    dep.start().await.expect("dependency should start");
+    drop(dep);
+
+    assert_eq!(count_of(&events.lock().unwrap(), Event::SmtpRelease), 1);
+}
+
+#[tokio::test]
+async fn start_readiness_failure_returns_fault_and_forces_stop() {
+    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
+    let mut dep = build_smtp_with_failing_readiness(events.clone());
+
+    let fault = dep.start().await.expect_err("dependency should fault");
+
+    assert_eq!(fault.id, dep.identifier());
+    assert!(fault.message.contains("readiness check failed"));
+    assert_eq!(dep.state(), RunnableState::Stopped);
+    assert_eq!(dep.faults().len(), 1);
+    assert_eq!(count_of(&events.lock().unwrap(), Event::SmtpForceStop), 1);
+}
+
+#[tokio::test]
+async fn start_readiness_failure_then_drop_does_not_force_stop_twice() {
+    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
+    let mut dep = build_smtp_with_failing_readiness(events.clone());
+
+    let _fault = dep.start().await.expect_err("dependency should fault");
+    drop(dep);
+
+    assert_eq!(count_of(&events.lock().unwrap(), Event::SmtpForceStop), 1);
+}
+
+#[tokio::test]
+async fn force_stop_called_twice_is_indistinguishable_from_once() {
+    let events = Arc::new(Mutex::new(Vec::<Event>::new()));
+    let mut dep = build_smtp(events.clone());
+
+    dep.start().await.expect("dependency should start");
+    dep.force_stop().await;
+    let after_first = dep.state();
+    dep.force_stop().await;
+
+    assert_eq!(after_first, RunnableState::Stopped);
+    assert_eq!(dep.state(), RunnableState::Stopped);
+    assert!(dep.faults().is_empty());
 }

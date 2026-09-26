@@ -1,3 +1,7 @@
+from datetime import timedelta
+
+from arena_pytest.support._expiry import _expiry_seconds
+
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -20,6 +24,14 @@ class KafkaDependencyBuilder:
             "topics": [],
         }
         self._children: List[Any] = []
+
+    def with_expiry(self, expiry: timedelta) -> "KafkaDependencyBuilder":
+        self._config["expiry_seconds"] = _expiry_seconds(expiry)
+        return self
+
+    def without_expiry(self) -> "KafkaDependencyBuilder":
+        self._config["expiry_seconds"] = 0
+        return self
 
     def with_image_name(self, image_name: str) -> "KafkaDependencyBuilder":
         self._config["image_name"] = image_name

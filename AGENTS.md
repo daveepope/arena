@@ -7,6 +7,8 @@
 - Use **`cargo check --workspace`** for fast Rust feedback when useful; treat **Bazel** as the source of truth for green builds.
 - Always report to the developer if you are adding ANY new 3rd party libraries
 - Never stray away from the plan set out by the developer
+- **NEVER commit code.** Do not run `git commit`, `git add`, `git push`, or any other command that stages or records changes. Leave changes in the working tree; committing is the developer's job. Supply a commit message as text only when asked for one.
+- **NEVER run a repin or a version bump without the developer's explicit permission.** This covers `bazel run //scripts:repin`, `bazel run //scripts:bump_version`, `CARGO_BAZEL_REPIN=1`, and any hand edit of `VERSION`, `workspace.package.version`, the `module()` version in `MODULE.bazel`, or the workspace-member versions in `Cargo.lock` / `Cargo.Bazel.lock`. These rewrite release metadata and every lockfile. Tell the developer the command to run and let them run it.
 - You will function as an informative AI coding agent to ASSIST the developer in adding new features, fixing bugs, increasing test coverage, maintaing the architecture.
 - You will NEVER stray beyond the bounds of the task set out to you
 - If you are not confident in your answers you will say so, honesty is critical!
@@ -15,7 +17,10 @@
 
 ## AI communication
 
-- Keep replies **concise** and **consistent** in tone and structure.
+- **VERY SHORT ANSWERS.** Default to one or two sentences, or a bare command. No essays, no summaries of what you just did, no restating the question. Expand only when the developer explicitly asks for detail.
+- **No unsolicited tables, headings, or bullet lists** in chat replies. Prose only, and as little of it as possible.
+- Answer the question that was asked. Nothing adjacent, nothing extra.
+- Keep replies **consistent** in tone and structure.
 - Be **clear**; ask **direct questions** when something is ambiguous. **Do not waffle**, hedge with filler, or pad with generic advice.
 - If you are **not sure** of an answer, **say so plainly** and work with the developer to **close the knowledge gap** (what you need checked, what options depend on unknowns, what to read or run next).
 - **Never use em dashes** (`—`). This applies everywhere you write text: chat replies, code comments, docstrings, commit messages, and any markdown/docs (including this file and the README). Use a period, comma, colon, or parentheses instead.
@@ -56,6 +61,7 @@
 - Prefer **performance, speed, and efficiency** in lifecycle and orchestration code.
 - Keep behavior **testable**, follow **simple SOLID** shaping (single responsibility, small interfaces), and **avoid over-abstraction**.
 - **Follow the established module/crate layout**; do not invent parallel structures without a clear reason.
+- **The Arena owns teardown.** Any dependency or component the Arena has started must be stopped by the Arena, including after a fault and including when the Arena is dropped. **Never leave dangling containers, networks, or processes.** Teardown is aggressive and runs in **two passes**: a graceful stop, then an **unconditional forced stop** over every subject regardless of the state it reports, because a subject claiming to be stopped may still be running. The forced stop must be **idempotent**, **infallible**, and **panic-free**. Neither pass may short-circuit: a failure is recorded and the sweep continues to every remaining subject. A fault path that returns before the forced sweep has run is a **defect**, not a tradeoff. If any dependency or component ends faulted, the Arena is faulted: **no exit path may report success while a subject may still be running.**
 
 ## Tests (unit and component)
 
@@ -86,7 +92,7 @@
 - When a **feature is complete**, run **`bazel build`** and **`bazel test`** (workspace- or target-appropriate scope).
 - After **`cargo check`** (or during iteration), still validate with **Bazel** before considering work done. Do not run pip, nuget, maven, nvm commands directly on the host, everything should be built via Bazel.
 - For **Python lockfiles**: edit **`arena-pytest/requirements.txt`** then run **`bazel run //arena-pytest:pip_requirements.update`** and **`bazel test //arena-pytest:pip_requirements_test`**. For **example apps** under `examples/`, edit **`examples/requirements.txt`** then run **`bazel run //examples:pip_requirements.update`** and **`bazel test //examples:pip_requirements_test`**. Do not run pip or pip-compile on the host for those workflows.
-- Tests that **start a running dependency** (container or in-process server) must declare **`tags = ["component_test"]`** on their **`rust_test`** / **`py_test`** / **`java_test`** target. PR CI runs the full suite on **Linux** and on **`macos-15-intel`** (Colima via **`setup-docker-macos-action`**). **`macos-latest`** runs build and non-`component_test` tests for Apple Silicon coverage. Coverage and hosts without a container runtime use **`--test_tag_filters=-component_test`**.
+- Tests that **start a running dependency** (container or in-process server) must declare **`tags = ["component_test"]`** on their **`rust_test`** / **`py_test`** / **`java_test`** target. PR CI runs the full suite on **`ubuntu-24.04`** (linux/amd64) and **`windows-latest`**, each with a companion job for `//examples/...`, and on **`ubuntu-24.04-arm`** (linux/arm64, with amd64 emulation registered via `tonistiigi/binfmt`) minus the mssql-backed targets: SQL Server publishes no arm64 image and exits under emulation, so `//arena-mssql:component_test`, `//arena-pytest:playbook_timing_component_test` and `//examples/...` stay on the amd64 runners. **`macos-15-intel`** and **`macos-latest`** have no container runtime and run build plus non-`component_test` tests only. Coverage and hosts without a container runtime use **`--test_tag_filters=-component_test`**.
 
 ## FFI layer
 

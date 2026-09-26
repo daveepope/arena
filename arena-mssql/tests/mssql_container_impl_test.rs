@@ -9,13 +9,19 @@ fn test_password() -> String {
     format!("pw-{nanos}")
 }
 
+const CLOSED_PORT_RANGE: std::ops::RangeInclusive<u16> = 21300..=21349;
+
 async fn closed_port() -> u16 {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind");
-    let port = listener.local_addr().expect("local_addr").port();
-    drop(listener);
-    port
+    arena_host::find_available_port::find_available_port(
+        CLOSED_PORT_RANGE,
+        arena_host::find_available_port::PortSearchStrategy::Random,
+    )
+    .unwrap_or_else(|| {
+        panic!(
+            "no available port found in range {}..={}",
+            CLOSED_PORT_RANGE.start(), CLOSED_PORT_RANGE.end()
+        )
+    })
 }
 
 #[tokio::test]

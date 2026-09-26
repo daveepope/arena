@@ -32,8 +32,7 @@ public class DeviceRestController {
 
   @PostMapping("/{id}/state")
   public DeviceStateResponse setState(
-      @PathVariable long id, @Valid @RequestBody SetDeviceStateRequest body)
-      throws InterruptedException {
+      @PathVariable long id, @Valid @RequestBody SetDeviceStateRequest body) {
     return devices.requestStateTransition(id, body);
   }
 

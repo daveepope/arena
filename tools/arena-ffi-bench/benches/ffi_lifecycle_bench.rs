@@ -96,7 +96,7 @@ fn bench_open_close_round_trip(c: &mut Criterion) {
         b.iter(|| {
             let name = CString::new("bench-arena").unwrap();
             let mut err: *mut c_char = std::ptr::null_mut();
-            let handle = arena_open(name.as_ptr(), std::ptr::null(), &mut err as *mut _);
+            let handle = arena_open(name.as_ptr(), std::ptr::null(), &mut err as *mut _, std::ptr::null_mut());
             assert!(!handle.is_null(), "expected handle, got error: {:?}", unsafe {
                 if err.is_null() {
                     None
@@ -104,7 +104,7 @@ fn bench_open_close_round_trip(c: &mut Criterion) {
                     Some(CStr::from_ptr(err).to_string_lossy().into_owned())
                 }
             });
-            arena_close(handle);
+            arena_close(handle, std::ptr::null_mut(), std::ptr::null_mut());
             arena_free_string(err);
         });
     });

@@ -1,8 +1,7 @@
 using System;
-using System.Net;
-using System.Net.Sockets;
 using ArenaDotnet.Xunit;
 using ArenaDotnet.Xunit.Dep;
+using ArenaDotnet.Xunit.Ffi;
 using ArenaDotnet.Xunit.Xunit;
 using Xunit;
 
@@ -10,32 +9,12 @@ namespace ArenaDotnet.Xunit.ComponentTest;
 
 public static class TestRuntime
 {
-    private static readonly object Lock = new object();
-    private static int? _nextPort;
+    private const int EphemeralPortRangeStart = 20900;
+    private const int EphemeralPortRangeEnd = 21100;
 
     public static int AllocatePort()
     {
-        lock (Lock)
-        {
-            if (_nextPort.HasValue)
-            {
-                var p = _nextPort.Value;
-                _nextPort = p + 1;
-                return p;
-            }
-            var port = FindOpenPort();
-            _nextPort = port + 1;
-            return port;
-        }
-    }
-
-    private static int FindOpenPort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
+        return ArenaHost.FindAvailablePort(EphemeralPortRangeStart, EphemeralPortRangeEnd, PortSearchStrategy.Random);
     }
 }
 

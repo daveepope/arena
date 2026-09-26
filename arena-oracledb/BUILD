@@ -24,6 +24,7 @@ rust_test(
     ) + [
         ":arena_oracledb",
         "//arena",
+        "//arena-container:arena_container",
     ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,
@@ -172,6 +173,7 @@ rust_test(
     ) + [
         ":arena_oracledb",
         "//arena",
+        "//arena-host:arena_host",
     ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,

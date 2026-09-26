@@ -3,6 +3,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public final class ArenaIdentifiers {
   private static final int SUFFIX_LEN = 6;
+  private static final String MODULE_PREFIX = "arena-";
   private static final String ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
   private static final int BASE = ALPHABET.length();
   private static final long MASK_64 = 0xFFFFFFFFFFFFFFFFL;
@@ -51,17 +52,20 @@ public final class ArenaIdentifiers {
     return new String(digits);
   }
 
-  private static boolean hasSuffix(String name) {
-    int marker = name.lastIndexOf("--");
-    if (marker < 0) {
+  private static boolean isAlreadyBuilt(String name) {
+    if (!name.startsWith(MODULE_PREFIX)) {
       return false;
     }
-    String suffix = name.substring(marker + 2);
-    if (suffix.length() != SUFFIX_LEN) {
+    int dash = name.lastIndexOf('-');
+    if (dash < 0) {
       return false;
     }
-    for (int i = 0; i < suffix.length(); i++) {
-      if (ALPHABET.indexOf(suffix.charAt(i)) < 0) {
+    String last = name.substring(dash + 1);
+    if (last.length() != SUFFIX_LEN) {
+      return false;
+    }
+    for (int i = 0; i < last.length(); i++) {
+      if (ALPHABET.indexOf(last.charAt(i)) < 0) {
         return false;
       }
     }
@@ -69,7 +73,7 @@ public final class ArenaIdentifiers {
   }
 
   public static String build(String module, String name) {
-    if (hasSuffix(name)) {
+    if (isAlreadyBuilt(name)) {
       return name;
     }
     String slug = slugify(name);
@@ -77,6 +81,6 @@ public final class ArenaIdentifiers {
     if (slug.isEmpty()) {
       return module + "-" + suffix;
     }
-    return module + "-" + slug + "--" + suffix;
+    return module + "-" + slug + "-" + suffix;
   }
 }

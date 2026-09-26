@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from arena_version import (
+    require_cargo,
     audit_arena_ffi_binary,
     regenerate_windows_pip_locks,
     repin_all_lockfiles,
@@ -23,6 +24,7 @@ def _repo_root() -> Path:
 
 def main() -> int:
     root = _repo_root()
+    require_cargo()
     print("repinning Rust, Python, and Maven lockfiles")
     repin_all_lockfiles(root)
     print(

@@ -4,7 +4,7 @@ use arena_executable_component::executable_component::ExecutableComponent;
 use arena_http::HttpDependency;
 use arena_kafka::{KafkaDependency, KafkaFlavor};
 use arena_mssql::MssqlDependency;
-use arena_oauth::OauthDependency;
+use arena_oauth::{OauthDependency, Provider};
 use arena_postgres::PostgresDependency;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
@@ -20,9 +20,12 @@ pub static OAUTH_ID: OnceLock<String> = OnceLock::new();
 
 static OAUTH_SERVER_TLS_CERT_PEM: OnceLock<String> = OnceLock::new();
 
+pub const OAUTH_COGNITO_POOL_ID: &str = "us-east-1_exampleUsers";
+
 pub struct TestRuntime {
     pub oauth_port: u16,
     pub oauth_issuer: String,
+    pub oauth_provider_issuer: String,
     pub postgres_port: u16,
     pub kafka_port: u16,
     pub calibration_http_port: u16,
@@ -32,12 +35,19 @@ pub struct TestRuntime {
     pub match_name: String,
 }
 
+const EPHEMERAL_PORT_RANGE: std::ops::RangeInclusive<u16> = 21100..=21199;
+
 fn ephemeral_tcp_port() -> u16 {
-    std::net::TcpListener::bind("127.0.0.1:0")
-        .expect("bind ephemeral tcp port")
-        .local_addr()
-        .expect("local_addr")
-        .port()
+    arena_host::find_available_port::find_available_port(
+        EPHEMERAL_PORT_RANGE,
+        arena_host::find_available_port::PortSearchStrategy::Random,
+    )
+    .unwrap_or_else(|| {
+        panic!(
+            "no available port found in range {}..={}",
+            EPHEMERAL_PORT_RANGE.start(), EPHEMERAL_PORT_RANGE.end()
+        )
+    })
 }
 
 fn run_suffix() -> String {
@@ -56,8 +66,11 @@ pub fn test_runtime() -> &'static TestRuntime {
     TEST_RUNTIME.get_or_init(|| {
         let oauth_port = ephemeral_tcp_port();
         let run_suffix = run_suffix();
+        let oauth_issuer = format!("https://127.0.0.1:{oauth_port}");
+        let oauth_provider_issuer = format!("{oauth_issuer}/{OAUTH_COGNITO_POOL_ID}");
         TestRuntime {
-            oauth_issuer: format!("https://127.0.0.1:{oauth_port}"),
+            oauth_issuer,
+            oauth_provider_issuer,
             oauth_port,
             postgres_port: ephemeral_tcp_port(),
             kafka_port: ephemeral_tcp_port(),
@@ -70,10 +83,6 @@ pub fn test_runtime() -> &'static TestRuntime {
     })
 }
 
-pub fn oauth_issuer() -> &'static str {
-    &test_runtime().oauth_issuer
-}
-
 pub fn exec_web_app_port() -> u16 {
     test_runtime().exec_web_app_port
 }
@@ -83,6 +92,32 @@ pub fn oauth_server_tls_cert_pem() -> &'static str {
         .get()
         .map(|s| s.as_str())
         .expect("oauth_server_tls_cert_pem: arena dependencies not initialized")
+}
+
+pub fn signed_token_with_scope(arena: &OpenArena, scope: &str) -> String {
+    let oauth = arena
+        .dependency(OAUTH_ID.get().expect("oauth id initialized"))
+        .and_then(|d| d.as_any().downcast_ref::<OauthDependency>())
+        .expect("oauth dependency should be available");
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time")
+        .as_secs();
+    let claims = serde_json::json!({
+        "iss": test_runtime().oauth_provider_issuer,
+        "sub": "arena-examples",
+        "scope": scope,
+        "iat": now,
+        "exp": now + 300,
+    });
+    oauth
+        .sign_claims(
+            &Provider::Cognito {
+                pool_id: OAUTH_COGNITO_POOL_ID.to_string(),
+            },
+            &claims,
+        )
+        .expect("sign_claims")
 }
 
 pub const POSTGRES_DB_NAME: &str = "readings_db";
@@ -117,7 +152,8 @@ pub fn setup_dependencies() -> Vec<Dependency> {
 
     let calibration_service = HttpDependency::builder("example-api-calibration")
         .with_port(rt.calibration_http_port)
-        .build();
+        .build()
+        .expect("build calibration dependency");
     CALIBRATION_ID
         .set(calibration_service.identifier.clone())
         .expect("calibration id set once");
@@ -141,7 +177,11 @@ pub fn setup_dependencies() -> Vec<Dependency> {
         .with_listen_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
         .with_port(rt.oauth_port)
         .with_metadata_base_url(&rt.oauth_issuer)
-        .build();
+        .with_provider(Provider::Cognito {
+            pool_id: OAUTH_COGNITO_POOL_ID.to_string(),
+        })
+        .build()
+        .expect("build oauth dependency");
     OAUTH_SERVER_TLS_CERT_PEM
         .set(
             oauth
@@ -212,14 +252,14 @@ pub fn setup_exec_component() -> Component {
                 rt.mssql_port, MSSQL_DB_NAME, MSSQL_DB_USER, MSSQL_DB_PASS
             ),
         )
-        .with_runtime_arg("oauth_issuer_url", rt.oauth_issuer.clone())
+        .with_runtime_arg("oauth_issuer_url", rt.oauth_provider_issuer.clone())
         .with_readiness_check_timeout(HttpReadinessCheck::new(), healthcheck_url, 30_000);
 
     if !is_bazel {
         builder = builder.with_source_path("examples");
     }
 
-    Box::new(builder.build())
+    Box::new(builder.build().expect("build web app component"))
 }
 
 use crate::playbooks::{
@@ -256,7 +296,10 @@ pub async fn create_arena() -> OpenArena {
     )];
     let closed_arena = ClosedArena::new(rt.closed_arena_name.clone(), matches);
 
-    closed_arena.open().await
+    closed_arena
+        .open()
+        .await
+        .unwrap_or_else(|state| panic!("arena failed to open: {state}"))
 }
 
 static SHARED_ARENA: OnceCell<OpenArena> = OnceCell::const_new();

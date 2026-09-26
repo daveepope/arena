@@ -15,9 +15,6 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class DeviceService {
 
-  private static final long TRANSITION_WAIT_TIMEOUT_MILLIS = 500L;
-  private static final long TRANSITION_WAIT_POLL_MILLIS = 25L;
-
   private final JdbcTemplate pg;
   private final DeviceWorkflowClientFactory workflows;
   private final ProvisionedEmailSender provisionedEmailSender;
@@ -58,20 +55,10 @@ public class DeviceService {
     return new CreateDeviceResponse(id, req.name());
   }
 
-  public DeviceStateResponse requestStateTransition(long deviceId, SetDeviceStateRequest req)
-      throws InterruptedException {
+  public DeviceStateResponse requestStateTransition(long deviceId, SetDeviceStateRequest req) {
     DeviceLifecycleWorkflow workflow = workflows.existingWorkflowStub(deviceId);
     try {
-      int countBefore = workflow.snapshot().transitionCount();
-      workflow.requestTransition(req.target());
-
-      long deadline = System.currentTimeMillis() + TRANSITION_WAIT_TIMEOUT_MILLIS;
-      DeviceSnapshot snapshot = workflow.snapshot();
-      while (snapshot.transitionCount() == countBefore && System.currentTimeMillis() < deadline) {
-        Thread.sleep(TRANSITION_WAIT_POLL_MILLIS);
-        snapshot = workflow.snapshot();
-      }
-
+      DeviceSnapshot snapshot = workflow.requestTransition(req.target());
       return new DeviceStateResponse(deviceId, snapshot.state(), snapshot.transitionCount());
     } catch (WorkflowNotFoundException e) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "device not found: " + deviceId, e);

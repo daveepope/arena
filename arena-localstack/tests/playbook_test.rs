@@ -15,11 +15,19 @@ impl LocalstackImpl for FakeLocalstackImpl {
         _image_tag: &str,
         _container_name: &str,
         _services: &[String],
-    ) {
+    ) -> Result<(), String> {
         self.endpoint = Some("http://127.0.0.1:4566".to_string());
+        Ok(())
     }
 
-    async fn stop(&mut self) {}
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn endpoint_url(&self) -> Option<&str> {
         self.endpoint.as_deref()
@@ -64,7 +72,7 @@ async fn run_empty_queues_active_drop_succeeds() {
         .with_readiness_check(OkReadinessCheck)
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
 
     let active = dep
         .playbook()
@@ -83,7 +91,7 @@ async fn started_playbook_dep() -> LocalstackDependency {
         .with_readiness_check(OkReadinessCheck)
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
     dep
 }
 
@@ -116,10 +124,18 @@ impl LocalstackImpl for EmptyEndpointLocalstackImpl {
         _image_tag: &str,
         _container_name: &str,
         _services: &[String],
-    ) {
+    ) -> Result<(), String> {
+        Ok(())
     }
 
-    async fn stop(&mut self) {}
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn endpoint_url(&self) -> Option<&str> {
         Some("")
@@ -135,7 +151,7 @@ async fn active_playbook_drop_empty_endpoint_skips_cleanup_thread() {
         .with_readiness_check(OkReadinessCheck)
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
 
     let active = dep.playbook().run().await;
     assert_eq!(active.endpoint(), "");

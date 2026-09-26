@@ -7,15 +7,56 @@ internal static class ArenaBindings
     internal static IntPtr OpenArena(string name, string configJson, ArenaLogLevel level)
     {
         ArenaNativeLib.arena_set_log_level((int)level);
-        IntPtr handle = ArenaNativeLib.arena_open(name, configJson, out var errOut);
+        IntPtr handle = ArenaNativeLib.arena_open(name, configJson, out var errOut, out var stateOut);
+        var stateDocument = TakeOutString(stateOut);
         if (handle == IntPtr.Zero)
-            throw TakeErr(errOut, "arena_open failed");
+        {
+            var message = TakeOutString(errOut);
+            throw new ArenaBindingError(
+                string.IsNullOrEmpty(message) ? "arena_open returned null" : message!, stateDocument);
+        }
+        ReleaseOutString(errOut);
         return handle;
     }
 
-    internal static void CloseArena(IntPtr handle)
+    internal static string? CloseArena(IntPtr handle)
     {
-        ArenaNativeLib.arena_close(handle);
+        var status = ArenaNativeLib.arena_close(handle, out var errOut, out var stateOut);
+        var message = TakeOutString(errOut);
+        var stateDocument = TakeOutString(stateOut);
+        if (status != 0)
+            throw new ArenaBindingError(
+                string.IsNullOrEmpty(message) ? $"arena_close (status_code={status})" : message!,
+                stateDocument);
+        return stateDocument;
+    }
+
+    internal static string StateJson(IntPtr handle)
+    {
+        if (handle == IntPtr.Zero)
+            throw new ArenaBindingError("arena_state_json called on closed arena");
+        var status = ArenaNativeLib.arena_state_json(handle, out var errOut, out var stateOut);
+        var message = TakeOutString(errOut);
+        var stateDocument = TakeOutString(stateOut);
+        if (status != 0)
+            throw new ArenaBindingError(
+                string.IsNullOrEmpty(message) ? $"arena_state_json (status_code={status})" : message!);
+        return string.IsNullOrEmpty(stateDocument) ? "{}" : stateDocument!;
+    }
+
+    private static string? TakeOutString(IntPtr value)
+    {
+        if (value == IntPtr.Zero)
+            return null;
+        var raw = ArenaNativeStrings.FromUtf8Ptr(value);
+        ArenaNativeLib.arena_free_string(value);
+        return raw;
+    }
+
+    private static void ReleaseOutString(IntPtr value)
+    {
+        if (value != IntPtr.Zero)
+            ArenaNativeLib.arena_free_string(value);
     }
 
     internal static void SoftReset(IntPtr handle, string dependencyIdentifier)
@@ -30,6 +71,18 @@ internal static class ArenaBindings
         var result = ArenaNativeLib.arena_hard_reset(handle, dependencyIdentifier, out var errOut);
         if (result != 0)
             throw TakeErr(errOut, "arena_hard_reset failed");
+    }
+
+    private const int ArenaStatusPanic = 3;
+
+    internal static int FindAvailablePort(int rangeStart, int rangeEnd, PortSearchStrategy strategy)
+    {
+        var status = ArenaNativeLib.arena_find_available_port(rangeStart, rangeEnd, (int)strategy, out var portOut, out var errOut);
+        if (status == ArenaStatusPanic)
+            throw new ArenaPortNotFoundException(TakeErr(errOut, "no available port found").Message);
+        if (status != 0)
+            throw TakeErr(errOut, "arena_find_available_port failed");
+        return portOut;
     }
 
     internal static void SetDispatcherDependencyAllowJson(string? json)
@@ -101,6 +154,16 @@ internal static class ArenaBindings
         var json = ArenaNativeStrings.FromUtf8Ptr(ptr);
         ArenaNativeLib.arena_free_string(ptr);
         return json;
+    }
+
+    internal static string OauthSignClaims(IntPtr handle, string dependencyIdentifier, string providerJson, string claimsJson)
+    {
+        var ptr = ArenaNativeLib.arena_oauth_sign_claims(handle, dependencyIdentifier, providerJson, claimsJson, out var errOut);
+        if (ptr == IntPtr.Zero)
+            throw TakeErr(errOut, "arena_oauth_sign_claims failed");
+        var jwt = ArenaNativeStrings.FromUtf8Ptr(ptr);
+        ArenaNativeLib.arena_free_string(ptr);
+        return jwt;
     }
 
     private static ArenaBindingError TakeErr(IntPtr errOut, string operation)

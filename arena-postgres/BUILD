@@ -78,6 +78,7 @@ rust_test(
     ) + [
         ":arena_postgres",
         "//arena",
+        "//arena-container:arena_container",
     ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,
@@ -151,6 +152,7 @@ rust_test(
     ) + [
         ":arena_postgres",
         "//arena",
+        "//arena-host:arena_host",
     ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,

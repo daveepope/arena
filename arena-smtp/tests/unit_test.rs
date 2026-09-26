@@ -1,3 +1,4 @@
+use arena::lifecycle::{Fault, RunnableState};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_smtp::{SmtpDependency, SmtpImpl, SmtpTlsConfig};
@@ -29,17 +30,24 @@ impl SmtpImpl for FakeSmtpImpl {
         _image_tag: &str,
         _container_name: &str,
         _tls: Option<&SmtpTlsConfig>,
-    ) {
+    ) -> Result<(), String> {
         self.smtp_address = Some("127.0.0.1:1025".to_string());
         self.http_api_url = Some("http://127.0.0.1:8025".to_string());
         self.events.lock().unwrap().push(Event::SmtpStart);
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.smtp_address = None;
         self.http_api_url = None;
         self.events.lock().unwrap().push(Event::SmtpStop);
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn smtp_address(&self) -> Option<&str> {
         self.smtp_address.as_deref()
@@ -112,10 +120,10 @@ async fn start_stop_happy_path_records_events() {
     let http_api_url_while_running_write = http_api_url_while_running.clone();
 
     let outcome = std::panic::AssertUnwindSafe(async {
-        smtp.start().await;
+        smtp.start().await.expect("start should succeed");
         *http_api_url_while_running_write.lock().unwrap() =
             smtp.http_api_url().map(str::to_string);
-        smtp.stop().await;
+        smtp.stop().await.expect("stop should succeed");
     })
     .catch_unwind()
     .await;
@@ -163,7 +171,7 @@ async fn start_readiness_err_panics_after_impl_start() {
         .build();
 
     let outcome = std::panic::AssertUnwindSafe(async {
-        dep.start().await;
+        dep.start().await.expect("start should succeed");
     })
     .catch_unwind()
     .await;
@@ -203,10 +211,18 @@ impl SmtpImpl for RetryingSmtpImpl {
         _image_tag: &str,
         _container_name: &str,
         _tls: Option<&SmtpTlsConfig>,
-    ) {
+    ) -> Result<(), String> {
+        Ok(())
     }
 
-    async fn stop(&mut self) {}
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn smtp_address(&self) -> Option<&str> {
         let polls = self.address_polls.fetch_add(1, Ordering::SeqCst) + 1;
@@ -234,8 +250,8 @@ async fn wait_until_ready_retries_until_impl_reports_address() {
         .with_readiness_check(AlwaysOkReadinessCheck)
         .build();
 
-    dep.start().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.stop().await.expect("stop should succeed");
 }
 
 #[tokio::test]
@@ -250,15 +266,15 @@ async fn hard_reset_stops_and_restarts_impl() {
         .with_readiness_check(AlwaysOkReadinessCheck)
         .build();
 
-    dep.start().await;
-    dep.hard_reset().await;
+    dep.start().await.expect("start should succeed");
+    dep.hard_reset().await.expect("hard reset should succeed");
 
     assert_eq!(
         events.lock().unwrap().as_slice(),
         &[Event::SmtpStart, Event::SmtpStop, Event::SmtpStart]
     );
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }
 
 #[tokio::test]
@@ -273,7 +289,7 @@ async fn soft_reset_before_start_is_noop() {
         .with_readiness_check(AlwaysOkReadinessCheck)
         .build();
 
-    dep.soft_reset().await;
+    dep.soft_reset().await.expect("soft reset should succeed");
 
     assert!(events.lock().unwrap().is_empty());
 }
@@ -290,9 +306,9 @@ async fn soft_reset_while_running_does_not_panic() {
         .with_readiness_check(AlwaysOkReadinessCheck)
         .build();
 
-    dep.start().await;
-    dep.soft_reset().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.soft_reset().await.expect("soft reset should succeed");
+    dep.stop().await.expect("stop should succeed");
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -318,18 +334,35 @@ impl RunnableDependency for RecordingChild {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+    fn state(&self) -> RunnableState {
+        RunnableState::NotStarted
+    }
 
-    async fn start(&mut self) {
+    fn faults(&self) -> &[Fault] {
+        &[]
+    }
+
+    async fn force_stop(&mut self) {}
+    fn release(&mut self) {}
+
+
+    async fn start(&mut self) -> Result<(), Fault> {
         self.events.lock().unwrap().push(ChildEvent::Start);
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), Fault> {
         self.events.lock().unwrap().push(ChildEvent::Stop);
+        Ok(())
     }
 
-    async fn soft_reset(&self) {}
+    async fn soft_reset(&self) -> Result<(), Fault> {
+        Ok(())
+    }
 
-    async fn hard_reset(&mut self) {}
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
     fn children(&self) -> &[Dependency] {
@@ -361,8 +394,8 @@ async fn add_child_appends_and_lifecycle_includes_it() {
     assert_eq!(dep.children().len(), 1);
     assert_eq!(dep.children_mut().len(), 1);
 
-    dep.start().await;
-    dep.stop().await;
+    dep.start().await.expect("start should succeed");
+    dep.stop().await.expect("stop should succeed");
 
     assert_eq!(
         child_events.lock().unwrap().as_slice(),
@@ -385,4 +418,22 @@ async fn identifier_and_any_casts_expose_dependency() {
     assert_eq!(RunnableDependency::identifier(&dep), expected_identifier);
     assert!(dep.as_any().downcast_ref::<SmtpDependency>().is_some());
     assert!(dep.as_any_mut().downcast_mut::<SmtpDependency>().is_some());
+}
+
+#[tokio::test]
+async fn build_with_implicit_tls_generates_certificate_without_panicking() {
+    let dep = SmtpDependency::builder("smtp-tls-build")
+        .with_implicit_tls()
+        .build();
+
+    assert!(dep.faults().is_empty());
+    assert_eq!(dep.state(), RunnableState::NotStarted);
+}
+
+#[tokio::test]
+async fn build_without_tls_records_no_fault() {
+    let dep = SmtpDependency::builder("smtp-no-tls").build();
+
+    assert!(dep.faults().is_empty());
+    assert_eq!(dep.state(), RunnableState::NotStarted);
 }

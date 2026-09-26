@@ -1,3 +1,5 @@
+pub(crate) const MODULE: &str = "arena-http";
+
 mod admin_client;
 pub mod builder;
 pub mod http_dependency;

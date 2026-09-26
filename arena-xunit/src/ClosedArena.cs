@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ArenaDotnet.Xunit.Ffi;
+using ArenaDotnet.Xunit.Lifecycle;
 using ArenaDotnet.Xunit.Playbook;
 using ArenaDotnet.Xunit.Support;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,7 @@ public sealed class ClosedArena
     private readonly Match _match;
     private readonly ArenaLogLevel _logLevel;
     private readonly ILogger? _logger;
+    private readonly ILoggerFactory? _loggerFactory;
     private readonly List<string>? _logDependencyIds;
     private readonly List<string>? _logComponentIds;
 
@@ -32,13 +34,25 @@ public sealed class ClosedArena
     {
     }
 
+    public ClosedArena(string name, Match match, ArenaLogLevel logLevel, ILoggerFactory? loggerFactory)
+        : this(name, match, logLevel, null, loggerFactory, null, null)
+    {
+    }
+
     public ClosedArena(string name, Match match, ArenaLogLevel logLevel, ILogger? logger,
         List<string>? logDependencyIds, List<string>? logComponentIds)
+        : this(name, match, logLevel, logger, null, logDependencyIds, logComponentIds)
+    {
+    }
+
+    public ClosedArena(string name, Match match, ArenaLogLevel logLevel, ILogger? logger,
+        ILoggerFactory? loggerFactory, List<string>? logDependencyIds, List<string>? logComponentIds)
     {
         _name = name;
         _match = match;
         _logLevel = logLevel;
         _logger = logger;
+        _loggerFactory = loggerFactory;
         _logDependencyIds = logDependencyIds;
         _logComponentIds = logComponentIds;
     }
@@ -53,33 +67,98 @@ public sealed class ClosedArena
             _logComponentIds != null && _logComponentIds.Count > 0
                 ? ArenaJson.Serialize(_logComponentIds) : null);
 
-        ulong logToken = _logger != null
-            ? ArenaLogTarget.RegisterForLogger(_logger)
-            : ArenaLogTarget.RegisterForLogger(CreateDefaultLogger());
-
+        var routing = _loggerFactory != null
+            ? new ArenaLogRouting(_loggerFactory)
+            : new ArenaLogRouting(_logger ?? CreateDefaultLogger());
+        ulong logToken = ArenaLogTarget.Register(routing);
+        ulong observerToken;
         try
         {
-            var handle = ArenaBindings.OpenArena(_name, json, _logLevel);
-            var playbooks = RunExecOnStartPlaybooks(handle);
-            return System.Threading.Tasks.Task.FromResult(new OpenArena(handle, logToken, _match, playbooks));
+            observerToken = ArenaLifecycleObservers.Register(
+                document => LifecycleLog.LogTransitionDocument(_name, routing, document));
         }
         catch
         {
             ArenaLogTarget.Unregister(logToken);
             throw;
         }
+
+        ArenaShutdown.EnsureHooksRegistered();
+
+        IntPtr handle;
+        try
+        {
+            handle = ArenaBindings.OpenArena(_name, json, _logLevel);
+        }
+        catch (ArenaBindingError e)
+        {
+            ArenaLifecycleObservers.Unregister(observerToken);
+            ArenaLogTarget.Unregister(logToken);
+            throw ArenaLifecycleError.From(e);
+        }
+        catch
+        {
+            ArenaLifecycleObservers.Unregister(observerToken);
+            ArenaLogTarget.Unregister(logToken);
+            throw;
+        }
+
+        Dictionary<Type, ActivePlaybook> playbooks;
+        try
+        {
+            playbooks = RunExecOnStartPlaybooks(handle);
+        }
+        catch
+        {
+            CloseArenaQuietly(handle);
+            ArenaLifecycleObservers.Unregister(observerToken);
+            ArenaLogTarget.Unregister(logToken);
+            throw;
+        }
+
+        return System.Threading.Tasks.Task.FromResult(
+            new OpenArena(handle, logToken, observerToken, routing, _match, playbooks));
+    }
+
+    private static void CloseArenaQuietly(IntPtr handle)
+    {
+        try
+        {
+            ArenaBindings.CloseArena(handle);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"arena: teardown after a failed open failed: {ex.Message}");
+        }
     }
 
     private Dictionary<Type, ActivePlaybook> RunExecOnStartPlaybooks(IntPtr handle)
     {
         var result = new Dictionary<Type, ActivePlaybook>();
-        foreach (var registered in _match.Playbooks)
+        try
         {
-            if (registered.ExecOnDependencyStart)
+            foreach (var registered in _match.Playbooks)
             {
-                var playbookHandle = ArenaBindings.MatchPlaybookRun(handle, registered.Playbook.Identifier);
-                result[registered.Playbook.GetType()] = WrapActivePlaybook(registered.Playbook, playbookHandle);
+                if (registered.ExecOnDependencyStart)
+                {
+                    var playbookHandle = ArenaBindings.MatchPlaybookRun(handle, registered.Playbook.Identifier);
+                    result[registered.Playbook.GetType()] = WrapActivePlaybook(registered.Playbook, playbookHandle);
+                }
             }
+        }
+        catch
+        {
+            foreach (var started in result.Values)
+            {
+                try
+                {
+                    started.Dispose();
+                }
+                catch
+                {
+                }
+            }
+            throw;
         }
         return result;
     }

@@ -8,6 +8,7 @@ public sealed class HttpDependency : IArenaDependency
 {
     public string Type => "http";
     public string Identifier { get; }
+    public long? ExpirySeconds { get; internal set; }
     public int Port { get; }
     public string? ListenIp { get; }
     public string? ContainerName { get; }
@@ -36,6 +37,7 @@ public sealed class HttpDependency : IArenaDependency
 
 public sealed class HttpDependencyBuilder
 {
+    private long? _expirySeconds;
     private readonly string _name;
     private int _port = 8080;
     private string? _listenIp;
@@ -85,9 +87,32 @@ public sealed class HttpDependencyBuilder
         return this;
     }
 
+    public HttpDependencyBuilder WithExpiry(System.TimeSpan expiry)
+    {
+        _expirySeconds = ExpirySeconds(expiry);
+        return this;
+    }
+
+    public HttpDependencyBuilder WithoutExpiry()
+    {
+        _expirySeconds = 0;
+        return this;
+    }
+
     public HttpDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-http", _name);
-        return new HttpDependency(identifier, _port, _listenIp, _containerName, _imageName, _imageTag, _children);
+        var built = new HttpDependency(identifier, _port, _listenIp, _containerName, _imageName, _imageTag, _children);
+        built.ExpirySeconds = _expirySeconds;
+        return built;
     }
+
+    private static long ExpirySeconds(System.TimeSpan expiry)
+    {
+        if (expiry < System.TimeSpan.Zero)
+            throw new System.ArgumentOutOfRangeException(nameof(expiry), "expiry must not be negative");
+        var seconds = (long)expiry.TotalSeconds;
+        return seconds == 0 && expiry > System.TimeSpan.Zero ? 1 : seconds;
+    }
+
 }

@@ -81,6 +81,42 @@ public class ArenaCollectionFixtureTest
         protected override Match Configure() => new MatchBuilder("arena-logger-match").Build();
     }
 
+    private class NoOauthDependencyFieldFixture : ArenaCollectionFixture
+    {
+        protected override Match Configure() => new MatchBuilder("no-oauth-dependency-match").Build();
+    }
+
+    private class MultipleOauthDependencyFieldsFixture : ArenaCollectionFixture
+    {
+        [ArenaDependency]
+        private static readonly OauthDependency OauthOne = new OauthDependencyBuilder("oauth-one").Build();
+
+        [ArenaDependency]
+        private static readonly OauthDependency OauthTwo = new OauthDependencyBuilder("oauth-two").Build();
+
+        protected override Match Configure() => new MatchBuilder("multiple-oauth-dependency-match").Build();
+    }
+
+    private class SingleOauthDependencyFieldFixture : ArenaCollectionFixture
+    {
+        [ArenaDependency]
+        public static readonly OauthDependency Oauth = new OauthDependencyBuilder("oauth-single").Build();
+
+        protected override Match Configure() => new MatchBuilder("single-oauth-dependency-match").Build();
+    }
+
+    private class BaseOauthDependencyFixture : ArenaCollectionFixture
+    {
+        [ArenaDependency]
+        public static readonly OauthDependency Oauth = new OauthDependencyBuilder("oauth-base").Build();
+
+        protected override Match Configure() => new MatchBuilder("inherited-oauth-dependency-match").Build();
+    }
+
+    private sealed class SubOauthDependencyFixture : BaseOauthDependencyFixture
+    {
+    }
+
     [Fact]
     public void Constructor_TwoInstancesOfSameFixtureType_SharesArenaAndOpensOnce()
     {
@@ -133,5 +169,45 @@ public class ArenaCollectionFixtureTest
         var (dependencyIds, componentIds) = fixture.CollectLogIdentifiers();
         Assert.Contains("stub-dependency-id", dependencyIds);
         Assert.Contains("stub-component-id", componentIds);
+    }
+
+    [Fact]
+    public void GetDependency_NoArenaDependencyField_ThrowsInvalidOperationException()
+    {
+        using var fixture = new NoOauthDependencyFieldFixture();
+
+        var error = Assert.Throws<InvalidOperationException>(() => fixture.GetDependency<OauthDependency>());
+
+        Assert.Contains("found none", error.Message);
+    }
+
+    [Fact]
+    public void GetDependency_MultipleArenaDependencyFieldsOfType_ThrowsInvalidOperationException()
+    {
+        using var fixture = new MultipleOauthDependencyFieldsFixture();
+
+        var error = Assert.Throws<InvalidOperationException>(() => fixture.GetDependency<OauthDependency>());
+
+        Assert.Contains("found more than one", error.Message);
+    }
+
+    [Fact]
+    public void GetDependency_SingleArenaDependencyField_ReturnsThatDependency()
+    {
+        using var fixture = new SingleOauthDependencyFieldFixture();
+
+        var dependency = fixture.GetDependency<OauthDependency>();
+
+        Assert.Equal(SingleOauthDependencyFieldFixture.Oauth.Identifier, dependency.Identifier);
+    }
+
+    [Fact]
+    public void GetDependency_FieldDeclaredOnBaseClass_ReturnsThatDependency()
+    {
+        using var fixture = new SubOauthDependencyFixture();
+
+        var dependency = fixture.GetDependency<OauthDependency>();
+
+        Assert.Equal(BaseOauthDependencyFixture.Oauth.Identifier, dependency.Identifier);
     }
 }

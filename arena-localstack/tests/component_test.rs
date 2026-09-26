@@ -11,12 +11,19 @@ use aws_smithy_http_client::tls::rustls_provider::CryptoMode;
 use aws_smithy_http_client::{tls, Builder as HttpClientBuilder};
 use futures::FutureExt;
 
+const EPHEMERAL_PORT_RANGE: std::ops::RangeInclusive<u16> = 21350..=21399;
+
 fn ephemeral_tcp_port() -> u16 {
-    std::net::TcpListener::bind("127.0.0.1:0")
-        .expect("bind ephemeral tcp port")
-        .local_addr()
-        .expect("local_addr")
-        .port()
+    arena_host::find_available_port::find_available_port(
+        EPHEMERAL_PORT_RANGE,
+        arena_host::find_available_port::PortSearchStrategy::Random,
+    )
+    .unwrap_or_else(|| {
+        panic!(
+            "no available port found in range {}..={}",
+            EPHEMERAL_PORT_RANGE.start(), EPHEMERAL_PORT_RANGE.end()
+        )
+    })
 }
 
 const ACCESS_KEY: &str = "test";
@@ -95,14 +102,14 @@ impl TestContext {
             .catch_unwind()
             .await;
         if let Err(panic_payload) = start_outcome {
-            localstack.stop().await;
+            localstack.stop().await.expect("stop should succeed");
             std::panic::resume_unwind(panic_payload);
         }
 
         let endpoint = match localstack.endpoint_url() {
             Some(v) => v.to_string(),
             None => {
-                localstack.stop().await;
+                localstack.stop().await.expect("stop should succeed");
                 return Err("localstack endpoint missing after start()".to_string());
             }
         };
@@ -110,7 +117,7 @@ impl TestContext {
         let queue_url = match localstack.queue_url(&queue_name) {
             Some(v) => v.to_string(),
             None => {
-                localstack.stop().await;
+                localstack.stop().await.expect("stop should succeed");
                 return Err(format!("queue url missing for {queue_name}"));
             }
         };
@@ -133,7 +140,7 @@ impl TestContext {
     }
 
     async fn stop(mut self) {
-        self.localstack.stop().await;
+        self.localstack.stop().await.expect("stop should succeed");
     }
 }
 

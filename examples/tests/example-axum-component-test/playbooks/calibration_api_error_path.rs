@@ -6,8 +6,8 @@ pub fn calibration_api_error_path_playbook(
     calibration_id: impl Into<String>,
 ) -> ManagedHttpPlaybook {
     ManagedHttpPlaybook::new(calibration_api_error_path_id(), calibration_id, |pb| {
-        pb.post(calibration_validate_path())
+        Ok(pb.post(calibration_validate_path())
             .will_return(server_error())
-            .into_playbook()
+            .into_playbook())
     })
 }

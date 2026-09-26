@@ -1,7 +1,9 @@
+pub mod expiry;
 pub mod http;
 pub mod kafka;
 pub mod localstack;
 pub mod mssql;
+pub mod oauth;
 pub mod oracle;
 pub(crate) mod playbook_dispatch;
 pub mod postgres;

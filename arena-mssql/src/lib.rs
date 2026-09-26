@@ -1,3 +1,5 @@
+pub(crate) const MODULE: &str = "arena-mssql";
+
 pub mod builder;
 pub mod managed_playbook;
 pub mod mssql_dependency;

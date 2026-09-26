@@ -19,13 +19,20 @@ impl PostgresImpl for FakePostgresImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
         self.conn_str = Some("postgres://u:p@127.0.0.1:1/fake".to_string());
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.conn_str = None;
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn connection_string(&self) -> Option<&str> {
         self.conn_str.as_deref()
@@ -61,7 +68,7 @@ async fn with_identifier_overrides_default_identifier() {
         .with_impl(FakePostgresImpl { conn_str: None })
         .with_readiness_check(AlwaysOkReadinessCheck)
         .build();
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
 
     let playbook = dep.playbook().with_identifier("custom-playbook-id");
 
@@ -69,5 +76,5 @@ async fn with_identifier_overrides_default_identifier() {
 
     assert!(outcome.is_err());
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }

@@ -92,6 +92,7 @@ fn console_executable_oauth_tls_ca_pem() -> String {
         .with_ephemeral_server_tls()
         .with_port(0)
         .build()
+        .expect("build oauth dependency")
         .server_tls_certificate_pem()
         .expect("oauth server tls cert")
         .to_string()
@@ -125,7 +126,8 @@ fn setup_executable_arena_components() -> Vec<Component> {
                 ),
             )
             .with_runtime_arg("oauth_issuer_url", format!("https://127.0.0.1:{}", OAUTH_PORT))
-            .build(),
+            .build()
+            .expect("build example web app component"),
     )]
 }
 
@@ -169,7 +171,8 @@ fn setup_arena_dependencies() -> (Vec<Dependency>, String, String) {
         .with_ephemeral_server_tls()
         .with_listen_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
         .with_port(OAUTH_PORT)
-        .build();
+        .build()
+        .expect("build oauth dependency");
     let oauth_ca_pem = oauth
         .server_tls_certificate_pem()
         .expect("oauth server tls cert")
@@ -312,7 +315,13 @@ async fn main() {
     ))];
     let closed_arena = ClosedArena::new(String::from("Example Arena"), matches);
 
-    let open_arena = closed_arena.open().await;
+    let open_arena = match closed_arena.open().await {
+        Ok(open) => open,
+        Err(state) => {
+            tracing::error!(arena_state = %state, "arena failed to open");
+            return;
+        }
+    };
 
     let kafka_bootstrap = open_arena
         .dependency(&kafka_id)

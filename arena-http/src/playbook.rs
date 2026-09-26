@@ -119,7 +119,8 @@ impl Playbook {
     }
 
     pub async fn run(self) -> ActivePlaybook {
-        let client = admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref());
+        let client = admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref())
+            .expect("HTTP admin API client");
         let mappings_url = format!("{}/mappings", self.admin_url);
 
         let mut registered: Vec<RegisteredMapping> = Vec::with_capacity(self.mappings.len());
@@ -217,7 +218,8 @@ impl ActivePlaybook {
         let actual = self.scoped_count(&criteria).await;
         if actual != expected_count {
             let client =
-                admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref());
+                admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref())
+            .expect("HTTP admin API client");
             let all = self.fetch_all_requests(&client).await;
             panic!(
                 "\n\nPlaybook verification failed for: {criteria}\n\
@@ -232,7 +234,8 @@ impl ActivePlaybook {
         let actual = self.scoped_count(&criteria).await;
         if actual < minimum {
             let client =
-                admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref());
+                admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref())
+            .expect("HTTP admin API client");
             let all = self.fetch_all_requests(&client).await;
             panic!(
                 "\n\nPlaybook verification failed for: {criteria}\n\
@@ -254,7 +257,8 @@ impl ActivePlaybook {
             self.panic_not_owned(&criteria);
         }
 
-        let client = admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref());
+        let client = admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref())
+            .expect("HTTP admin API client");
         let events = self.fetch_scope_events(&client).await;
         let matched: Vec<&ServeEvent> = events
             .iter()
@@ -275,7 +279,8 @@ impl ActivePlaybook {
             self.panic_not_owned(criteria);
         }
 
-        let client = admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref());
+        let client = admin_api_client(&self.admin_url, self.trusted_tls_certificate_pem.as_deref())
+            .expect("HTTP admin API client");
         let events = self.fetch_scope_events(&client).await;
         events
             .iter()
@@ -430,7 +435,8 @@ impl Drop for ActivePlaybook {
                 }
             };
             rt.block_on(async move {
-                let client = admin_api_client(&admin_url, trusted_tls_certificate_pem.as_deref());
+                let client = admin_api_client(&admin_url, trusted_tls_certificate_pem.as_deref())
+            .expect("HTTP admin API client");
 
                 let verify_result = if already_unwinding || expectations.is_empty() {
                     Ok(())

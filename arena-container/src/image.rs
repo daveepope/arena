@@ -53,6 +53,12 @@ impl ImagePullClient for Docker {
     }
 }
 
+pub fn inspected_platform_name(inspect: &ImageInspect) -> Option<String> {
+    let os = inspect.os.as_deref()?;
+    let architecture = inspect.architecture.as_deref()?;
+    Some(format!("{os}/{architecture}"))
+}
+
 pub fn image_matches_platform(inspect: &ImageInspect, platform: &str) -> bool {
     let mut requested = platform.splitn(3, '/');
     let requested_os = requested.next();

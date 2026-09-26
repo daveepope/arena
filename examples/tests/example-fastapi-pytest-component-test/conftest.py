@@ -34,6 +34,7 @@ from arena_pytest import (
     ArenaLogLevel,
     BuildTool,
     ClosedArena,
+    Custom,
     EventRuleSpec,
     EventRuleTarget,
     ExecutableComponentBuilder,
@@ -49,9 +50,12 @@ from arena_pytest import (
     SqsQueueTarget,
     TemporalDependencyBuilder,
     oauth_loopback_tls_pem_pair,
+    oauth_signer_fixture,
 )
 
 from arena_config import (
+    CALIBRATION_CONTAINER_NAME,
+    CALIBRATION_HOST_PORT,
     CLOSED_ARENA_NAME,
     COMPONENT_NAME_EXECUTABLE,
     DEP_NAME_CALIBRATION_HTTP,
@@ -65,6 +69,7 @@ from arena_config import (
     LOCALSTACK_HOST_PORT,
     MATCH_NAME,
     MSSQL_CONNECTION_STRING_LOCAL,
+    MSSQL_CONTAINER_NAME,
     MSSQL_DB_NAME,
     MSSQL_DB_PASS,
     MSSQL_DB_USER,
@@ -73,21 +78,25 @@ from arena_config import (
     OAUTH_PORT,
     ORACLE_ADMIN_PASS,
     ORACLE_CONNECTION_STRING_LOCAL,
+    ORACLE_CONTAINER_NAME,
     ORACLE_DB_PASS,
     ORACLE_DB_USER,
     ORACLE_PORT,
+    POSTGRES_CONTAINER_NAME,
     POSTGRES_DB_NAME,
     POSTGRES_DB_PASS,
     POSTGRES_DB_USER,
     POSTGRES_PORT,
-    CALIBRATION_HOST_PORT,
+    SMTP_CONTAINER_NAME,
     SMTP_HOST_PORT,
     SMTP_UI_PORT,
+    TEMPORAL_CONTAINER_NAME,
     TEMPORAL_GRPC_PORT,
     TEMPORAL_UI_PORT,
 )
 
 from api_http import ApiClient
+from oauth_claims import claims_with_scope
 from playbook_fixtures import active_http_playbook
 from playbooks import (
     CalibrationApiHappyPathPlaybook,
@@ -152,26 +161,8 @@ def _find_fastapi_executable() -> str:
     return ""
 
 
-def _fetch_access_token(ca_path: str, issuer: str) -> str:
-    s = requests.Session()
-    s.verify = ca_path
-    disc = s.get(f"{issuer}/.well-known/oauth-authorization-server", timeout=30)
-    disc.raise_for_status()
-    token_url = disc.json()["token_endpoint"]
-    tok = s.post(
-        token_url,
-        data={
-            "grant_type": "client_credentials",
-            "client_id": "arena-examples",
-            "scope": "readings",
-        },
-        timeout=30,
-    )
-    tok.raise_for_status()
-    return str(tok.json()["access_token"])
-
-
 _OAUTH_CA_FILE = ""
+_OAUTH = None
 
 
 def _wait_sqs_reading_created(
@@ -213,7 +204,7 @@ def _wait_sqs_reading_created(
 
 @pytest.fixture(scope="session")
 def closed_arena() -> ClosedArena:
-    global _OAUTH_CA_FILE
+    global _OAUTH_CA_FILE, _OAUTH
     pytest.importorskip("boto3")
     ca_pem, server_key_pem = oauth_loopback_tls_pem_pair()
 
@@ -243,9 +234,11 @@ def closed_arena() -> ClosedArena:
         .with_metadata_base_url(OAUTH_ISSUER)
         .build()
     )
+    _OAUTH = oauth
 
     postgres = (
         PostgresDependencyBuilder(DEP_NAME_POSTGRES)
+        .with_container_name(POSTGRES_CONTAINER_NAME)
         .with_image("14.20-trixie")
         .with_port(POSTGRES_PORT)
         .with_database_name(POSTGRES_DB_NAME)
@@ -257,6 +250,7 @@ def closed_arena() -> ClosedArena:
 
     mssql = (
         MssqlDependencyBuilder(DEP_NAME_MSSQL)
+        .with_container_name(MSSQL_CONTAINER_NAME)
         .with_port(MSSQL_PORT)
         .with_database_name(MSSQL_DB_NAME)
         .with_database_username(MSSQL_DB_USER)
@@ -267,6 +261,7 @@ def closed_arena() -> ClosedArena:
 
     oracle = (
         OracleDependencyBuilder(DEP_NAME_ORACLE)
+        .with_container_name(ORACLE_CONTAINER_NAME)
         .with_port(ORACLE_PORT)
         .with_database_username(ORACLE_DB_USER)
         .with_database_password(ORACLE_DB_PASS)
@@ -279,12 +274,14 @@ def closed_arena() -> ClosedArena:
 
     calibration = (
         HttpDependencyBuilder(DEP_NAME_CALIBRATION_HTTP)
+        .with_container_name(CALIBRATION_CONTAINER_NAME)
         .with_port(CALIBRATION_HOST_PORT)
         .build()
     )
 
     temporal = (
         TemporalDependencyBuilder(DEP_NAME_TEMPORAL)
+        .with_container_name(TEMPORAL_CONTAINER_NAME)
         .with_image("1.8.0")
         .with_port(TEMPORAL_GRPC_PORT)
         .with_ui_port(TEMPORAL_UI_PORT)
@@ -293,6 +290,7 @@ def closed_arena() -> ClosedArena:
 
     smtp = (
         SmtpDependencyBuilder(DEP_NAME_SMTP)
+        .with_container_name(SMTP_CONTAINER_NAME)
         .with_port(SMTP_HOST_PORT)
         .with_ui_port(SMTP_UI_PORT)
         .with_starttls()
@@ -394,19 +392,8 @@ def closed_arena() -> ClosedArena:
     return ClosedArena(
         CLOSED_ARENA_NAME,
         [a_match],
-        log_level=ArenaLogLevel.WARN,
-        logger=_LOG,
-        log_component_ids=(COMPONENT_NAME_EXECUTABLE,),
-        log_dependency_ids=(
-            oauth.identifier,
-            postgres.identifier,
-            mssql.identifier,
-            oracle.identifier,
-            calibration.identifier,
-            localstack.identifier,
-            temporal.identifier,
-            smtp.identifier,
-        ),
+        log_level=ArenaLogLevel.INFO,
+        logger=_LOG
     )
 
 
@@ -420,15 +407,16 @@ def mssql_connection_string() -> str:
     return MSSQL_CONNECTION_STRING_LOCAL
 
 
+oauth_signer = oauth_signer_fixture(lambda: _OAUTH)
+
+
 @pytest.fixture(scope="session")
-def api_client(arena, base_url) -> ApiClient:
+async def api_client(oauth_signer, base_url) -> ApiClient:
     import requests
 
-    _ = arena
     session = requests.Session()
-    session.headers.update(
-        {"Authorization": f"Bearer {_fetch_access_token(_OAUTH_CA_FILE, OAUTH_ISSUER)}"}
-    )
+    token = await oauth_signer.sign(Custom(), claims_with_scope(OAUTH_ISSUER, "readings"))
+    session.headers.update({"Authorization": f"Bearer {token}"})
     return ApiClient(base_url, session)
 
 

@@ -89,7 +89,10 @@ ORACLE_ADMIN_PASS = "pw_" + RUNTIME.run_suffix[20:32]
 POSTGRES_CONTAINER_NAME = RUNTIME.container_name(_CTR_NAMES["postgres"])
 KAFKA_CONTAINER_NAME = RUNTIME.container_name(_CTR_NAMES["kafka"])
 MSSQL_CONTAINER_NAME = RUNTIME.container_name(_CTR_NAMES["mssql"])
+ORACLE_CONTAINER_NAME = RUNTIME.container_name(_CTR_NAMES["oracle"])
 CALIBRATION_CONTAINER_NAME = RUNTIME.container_name(_CTR_NAMES["calibration"])
+TEMPORAL_CONTAINER_NAME = RUNTIME.container_name(_CTR_NAMES["temporal"])
+SMTP_CONTAINER_NAME = RUNTIME.container_name(_CTR_NAMES["smtp"])
 
 KAFKA_TOPIC = _DATA["kafka_topic"]
 CALIBRATION_VALIDATE_PATH = _DATA["calibration_validate_path"]

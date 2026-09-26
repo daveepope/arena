@@ -14,6 +14,7 @@ public sealed class MssqlDependency : IArenaDependency
 {
     public string Type => "mssql";
     public string Identifier { get; }
+    public long? ExpirySeconds { get; internal set; }
     public int Port { get; }
     public MssqlEncryption Encryption { get; }
     public string? DatabaseName { get; }
@@ -61,6 +62,7 @@ public sealed class MssqlDependency : IArenaDependency
 
 public sealed class MssqlDependencyBuilder
 {
+    private long? _expirySeconds;
     private readonly string _name;
     private int _port = 1433;
     private MssqlEncryption _encryption = MssqlEncryption.On;
@@ -138,9 +140,32 @@ public sealed class MssqlDependencyBuilder
         return this;
     }
 
+    public MssqlDependencyBuilder WithExpiry(System.TimeSpan expiry)
+    {
+        _expirySeconds = ExpirySeconds(expiry);
+        return this;
+    }
+
+    public MssqlDependencyBuilder WithoutExpiry()
+    {
+        _expirySeconds = 0;
+        return this;
+    }
+
     public MssqlDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-mssql", _name);
-        return new MssqlDependency(identifier, _port, _encryption, _databaseName, _databaseUsername, _databasePassword, _imageName, _image, _containerName, _startupSqlScripts, _children);
+        var built = new MssqlDependency(identifier, _port, _encryption, _databaseName, _databaseUsername, _databasePassword, _imageName, _image, _containerName, _startupSqlScripts, _children);
+        built.ExpirySeconds = _expirySeconds;
+        return built;
     }
+
+    private static long ExpirySeconds(System.TimeSpan expiry)
+    {
+        if (expiry < System.TimeSpan.Zero)
+            throw new System.ArgumentOutOfRangeException(nameof(expiry), "expiry must not be negative");
+        var seconds = (long)expiry.TotalSeconds;
+        return seconds == 0 && expiry > System.TimeSpan.Zero ? 1 : seconds;
+    }
+
 }

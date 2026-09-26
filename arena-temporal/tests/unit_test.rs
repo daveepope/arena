@@ -1,3 +1,4 @@
+use arena::lifecycle::{Fault, RunnableState};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_temporal::{TemporalDependency, TemporalImpl};
@@ -28,17 +29,24 @@ impl TemporalImpl for FakeTemporalImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
         self.grpc_endpoint = Some("127.0.0.1:7233".to_string());
         self.ui_url = Some("http://127.0.0.1:8233".to_string());
         self.events.lock().unwrap().push(Event::TemporalStart);
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.grpc_endpoint = None;
         self.ui_url = None;
         self.events.lock().unwrap().push(Event::TemporalStop);
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn grpc_endpoint(&self) -> Option<&str> {
         self.grpc_endpoint.as_deref()
@@ -108,8 +116,8 @@ async fn start_stop_happy_path_records_events() {
         .build();
 
     let outcome = std::panic::AssertUnwindSafe(async {
-        temporal.start().await;
-        temporal.stop().await;
+        temporal.start().await.expect("start should succeed");
+        temporal.stop().await.expect("stop should succeed");
     })
     .catch_unwind()
     .await;
@@ -157,7 +165,7 @@ async fn start_readiness_err_panics_after_impl_start() {
         .build();
 
     let outcome = std::panic::AssertUnwindSafe(async {
-        dep.start().await;
+        dep.start().await.expect("start should succeed");
     })
     .catch_unwind()
     .await;
@@ -181,10 +189,25 @@ impl RunnableDependency for NoopChildDependency {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+    fn state(&self) -> RunnableState {
+        RunnableState::NotStarted
+    }
 
-    async fn start(&mut self) {}
+    fn faults(&self) -> &[Fault] {
+        &[]
+    }
 
-    async fn stop(&mut self) {}
+    async fn force_stop(&mut self) {}
+    fn release(&mut self) {}
+
+
+    async fn start(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
+
+    async fn stop(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
 
@@ -196,9 +219,13 @@ impl RunnableDependency for NoopChildDependency {
         &mut []
     }
 
-    async fn soft_reset(&self) {}
+    async fn soft_reset(&self) -> Result<(), Fault> {
+        Ok(())
+    }
 
-    async fn hard_reset(&mut self) {}
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 }
 
 #[test]
@@ -237,10 +264,18 @@ impl TemporalImpl for FlakyTemporalImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
+        Ok(())
     }
 
-    async fn stop(&mut self) {}
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn grpc_endpoint(&self) -> Option<&str> {
         let seen = self.calls.fetch_add(1, Ordering::SeqCst);
@@ -276,9 +311,9 @@ async fn wait_until_ready_retries_until_impl_reports_endpoint() {
         .with_readiness_check(ImmediateReadinessCheck)
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
 
     assert_eq!(dep.grpc_endpoint(), Some("127.0.0.1:7233"));
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }

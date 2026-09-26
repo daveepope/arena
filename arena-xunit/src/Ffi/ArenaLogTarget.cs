@@ -19,9 +19,8 @@ internal static class ArenaLogTarget
 {
     private static readonly ConcurrentDictionary<ulong, LogEntry> Entries = new();
 
-    public static ulong RegisterForLogger(ILogger logger)
+    public static ulong Register(ArenaLogRouting context)
     {
-        var context = new LogContext(logger);
         var userDataHandle = GCHandle.Alloc(context);
         var callback = new ArenaLogCallback(Invoke);
         var token = ArenaNativeLib.arena_add_log_target(callback, GCHandle.ToIntPtr(userDataHandle));
@@ -50,15 +49,22 @@ internal static class ArenaLogTarget
         try
         {
             var gcHandle = GCHandle.FromIntPtr(userData);
-            var context = (LogContext)gcHandle.Target!;
+            var routing = (ArenaLogRouting)gcHandle.Target!;
             var logLevel = MapLogLevel(level);
-            var message = ArenaNativeStrings.FromUtf8Ptr(messageUtf8);
-            context.Logger.Log(logLevel, 0, message, null, (s, e) => message);
+            var loggerName = LoggerNameOf(targetUtf8);
+            var logger = routing.LoggerFor(loggerName);
+            var message = routing.MessageFor(loggerName, ArenaNativeStrings.FromUtf8Ptr(messageUtf8));
+            logger.Log(logLevel, 0, message, null, (s, e) => message);
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"ArenaLogTarget: logger threw while handling a native log callback: {ex}");
         }
+    }
+
+    private static string LoggerNameOf(IntPtr targetUtf8)
+    {
+        return targetUtf8 == IntPtr.Zero ? string.Empty : ArenaNativeStrings.FromUtf8Ptr(targetUtf8);
     }
 
     private static LogLevel MapLogLevel(int level)
@@ -72,12 +78,6 @@ internal static class ArenaLogTarget
             5 => LogLevel.Trace,
             _ => LogLevel.Information
         };
-    }
-
-    private sealed class LogContext
-    {
-        public ILogger Logger { get; }
-        public LogContext(ILogger logger) => Logger = logger;
     }
 
     private sealed class LogEntry

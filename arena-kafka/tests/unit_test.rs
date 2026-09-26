@@ -1,3 +1,4 @@
+use arena::lifecycle::{Fault, RunnableState};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_kafka::{KafkaDependency, KafkaImpl};
@@ -32,14 +33,21 @@ impl KafkaImpl for FakeKafkaImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
         self.bootstrap = Some("127.0.0.1:9092".to_string());
         self.events.lock().unwrap().push(Event::KafkaStart);
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.events.lock().unwrap().push(Event::KafkaStop);
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn bootstrap_servers(&self) -> Option<&str> {
         self.bootstrap.as_deref()
@@ -87,17 +95,30 @@ impl RunnableDependency for FakeDep {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
-
-    async fn start(&mut self) {
-        self.events.lock().unwrap().push(Event::DepStart(self.name));
+    fn state(&self) -> RunnableState {
+        RunnableState::NotStarted
     }
 
-    async fn stop(&mut self) {
+    fn faults(&self) -> &[Fault] {
+        &[]
+    }
+
+    async fn force_stop(&mut self) {}
+    fn release(&mut self) {}
+
+
+    async fn start(&mut self) -> Result<(), Fault> {
+        self.events.lock().unwrap().push(Event::DepStart(self.name));
+        Ok(())
+    }
+
+    async fn stop(&mut self) -> Result<(), Fault> {
         if self.stopped {
-            return;
+            return Ok(());
         }
         self.events.lock().unwrap().push(Event::DepStop(self.name));
         self.stopped = true;
+        Ok(())
     }
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
@@ -108,9 +129,13 @@ impl RunnableDependency for FakeDep {
         &mut []
     }
 
-    async fn soft_reset(&self) {}
+    async fn soft_reset(&self) -> Result<(), Fault> {
+        Ok(())
+    }
 
-    async fn hard_reset(&mut self) {}
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 }
 
 struct FailingReadinessCheck;
@@ -157,8 +182,8 @@ async fn start_stop_happy_path_records_events() {
         })
         .build();
 
-    kafka.start().await;
-    kafka.stop().await;
+    kafka.start().await.expect("start should succeed");
+    kafka.stop().await.expect("stop should succeed");
 
     let got = events.lock().unwrap().clone();
     assert_eq!(
@@ -193,7 +218,7 @@ async fn start_readiness_err_panics_after_impl_start() {
         .build();
 
     let outcome = std::panic::AssertUnwindSafe(async {
-        dep.start().await;
+        dep.start().await.expect("start should succeed");
     })
     .catch_unwind()
     .await;
@@ -237,9 +262,18 @@ struct FlakyKafkaImpl {
 
 #[async_trait]
 impl KafkaImpl for FlakyKafkaImpl {
-    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) {}
+    async fn start(&mut self, _port: u16, _image_name: &str, _image_tag: &str, _container_name: &str) -> Result<(), String> {
+        Ok(())
+    }
 
-    async fn stop(&mut self) {}
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn bootstrap_servers(&self) -> Option<&str> {
         let seen = self.calls.fetch_add(1, Ordering::SeqCst);
@@ -273,9 +307,9 @@ async fn wait_until_ready_retries_until_impl_reports_bootstrap() {
         .with_readiness_check(ImmediateReadinessCheck)
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
 
     assert_eq!(dep.bootstrap_servers(), Some("127.0.0.1:9092"));
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }

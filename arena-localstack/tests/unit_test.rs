@@ -1,8 +1,8 @@
+use arena::lifecycle::{Fault, RunnableState};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
 use arena_localstack::{LocalstackDependency, LocalstackImpl};
 use async_trait::async_trait;
-use futures::FutureExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -10,8 +10,10 @@ use std::sync::{Arc, Mutex};
 enum Event {
     DepStart(&'static str),
     DepStop(&'static str),
+    DepForceStop(&'static str),
     LocalstackStart,
     LocalstackStop,
+    LocalstackForceStop,
     ReadinessCheck,
 }
 
@@ -29,14 +31,25 @@ impl LocalstackImpl for FakeLocalstackImpl {
         _image_tag: &str,
         _container_name: &str,
         _services: &[String],
-    ) {
+    ) -> Result<(), String> {
         self.endpoint = Some("http://127.0.0.1:4566".to_string());
         self.events.lock().unwrap().push(Event::LocalstackStart);
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.events.lock().unwrap().push(Event::LocalstackStop);
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        self.events
+            .lock()
+            .unwrap()
+            .push(Event::LocalstackForceStop);
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn endpoint_url(&self) -> Option<&str> {
         self.endpoint.as_deref()
@@ -79,17 +92,35 @@ impl RunnableDependency for FakeDep {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
-
-    async fn start(&mut self) {
-        self.events.lock().unwrap().push(Event::DepStart(self.name));
+    fn state(&self) -> RunnableState {
+        RunnableState::NotStarted
     }
 
-    async fn stop(&mut self) {
+    fn faults(&self) -> &[Fault] {
+        &[]
+    }
+
+    async fn force_stop(&mut self) {
+        self.events
+            .lock()
+            .unwrap()
+            .push(Event::DepForceStop(self.name));
+    }
+    fn release(&mut self) {}
+
+
+    async fn start(&mut self) -> Result<(), Fault> {
+        self.events.lock().unwrap().push(Event::DepStart(self.name));
+        Ok(())
+    }
+
+    async fn stop(&mut self) -> Result<(), Fault> {
         if self.stopped {
-            return;
+            return Ok(());
         }
         self.events.lock().unwrap().push(Event::DepStop(self.name));
         self.stopped = true;
+        Ok(())
     }
 
     fn add_child(&mut self, _dep: Box<dyn RunnableDependency>) {}
@@ -100,9 +131,13 @@ impl RunnableDependency for FakeDep {
         &mut []
     }
 
-    async fn soft_reset(&self) {}
+    async fn soft_reset(&self) -> Result<(), Fault> {
+        Ok(())
+    }
 
-    async fn hard_reset(&mut self) {}
+    async fn hard_reset(&mut self) -> Result<(), Fault> {
+        Ok(())
+    }
 }
 
 struct FailingReadinessCheck;
@@ -149,8 +184,8 @@ async fn start_stop_happy_path_records_events() {
         })
         .build();
 
-    localstack.start().await;
-    localstack.stop().await;
+    localstack.start().await.expect("start should succeed");
+    localstack.stop().await.expect("stop should succeed");
 
     let got = events.lock().unwrap().clone();
     assert_eq!(
@@ -168,7 +203,7 @@ async fn start_stop_happy_path_records_events() {
 }
 
 #[tokio::test]
-async fn start_readiness_err_panics_after_impl_start() {
+async fn start_readiness_failure_returns_fault_after_impl_start() {
     let events = Arc::new(Mutex::new(Vec::<Event>::new()));
     let mut dep = LocalstackDependency::builder("localstack")
         .with_impl(FakeLocalstackImpl {
@@ -180,21 +215,17 @@ async fn start_readiness_err_panics_after_impl_start() {
         .with_readiness_check(FailingReadinessCheck)
         .build();
 
-    let outcome = std::panic::AssertUnwindSafe(async {
-        dep.start().await;
-    })
-    .catch_unwind()
-    .await;
+    let fault = dep.start().await.expect_err("dependency should fault");
 
-    assert!(outcome.is_err());
+    assert!(fault.message.contains("readiness check failed"));
     assert_eq!(
         events.lock().unwrap().as_slice(),
-        &[Event::LocalstackStart]
+        &[Event::LocalstackStart, Event::LocalstackForceStop]
     );
 }
 
 #[tokio::test]
-async fn start_readiness_err_stop_stops_started_children() {
+async fn start_readiness_failure_then_stop_does_not_stop_children_twice() {
     let events = Arc::new(Mutex::new(Vec::<Event>::new()));
 
     let deps: Vec<Box<dyn RunnableDependency>> = vec![Box::new(FakeDep {
@@ -214,20 +245,16 @@ async fn start_readiness_err_stop_stops_started_children() {
         .with_readiness_check(FailingReadinessCheck)
         .build();
 
-    let outcome = std::panic::AssertUnwindSafe(async {
-        dep.start().await;
-    })
-    .catch_unwind()
-    .await;
-
-    assert!(outcome.is_err());
-    dep.stop().await;
+    let _fault = dep.start().await.expect_err("dependency should fault");
+    dep.stop().await.expect("stop should succeed");
 
     assert_eq!(
         events.lock().unwrap().as_slice(),
         &[
             Event::DepStart("dep-a"),
             Event::LocalstackStart,
+            Event::LocalstackForceStop,
+            Event::DepForceStop("dep-a"),
             Event::LocalstackStop,
             Event::DepStop("dep-a"),
         ]
@@ -235,7 +262,7 @@ async fn start_readiness_err_stop_stops_started_children() {
 }
 
 #[tokio::test]
-async fn start_readiness_err_drop_stops_started_children() {
+async fn start_readiness_failure_returns_fault_and_force_stops_children() {
     let events = Arc::new(Mutex::new(Vec::<Event>::new()));
 
     let deps: Vec<Box<dyn RunnableDependency>> = vec![Box::new(FakeDep {
@@ -255,23 +282,27 @@ async fn start_readiness_err_drop_stops_started_children() {
         .with_readiness_check(FailingReadinessCheck)
         .build();
 
-    let outcome = std::panic::AssertUnwindSafe(async {
-        dep.start().await;
-    })
-    .catch_unwind()
-    .await;
+    let fault = dep.start().await.expect_err("dependency should fault");
 
-    assert!(outcome.is_err());
+    assert_eq!(fault.id, dep.identifier());
+    assert_eq!(dep.state(), RunnableState::Stopped);
+
+    let observed = events.lock().unwrap().clone();
     drop(dep);
 
     assert_eq!(
-        events.lock().unwrap().as_slice(),
+        observed,
         &[
             Event::DepStart("dep-a"),
             Event::LocalstackStart,
-            Event::LocalstackStop,
-            Event::DepStop("dep-a"),
+            Event::LocalstackForceStop,
+            Event::DepForceStop("dep-a"),
         ]
+    );
+    assert_eq!(
+        events.lock().unwrap().as_slice(),
+        observed,
+        "a faulted dependency must not be torn down again on drop"
     );
 }
 
@@ -324,10 +355,18 @@ impl LocalstackImpl for FlakyLocalstackImpl {
         _image_tag: &str,
         _container_name: &str,
         _services: &[String],
-    ) {
+    ) -> Result<(), String> {
+        Ok(())
     }
 
-    async fn stop(&mut self) {}
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn endpoint_url(&self) -> Option<&str> {
         let seen = self.calls.fetch_add(1, Ordering::SeqCst);
@@ -361,9 +400,9 @@ async fn wait_until_ready_retries_until_impl_reports_endpoint() {
         .with_readiness_check(ImmediateReadinessCheck)
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
 
     assert_eq!(dep.endpoint_url(), Some("http://127.0.0.1:4566"));
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }

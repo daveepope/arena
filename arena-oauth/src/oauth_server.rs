@@ -7,8 +7,7 @@ use axum_server::{bind, bind_rustls, Handle};
 use std::sync::Once;
 
 use crate::discovery::OAuthAuthorizationServerMetadata;
-use crate::keys::RsaKeyPair;
-use crate::oauth_common::{OAuthSigningState, OauthListenAddr};
+use crate::oauth_common::{IssuerRegistration, OAuthSigningState, OauthListenAddr};
 use crate::oauth_https::https_router;
 
 static RUSTLS_CRYPTO_INSTALL: Once = Once::new();
@@ -24,12 +23,31 @@ struct OauthServerStarted {
     join: tokio::task::JoinHandle<std::result::Result<(), std::io::Error>>,
     base_url: String,
     readiness_poll_base: String,
+    server_certificate_pem: Option<String>,
     signing_state: Arc<OAuthSigningState>,
 }
 
 #[derive(Default)]
 pub(crate) struct OauthServer {
     inner: Option<OauthServerStarted>,
+}
+
+fn readiness_client(
+    server_certificate_pem: Option<&str>,
+) -> Result<reqwest::Client, String> {
+    let mut builder = reqwest::Client::builder();
+
+    if let Some(pem) = server_certificate_pem {
+        let certificate = reqwest::Certificate::from_pem(pem.as_bytes())
+            .map_err(|e| format!("readiness: invalid server TLS certificate: {e}"))?;
+        builder = builder
+            .add_root_certificate(certificate)
+            .tls_built_in_root_certs(false);
+    }
+
+    builder
+        .build()
+        .map_err(|e| format!("readiness: client build failed: {e}"))
 }
 
 fn reserve_bind_port(listen_ip: IpAddr) -> u16 {
@@ -49,18 +67,20 @@ fn origin_base_url(scheme: &str, listen_ip: IpAddr, bind_port: u16) -> String {
 impl OauthServer {
     pub(crate) async fn start(
         &mut self,
-        log_label: &str,
         listen: OauthListenAddr,
-        keys: RsaKeyPair,
+        issuers: Vec<IssuerRegistration>,
         scopes_supported: Vec<String>,
         token_ttl_secs: u64,
         tls_pem: Option<(String, String)>,
         metadata_base_url_override: Option<String>,
-    ) {
-        assert!(
-            self.inner.is_none(),
-            "[Oauth-{log_label}] oauth server already running"
-        );
+    ) -> Result<(), String> {
+        if self.inner.is_some() {
+            return Err("oauth server already running".to_string());
+        }
+
+        for issuer in &issuers {
+            issuer.keys.resolve();
+        }
 
         let scheme = if tls_pem.is_some() { "https" } else { "http" };
 
@@ -83,24 +103,30 @@ impl OauthServer {
 
         let metadata = Arc::new(OAuthAuthorizationServerMetadata::for_base_url(
             &metadata_base,
+            &issuers[0].issuer_path,
+            &issuers[0].jwks_path,
             scopes_supported,
         ));
         let signing_state = Arc::new(OAuthSigningState {
             metadata,
-            keys: Arc::new(keys),
+            issuers,
             token_ttl_secs,
+            base_url: metadata_base.clone(),
         });
 
         let addr = SocketAddr::new(listen.ip, bind_port);
         let router = https_router(signing_state.clone());
         let handle = Handle::new();
 
+        let mut server_certificate_pem = None;
+
         let join = match tls_pem {
             Some((cert_pem, key_pem)) => {
                 ensure_rustls_default_crypto_provider();
+                server_certificate_pem = Some(cert_pem.clone());
                 let rustls = RustlsConfig::from_pem(cert_pem.into_bytes(), key_pem.into_bytes())
                     .await
-                    .unwrap_or_else(|e| panic!("[Oauth-{log_label}] invalid TLS PEM: {e}"));
+                    .map_err(|e| format!("invalid TLS PEM: {e}"))?;
                 let server = bind_rustls(addr, rustls).handle(handle.clone());
                 tokio::spawn(async move { server.serve(router.into_make_service()).await })
             }
@@ -115,8 +141,17 @@ impl OauthServer {
             join,
             base_url: metadata_base,
             readiness_poll_base,
+            server_certificate_pem,
             signing_state,
         });
+        Ok(())
+    }
+
+    pub(crate) fn release(&mut self) {
+        if let Some(inner) = self.inner.take() {
+            inner.handle.graceful_shutdown(None);
+            inner.join.abort();
+        }
     }
 
     pub(crate) async fn stop(&mut self) {
@@ -146,20 +181,23 @@ impl OauthServer {
         self.inner.as_ref().map(|s| &s.signing_state)
     }
 
-    pub(crate) async fn wait_until_ready(&self, log_label: &str) {
+    pub(crate) async fn wait_until_ready(&self, log_label: &str) -> Result<(), String> {
         let timeout = Duration::from_secs(30);
         let poll_every = Duration::from_millis(100);
         let start = Instant::now();
-        let poll_base = self
+        let Some(poll_base) = self
             .inner
             .as_ref()
             .map(|s| s.readiness_poll_base.as_str())
-            .unwrap_or_else(|| panic!("[Oauth-{log_label}] readiness: server not started"));
+        else {
+            return Err("readiness: server not started".to_string());
+        };
         let url = format!("{poll_base}/.well-known/oauth-authorization-server");
-        let client = reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()
-            .expect("reqwest client");
+        let client = readiness_client(
+            self.inner
+                .as_ref()
+                .and_then(|s| s.server_certificate_pem.as_deref()),
+        )?;
 
         tracing::debug!(
             subsystem = "oauth",
@@ -175,10 +213,9 @@ impl OauthServer {
 
         loop {
             if start.elapsed() >= timeout {
-                panic!(
-                    "[Oauth-{log_label}] did not become ready within {:?}. url={url}, attempts={attempt}, last_outcome={:?}",
-                    timeout, last_outcome
-                );
+                return Err(format!(
+                    "did not become ready within {timeout:?}. url={url}, attempts={attempt}, last_outcome={last_outcome:?}"
+                ));
             }
 
             attempt = attempt.saturating_add(1);
@@ -222,5 +259,6 @@ impl OauthServer {
             }
             tokio::time::sleep(poll_every).await;
         }
+        Ok(())
     }
 }

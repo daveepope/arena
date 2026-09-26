@@ -3,6 +3,7 @@ use arena_ffi::dependency::postgres::postgres_dependency::{build, PostgresDepend
 fn minimal_postgres_config() -> PostgresDependencyConfig {
     PostgresDependencyConfig {
         identifier: "pg".to_string(),
+        expiry_seconds: None,
         image_name: None,
         image: None,
         port: None,

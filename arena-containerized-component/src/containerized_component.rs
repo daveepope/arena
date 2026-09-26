@@ -1,6 +1,10 @@
+use arena::lifecycle::message;
+use arena::lifecycle::Subject;
 use crate::builder::ContainerizedComponentBuilder;
 use arena::component::RunnableComponent;
+use arena::component::Component;
 use arena::healthcheck::ReadinessCheck;
+use arena::lifecycle::{Fault, RunnableState};
 use async_trait::async_trait;
 use bollard::container::LogOutput;
 use bollard::models::{
@@ -16,6 +20,7 @@ use std::collections::HashMap;
 
 pub struct ContainerizedComponent {
     pub(crate) identifier: String,
+    pub(crate) expiry: Option<std::time::Duration>,
     pub(crate) children: Option<Vec<Box<dyn RunnableComponent>>>,
     pub(crate) image_tag: String,
     pub(crate) network: Option<String>,
@@ -29,6 +34,8 @@ pub struct ContainerizedComponent {
     pub(crate) runtime_client: Docker,
     pub(crate) container_id: Option<String>,
     pub(crate) stopped: bool,
+    pub(crate) state: RunnableState,
+    pub(crate) faults: Vec<Fault>,
 }
 
 impl ContainerizedComponent {
@@ -46,7 +53,10 @@ impl ContainerizedComponent {
         ContainerizedComponentBuilder::new_from_image(identifier, image)
     }
 
-    async fn create_and_start_container(&mut self) {
+    async fn create_and_start_container(&mut self) -> Result<(), String> {
+        arena_container::expiry::remove_expired_containers_if_enabled(crate::MODULE, self.expiry)
+            .await;
+
         arena_container::container::try_remove_existing_container(&self.identifier).await;
 
         tracing::debug!(
@@ -135,6 +145,11 @@ impl ContainerizedComponent {
             },
             host_config: Some(host_config),
             networking_config,
+            labels: Some(
+                arena_container::expiry::expiry_labels_for(crate::MODULE, self.expiry)
+                    .into_iter()
+                    .collect(),
+            ),
             ..Default::default()
         };
 
@@ -148,12 +163,7 @@ impl ContainerizedComponent {
             .runtime_client
             .create_container(Some(options), body)
             .await
-            .unwrap_or_else(|e| {
-                panic!(
-                    "{}: failed to create container: {}",
-                    self.identifier, e
-                )
-            });
+            .map_err(|e| format!("failed to create container: {e}"))?;
 
         self.container_id = Some(response.id.clone());
         let id_short = response.id[..12.min(response.id.len())].to_string();
@@ -181,12 +191,7 @@ impl ContainerizedComponent {
                 None::<bollard::query_parameters::StartContainerOptions>,
             )
             .await
-            .unwrap_or_else(|e| {
-                panic!(
-                    "{}: failed to start container: {}",
-                    self.identifier, e
-                )
-            });
+            .map_err(|e| format!("failed to start container: {e}"))?;
 
         tracing::debug!(
             component = %self.identifier,
@@ -194,6 +199,7 @@ impl ContainerizedComponent {
             phase = "container_running",
             "container started",
         );
+        Ok(())
     }
 
     fn spawn_log_follower(&self) {
@@ -256,9 +262,9 @@ impl ContainerizedComponent {
         }
     }
 
-    async fn wait_until_ready(&self) {
+    async fn wait_until_ready(&self) -> Result<(), String> {
         if self.readiness_checks.is_empty() {
-            return;
+            return Ok(());
         }
 
         for (check, target, check_timeout_ms) in &self.readiness_checks {
@@ -273,10 +279,7 @@ impl ContainerizedComponent {
                     );
                 }
                 Err(msg) => {
-                    panic!(
-                        "{}: readiness check failed for target {}: {}",
-                        self.identifier, target, msg
-                    );
+                    return Err(message::readiness_failed_for_target(target, msg));
                 }
             }
         }
@@ -284,6 +287,36 @@ impl ContainerizedComponent {
             component = %self.identifier,
             "all readiness checks passed",
         );
+        Ok(())
+    }
+
+    async fn fail(&mut self, message: impl Into<String>, causes: Vec<Fault>) -> Fault {
+        let fault = Fault::component(&self.identifier, message).caused_by_all(causes);
+        self.faults.push(fault.clone());
+        <Self as RunnableComponent>::force_stop(self).await;
+        fault
+    }
+
+    async fn force_remove_container(&self) -> bool {
+        let Some(container_id) = self.container_id.as_deref() else {
+            return true;
+        };
+
+        let remove_options = RemoveContainerOptionsBuilder::default().force(true).build();
+        if let Err(e) = self
+            .runtime_client
+            .remove_container(container_id, Some(remove_options))
+            .await
+        {
+            tracing::warn!(
+                component = %self.identifier,
+                error = %e,
+                phase = "container_force_remove",
+                "forced container remove returned error",
+            );
+        }
+
+        !arena_container::container::is_container_running(container_id).await
     }
 
     async fn stop_container(&self) {
@@ -339,9 +372,29 @@ impl ContainerizedComponent {
 
 #[async_trait]
 impl RunnableComponent for ContainerizedComponent {
-    async fn start(&mut self) {
+    fn identifier(&self) -> &str {
+        &self.identifier
+    }
+
+    fn state(&self) -> RunnableState {
+        self.state
+    }
+
+    fn faults(&self) -> &[Fault] {
+        &self.faults
+    }
+
+    async fn start(&mut self) -> Result<(), Fault> {
+        self.state = RunnableState::Starting;
+
+        let mut child_faults = Vec::new();
         for child in self.children.iter_mut().flatten() {
-            child.start().await;
+            if let Err(fault) = arena::component::start_child(child).await {
+                child_faults.push(fault);
+            }
+        }
+        if !child_faults.is_empty() {
+            return Err(self.fail(message::child_start_failed(Subject::Component), child_faults).await);
         }
 
         tracing::debug!(
@@ -350,21 +403,30 @@ impl RunnableComponent for ContainerizedComponent {
             "starting",
         );
 
-        self.create_and_start_container().await;
+        if let Err(message) = self.create_and_start_container().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
         self.spawn_log_follower();
-        self.wait_until_ready().await;
 
+        self.state = RunnableState::ReadinessCheck;
+        if let Err(message) = self.wait_until_ready().await {
+            return Err(self.fail(message, Vec::new()).await);
+        }
+
+        self.state = RunnableState::Started;
         tracing::debug!(
             component = %self.identifier,
             phase = "start_done",
             "started",
         );
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), Fault> {
         if self.stopped {
-            return;
+            return Ok(());
         }
+        self.state = RunnableState::Stopping;
 
         tracing::debug!(
             component = %self.identifier,
@@ -384,14 +446,76 @@ impl RunnableComponent for ContainerizedComponent {
             "stopped",
         );
 
+        let mut causes = Vec::new();
         for child in self.children.iter_mut().flatten().rev() {
-            child.stop().await;
+            if let Err(fault) = arena::component::stop_child(child).await {
+                causes.push(fault);
+            }
         }
 
         self.stopped = true;
+
+        if !causes.is_empty() {
+            let fault =
+                Fault::component(&self.identifier, message::stop_did_not_complete()).caused_by_all(causes);
+            self.faults.push(fault.clone());
+            self.state = RunnableState::Faulted;
+            return Err(fault);
+        }
+
+        self.state = RunnableState::Stopped;
+        Ok(())
+    }
+
+    fn release(&mut self) {
+        self.container_id = None;
+        self.stopped = true;
+        for child in self.children.iter_mut().flatten().rev() {
+            arena::component::release_child(child);
+        }
+        self.state = RunnableState::Stopped;
+    }
+
+    async fn force_stop(&mut self) {
+        let removed = self.force_remove_container().await;
+        self.stopped = true;
+
+        if let Some(ref network) = self.network {
+            arena_container::network::remove_network(network).await;
+        }
+
+        for child in self.children.iter_mut().flatten().rev() {
+            arena::component::force_stop_child(child).await;
+        }
+
+        if removed {
+            self.state = RunnableState::Stopped;
+            return;
+        }
+
+        let unconfirmed = Fault::component(
+            &self.identifier,
+            message::forced_teardown_unconfirmed(),
+        );
+        if !self
+            .faults
+            .iter()
+            .any(|f| f.message == unconfirmed.message && f.id == unconfirmed.id)
+        {
+            self.faults.push(unconfirmed);
+        }
+        self.state = RunnableState::Faulted;
     }
 
     fn add_child(&mut self, child: Box<dyn RunnableComponent>) {
         self.children.get_or_insert_with(Vec::new).push(child);
+    }
+
+    fn children(&self) -> &[Component] {
+        self.children.as_deref().unwrap_or(&[])
+    }
+
+    fn children_mut(&mut self) -> &mut [Component] {
+        self.children.as_deref_mut().unwrap_or(&mut [])
     }
 }

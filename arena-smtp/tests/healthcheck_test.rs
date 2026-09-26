@@ -20,10 +20,18 @@ impl SmtpImpl for FixedAddressSmtpImpl {
         _image_tag: &str,
         _container_name: &str,
         _tls: Option<&SmtpTlsConfig>,
-    ) {
+    ) -> Result<(), String> {
+        Ok(())
     }
 
-    async fn stop(&mut self) {}
+    async fn stop(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn smtp_address(&self) -> Option<&str> {
         Some(&self.smtp_address)
@@ -54,9 +62,10 @@ async fn default_readiness_check_accepts_real_smtp_banner() {
 
     tokio::time::timeout(Duration::from_secs(5), dep.start())
         .await
-        .expect("start should complete against a locally-ready banner");
+        .expect("start should complete against a locally-ready banner")
+        .expect("start should succeed");
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }
 
 #[tokio::test]
@@ -86,9 +95,10 @@ async fn default_readiness_check_implicit_tls_ready_without_banner() {
 
     tokio::time::timeout(Duration::from_secs(5), dep.start())
         .await
-        .expect("implicit tls readiness should complete on connect without a banner");
+        .expect("implicit tls readiness should complete on connect without a banner")
+        .expect("start should succeed");
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }
 
 #[tokio::test]
@@ -114,7 +124,8 @@ async fn default_readiness_check_retries_after_dropped_connection() {
 
     tokio::time::timeout(Duration::from_secs(5), dep.start())
         .await
-        .expect("start should complete once the second connection succeeds");
+        .expect("start should complete once the second connection succeeds")
+        .expect("start should succeed");
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }

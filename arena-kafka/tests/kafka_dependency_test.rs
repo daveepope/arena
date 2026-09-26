@@ -24,14 +24,21 @@ impl KafkaImpl for FakeKafkaImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
         self.bootstrap = Some("127.0.0.1:9092".to_string());
         self.events.lock().unwrap().push(Event::KafkaStart);
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.events.lock().unwrap().push(Event::KafkaStop);
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn bootstrap_servers(&self) -> Option<&str> {
         self.bootstrap.as_deref()
@@ -78,7 +85,7 @@ async fn soft_reset_not_running_is_noop() {
     let readiness_calls = Arc::new(AtomicUsize::new(0));
     let dep = build_kafka(events.clone(), readiness_calls);
 
-    dep.soft_reset().await;
+    dep.soft_reset().await.expect("soft reset should succeed");
 
     assert!(events.lock().unwrap().is_empty());
 }
@@ -89,7 +96,7 @@ async fn hard_reset_not_running_is_noop() {
     let readiness_calls = Arc::new(AtomicUsize::new(0));
     let mut dep = build_kafka(events.clone(), readiness_calls);
 
-    dep.hard_reset().await;
+    dep.hard_reset().await.expect("hard reset should succeed");
 
     assert!(events.lock().unwrap().is_empty());
 }
@@ -100,10 +107,10 @@ async fn hard_reset_running_dep_restarts_impl() {
     let readiness_calls = Arc::new(AtomicUsize::new(0));
     let mut dep = build_kafka(events.clone(), readiness_calls.clone());
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
     assert_eq!(readiness_calls.load(Ordering::SeqCst), 1);
 
-    dep.hard_reset().await;
+    dep.hard_reset().await.expect("hard reset should succeed");
 
     assert_eq!(readiness_calls.load(Ordering::SeqCst), 2);
     assert_eq!(
@@ -111,7 +118,7 @@ async fn hard_reset_running_dep_restarts_impl() {
         &[Event::KafkaStart, Event::KafkaStop, Event::KafkaStart]
     );
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }
 
 #[tokio::test]
@@ -120,10 +127,10 @@ async fn soft_reset_running_dep_with_no_topics_is_noop() {
     let readiness_calls = Arc::new(AtomicUsize::new(0));
     let mut dep = build_kafka(events.clone(), readiness_calls);
 
-    dep.start().await;
-    dep.soft_reset().await;
+    dep.start().await.expect("start should succeed");
+    dep.soft_reset().await.expect("soft reset should succeed");
 
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }
 
 struct UnreachableKafkaImpl {
@@ -138,13 +145,20 @@ impl KafkaImpl for UnreachableKafkaImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
         self.events.lock().unwrap().push(Event::KafkaStart);
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         self.events.lock().unwrap().push(Event::KafkaStop);
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn bootstrap_servers(&self) -> Option<&str> {
         Some("127.0.0.1:1")
@@ -166,7 +180,7 @@ async fn start_with_topics_and_unreachable_bootstrap_panics_creating_topics() {
         })
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
 }
 
 #[tokio::test]
@@ -179,6 +193,6 @@ async fn start_with_default_readiness_check_and_unreachable_bootstrap_panics() {
         .with_image_tag("x")
         .build();
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
 }
 

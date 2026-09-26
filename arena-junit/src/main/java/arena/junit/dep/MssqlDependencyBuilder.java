@@ -20,6 +20,16 @@ public final class MssqlDependencyBuilder {
     config.put("identifier", ArenaIdentifiers.build("arena-mssql", name));
   }
 
+  public MssqlDependencyBuilder withExpiry(java.time.Duration expiry) {
+    config.put("expiry_seconds", expirySeconds(expiry));
+    return this;
+  }
+
+  public MssqlDependencyBuilder withoutExpiry() {
+    config.put("expiry_seconds", 0);
+    return this;
+  }
+
   public MssqlDependencyBuilder withImageName(String imageName) {
     config.put("image_name", imageName);
     return this;
@@ -81,4 +91,13 @@ public final class MssqlDependencyBuilder {
     }
     return new MssqlDependency(cfg);
   }
+
+  private static long expirySeconds(java.time.Duration expiry) {
+    if (expiry.isNegative()) {
+      throw new IllegalArgumentException("expiry must not be negative: " + expiry);
+    }
+    long seconds = expiry.toSeconds();
+    return seconds == 0 && !expiry.isZero() ? 1 : seconds;
+  }
+
 }

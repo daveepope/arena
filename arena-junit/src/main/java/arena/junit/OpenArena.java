@@ -1,11 +1,15 @@
 package arena.junit;
 
-import com.sun.jna.Pointer;
+import arena.junit.ffi.ArenaBindingError;
 import arena.junit.ffi.ArenaBindings;
 import arena.junit.ffi.ArenaLogbackFlush;
 import arena.junit.ffi.ArenaStatus;
+import arena.junit.lifecycle.ArenaLifecycleError;
+import arena.junit.lifecycle.ArenaState;
+import arena.junit.lifecycle.LifecycleLog;
 import arena.junit.match.Match;
 import arena.junit.playbook.Playbook;
+import com.sun.jna.Pointer;
 import java.util.List;
 
 public final class OpenArena {
@@ -58,8 +62,13 @@ public final class OpenArena {
       return;
     }
     handle = null;
+    String stateDocument = null;
     try {
-      ArenaBindings.arenaClose(h);
+      try {
+        stateDocument = ArenaBindings.arenaClose(h);
+      } catch (ArenaBindingError e) {
+        throw ArenaLifecycleError.from(e);
+      }
     } finally {
       ArenaLogbackFlush.flushIfPresent();
       long tok = dispatcherLoggingTargetToken;
@@ -68,6 +77,13 @@ public final class OpenArena {
         dispatcherLoggingTargetToken = 0L;
       }
     }
+    if (stateDocument != null) {
+      LifecycleLog.logClosingSummaryDocument(stateDocument);
+    }
+  }
+
+  public ArenaState state() {
+    return ArenaState.parse(ArenaBindings.arenaStateJson(handle));
   }
 
   public ArenaStatus softReset(String dependencyIdentifier) {

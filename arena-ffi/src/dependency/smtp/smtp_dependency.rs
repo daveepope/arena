@@ -6,6 +6,8 @@ use serde::Deserialize;
 pub struct SmtpDependencyConfig {
     pub identifier: String,
     #[serde(default)]
+    pub expiry_seconds: Option<u64>,
+    #[serde(default)]
     pub image_name: Option<String>,
     #[serde(default)]
     pub image: Option<String>,
@@ -45,5 +47,15 @@ pub fn build(config: &SmtpDependencyConfig, network: Option<&str>) -> Result<Dep
         Some("implicit") => builder = builder.with_implicit_tls(),
         Some(other) => return Err(format!("unknown smtp tls_mode: {other}")),
     }
+    match crate::dependency::expiry::expiry_override(config.expiry_seconds) {
+        Some(crate::dependency::expiry::ExpiryOverride::Disabled) => {
+            builder = builder.without_expiry();
+        }
+        Some(crate::dependency::expiry::ExpiryOverride::After(expiry)) => {
+            builder = builder.with_expiry(expiry);
+        }
+        None => {}
+    }
+
     Ok(Box::new(builder.build()))
 }

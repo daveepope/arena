@@ -8,6 +8,7 @@ use super::shared_tracing::{
     ArenaEmittedRecord, ArenaLogDelivery, ArenaLoggingTarget,
 };
 use super::severity_level::Level as ArenaRustLevel;
+use crate::boundary::call_across_boundary;
 
 pub type ArenaLogCallback = unsafe extern "C" fn(
     level: i32,
@@ -24,7 +25,7 @@ static ABI_LOG_TARGETS: LazyLock<Mutex<HashMap<u64, ArenaLogDelivery>>> =
 
 static ABI_NEXT_LOG_TARGET_TOKEN: AtomicU64 = AtomicU64::new(1);
 
-static DEFAULT_DISPATCHER_LOGGING_TARGET_LOGGER_NAME: &[u8] = b"arena.rust.dispatcher\0";
+static DEFAULT_DISPATCHER_LOGGING_TARGET_LOGGER_NAME: &[u8] = b"arena\0";
 
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -97,17 +98,21 @@ pub extern "C" fn arena_add_log_target(
     let Some(callback) = callback else {
         return 0;
     };
-    super::init_logging();
+    let binding = user_data as usize;
+    call_across_boundary(move || {
+        super::init_logging();
 
-    let token = ABI_NEXT_LOG_TARGET_TOKEN.fetch_add(1, Ordering::Relaxed);
-    let subscription = ArenaLogDelivery::subscribe(Arc::new(ForwardToCAbi {
-        func: callback,
-        binding: user_data,
-    }));
+        let token = ABI_NEXT_LOG_TARGET_TOKEN.fetch_add(1, Ordering::Relaxed);
+        let subscription = ArenaLogDelivery::subscribe(Arc::new(ForwardToCAbi {
+            func: callback,
+            binding: binding as *mut c_void,
+        }));
 
-    let mut slots = ABI_LOG_TARGETS.lock().unwrap_or_else(|p| p.into_inner());
-    slots.insert(token, subscription);
-    token
+        let mut slots = ABI_LOG_TARGETS.lock().unwrap_or_else(|p| p.into_inner());
+        slots.insert(token, subscription);
+        token
+    })
+    .unwrap_or(0)
 }
 
 #[no_mangle]
@@ -115,17 +120,25 @@ pub extern "C" fn arena_remove_log_target(token: u64) {
     if token == 0 {
         return;
     }
-    let mut slots = ABI_LOG_TARGETS.lock().unwrap_or_else(|p| p.into_inner());
-    let _released = slots.remove(&token);
+    let _ = call_across_boundary(move || {
+        let mut slots = ABI_LOG_TARGETS.lock().unwrap_or_else(|p| p.into_inner());
+        let _released = slots.remove(&token);
+    });
 }
 
 #[no_mangle]
 pub extern "C" fn arena_dispatcher_default_logging_target_logger_name_utf8() -> *const c_char {
-    DEFAULT_DISPATCHER_LOGGING_TARGET_LOGGER_NAME.as_ptr() as *const c_char
+    call_across_boundary(|| DEFAULT_DISPATCHER_LOGGING_TARGET_LOGGER_NAME.as_ptr() as usize)
+        .unwrap_or(0) as *const c_char
 }
 
 #[no_mangle]
 pub extern "C" fn arena_dispatcher_default_logging_target_publish_level(level: i32) -> i32 {
+    call_across_boundary(move || dispatcher_default_logging_target_publish_level_of(level))
+        .unwrap_or(ArenaLogLevel::Info as i32)
+}
+
+fn dispatcher_default_logging_target_publish_level_of(level: i32) -> i32 {
     match level {
         x if x == ArenaLogLevel::Error as i32 => ArenaLogLevel::Error as i32,
         x if x == ArenaLogLevel::Warn as i32 => ArenaLogLevel::Warn as i32,

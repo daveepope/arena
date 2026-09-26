@@ -5,6 +5,7 @@ _ARENA_FFI_DEPS = all_crate_deps(normal = True) + [
     "//arena",
     "//arena-containerized-component:arena_containerized_component",
     "//arena-executable-component:arena_executable_component",
+    "//arena-host:arena_host",
     "//arena-http:arena_http",
     "//arena-kafka:arena_kafka",
     "//arena-localstack:arena_localstack",
@@ -38,6 +39,24 @@ rust_shared_library(
 )
 
 rust_test(
+    name = "ffi_expiry_test",
+    srcs = ["tests/unit/expiry_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        "//arena",
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
     name = "ffi_healthcheck_test",
     srcs = ["tests/unit/healthcheck_test.rs"],
     size = "small",
@@ -58,6 +77,25 @@ rust_test(
 rust_test(
     name = "ffi_containerized_component_test",
     srcs = ["tests/component/containerized/containerized_component_test.rs"],
+    size = "small",
+    edition = "2021",
+    tags = ["component_test"],
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        "//arena",
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_oauth_sign_claims_test",
+    srcs = ["tests/component/oauth/oauth_sign_claims_test.rs"],
     size = "small",
     edition = "2021",
     tags = ["component_test"],
@@ -101,6 +139,8 @@ rust_test(
         normal_dev = True,
     ) + [
         ":arena_ffi",
+        "//arena",
+        "//arena-http:arena_http",
     ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,
@@ -193,6 +233,49 @@ rust_test(
         normal = True,
         normal_dev = True,
     ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_oauth_sign_claims_validation_test",
+    srcs = [
+        "tests/unit/dependency/oauth/sign_claims_ffi_validation.rs",
+        "tests/unit/ffi_error_text.rs",
+    ],
+    crate_root = "tests/unit/dependency/oauth/sign_claims_ffi_validation.rs",
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_oauth_sign_claims_unit_test",
+    srcs = [
+        "tests/unit/dependency/oauth/sign_claims_test.rs",
+        "tests/unit/ffi_error_text.rs",
+    ],
+    crate_root = "tests/unit/dependency/oauth/sign_claims_test.rs",
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        "//arena",
         ":arena_ffi",
     ],
     proc_macro_deps = all_crate_deps(
@@ -401,6 +484,23 @@ rust_test(
 )
 
 rust_test(
+    name = "ffi_find_available_port_test",
+    srcs = ["tests/unit/find_available_port_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
     name = "ffi_arena_test",
     srcs = [
         "tests/unit/arena_test.rs",
@@ -458,6 +558,124 @@ rust_test(
 rust_test(
     name = "ffi_logging_test",
     srcs = ["tests/unit/logging/logging_ffi_callbacks.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_logging_mod_test",
+    srcs = ["tests/unit/logging/logging_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_shared_tracing_test",
+    srcs = [
+        "tests/unit/logging/dispatcher_capture.rs",
+        "tests/unit/logging/shared_tracing_test.rs",
+    ],
+    crate_root = "tests/unit/logging/shared_tracing_test.rs",
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_boundary_test",
+    srcs = ["tests/unit/boundary_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_arena_state_test",
+    srcs = [
+        "tests/unit/arena_state_test.rs",
+        "tests/unit/ffi_error_text.rs",
+    ],
+    crate_root = "tests/unit/arena_state_test.rs",
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_lifecycle_observer_test",
+    srcs = [
+        "tests/unit/ffi_error_text.rs",
+        "tests/unit/lifecycle_observer_test.rs",
+    ],
+    crate_root = "tests/unit/lifecycle_observer_test.rs",
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_open_arena_test",
+    srcs = [
+        "tests/unit/ffi_error_text.rs",
+        "tests/unit/open_arena_test.rs",
+    ],
+    crate_root = "tests/unit/open_arena_test.rs",
     size = "small",
     edition = "2021",
     deps = all_crate_deps(

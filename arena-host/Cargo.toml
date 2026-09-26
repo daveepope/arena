@@ -1,0 +1,16 @@
+[package]
+name = "arena-host"
+version.workspace = true
+edition = "2021"
+authors = ["David Pope"]
+description = "Zero-dependency host utilities for Arena (free TCP port discovery with per-process collision safety)."
+license = "todo"
+
+[lib]
+path = "src/lib.rs"
+
+[[test]]
+name = "find_available_port_test"
+path = "tests/unit/find_available_port_test.rs"
+
+[dependencies]

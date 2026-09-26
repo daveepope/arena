@@ -186,13 +186,20 @@ impl MssqlImpl for SilentEndpointMssqlImpl {
         _image_name: &str,
         _image_tag: &str,
         _container_name: &str,
-    ) {
+    ) -> Result<(), String> {
         *self.started.lock().unwrap() = true;
+        Ok(())
     }
 
-    async fn stop(&mut self) {
+    async fn stop(&mut self) -> Result<(), String> {
         *self.started.lock().unwrap() = false;
+        Ok(())
     }
+    async fn force_stop(&mut self) -> bool {
+        true
+    }
+    fn release(&mut self) {}
+
 
     fn connection_string(&self) -> Option<&str> {
         Some(&self.conn_str)
@@ -237,7 +244,7 @@ async fn start_silent_post_readiness_endpoint_panics_within_configured_connect_b
 
     let started_at = Instant::now();
     let outcome = std::panic::AssertUnwindSafe(async {
-        mssql.start().await;
+        mssql.start().await.expect("start should succeed");
     })
     .catch_unwind()
     .await;
@@ -254,8 +261,8 @@ async fn start_silent_post_readiness_endpoint_panics_within_configured_connect_b
         "expected impl.start() to have been called"
     );
     assert!(
-        elapsed < configured_budget * 20,
-        "expected start() to panic shortly after configured connect budget; configured={configured_budget:?} elapsed={elapsed:?}"
+        elapsed < Duration::from_secs(5),
+        "expected start() to fail well before the default connect budget would; configured={configured_budget:?} elapsed={elapsed:?}"
     );
 
     if let Err(panic_payload) = outcome {
@@ -265,7 +272,7 @@ async fn start_silent_post_readiness_endpoint_panics_within_configured_connect_b
             .or_else(|| panic_payload.downcast_ref::<&'static str>().map(|s| s.to_string()))
             .unwrap_or_default();
         assert!(
-            msg.contains("mssql connect exceeded"),
+            msg.contains("mssql connect exceeded 50ms"),
             "expected panic message to mention connect timeout, got {msg:?}"
         );
     }

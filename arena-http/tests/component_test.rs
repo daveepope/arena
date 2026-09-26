@@ -24,8 +24,8 @@ struct TestContext {
 impl TestContext {
     async fn new() -> Result<Self, String> {
         tracing::info!(suite = "crate_component", crate_under_test = "arena_http", phase = "dependency_start_begin", "starting dependency");
-        let mut http_dependency = HttpDependency::builder("").build();
-        http_dependency.start().await;
+        let mut http_dependency = HttpDependency::builder("").build().expect("build http dependency");
+        http_dependency.start().await.expect("start should succeed");
 
         let base_url = http_dependency
             .base_url()
@@ -89,7 +89,7 @@ impl TestContext {
     }
 
     async fn stop(mut self) {
-        self.http_dependency.stop().await;
+        self.http_dependency.stop().await.expect("stop should succeed");
     }
 }
 
@@ -1071,12 +1071,19 @@ async fn http_dependency_expect_called_mismatch_panics_on_drop_component_test() 
     }
 }
 
+const EPHEMERAL_PORT_RANGE: std::ops::RangeInclusive<u16> = 21450..=21499;
+
 fn ephemeral_host_tcp_port() -> u16 {
-    std::net::TcpListener::bind("127.0.0.1:0")
-        .expect("bind ephemeral tcp port")
-        .local_addr()
-        .expect("local_addr")
-        .port()
+    arena_host::find_available_port::find_available_port(
+        EPHEMERAL_PORT_RANGE,
+        arena_host::find_available_port::PortSearchStrategy::Random,
+    )
+    .unwrap_or_else(|| {
+        panic!(
+            "no available port found in range {}..={}",
+            EPHEMERAL_PORT_RANGE.start(), EPHEMERAL_PORT_RANGE.end()
+        )
+    })
 }
 
 fn stub_https_client() -> reqwest::Client {
@@ -1099,9 +1106,9 @@ async fn http_dependency_https_listener_stub_roundtrip_component_test() {
         .listener_container_port(8443)
         .host_port(https_host_port)
         .done()
-        .build();
+        .build().expect("build http dependency");
 
-    dep.start().await;
+    dep.start().await.expect("start should succeed");
 
     let https_origin = dep
         .https_base_url()
@@ -1150,5 +1157,5 @@ async fn http_dependency_https_listener_stub_roundtrip_component_test() {
     pb.verify(1, get_requested_for("/api/https-stub-check"))
         .await;
     drop(pb);
-    dep.stop().await;
+    dep.stop().await.expect("stop should succeed");
 }

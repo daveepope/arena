@@ -1,10 +1,13 @@
 package arena.examples.readings.springboot.workflow;
 
 import io.temporal.activity.ActivityOptions;
+import io.temporal.failure.ApplicationFailure;
 import io.temporal.workflow.Workflow;
 import java.time.Duration;
 
 public final class DeviceLifecycleWorkflowImpl implements DeviceLifecycleWorkflow {
+
+  private static final Duration TRANSITION_TIMEOUT = Duration.ofSeconds(30);
 
   private static final ActivityOptions ACTIVITY_OPTIONS =
       ActivityOptions.newBuilder().setStartToCloseTimeout(Duration.ofSeconds(10)).build();
@@ -32,8 +35,20 @@ public final class DeviceLifecycleWorkflowImpl implements DeviceLifecycleWorkflo
   }
 
   @Override
-  public void requestTransition(DeviceState target) {
-    this.requested = target;
+  public DeviceSnapshot requestTransition(DeviceState target) {
+    Workflow.await(() -> requested == null || stopRequested);
+    if (stopRequested) {
+      throw ApplicationFailure.newNonRetryableFailure(
+          "device is stopping", "DeviceTransitionRejected");
+    }
+    int countBefore = transitionCount;
+    requested = target;
+    if (!Workflow.await(TRANSITION_TIMEOUT, () -> transitionCount != countBefore)) {
+      throw ApplicationFailure.newNonRetryableFailure(
+          "device transition to " + target + " was not applied within " + TRANSITION_TIMEOUT,
+          "DeviceTransitionTimeout");
+    }
+    return new DeviceSnapshot(state, transitionCount);
   }
 
   @Override

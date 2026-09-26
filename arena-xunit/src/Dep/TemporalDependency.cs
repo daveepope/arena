@@ -8,6 +8,7 @@ public sealed class TemporalDependency : IArenaDependency
 {
     public string Type => "temporal";
     public string Identifier { get; }
+    public long? ExpirySeconds { get; internal set; }
     public int Port { get; }
     public int UiPort { get; }
     public string? Image { get; }
@@ -36,6 +37,7 @@ public sealed class TemporalDependency : IArenaDependency
 
 public sealed class TemporalDependencyBuilder
 {
+    private long? _expirySeconds;
     private readonly string _name;
     private int _port = 7233;
     private int _uiPort = 8233;
@@ -85,9 +87,32 @@ public sealed class TemporalDependencyBuilder
         return this;
     }
 
+    public TemporalDependencyBuilder WithExpiry(System.TimeSpan expiry)
+    {
+        _expirySeconds = ExpirySeconds(expiry);
+        return this;
+    }
+
+    public TemporalDependencyBuilder WithoutExpiry()
+    {
+        _expirySeconds = 0;
+        return this;
+    }
+
     public TemporalDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-temporal", _name);
-        return new TemporalDependency(identifier, _port, _uiPort, _image, _imageName, _containerName, _children);
+        var built = new TemporalDependency(identifier, _port, _uiPort, _image, _imageName, _containerName, _children);
+        built.ExpirySeconds = _expirySeconds;
+        return built;
     }
+
+    private static long ExpirySeconds(System.TimeSpan expiry)
+    {
+        if (expiry < System.TimeSpan.Zero)
+            throw new System.ArgumentOutOfRangeException(nameof(expiry), "expiry must not be negative");
+        var seconds = (long)expiry.TotalSeconds;
+        return seconds == 0 && expiry > System.TimeSpan.Zero ? 1 : seconds;
+    }
+
 }

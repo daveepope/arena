@@ -413,6 +413,7 @@ py_library(
     name = "ephemeral_test_runtime",
     srcs = ["tests/pytest-shared/ephemeral_test_runtime.py"],
     imports = ["tests/pytest-shared"],
+    deps = ["//arena-pytest:arena_pytest_lib"],
     visibility = ["//visibility:public"],
 )
 
@@ -422,6 +423,7 @@ py_test(
     srcs = ["tests/pytest-shared/ephemeral_test_runtime_test.py"],
     main = "tests/pytest-shared/ephemeral_test_runtime_test.py",
     imports = ["tests/pytest-shared"],
+    data = ["//arena-ffi:arena_ffi_shared"],
     deps = [
         ":ephemeral_test_runtime",
         "@pip//pytest",
@@ -444,6 +446,10 @@ java_library(
     name = "ephemeral_test_runtime_java",
     srcs = [
         "tests/junit-shared/arena/examples/testruntime/EphemeralTestRuntime.java",
+    ],
+    deps = [
+        "//arena-junit:arena_junit_lib",
+        "@arena_java_maven//:net_java_dev_jna_jna",
     ],
     visibility = ["//visibility:public"],
 )
@@ -478,6 +484,7 @@ py_library(
     name = "pytest_shared",
     srcs = [
         "tests/pytest-shared/api_http.py",
+        "tests/pytest-shared/oauth_claims.py",
         "tests/pytest-shared/playbook_fixtures.py",
         "tests/pytest-shared/playbooks.py",
     ],
@@ -709,6 +716,7 @@ rust_test(
     ) + [
         ":arena_examples",
         "//arena",
+        "//arena-host:arena_host",
         "//arena-http:arena_http",
         "//arena-kafka:arena_kafka",
         "//arena-postgres:arena_postgres",
@@ -932,6 +940,7 @@ java_test(
 csharp_library(
     name = "xunit_shared",
     target_frameworks = ["net8.0"],
+    nullable = "enable",
     srcs = glob(["tests/xunit-shared/**/*.cs"]),
     deps = [
         "//arena-xunit:arena_xunit_lib",
@@ -949,7 +958,11 @@ csharp_library(
 csharp_library(
     name = "ephemeral_test_runtime_dotnet",
     target_frameworks = ["net8.0"],
+    nullable = "enable",
     srcs = ["tests/xunit-shared/EphemeralTestRuntime.cs"],
+    deps = [
+        "//arena-xunit:arena_xunit_lib",
+    ],
     visibility = ["//visibility:public"],
 )
 

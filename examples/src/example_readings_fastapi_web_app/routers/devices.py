@@ -1,5 +1,4 @@
 import asyncio
-import time
 from contextlib import asynccontextmanager
 from typing import List
 
@@ -16,10 +15,6 @@ from example_readings_fastapi_web_app.workflows.device_workflow import (
 )
 
 router = APIRouter(prefix="/devices", tags=["devices"])
-
-TRANSITION_WAIT_TIMEOUT_SECONDS = 0.5
-TRANSITION_WAIT_POLL_SECONDS = 0.025
-
 
 class CreateDeviceBody(BaseModel):
     name: str
@@ -132,14 +127,9 @@ async def set_device_state(
 ) -> DeviceStateResponse:
     handle = _workflow_handle(request, device_id)
     async with _translate_not_found(device_id):
-        count_before = (await handle.query(DeviceLifecycleWorkflow.snapshot)).transition_count
-        await handle.signal(DeviceLifecycleWorkflow.request_transition, body.target)
-
-        deadline = time.monotonic() + TRANSITION_WAIT_TIMEOUT_SECONDS
-        snapshot = await handle.query(DeviceLifecycleWorkflow.snapshot)
-        while snapshot.transition_count == count_before and time.monotonic() < deadline:
-            await asyncio.sleep(TRANSITION_WAIT_POLL_SECONDS)
-            snapshot = await handle.query(DeviceLifecycleWorkflow.snapshot)
+        snapshot = await handle.execute_update(
+            DeviceLifecycleWorkflow.request_transition, body.target
+        )
     return DeviceStateResponse(
         device_id=device_id,
         state=snapshot.state,

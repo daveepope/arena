@@ -24,21 +24,21 @@ fn arena_match_playbook_run_null_arena_handle_returns_null_and_writes_error() {
 fn arena_match_playbook_run_null_identifier_returns_null_and_writes_error() {
     let name = CString::new("test").unwrap();
     let mut err: *mut c_char = std::ptr::null_mut();
-    let arena_handle = arena_open(name.as_ptr(), std::ptr::null(), &mut err as *mut _);
+    let arena_handle = arena_open(name.as_ptr(), std::ptr::null(), &mut err as *mut _, std::ptr::null_mut());
     assert!(!arena_handle.is_null());
 
     let handle = arena_match_playbook_run(arena_handle, std::ptr::null(), &mut err as *mut _);
 
     assert!(handle.is_null());
     assert!(err_text(err).contains("identifier must not be null"));
-    arena_close(arena_handle);
+    arena_close(arena_handle, std::ptr::null_mut(), std::ptr::null_mut());
 }
 
 #[test]
 fn arena_match_playbook_run_unregistered_playbook_returns_null_and_writes_error() {
     let name = CString::new("test").unwrap();
     let mut err: *mut c_char = std::ptr::null_mut();
-    let arena_handle = arena_open(name.as_ptr(), std::ptr::null(), &mut err as *mut _);
+    let arena_handle = arena_open(name.as_ptr(), std::ptr::null(), &mut err as *mut _, std::ptr::null_mut());
     assert!(!arena_handle.is_null());
 
     let identifier = CString::new("does-not-exist").unwrap();
@@ -46,7 +46,7 @@ fn arena_match_playbook_run_unregistered_playbook_returns_null_and_writes_error(
 
     assert!(handle.is_null());
     assert!(err_text(err).contains("is not registered on any match"));
-    arena_close(arena_handle);
+    arena_close(arena_handle, std::ptr::null_mut(), std::ptr::null_mut());
 }
 
 #[test]

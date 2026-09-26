@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: build-test-publish-${{ github.event.pull_request.number || github.ref }}
+  group: build-test-publish-${{ github.event.pull_request.number || github.ref }}${{ github.event.action == 'labeled' && '-labeled' || '' }}
   cancel-in-progress: true
 
 permissions: read-all
@@ -194,6 +194,7 @@ jobs:
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -243,6 +244,10 @@ jobs:
               - '**/requirements.txt'
               - 'MODULE.bazel'
               - 'MODULE.bazel.lock'
+
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
@@ -308,6 +313,7 @@ jobs:
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -366,14 +372,15 @@ jobs:
         if: steps.paths.outputs.rust_crates == 'true'
         run: bazel run //scripts:audit_and_vet_rust --config=ci
 
-  test_ubuntu_24_04:
-    name: Test Ubuntu 24.04
+  test_unit_ubuntu_24_04:
+    name: Test unit Ubuntu 24.04
     needs: [changes, master_merge_guard]
     if: >-
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -399,11 +406,15 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
+
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
           bazelisk-cache: true
-          disk-cache: build-test-publish-arena-ubuntu-24.04
+          disk-cache: build-test-publish-arena-unit-ubuntu-24.04
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
@@ -422,23 +433,17 @@ jobs:
 
       - name: Build and test
         run: |
-          set +e
-          bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
-          status1=$?
-          bazel test //... --config=ci --build_tests_only --test_tag_filters=component_test --local_test_jobs=4 -- //... -//examples/...
-          status2=$?
-          if [ $status1 -ne 0 ] || [ $status2 -ne 0 ]; then
-            exit 1
-          fi
+          bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
 
-  test_examples_ubuntu_24_04:
-    name: Test examples Ubuntu 24.04
+  test_component_ubuntu_24_04:
+    name: Test component Ubuntu 24.04
     needs: [changes, master_merge_guard]
     if: >-
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -463,6 +468,271 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
+
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-component-ubuntu-24.04
+          repository-cache: true
+
+      - name: Configure BuildBuddy remote cache
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
+          fi
+
+      - name: Build and test
+        run: |
+          bazel test //... --config=ci --build_tests_only --test_tag_filters=component_test --local_test_jobs=4 -- //... -//examples/... -//arena-oracledb:component_test
+
+  test_component_oracle:
+    name: Test component OracleDB ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    needs: [changes, master_merge_guard]
+    if: >-
+      always() && !cancelled() &&
+      needs.changes.result == 'success' &&
+      (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
+      needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
+      (
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped' &&
+          !(
+            github.event.pull_request.user.login == 'dependabot[bot]' &&
+            needs.changes.outputs.version_changed != 'true'
+          )
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
+      )
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
+
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-component-oracle-${{ matrix.runner }}
+          repository-cache: true
+
+      - name: Configure BuildBuddy remote cache
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
+          fi
+
+      - name: Build and test
+        run: |
+          bazel test //arena-oracledb:component_test --config=ci --build_tests_only --local_test_jobs=1
+
+
+  test_unit_ubuntu_24_04_arm64:
+    name: Test unit Ubuntu 24.04 ARM64
+    needs: [changes, master_merge_guard]
+    if: >-
+      always() && !cancelled() &&
+      needs.changes.result == 'success' &&
+      (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
+      needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
+      (
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped' &&
+          !(
+            github.event.pull_request.user.login == 'dependabot[bot]' &&
+            needs.changes.outputs.version_changed != 'true'
+          )
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
+      )
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
+
+      - name: Install mold
+        run: sudo apt-get update && sudo apt-get install -y mold
+
+      - name: Register amd64 image support
+        run: |
+          docker run --privileged --rm \
+            tonistiigi/binfmt@sha256:ea2f0dd74e74f101df59f9a6b31d0960994060c7982a921cbceecee0f1841125 \
+            --install amd64
+          docker run --rm --platform=linux/amd64 alpine:3.22 uname -m
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-unit-ubuntu-24.04-arm64
+          repository-cache: true
+
+      - name: Configure BuildBuddy remote cache
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
+          fi
+
+      - name: Build and test
+        run: |
+          bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
+
+  test_component_ubuntu_24_04_arm64:
+    name: Test component Ubuntu 24.04 ARM64
+    needs: [changes, master_merge_guard]
+    if: >-
+      always() && !cancelled() &&
+      needs.changes.result == 'success' &&
+      (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
+      needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
+      (
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped' &&
+          !(
+            github.event.pull_request.user.login == 'dependabot[bot]' &&
+            needs.changes.outputs.version_changed != 'true'
+          )
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
+      )
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
+
+      - name: Install mold
+        run: sudo apt-get update && sudo apt-get install -y mold
+
+      - name: Register amd64 image support
+        run: |
+          docker run --privileged --rm \
+            tonistiigi/binfmt@sha256:ea2f0dd74e74f101df59f9a6b31d0960994060c7982a921cbceecee0f1841125 \
+            --install amd64
+          docker run --rm --platform=linux/amd64 alpine:3.22 uname -m
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-component-ubuntu-24.04-arm64
+          repository-cache: true
+
+      - name: Configure BuildBuddy remote cache
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
+          fi
+
+      - name: Build and test
+        run: |
+          bazel test //... --config=ci --build_tests_only --test_tag_filters=component_test --local_test_jobs=4 -- //... \
+            -//examples/... \
+            -//arena-mssql:component_test \
+            -//arena-oracledb:component_test \
+            -//arena-pytest:playbook_timing_component_test
+
+  test_examples_ubuntu_24_04:
+    name: Test component examples Ubuntu 24.04
+    needs: [changes, master_merge_guard]
+    if: >-
+      always() && !cancelled() &&
+      needs.changes.result == 'success' &&
+      (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
+      needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
+      (
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped' &&
+          !(
+            github.event.pull_request.user.login == 'dependabot[bot]' &&
+            needs.changes.outputs.version_changed != 'true'
+          )
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
+      )
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
+
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
@@ -493,6 +763,7 @@ jobs:
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -516,6 +787,10 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
+
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
@@ -550,13 +825,14 @@ jobs:
           fail_ci_if_error: false
 
   test_macos_intel:
-    name: Test macOS Intel
+    name: Test unit macOS Intel
     needs: [changes, master_merge_guard]
     if: >-
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -601,16 +877,17 @@ jobs:
           fi
 
       - name: Build and test
-        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
 
   test_macos_arm64:
-    name: Test macOS ARM64
+    name: Test unit macOS ARM64
     needs: [changes, master_merge_guard]
     if: >-
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -655,16 +932,17 @@ jobs:
           fi
 
       - name: Build and test
-        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
 
-  test_windows:
-    name: Test Windows
+  test_unit_windows:
+    name: Test unit Windows
     needs: [changes, master_merge_guard]
     if: >-
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -694,7 +972,65 @@ jobs:
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
           bazelisk-cache: true
-          disk-cache: build-test-publish-arena-windows
+          disk-cache: build-test-publish-arena-unit-windows
+          repository-cache: true
+
+      - name: Configure BuildBuddy remote cache
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
+          fi
+        shell: bash
+
+      - name: Build and test
+        shell: bash
+        run: |
+          bazel test --config=ci --enable_runfiles --build_tests_only --test_tag_filters=-component_test,-no-windows --local_test_jobs=6 -- //...
+
+  test_component_windows:
+    name: Test component Windows
+    needs: [changes, master_merge_guard]
+    if: >-
+      always() && !cancelled() &&
+      needs.changes.result == 'success' &&
+      (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
+      needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
+      (
+        (
+          github.event_name == 'pull_request' &&
+          needs.master_merge_guard.result == 'skipped' &&
+          !(
+            github.event.pull_request.user.login == 'dependabot[bot]' &&
+            needs.changes.outputs.version_changed != 'true'
+          )
+        ) ||
+        (
+          github.event_name == 'push' &&
+          needs.master_merge_guard.result == 'success' &&
+          needs.master_merge_guard.outputs.from_merged_pr != 'true'
+        )
+      )
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: build-test-publish-arena-component-windows
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
@@ -716,23 +1052,17 @@ jobs:
       - name: Build and test
         shell: bash
         run: |
-          set +e
-          bazel test --config=ci --enable_runfiles --build_tests_only --test_tag_filters=-component_test,-no-windows -- //...
-          status1=$?
-          bazel test --config=ci --enable_runfiles --build_tests_only --test_tag_filters=component_test,-no-windows --local_test_jobs=1 --test_env=DOCKER_HOST -- //... -//examples/... -//arena-containerized-component:volume_mapping_component_test -//arena-containerized-component:from_image_component_test
-          status2=$?
-          if [ $status1 -ne 0 ] || [ $status2 -ne 0 ]; then
-            exit 1
-          fi
+          bazel test --config=ci --enable_runfiles --build_tests_only --test_tag_filters=component_test,-no-windows --local_test_jobs=1 --test_env=DOCKER_HOST -- //... -//examples/... -//arena-containerized-component:component_test
 
   test_examples_windows:
-    name: Test examples Windows
+    name: Test component examples Windows
     needs: [changes, master_merge_guard]
     if: >-
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
       (needs.master_merge_guard.result == 'success' || needs.master_merge_guard.result == 'skipped') &&
       needs.changes.outputs.has_ci_relevant == 'true' &&
+      github.event.action != 'labeled' &&
       (
         (
           github.event_name == 'pull_request' &&
@@ -832,6 +1162,37 @@ jobs:
             examples/requirements_windows.txt
           if-no-files-found: error
 
+  prior_checks:
+    name: Prior checks green (pre-release label)
+    needs: [changes, master_merge_guard]
+    if: >-
+      always() && !cancelled() &&
+      needs.changes.result == 'success' &&
+      github.event_name == 'pull_request' &&
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'pre-release'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+      checks: read
+    timeout-minutes: 10
+    steps:
+      - name: Require the previous run for this commit to have succeeded
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          conclusion="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/build-test-publish-arena.yml/runs?head_sha=${HEAD_SHA}&per_page=30" \
+            --jq "[.workflow_runs[] | select(.id != ${GITHUB_RUN_ID} and .status == \"completed\" and .conclusion != \"cancelled\")] | first | .conclusion // \"none\"")"
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::the previous run for $HEAD_SHA is '$conclusion'; let it pass before adding the pre-release label"
+            exit 1
+          fi
+          echo "previous run for $HEAD_SHA passed"
+
   publish_gate:
     name: Publish gate
     needs:
@@ -839,13 +1200,19 @@ jobs:
       - master_merge_guard
       - require_version_bump
       - verify
-      - test_ubuntu_24_04
+      - test_unit_ubuntu_24_04
+      - test_component_ubuntu_24_04
+      - test_component_oracle
+      - test_unit_ubuntu_24_04_arm64
+      - test_component_ubuntu_24_04_arm64
       - test_examples_ubuntu_24_04
       - coverage_ubuntu_24_04
       - test_macos_intel
       - test_macos_arm64
-      - test_windows
+      - test_unit_windows
+      - test_component_windows
       - test_examples_windows
+      - prior_checks
     if: >-
       always() && !cancelled() &&
       needs.changes.result == 'success' &&
@@ -857,14 +1224,28 @@ jobs:
           github.event.pull_request.head.repo.full_name == github.repository &&
           needs.master_merge_guard.result == 'skipped' &&
           needs.require_version_bump.result == 'success' &&
-          needs.verify.result == 'success' &&
-          needs.test_ubuntu_24_04.result == 'success' &&
-          needs.test_examples_ubuntu_24_04.result == 'success' &&
-          needs.coverage_ubuntu_24_04.result == 'success' &&
-          needs.test_macos_intel.result == 'success' &&
-          needs.test_macos_arm64.result == 'success' &&
-          needs.test_windows.result == 'success' &&
-          needs.test_examples_windows.result == 'success'
+          (
+            (
+              github.event.action == 'labeled' &&
+              needs.prior_checks.result == 'success'
+            ) ||
+            (
+              github.event.action != 'labeled' &&
+              needs.verify.result == 'success' &&
+              needs.test_unit_ubuntu_24_04.result == 'success' &&
+              needs.test_component_ubuntu_24_04.result == 'success' &&
+              needs.test_component_oracle.result == 'success' &&
+              needs.test_unit_ubuntu_24_04_arm64.result == 'success' &&
+              needs.test_component_ubuntu_24_04_arm64.result == 'success' &&
+              needs.test_examples_ubuntu_24_04.result == 'success' &&
+                  needs.coverage_ubuntu_24_04.result == 'success' &&
+              needs.test_macos_intel.result == 'success' &&
+              needs.test_macos_arm64.result == 'success' &&
+              needs.test_unit_windows.result == 'success' &&
+              needs.test_component_windows.result == 'success' &&
+              needs.test_examples_windows.result == 'success'
+            )
+          )
         ) ||
         (
           github.event_name == 'push' &&
@@ -874,11 +1255,16 @@ jobs:
             needs.master_merge_guard.outputs.from_merged_pr == 'true' ||
             (
               needs.verify.result == 'success' &&
-              needs.test_ubuntu_24_04.result == 'success' &&
+              needs.test_unit_ubuntu_24_04.result == 'success' &&
+              needs.test_component_ubuntu_24_04.result == 'success' &&
+              needs.test_component_oracle.result == 'success' &&
+              needs.test_unit_ubuntu_24_04_arm64.result == 'success' &&
+              needs.test_component_ubuntu_24_04_arm64.result == 'success' &&
               needs.test_examples_ubuntu_24_04.result == 'success' &&
               needs.test_macos_intel.result == 'success' &&
               needs.test_macos_arm64.result == 'success' &&
-              needs.test_windows.result == 'success' &&
+              needs.test_unit_windows.result == 'success' &&
+              needs.test_component_windows.result == 'success' &&
               needs.test_examples_windows.result == 'success'
             )
           )
@@ -928,6 +1314,10 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
+
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
@@ -1234,6 +1624,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
+
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
@@ -1315,6 +1709,10 @@ jobs:
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0
+
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
@@ -1492,6 +1890,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
+
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
@@ -1588,6 +1990,10 @@ jobs:
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0
+
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4

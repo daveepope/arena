@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using ArenaDotnet.Xunit.Ffi;
+using ArenaDotnet.Xunit.Lifecycle;
 using ArenaDotnet.Xunit.Playbook;
 
 namespace ArenaDotnet.Xunit;
@@ -9,16 +11,26 @@ public sealed class OpenArena : IDisposable
 {
     private readonly ArenaHandle _handle;
     private readonly ulong _logToken;
+    private readonly ulong _lifecycleObserverToken;
+    private readonly ArenaLogRouting _routing;
     private readonly Match _match;
     private readonly Dictionary<Type, ActivePlaybook> _sessionPlaybooks;
     private readonly Dictionary<Type, Playbook.IPlaybook> _registeredPlaybooks;
     private readonly Dictionary<Type, bool> _playbookExecOnStart;
-    private bool _disposed;
+    private int _disposed;
 
-    internal OpenArena(IntPtr handle, ulong logToken, Match match, Dictionary<Type, ActivePlaybook> sessionPlaybooks)
+    internal OpenArena(
+        IntPtr handle,
+        ulong logToken,
+        ulong lifecycleObserverToken,
+        ArenaLogRouting routing,
+        Match match,
+        Dictionary<Type, ActivePlaybook> sessionPlaybooks)
     {
         _handle = new ArenaHandle(handle);
         _logToken = logToken;
+        _lifecycleObserverToken = lifecycleObserverToken;
+        _routing = routing;
         _match = match;
         _sessionPlaybooks = sessionPlaybooks;
         _registeredPlaybooks = new Dictionary<Type, Playbook.IPlaybook>();
@@ -28,6 +40,7 @@ public sealed class OpenArena : IDisposable
             _registeredPlaybooks[reg.Playbook.GetType()] = reg.Playbook;
             _playbookExecOnStart[reg.Playbook.GetType()] = reg.ExecOnDependencyStart;
         }
+        ArenaShutdown.Track(this);
     }
 
     internal IntPtr Handle => _handle.DangerousGetHandle();
@@ -42,6 +55,12 @@ public sealed class OpenArena : IDisposable
     {
         ThrowIfDisposed();
         ArenaBindings.HardReset(Handle, dependencyIdentifier);
+    }
+
+    public ArenaState State()
+    {
+        ThrowIfDisposed();
+        return ArenaState.Parse(ArenaBindings.StateJson(Handle));
     }
 
     public Playbook.IPlaybook? GetPlaybook(Type playbookType)
@@ -82,9 +101,9 @@ public sealed class OpenArena : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
-        _disposed = true;
+        ArenaShutdown.Untrack(this);
 
         List<Exception>? errors = null;
         foreach (var pb in _sessionPlaybooks.Values)
@@ -100,25 +119,36 @@ public sealed class OpenArena : IDisposable
         }
         _sessionPlaybooks.Clear();
 
+        string? stateDocument = null;
+        IntPtr raw = _handle.DangerousGetHandle();
+        _handle.SetHandleAsInvalid();
         try
         {
-            _handle.Dispose();
+            if (raw != IntPtr.Zero)
+                stateDocument = ArenaBindings.CloseArena(raw);
+        }
+        catch (ArenaBindingError ex)
+        {
+            (errors ??= new List<Exception>()).Add(ArenaLifecycleError.From(ex));
         }
         finally
         {
+            ArenaLifecycleObservers.Unregister(_lifecycleObserverToken);
             ArenaLogTarget.Unregister(_logToken);
         }
+        if (stateDocument != null)
+            LifecycleLog.LogClosingSummaryDocument(stateDocument, _routing);
 
         if (errors == null)
             return;
         if (errors.Count == 1)
             System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(errors[0]).Throw();
-        throw new AggregateException("one or more session playbooks failed verification on arena close", errors);
+        throw new AggregateException("arena close completed with failures", errors);
     }
 
-    private void ThrowIfDisposed()
+    internal void ThrowIfDisposed()
     {
-        if (_disposed)
+        if (Volatile.Read(ref _disposed) != 0)
             throw new ObjectDisposedException(nameof(OpenArena));
     }
 }

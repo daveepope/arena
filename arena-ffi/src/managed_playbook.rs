@@ -1,5 +1,5 @@
 use arena::Playbook;
-use arena_http::{ManagedHttpPlaybook, Playbook as HttpPlaybook};
+use arena_http::ManagedHttpPlaybook;
 use arena_localstack::ManagedLocalstackPlaybook;
 use arena_mssql::ManagedMssqlPlaybook;
 use arena_oracledb::ManagedOraclePlaybook;
@@ -61,11 +61,21 @@ pub(crate) struct PostgresPlaybookConfig {
 
 pub fn build(config: ManagedPlaybookConfig) -> Box<dyn Playbook> {
     match config.kind {
-        PlaybookKindConfig::Http(http) => Box::new(ManagedHttpPlaybook::new(
-            config.identifier,
-            http.dependency_identifier,
-            move |pb| build_http_playbook(pb, &http.mappings),
-        )),
+        PlaybookKindConfig::Http(http) => {
+            let identifier = config.identifier.clone();
+            Box::new(ManagedHttpPlaybook::new(
+                config.identifier,
+                http.dependency_identifier,
+                move |pb| {
+                    build_playbook_from_mappings(pb, &http.mappings).map_err(|e| {
+                        arena::Fault::playbook(
+                            identifier.clone(),
+                            format!("http playbook registration failed: {e}"),
+                        )
+                    })
+                },
+            ))
+        }
         PlaybookKindConfig::Mssql(mssql) => Box::new(ManagedMssqlPlaybook::new(
             config.identifier,
             mssql.dependency_identifier,
@@ -85,7 +95,3 @@ pub fn build(config: ManagedPlaybookConfig) -> Box<dyn Playbook> {
     }
 }
 
-fn build_http_playbook(pb: HttpPlaybook, mappings: &[MappingSpec]) -> HttpPlaybook {
-    build_playbook_from_mappings(pb, mappings)
-        .unwrap_or_else(|e| panic!("http playbook registration failed: {e}"))
-}

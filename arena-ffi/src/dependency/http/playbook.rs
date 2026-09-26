@@ -1,5 +1,4 @@
 use std::os::raw::c_char;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use arena_http::{
     delete_requested_for, get_requested_for, post_requested_for, put_requested_for, ActivePlaybook,
@@ -14,6 +13,7 @@ use crate::error::{clear_error, write_error};
 use crate::panic_payload::panic_message;
 use crate::strings::c_str_to_string;
 use crate::{ArenaStatus, OpenArenaHandle};
+use crate::boundary::call_across_boundary;
 
 #[derive(Debug, Deserialize)]
 struct PlaybookSpec {
@@ -95,7 +95,7 @@ pub extern "C" fn arena_http_playbook_open(
         }
     };
 
-    let parsed: PlaybookSpec = match catch_unwind(AssertUnwindSafe(|| serde_json::from_str(&spec_str)))
+    let parsed: PlaybookSpec = match call_across_boundary(|| serde_json::from_str(&spec_str))
     {
         Ok(Ok(v)) => v,
         Ok(Err(e)) => {
@@ -108,7 +108,7 @@ pub extern "C" fn arena_http_playbook_open(
             return std::ptr::null_mut();
         }
         Err(payload) => {
-            let msg = panic_message(&payload);
+            let msg = panic_message(payload.as_ref());
             unsafe {
                 write_error(err_out, format!("panic in arena_http_playbook_open: {msg}"))
             };
@@ -126,7 +126,7 @@ pub extern "C" fn arena_http_playbook_open(
         return std::ptr::null_mut();
     }
 
-    let outcome = catch_unwind(AssertUnwindSafe(|| -> Result<ActivePlaybookInner, String> {
+    let outcome = call_across_boundary(|| -> Result<ActivePlaybookInner, String> {
         let arena_runtime = unsafe { OpenArenaRuntimeState::as_ref(arena_handle) };
         let runtime_handle = arena_runtime.runtime.handle().clone();
 
@@ -140,7 +140,7 @@ pub extern "C" fn arena_http_playbook_open(
             runtime_handle,
             active: Some(Box::new(active)),
         })
-    }));
+    });
 
     match outcome {
         Ok(Ok(inner)) => inner.into_raw(),
@@ -150,7 +150,7 @@ pub extern "C" fn arena_http_playbook_open(
             std::ptr::null_mut()
         }
         Err(payload) => {
-            let msg = panic_message(&payload);
+            let msg = panic_message(payload.as_ref());
             tracing::error!(
                 panic_message = %msg,
                 op = "http_playbook_open",
@@ -234,7 +234,7 @@ pub extern "C" fn arena_http_playbook_verify(
         }
     };
 
-    let parsed: VerifySpec = match catch_unwind(AssertUnwindSafe(|| serde_json::from_str(&spec_str)))
+    let parsed: VerifySpec = match call_across_boundary(|| serde_json::from_str(&spec_str))
     {
         Ok(Ok(v)) => v,
         Ok(Err(e)) => {
@@ -247,7 +247,7 @@ pub extern "C" fn arena_http_playbook_verify(
             return ArenaStatus::InvalidArgument;
         }
         Err(payload) => {
-            let msg = panic_message(&payload);
+            let msg = panic_message(payload.as_ref());
             unsafe {
                 write_error(
                     err_out,
@@ -260,7 +260,7 @@ pub extern "C" fn arena_http_playbook_verify(
     let _ = parsed.dependency_identifier;
 
     let outcome =
-        catch_unwind(AssertUnwindSafe(|| run_http_verify(handle, parsed).map_err(|msg| msg)));
+        call_across_boundary(|| run_http_verify(handle, parsed).map_err(|msg| msg));
 
     match outcome {
         Ok(Ok(())) => ArenaStatus::Ok,
@@ -269,7 +269,7 @@ pub extern "C" fn arena_http_playbook_verify(
             ArenaStatus::Failed
         }
         Err(payload) => {
-            let msg = panic_message(&payload);
+            let msg = panic_message(payload.as_ref());
             tracing::error!(error = %msg, op = "http_playbook_verify", "playbook verify failed");
             unsafe { write_error(err_out, format!("arena_http_playbook_verify: {msg}")) };
             ArenaStatus::Failed

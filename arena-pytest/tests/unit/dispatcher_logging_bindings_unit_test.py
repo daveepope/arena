@@ -53,11 +53,15 @@ def _arena_open_null_peer_and_err_text(
     arena_host_binding: bytes = b"pytest-dispatcher-host-logging-binding",
 ) -> tuple[int, str]:
     err_slot = ctypes.c_void_p()
+    state_slot = ctypes.c_void_p()
     raw = ffi.lib.arena_open(
         ctypes.c_char_p(arena_host_binding),
         ctypes.c_char_p(_MATCH_JSON_OPEN_FAILS_AT_BUILD_WITHOUT_CONTAINERS),
         ctypes.byref(err_slot),
+        ctypes.byref(state_slot),
     )
+    if state_slot.value:
+        ffi.lib.arena_free_string(state_slot.value)
     peer = ctypes.cast(raw, ctypes.c_void_p).value or 0
     text = ""
     if err_slot.value:
@@ -239,3 +243,68 @@ if __name__ == "__main__":
             [__import__("os").path.dirname(__import__("os").path.abspath(__file__)), "-v", "-s"]
         )
     )
+
+
+def test_close_arena_custom_logger_token_flushes_and_unregisters(arena_ffi):
+    from arena_pytest.ffi._ffi import close_arena
+
+    lg, capture = _build_real_logger()
+    tok = register_dispatcher_logging_target_for_logger(
+        arena_ffi, lg, arena_log_level=ArenaLogLevel.INFO
+    )
+
+    state_document = close_arena(
+        arena_ffi, 0, dispatcher_logging_target_token=tok
+    )
+
+    assert state_document is None
+    assert not any(
+        getattr(h, "_arena_pytest_dispatcher_stderr", False) for h in lg.handlers
+    ), "close must remove the dispatcher stderr emitter from the custom logger"
+
+
+def _arena_root_has_dispatcher_emitter() -> bool:
+    import logging as _logging
+
+    from arena_pytest.ffi._ffi import _arena_dispatcher_stderr_handler_predicate
+
+    root = _logging.getLogger("arena")
+    return any(_arena_dispatcher_stderr_handler_predicate(h) for h in root.handlers)
+
+
+def test_register_custom_logger_installs_arena_root_emitter_for_transitions(arena_ffi):
+    lg, _capture = _build_real_logger()
+    assert not _arena_root_has_dispatcher_emitter()
+
+    tok = register_dispatcher_logging_target_for_logger(
+        arena_ffi, lg, arena_log_level=ArenaLogLevel.INFO
+    )
+    installed = _arena_root_has_dispatcher_emitter()
+    unregister_dispatcher_logging_target(arena_ffi, tok)
+
+    assert installed
+    assert not _arena_root_has_dispatcher_emitter()
+
+
+def test_register_custom_logger_existing_root_emitter_is_kept_on_unregister(arena_ffi):
+    import logging as _logging
+
+    from arena_pytest.ffi._ffi import (
+        _install_dispatcher_direct_stderr_emitter,
+        _remove_dispatcher_direct_stderr_emitter,
+    )
+
+    root = _logging.getLogger("arena")
+    _install_dispatcher_direct_stderr_emitter(root, ArenaLogLevel.INFO)
+    try:
+        lg, _capture = _build_real_logger()
+        tok = register_dispatcher_logging_target_for_logger(
+            arena_ffi, lg, arena_log_level=ArenaLogLevel.INFO
+        )
+        unregister_dispatcher_logging_target(arena_ffi, tok)
+
+        assert _arena_root_has_dispatcher_emitter(), (
+            "an emitter the bridge did not install must survive unregister"
+        )
+    finally:
+        _remove_dispatcher_direct_stderr_emitter(root)

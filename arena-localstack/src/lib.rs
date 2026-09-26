@@ -1,3 +1,5 @@
+pub(crate) const MODULE: &str = "arena-localstack";
+
 pub mod builder;
 pub mod localstack_dependency;
 pub mod managed_playbook;
