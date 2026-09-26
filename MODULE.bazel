@@ -553,7 +553,11 @@ nuget_archive(
 # py-spy is a binary-only crate (no library target), so it cannot be a normal
 # workspace Cargo.toml dependency of arena-profile; crate.from_specs vendors
 # and builds its binary from source independently of the Cargo.lock graph.
-crate.spec(package = "py-spy", version = "=0.4.2")
+crate.spec(
+    package = "py-spy",
+    version = "=0.4.2",
+    repositories = ["profiling_tools"],
+)
 crate.annotation(
     crate = "py-spy",
     repositories = ["profiling_tools"],

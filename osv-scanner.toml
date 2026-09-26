@@ -17,3 +17,11 @@ reason = "rustls-webpki 0.101.7 name-constraint parsing bug, pulled in via tiber
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0099"
 reason = "rustls-webpki 0.101.7 CRL-parsing bug, pulled in via tiberius 0.12.3 (arena-mssql). Same tiberius chain as RUSTSEC-2026-0098; no fixed release exists upstream."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2020-0168"
+reason = "mach 0.3.2 unmaintained warning, reached only through py-spy 0.4.2 -> remoteprocess 0.5.3, which Bazel vendors to build the py-spy sampler binary used for Python CPU profiling. No fixed release exists upstream (mach2 is a fork remoteprocess does not use), and the crate is not linked into any Arena library or FFI artifact."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0253"
+reason = "lru 0.17.0 unsoundness in LruCache::pop(), reached only through py-spy 0.4.2, which pins lru 0.17 so 0.18.2 cannot be taken until py-spy updates. The use-after-free requires catch_unwind around a key type with a panicking Drop impl; py-spy caches plain symbol data and does not do this. Not linked into any Arena library or FFI artifact. Revisit when py-spy bumps lru."

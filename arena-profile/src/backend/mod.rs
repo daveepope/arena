@@ -123,6 +123,7 @@ mod tests {
         assert_ne!(first, second);
     }
 
+    #[cfg(unix)]
     #[test]
     fn resolve_binary_fallback_on_path_returns_ok() {
         let result = resolve_binary(&[], "sh", "sh", "install sh");
@@ -173,6 +174,7 @@ mod tests {
         let _ = std::fs::remove_file(&real_file);
     }
 
+    #[cfg(unix)]
     #[test]
     fn binary_on_path_absolute_existing_path_returns_true() {
         assert!(binary_on_path("/bin/sh"));
@@ -201,6 +203,7 @@ mod tests {
         assert!(matches!(result, CpuProfileError::Spawn(_)));
     }
 
+    #[cfg(unix)]
     #[test]
     fn signal_interrupt_running_child_returns_ok_and_interrupts() {
         let mut child = Command::new("sleep").arg("5").spawn().expect("spawn sleep");
@@ -212,6 +215,7 @@ mod tests {
         assert!(child.try_wait().unwrap().is_some());
     }
 
+    #[cfg(unix)]
     #[test]
     fn signal_interrupt_already_exited_child_returns_ok_without_signaling() {
         let mut child = Command::new("true").spawn().expect("spawn true");

@@ -344,6 +344,7 @@ mod tests {
         assert!(matches!(result, Err(CpuProfileError::MissingBinary { binary: "perf", .. })));
     }
 
+    #[cfg(unix)]
     #[test]
     fn wrapped_finish_collect_fails_returns_finish_error() {
         let output_path = temp_html_path("wrapped-finish-fail");
@@ -366,6 +367,7 @@ mod tests {
         assert!(matches!(result, Err(CpuProfileError::Finish(_))));
     }
 
+    #[cfg(unix)]
     #[test]
     fn wrapped_finish_collect_succeeds_renders_html_report() {
         let output_path = temp_html_path("wrapped-finish-success");
@@ -420,6 +422,7 @@ mod tests {
         assert_eq!(shutdown_signal, ShutdownSignal::Terminate);
     }
 
+    #[cfg(unix)]
     #[test]
     fn augmented_finish_collect_fails_returns_finish_error() {
         let output_path = temp_html_path("augmented-finish-fail");
@@ -441,6 +444,7 @@ mod tests {
         assert!(matches!(result, Err(CpuProfileError::Finish(_))));
     }
 
+    #[cfg(unix)]
     #[test]
     fn augmented_finish_collect_succeeds_renders_html_report() {
         let output_path = temp_html_path("augmented-finish-success");
@@ -489,6 +493,7 @@ mod tests {
         let _ = std::fs::remove_file(&output_path);
     }
 
+    #[cfg(unix)]
     #[test]
     fn wrapped_finish_with_hotspots_enabled_renders_hotspots_table() {
         let output_path = temp_html_path("wrapped-finish-hotspots");

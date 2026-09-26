@@ -373,16 +373,22 @@ def check_cargo_vet_watermarks(report: dict) -> None:
     )
 
 
-def record_module_lockfile(root: Path) -> None:
+def record_bazel_lockfiles(root: Path) -> None:
     bazel = os.environ.get("BAZEL", "bazel")
     env = os.environ.copy()
     env.pop("CARGO_BAZEL_REPIN", None)
-    args = [bazel, "mod", "deps"]
+    crate_env = {**env, "CARGO_BAZEL_REPIN": "1"}
     bazel_config = os.environ.get("ARENA_BAZEL_CONFIG", "").strip()
-    if bazel_config:
-        args.append(f"--config={bazel_config}")
-    args.append("--lockfile_mode=update")
-    subprocess.run(args, cwd=root, env=env, check=True)
+
+    commands = [
+        ([bazel, "build", "//..."], crate_env),
+        ([bazel, "mod", "deps"], env),
+    ]
+    for args, command_env in commands:
+        if bazel_config:
+            args.append(f"--config={bazel_config}")
+        args.append("--lockfile_mode=update")
+        subprocess.run(args, cwd=root, env=command_env, check=True)
 
 
 def repin_all_lockfiles(root: Path) -> None:

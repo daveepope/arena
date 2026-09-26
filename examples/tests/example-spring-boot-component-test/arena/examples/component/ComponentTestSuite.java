@@ -297,6 +297,9 @@ public final class ComponentTestSuite {
     }
   }
 
+  private static final boolean CPU_PROFILING_SUPPORTED =
+      System.getProperty("os.name", "").startsWith("Linux");
+
   private static ExecutableComponent buildWebApp(String name, int port) {
     String appLauncher;
     try {
@@ -314,59 +317,66 @@ public final class ComponentTestSuite {
                     + ProcessHandle.current().pid()
                     + ".html")
             .toString();
-    return new ExecutableComponentBuilder(name)
-        .withExecutablePath(appLauncher)
-        .withBuildTool(BuildTool.MAVEN)
-        .withCpuProfile(cpuProfileOutputPath)
-        .withCpuProfileAutoOpen()
-        .withHotspots()
-        .withEnvVar("WEB_APP_PORT", String.valueOf(port))
-        .withEnvVar(
-            "POSTGRES_CONNECTION_STRING",
-            "host=localhost port="
-                + POSTGRES_PORT
-                + " user="
-                + POSTGRES_DB_USER
-                + " password="
-                + POSTGRES_DB_PASS
-                + " dbname="
-                + POSTGRES_DB_NAME)
-        .withEnvVar("CALIBRATION_API_BASE_URL", "http://127.0.0.1:" + CALIBRATION_HOST_PORT)
-        .withEnvVar(
-            "MSSQL_CONNECTION_STRING",
-            "Server=tcp:localhost,"
-                + MSSQL_PORT
-                + ";Database="
-                + MSSQL_DB_NAME
-                + ";User Id="
-                + MSSQL_DB_USER
-                + ";Password="
-                + MSSQL_DB_PASS
-                + ";TrustServerCertificate=True;")
-        .withEnvVar(
-            "ORACLE_CONNECTION_STRING",
-            ORACLE_DB_USER
-                + "/"
-                + ORACLE_DB_PASS
-                + "@localhost:"
-                + ORACLE_PORT
-                + "/"
-                + ORACLE_DB_NAME)
-        .withEnvVar("TEMPORAL_TARGET", TEMPORAL_TARGET)
-        .withEnvVar("SMTP_HOST", "127.0.0.1")
-        .withEnvVar("SMTP_PORT", String.valueOf(SMTP_HOST_PORT))
-        .withEnvVar("OAUTH_ISSUER_URL", OAUTH_PROVIDER_ISSUER)
-        .withEnvVar("OAUTH_TLS_CA_FILE", OAUTH_CA_PATH)
-        .withEnvVar("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
-        .withEnvVar("AWS_ENDPOINT_URL", LOCALSTACK_ENDPOINT)
-        .withEnvVar("AWS_DEFAULT_REGION", REGION)
-        .withEnvVar("AWS_ACCESS_KEY_ID", AWS_DUMMY.get("aws_access_key_id"))
-        .withEnvVar("AWS_SECRET_ACCESS_KEY", AWS_DUMMY.get("aws_secret_access_key"))
-        .withEnvVar("EVENT_BUS_NAME", EVENT_BUS_NAME)
-        .withEnvVar("EVENT_SOURCE", EVENT_SOURCE)
-        .withReadinessCheck(
-            HttpReadinessCheck.create(), "http://127.0.0.1:" + port + "/health", 30_000L)
-        .build();
+    ExecutableComponentBuilder builder =
+        new ExecutableComponentBuilder(name)
+            .withExecutablePath(appLauncher)
+            .withBuildTool(BuildTool.MAVEN)
+            .withEnvVar("WEB_APP_PORT", String.valueOf(port))
+            .withEnvVar(
+                "POSTGRES_CONNECTION_STRING",
+                "host=localhost port="
+                    + POSTGRES_PORT
+                    + " user="
+                    + POSTGRES_DB_USER
+                    + " password="
+                    + POSTGRES_DB_PASS
+                    + " dbname="
+                    + POSTGRES_DB_NAME)
+            .withEnvVar("CALIBRATION_API_BASE_URL", "http://127.0.0.1:" + CALIBRATION_HOST_PORT)
+            .withEnvVar(
+                "MSSQL_CONNECTION_STRING",
+                "Server=tcp:localhost,"
+                    + MSSQL_PORT
+                    + ";Database="
+                    + MSSQL_DB_NAME
+                    + ";User Id="
+                    + MSSQL_DB_USER
+                    + ";Password="
+                    + MSSQL_DB_PASS
+                    + ";TrustServerCertificate=True;")
+            .withEnvVar(
+                "ORACLE_CONNECTION_STRING",
+                ORACLE_DB_USER
+                    + "/"
+                    + ORACLE_DB_PASS
+                    + "@localhost:"
+                    + ORACLE_PORT
+                    + "/"
+                    + ORACLE_DB_NAME)
+            .withEnvVar("TEMPORAL_TARGET", TEMPORAL_TARGET)
+            .withEnvVar("SMTP_HOST", "127.0.0.1")
+            .withEnvVar("SMTP_PORT", String.valueOf(SMTP_HOST_PORT))
+            .withEnvVar("OAUTH_ISSUER_URL", OAUTH_PROVIDER_ISSUER)
+            .withEnvVar("OAUTH_TLS_CA_FILE", OAUTH_CA_PATH)
+            .withEnvVar("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
+            .withEnvVar("AWS_ENDPOINT_URL", LOCALSTACK_ENDPOINT)
+            .withEnvVar("AWS_DEFAULT_REGION", REGION)
+            .withEnvVar("AWS_ACCESS_KEY_ID", AWS_DUMMY.get("aws_access_key_id"))
+            .withEnvVar("AWS_SECRET_ACCESS_KEY", AWS_DUMMY.get("aws_secret_access_key"))
+            .withEnvVar("EVENT_BUS_NAME", EVENT_BUS_NAME)
+            .withEnvVar("EVENT_SOURCE", EVENT_SOURCE)
+            .withReadinessCheck(
+                HttpReadinessCheck.create(), "http://127.0.0.1:" + port + "/health", 30_000L);
+
+    if (CPU_PROFILING_SUPPORTED) {
+      builder =
+          builder
+              .withCpuProfile(cpuProfileOutputPath)
+              .withCpuProfileAutoOpen()
+              .withHotspots();
+    }
+
+    return builder.build();
   }
 
   private static List<String> readSchema(String filename) {
