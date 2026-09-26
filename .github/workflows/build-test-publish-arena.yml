@@ -473,6 +473,14 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
 
+      - name: Enable CPU profiling samplers
+        run: |
+          sudo apt-get install -y linux-tools-common "linux-tools-$(uname -r)" \
+            || sudo apt-get install -y linux-tools-common linux-tools-generic
+          sudo sysctl -w kernel.perf_event_paranoid=1
+          sudo sysctl -w kernel.kptr_restrict=0
+          perf --version
+
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
@@ -669,6 +677,14 @@ jobs:
             tonistiigi/binfmt@sha256:ea2f0dd74e74f101df59f9a6b31d0960994060c7982a921cbceecee0f1841125 \
             --install amd64
           docker run --rm --platform=linux/amd64 alpine:3.22 uname -m
+
+      - name: Enable CPU profiling samplers
+        run: |
+          sudo apt-get install -y linux-tools-common "linux-tools-$(uname -r)" \
+            || sudo apt-get install -y linux-tools-common linux-tools-generic
+          sudo sysctl -w kernel.perf_event_paranoid=1
+          sudo sysctl -w kernel.kptr_restrict=0
+          perf --version
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4

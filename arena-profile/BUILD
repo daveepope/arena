@@ -85,6 +85,10 @@ rust_test(
     size = "small",
     edition = "2021",
     tags = ["component_test"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,
@@ -99,6 +103,10 @@ rust_test(
     size = "small",
     edition = "2021",
     tags = ["component_test"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,
@@ -113,6 +121,10 @@ rust_test(
     size = "small",
     edition = "2021",
     tags = ["component_test"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = all_crate_deps(
         normal = True,
         normal_dev = True,
