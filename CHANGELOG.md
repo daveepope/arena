@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `rustls` 0.23.43 -> 0.23.45 (RUSTSEC-2026-0285)
+- Example apps: `anyio` 4.14.2 (CVE-2026-63374, CVE-2026-64847), `netty-handler` 4.1.137.Final (CVE-2026-75595, CVE-2026-75596)
+- Dropped the unused `py-spy` workspace dependency, removing `lru` and `mach` from the lock graph
+
+### Fixed
+
+- Forced teardown finishes an active CPU profile instead of orphaning the profiled process
+- `scripts/repin.py` no longer leaves `MODULE.bazel.lock` stale: `CARGO_BAZEL_REPIN` is scoped to the crate repin step and the lockfile is recorded last
 
 ## [7.0.1]
 

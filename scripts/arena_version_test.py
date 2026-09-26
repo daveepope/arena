@@ -23,6 +23,7 @@ from arena_version import (
     release_lockfiles_need_repin,
     release_version_increased,
     release_version_only,
+    record_module_lockfile,
     repin_all_lockfiles,
     run_cargo_vet_check_report,
     sync_workspace_version,
@@ -230,6 +231,16 @@ class SyncWorkspaceVersionTest(unittest.TestCase):
             with patch("arena_version.subprocess.run") as run:
                 repin_all_lockfiles(root)
                 self.assertEqual(run.call_count, 5)
+
+    def test_record_module_lockfile_repin_var_in_env_omits_it(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.dict(os.environ, {"CARGO_BAZEL_REPIN": "1"}):
+                with patch("arena_version.subprocess.run") as run:
+                    record_module_lockfile(root)
+            args = run.call_args.args[0]
+            self.assertIsNone(run.call_args.kwargs["env"].get("CARGO_BAZEL_REPIN"))
+            self.assertEqual(args[-1], "--lockfile_mode=update")
 
     def test_repin_all_lockfiles_repin_var_in_env_sets_it_on_build_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

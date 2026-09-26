@@ -515,9 +515,9 @@
         "bzlTransitiveDigest": "/d4cC4MNkwPonPClChOBL7JH4qol+VDageDJSIBJeu0=",
         "usagesDigest": "DgNTLOSHrSsqxmyuOKOnwmdd+prPJKhZNi6Wxud7QGQ=",
         "recordedFileInputs": {
-          "@@//Cargo.toml": "f4a5428f235de5f043b0b7e794df9aec3ce6f237bddedc9b5ad87d6333193742",
-          "@@//Cargo.Bazel.lock": "f3d174a685d082d1b107346793694cddfb2cac1bdb6be8f85acb4f94e20649da",
-          "@@//Cargo.lock": "43d7565132330c8b77ae15ebed7a91310964af903f117446f4412ad65920c407",
+          "@@//Cargo.toml": "29067879d3a0708cb38c356aa7d18e1ec3a13f44faed1218bd9bf5891fb906c1",
+          "@@//Cargo.Bazel.lock": "ba8a00464beb8ac302ab29284e7ed1b55baf4faebca882cb310170dd54afd564",
+          "@@//Cargo.lock": "613bcdc49afb402e36fd36afe5d67e6d06fa3d6a463da066ab81d1558f37c614",
           "@@//MODULE.bazel": "bd7201f383285c1d252cc4597cce0ba549ab26550df9523fcfc42b10b28159f3",
           "@@rules_rust~~rust_host_tools~rust_host_tools//rust_host_tools": "ENOENT"
         },

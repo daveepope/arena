@@ -67,11 +67,11 @@ jobs:
           if [ -n "$CHANGED" ]; then
             only_non_publishable=true
             for path in $CHANGED; do
-              if client_surface_path "$path"; then
-                has_client_surface_change=true
-              fi
               if docs_path "$path"; then
                 continue
+              fi
+              if client_surface_path "$path"; then
+                has_client_surface_change=true
               fi
               only_non_publishable=false
               has_ci_relevant=true
@@ -428,9 +428,6 @@ jobs:
             echo "common:ci --bes_backend=" >> .bazelrc.user
           fi
 
-      - name: Allow perf to read CPU counters (cap_perfmon on the perf binary only)
-        run: sudo setcap cap_perfmon+ep "$(which perf)"
-
       - name: Build and test
         run: |
           bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
@@ -479,7 +476,7 @@ jobs:
             || sudo apt-get install -y linux-tools-common linux-tools-generic
           sudo sysctl -w kernel.perf_event_paranoid=1
           sudo sysctl -w kernel.kptr_restrict=0
-          perf --version
+          perf --version || echo "perf is unavailable for this kernel; CPU profiling tests will report it"
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
@@ -684,7 +681,7 @@ jobs:
             || sudo apt-get install -y linux-tools-common linux-tools-generic
           sudo sysctl -w kernel.perf_event_paranoid=1
           sudo sysctl -w kernel.kptr_restrict=0
-          perf --version
+          perf --version || echo "perf is unavailable for this kernel; CPU profiling tests will report it"
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
@@ -749,6 +746,14 @@ jobs:
       - name: Install mold
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
+
+      - name: Enable CPU profiling samplers
+        run: |
+          sudo apt-get install -y linux-tools-common "linux-tools-$(uname -r)" \
+            || sudo apt-get install -y linux-tools-common linux-tools-generic
+          sudo sysctl -w kernel.perf_event_paranoid=1
+          sudo sysctl -w kernel.kptr_restrict=0
+          perf --version || echo "perf is unavailable for this kernel; CPU profiling tests will report it"
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4

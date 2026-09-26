@@ -314,8 +314,8 @@ def run_cargo_vet_check_report(root: Path) -> dict:
     return json.loads(result.stdout)
 
 
-CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK = 144
-CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK = 379
+CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK = 145
+CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK = 378
 
 
 def _check_cargo_vet_watermark(
@@ -371,6 +371,18 @@ def check_cargo_vet_watermarks(report: dict) -> None:
             "package it covered was removed. Investigate before accepting this."
         ),
     )
+
+
+def record_module_lockfile(root: Path) -> None:
+    bazel = os.environ.get("BAZEL", "bazel")
+    env = os.environ.copy()
+    env.pop("CARGO_BAZEL_REPIN", None)
+    args = [bazel, "mod", "deps"]
+    bazel_config = os.environ.get("ARENA_BAZEL_CONFIG", "").strip()
+    if bazel_config:
+        args.append(f"--config={bazel_config}")
+    args.append("--lockfile_mode=update")
+    subprocess.run(args, cwd=root, env=env, check=True)
 
 
 def repin_all_lockfiles(root: Path) -> None:

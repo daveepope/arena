@@ -42,7 +42,6 @@ arena-host = { path = "arena-host" }
 arena-containerized-component = { path = "arena-containerized-component" }
 arena-profile = { path = "arena-profile" }
 inferno = "0.12.8"
-py-spy = "0.4.2"
 runfiles = "0.2.0"
 arena-ffi = { path = "arena-ffi" }
 axum = "0.8.8"

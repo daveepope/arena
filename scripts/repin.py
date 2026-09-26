@@ -9,6 +9,7 @@ from pathlib import Path
 from arena_version import (
     require_cargo,
     audit_arena_ffi_binary,
+    record_module_lockfile,
     regenerate_windows_pip_locks,
     repin_all_lockfiles,
     vet_rust_dependencies,
@@ -34,6 +35,8 @@ def main() -> int:
     audit_arena_ffi_binary(root)
     vet_rust_dependencies(root)
     regenerate_windows_pip_locks(root)
+    record_module_lockfile(root)
+    print("recorded MODULE.bazel.lock against the final lockfile state")
     return 0
 
 
