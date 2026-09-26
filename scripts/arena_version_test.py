@@ -231,6 +231,37 @@ class SyncWorkspaceVersionTest(unittest.TestCase):
                 repin_all_lockfiles(root)
                 self.assertEqual(run.call_count, 5)
 
+    def test_repin_all_lockfiles_repin_var_in_env_sets_it_on_build_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.dict(os.environ, {"CARGO_BAZEL_REPIN": "1"}):
+                with patch("arena_version.subprocess.run") as run:
+                    repin_all_lockfiles(root)
+            calls = [
+                (call.args[0], call.kwargs["env"].get("CARGO_BAZEL_REPIN"))
+                for call in run.call_args_list
+            ]
+            self.assertEqual(calls[0][1], "1")
+            for args, repin in calls[1:]:
+                self.assertIsNone(repin, args)
+
+    def test_repin_all_lockfiles_bazel_config_orders_lockfile_mode_last(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.dict(os.environ, {"ARENA_BAZEL_CONFIG": "ci"}):
+                with patch("arena_version.subprocess.run") as run:
+                    repin_all_lockfiles(root)
+            writers = [
+                call.args[0]
+                for call in run.call_args_list
+                if "--lockfile_mode=update" in call.args[0]
+            ]
+            self.assertEqual(len(writers), 2)
+            for args in writers:
+                self.assertGreater(
+                    args.index("--lockfile_mode=update"), args.index("--config=ci"), args
+                )
+
     def test_repin_all_lockfiles_passes_bazel_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
