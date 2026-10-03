@@ -314,8 +314,8 @@ def run_cargo_vet_check_report(root: Path) -> dict:
     return json.loads(result.stdout)
 
 
-CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK = 140
-CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK = 359
+CARGO_VET_AUDITED_PACKAGE_COUNT_WATERMARK = 145
+CARGO_VET_EXEMPTED_PACKAGE_COUNT_WATERMARK = 378
 
 
 def _check_cargo_vet_watermark(
@@ -373,20 +373,41 @@ def check_cargo_vet_watermarks(report: dict) -> None:
     )
 
 
-def repin_all_lockfiles(root: Path) -> None:
+def record_bazel_lockfiles(root: Path) -> None:
     bazel = os.environ.get("BAZEL", "bazel")
     env = os.environ.copy()
-    env["CARGO_BAZEL_REPIN"] = "1"
+    env.pop("CARGO_BAZEL_REPIN", None)
+    crate_env = {**env, "CARGO_BAZEL_REPIN": "1"}
     bazel_config = os.environ.get("ARENA_BAZEL_CONFIG", "").strip()
 
     commands = [
-        [bazel, "build", "//..."],
-        [bazel, "mod", "deps", "--lockfile_mode=update"],
-        [bazel, "run", "@arena_java_maven//:pin"],
-        [bazel, "run", "//arena-pytest:pip_requirements.update"],
-        [bazel, "run", "//examples:pip_requirements.update"],
+        ([bazel, "build", "//..."], crate_env),
+        ([bazel, "mod", "deps"], env),
     ]
-    for args in commands:
+    for args, command_env in commands:
         if bazel_config:
             args.append(f"--config={bazel_config}")
-        subprocess.run(args, cwd=root, env=env, check=True)
+        args.append("--lockfile_mode=update")
+        subprocess.run(args, cwd=root, env=command_env, check=True)
+
+
+def repin_all_lockfiles(root: Path) -> None:
+    bazel = os.environ.get("BAZEL", "bazel")
+    env = os.environ.copy()
+    env.pop("CARGO_BAZEL_REPIN", None)
+    crate_env = {**env, "CARGO_BAZEL_REPIN": "1"}
+    bazel_config = os.environ.get("ARENA_BAZEL_CONFIG", "").strip()
+    write_lockfile = ["--lockfile_mode=update"]
+
+    commands = [
+        ([bazel, "build", "//..."], crate_env, write_lockfile),
+        ([bazel, "mod", "deps"], env, write_lockfile),
+        ([bazel, "run", "@arena_java_maven//:pin"], env, []),
+        ([bazel, "run", "//arena-pytest:pip_requirements.update"], env, []),
+        ([bazel, "run", "//examples:pip_requirements.update"], env, []),
+    ]
+    for args, command_env, trailing_args in commands:
+        if bazel_config:
+            args.append(f"--config={bazel_config}")
+        args.extend(trailing_args)
+        subprocess.run(args, cwd=root, env=command_env, check=True)

@@ -28,3 +28,6 @@ venv/
 /tools/benches/dotnet/obj/
 
 /.claude/worktrees/
+
+# arena-explain-diff skill output (should normally be saved under /tmp, outside the repo)
+arena-explain-*.html

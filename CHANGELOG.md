@@ -5,6 +5,30 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.1.0]
+
+### Added
+
+- `arena-profile`: new crate sampling CPU profiles and rendering them to an HTML flamegraph report via inferno
+- `arena-profile`: `perf`, async-profiler, py-spy and dotnet-trace backends selected from the component's build tool
+- `arena-executable-component`: `with_cpu_profile`/`with_cpu_profile_auto_open`/`with_hotspots` on `ExecutableComponentBuilder`
+- `arena-ffi`: `cpu_profile_output`/`cpu_profile_auto_open`/`cpu_profile_hotspots` on the executable component config
+- `arena-pytest`, `arena-junit`, `arena-xunit`: `with_cpu_profile`/`with_cpu_profile_auto_open`/`with_hotspots` bindings
+- `arena-junit`, `arena-xunit`: `BuildTool.PYTHON`/`BuildTool.Python`
+- async-profiler and py-spy vendored through Bazel, so no host install is required
+
+### Changed
+
+- `rustls` 0.23.43 -> 0.23.45 (RUSTSEC-2026-0285)
+- Example apps: `anyio` 4.14.2 (CVE-2026-63374, CVE-2026-64847), `netty-handler` 4.1.137.Final (CVE-2026-75595, CVE-2026-75596)
+
+### Fixed
+
+- Forced teardown finishes an active CPU profile instead of orphaning the profiled process
+- `scripts/repin.py` no longer leaves `MODULE.bazel.lock` stale: `CARGO_BAZEL_REPIN` is scoped to the crate repin step and the lockfile is recorded last
+- `OpenArena::run_playbook` now records a panicking playbook as a `Fault` instead of letting it unwind out of the arena
+- `arena-ffi`'s executable component config no longer duplicates the `cpu_profile_output` build-tool allow-list; it relies solely on `ExecutableComponentBuilder`'s own validation
+
 ## [7.0.1]
 
 ### Fixed

@@ -13,6 +13,9 @@ fn minimal_config() -> ExecutableComponentConfig {
         runtime_args: None,
         readiness_checks: None,
         readiness_check_url: None,
+        cpu_profile_output: None,
+        cpu_profile_auto_open: false,
+        cpu_profile_hotspots: false,
     }
 }
 

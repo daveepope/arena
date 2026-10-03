@@ -32,6 +32,7 @@ import requests
 
 from arena_pytest import (
     ArenaLogLevel,
+    BuildTool,
     ClosedArena,
     Custom,
     EventRuleSpec,
@@ -332,6 +333,7 @@ def closed_arena() -> ClosedArena:
     fastapi_component = (
         ExecutableComponentBuilder(COMPONENT_NAME_EXECUTABLE)
         .with_executable_path(exe)
+        .with_build_tool(BuildTool.PYTHON)
         .with_env_var("WEB_APP_PORT", str(WEB_APP_PORT))
         .with_env_var("POSTGRES_CONNECTION_STRING", pg_cs)
         .with_env_var("CALIBRATION_URL", f"http://127.0.0.1:{CALIBRATION_HOST_PORT}")

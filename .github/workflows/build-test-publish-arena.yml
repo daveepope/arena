@@ -25,6 +25,7 @@ jobs:
       only_non_publishable: ${{ steps.classify.outputs.only_non_publishable }}
       has_publishable: ${{ steps.classify.outputs.has_publishable }}
       has_ci_relevant: ${{ steps.classify.outputs.has_ci_relevant }}
+      has_client_surface_change: ${{ steps.classify.outputs.has_client_surface_change }}
       version_changed: ${{ steps.filter.outputs.version_changed }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -56,14 +57,21 @@ jobs:
           build_process_path() {
             [[ "$1" == .github/workflows/* || "$1" == .github/dependabot.yml || "$1" == supply-chain/* ]]
           }
+          client_surface_path() {
+            [[ "$1" == arena-ffi/* || "$1" == arena-pytest/* || "$1" == arena-junit/* ]]
+          }
           only_non_publishable=false
           has_publishable=false
           has_ci_relevant=false
+          has_client_surface_change=false
           if [ -n "$CHANGED" ]; then
             only_non_publishable=true
             for path in $CHANGED; do
               if docs_path "$path"; then
                 continue
+              fi
+              if client_surface_path "$path"; then
+                has_client_surface_change=true
               fi
               only_non_publishable=false
               has_ci_relevant=true
@@ -76,8 +84,9 @@ jobs:
           echo "only_non_publishable=${only_non_publishable}" >> "$GITHUB_OUTPUT"
           echo "has_publishable=${has_publishable}" >> "$GITHUB_OUTPUT"
           echo "has_ci_relevant=${has_ci_relevant}" >> "$GITHUB_OUTPUT"
+          echo "has_client_surface_change=${has_client_surface_change}" >> "$GITHUB_OUTPUT"
           echo "changed=${CHANGED:-<none>}"
-          echo "only_non_publishable=${only_non_publishable} has_publishable=${has_publishable} has_ci_relevant=${has_ci_relevant}"
+          echo "only_non_publishable=${only_non_publishable} has_publishable=${has_publishable} has_ci_relevant=${has_ci_relevant} has_client_surface_change=${has_client_surface_change}"
 
   dependabot_awaiting_version_bump:
     name: Awaiting Dependabot version bump
@@ -122,7 +131,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       (
         needs.changes.outputs.version_changed == 'true' ||
-        needs.changes.outputs.has_publishable == 'true'
+        needs.changes.outputs.has_client_surface_change == 'true'
       ) &&
       !(
         github.event.pull_request.user.login == 'dependabot[bot]' &&
@@ -275,7 +284,7 @@ jobs:
           steps.paths.outputs.rust_crates == 'true' ||
           steps.paths.outputs.version_file == 'true'
         run: |
-          CARGO_BAZEL_REPIN=1 bazel build //... --config=ci
+          CARGO_BAZEL_REPIN=1 bazel build //... --config=ci --lockfile_mode=update
           bazel mod deps --lockfile_mode=update
           if ! git diff --quiet Cargo.Bazel.lock Cargo.lock MODULE.bazel.lock; then
             echo "Lockfiles are out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //... && bazel mod deps --lockfile_mode=update"
@@ -460,6 +469,14 @@ jobs:
       - name: Install mold
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
+
+      - name: Enable CPU profiling samplers
+        run: |
+          sudo apt-get install -y linux-tools-common "linux-tools-$(uname -r)" \
+            || sudo apt-get install -y linux-tools-common linux-tools-generic
+          sudo sysctl -w kernel.perf_event_paranoid=1
+          sudo sysctl -w kernel.kptr_restrict=0
+          perf --version || echo "perf is unavailable for this kernel; CPU profiling tests will report it"
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
@@ -658,6 +675,14 @@ jobs:
             --install amd64
           docker run --rm --platform=linux/amd64 alpine:3.22 uname -m
 
+      - name: Enable CPU profiling samplers
+        run: |
+          sudo apt-get install -y linux-tools-common "linux-tools-$(uname -r)" \
+            || sudo apt-get install -y linux-tools-common linux-tools-generic
+          sudo sysctl -w kernel.perf_event_paranoid=1
+          sudo sysctl -w kernel.kptr_restrict=0
+          perf --version || echo "perf is unavailable for this kernel; CPU profiling tests will report it"
+
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
@@ -721,6 +746,14 @@ jobs:
       - name: Install mold
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
+
+      - name: Enable CPU profiling samplers
+        run: |
+          sudo apt-get install -y linux-tools-common "linux-tools-$(uname -r)" \
+            || sudo apt-get install -y linux-tools-common linux-tools-generic
+          sudo sysctl -w kernel.perf_event_paranoid=1
+          sudo sysctl -w kernel.kptr_restrict=0
+          perf --version || echo "perf is unavailable for this kernel; CPU profiling tests will report it"
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4

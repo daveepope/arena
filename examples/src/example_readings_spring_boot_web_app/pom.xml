@@ -42,6 +42,11 @@
       </dependency>
       <dependency>
         <groupId>io.netty</groupId>
+        <artifactId>netty-handler</artifactId>
+        <version>4.1.137.Final</version>
+      </dependency>
+      <dependency>
+        <groupId>io.netty</groupId>
         <artifactId>netty-codec-http2</artifactId>
         <version>4.1.136.Final</version>
       </dependency>

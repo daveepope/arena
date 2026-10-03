@@ -16,13 +16,14 @@ members = [
     "arena-cryptography",
     "arena-host",
     "arena-containerized-component",
+    "arena-profile",
     "arena-ffi",
     "tools/arena-ffi-bench",
     "examples"
 ]
 
 [workspace.package]
-version = "7.0.1"
+version = "7.1.0"
 [workspace.dependencies]
 arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }
@@ -39,6 +40,9 @@ arena-container = { path = "arena-container" }
 arena-cryptography = { path = "arena-cryptography" }
 arena-host = { path = "arena-host" }
 arena-containerized-component = { path = "arena-containerized-component" }
+arena-profile = { path = "arena-profile" }
+inferno = "0.12.8"
+runfiles = "0.2.0"
 arena-ffi = { path = "arena-ffi" }
 axum = "0.8.8"
 serde = { version = "1", features = ["derive"] }

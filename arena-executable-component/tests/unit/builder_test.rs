@@ -100,3 +100,63 @@ fn build_make_in_empty_source_dir_returns_fault() {
     let _ = std::fs::remove_dir_all(&source);
     assert!(fault.message.contains("build failed") || fault.message.contains("failed to run make"));
 }
+
+#[test]
+fn build_cpu_profile_with_supported_build_tool_returns_component() {
+    for build_tool in [
+        BuildTool::Cargo,
+        BuildTool::Maven,
+        BuildTool::Gradle,
+        BuildTool::Python,
+        BuildTool::Dotnet,
+    ] {
+        let component = ExecutableComponent::builder("exec-cpu-profile-supported")
+            .with_build_tool(build_tool)
+            .with_executable_path("/bin/true")
+            .with_cpu_profile(std::env::temp_dir().join("arena-exec-cpu-profile-probe.html"))
+            .with_cpu_profile_auto_open()
+            .with_hotspots()
+            .build()
+            .expect("build executable component");
+        assert!(component.identifier().contains("exec-cpu-profile-supported"));
+    }
+}
+
+#[test]
+fn build_cpu_profile_with_unsupported_build_tool_returns_fault() {
+    for (build_tool, expected) in [
+        (BuildTool::Make, "BuildTool::Make"),
+        (BuildTool::CMake, "BuildTool::CMake"),
+        (
+            BuildTool::Custom {
+                command: "make-it-so".to_string(),
+                args: Vec::new(),
+            },
+            "BuildTool::Custom(\"make-it-so\")",
+        ),
+    ] {
+        let fault = ExecutableComponent::builder("exec-cpu-profile-unsupported")
+            .with_build_tool(build_tool)
+            .with_executable_path("/bin/true")
+            .with_cpu_profile(std::env::temp_dir().join("arena-exec-cpu-profile-probe.html"))
+            .build()
+            .err()
+            .expect("unsupported build tool must fault");
+        assert!(fault.id.contains("exec-cpu-profile-unsupported"));
+        assert!(fault.message.contains(".with_cpu_profile() is not supported for"));
+        assert!(fault.message.contains(expected));
+    }
+}
+
+#[test]
+fn build_cpu_profile_without_build_tool_returns_fault() {
+    let fault = ExecutableComponent::builder("exec-cpu-profile-no-build-tool")
+        .with_executable_path("/bin/true")
+        .with_cpu_profile(std::env::temp_dir().join("arena-exec-cpu-profile-probe.html"))
+        .build()
+        .err()
+        .expect("missing build tool must fault");
+    assert!(fault
+        .message
+        .contains("requires a build_tool of Cargo, Maven, Gradle, Python, or Dotnet"));
+}
