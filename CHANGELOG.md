@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `arena-profile`: new crate sampling CPU profiles and rendering them to an HTML flamegraph report via inferno
-- `arena-profile`: `perf`, async-profiler and py-spy backends selected from the component's build tool
+- `arena-profile`: `perf`, async-profiler, py-spy and dotnet-trace backends selected from the component's build tool
 - `arena-executable-component`: `with_cpu_profile`/`with_cpu_profile_auto_open`/`with_hotspots` on `ExecutableComponentBuilder`
 - `arena-ffi`: `cpu_profile_output`/`cpu_profile_auto_open`/`cpu_profile_hotspots` on the executable component config
 - `arena-pytest`, `arena-junit`, `arena-xunit`: `with_cpu_profile`/`with_cpu_profile_auto_open`/`with_hotspots` bindings
@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Forced teardown finishes an active CPU profile instead of orphaning the profiled process
 - `scripts/repin.py` no longer leaves `MODULE.bazel.lock` stale: `CARGO_BAZEL_REPIN` is scoped to the crate repin step and the lockfile is recorded last
+- `OpenArena::run_playbook` now records a panicking playbook as a `Fault` instead of letting it unwind out of the arena
+- `arena-ffi`'s executable component config no longer duplicates the `cpu_profile_output` build-tool allow-list; it relies solely on `ExecutableComponentBuilder`'s own validation
 
 ## [7.0.1]
 

@@ -273,7 +273,7 @@ fn cpu_profiler_backend(
             Ok(arena_profile::CpuProfilerBackend::AsyncProfiler)
         }
         Some(BuildTool::Python) => Ok(arena_profile::CpuProfilerBackend::PySpy),
-        Some(BuildTool::Dotnet) => Err(cpu_profile_unsupported(identifier, "BuildTool::Dotnet")),
+        Some(BuildTool::Dotnet) => Ok(arena_profile::CpuProfilerBackend::DotnetTrace),
         Some(BuildTool::Make) => Err(cpu_profile_unsupported(identifier, "BuildTool::Make")),
         Some(BuildTool::CMake) => Err(cpu_profile_unsupported(identifier, "BuildTool::CMake")),
         Some(BuildTool::Custom { command, .. }) => Err(cpu_profile_unsupported(
@@ -282,7 +282,7 @@ fn cpu_profiler_backend(
         )),
         None => Err(Fault::component(
             identifier,
-            ".with_cpu_profile() requires a build_tool of Cargo, Maven, Gradle, or Python",
+            ".with_cpu_profile() requires a build_tool of Cargo, Maven, Gradle, Python, or Dotnet",
         )),
     }
 }

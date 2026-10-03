@@ -1,3 +1,4 @@
+use arena_profile::profiler::render_collected;
 use arena_profile::{prepare_cpu_profile, CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch, RenderError};
 use std::path::PathBuf;
 
@@ -10,6 +11,17 @@ fn sample_request() -> LaunchRequest {
         program: PathBuf::from("/bin/target"),
         args: vec!["a".to_string(), "b".to_string()],
     }
+}
+
+fn write_sample_folded_stacks(name: &str) -> PathBuf {
+    static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let unique_id = NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let path = std::env::temp_dir().join(format!(
+        "arena-profile-profiler-test-folded-{name}-{}-{unique_id}.folded",
+        std::process::id()
+    ));
+    std::fs::write(&path, "main;handler;compute 42\n").expect("write sample folded stacks");
+    path
 }
 
 #[test]
@@ -89,4 +101,28 @@ fn prepare_cpu_profile_async_profiler_backend_returns_args_augmented_variant() {
         Ok(PreparedLaunch::Wrapped { .. }) => panic!("expected ArgsAugmented variant"),
         Err(other) => panic!("expected MissingBinary, got {other}"),
     }
+}
+
+#[test]
+fn render_collected_missing_folded_path_returns_finish_error() {
+    let missing = std::env::temp_dir().join(format!(
+        "arena-profile-profiler-test-missing-folded-{}.folded",
+        std::process::id()
+    ));
+
+    let result = render_collected(&missing, &temp_html_path("render-collected-missing"), false);
+
+    assert!(matches!(result, Err(CpuProfileError::Finish(_))));
+}
+
+#[test]
+fn render_collected_valid_folded_path_removes_folded_file_after_render() {
+    let folded_path = write_sample_folded_stacks("render-collected-cleanup");
+    let output_path = temp_html_path("render-collected-cleanup");
+
+    let result = render_collected(&folded_path, &output_path, false);
+
+    assert!(result.is_ok());
+    assert!(!folded_path.exists());
+    let _ = std::fs::remove_file(&output_path);
 }

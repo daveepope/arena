@@ -170,23 +170,25 @@ async fn build_components_async_exec_variant_dispatches_to_builder() {
 
 #[tokio::test]
 async fn build_components_async_exec_with_cpu_profile_and_supported_build_tool_succeeds() {
-    let config = exec_component_with_cpu_profile_config(Some("python"));
-    let result = build_components_async(&config).await;
-    assert!(result.is_ok());
+    for build_tool in ["python", "dotnet"] {
+        let config = exec_component_with_cpu_profile_config(Some(build_tool));
+        let result = build_components_async(&config).await;
+        assert!(result.is_ok(), "expected {build_tool} to be supported for cpu_profile_output");
+    }
 }
 
 #[tokio::test]
 async fn build_components_async_exec_with_cpu_profile_and_no_build_tool_returns_err() {
     let config = exec_component_with_cpu_profile_config(None);
     let result = build_components_async(&config).await;
-    assert!(matches!(result, Err(e) if e.contains("cpu_profile_output requires build_tool")));
+    assert!(matches!(result, Err(e) if e.contains(".with_cpu_profile() requires a build_tool")));
 }
 
 #[tokio::test]
 async fn build_components_async_exec_with_cpu_profile_and_unsupported_build_tool_returns_err() {
-    let config = exec_component_with_cpu_profile_config(Some("dotnet"));
+    let config = exec_component_with_cpu_profile_config(Some("make"));
     let result = build_components_async(&config).await;
-    assert!(matches!(result, Err(e) if e.contains("cpu_profile_output requires build_tool")));
+    assert!(matches!(result, Err(e) if e.contains(".with_cpu_profile() is not supported for BuildTool::Make")));
 }
 
 #[tokio::test]

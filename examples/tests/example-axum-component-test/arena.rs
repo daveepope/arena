@@ -7,7 +7,6 @@ use arena_mssql::MssqlDependency;
 use arena_oauth::{OauthDependency, Provider};
 use arena_postgres::PostgresDependency;
 use std::net::{IpAddr, Ipv4Addr};
-use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::runtime::Runtime;
@@ -210,13 +209,6 @@ pub fn resolve_web_app_binary() -> String {
     "target/release/example-readings-axum-web-app".to_string()
 }
 
-pub fn cpu_profile_output_path() -> PathBuf {
-    std::env::temp_dir().join(format!(
-        "arena-axum-example-cpu-profile-{}.html",
-        std::process::id()
-    ))
-}
-
 pub fn setup_exec_component() -> Component {
     let rt = test_runtime();
     let healthcheck_url = format!("http://127.0.0.1:{}/health", rt.exec_web_app_port);
@@ -254,14 +246,6 @@ pub fn setup_exec_component() -> Component {
 
     if !is_bazel {
         builder = builder.with_source_path("examples");
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        builder = builder
-            .with_cpu_profile(cpu_profile_output_path())
-            .with_cpu_profile_auto_open()
-            .with_hotspots();
     }
 
     Box::new(builder.build().expect("build web app component"))

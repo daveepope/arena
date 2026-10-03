@@ -1,5 +1,6 @@
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@crates//:defs.bzl", "all_crate_deps")
+load("@rules_dotnet//dotnet:defs.bzl", "csharp_binary")
 
 config_setting(
     name = "linux_x86_64",
@@ -34,15 +35,8 @@ rust_library(
 )
 
 rust_test(
-    name = "arena_profile_lib_unit_test",
-    crate = ":arena_profile",
-    size = "small",
-    edition = "2021",
-)
-
-rust_test(
     name = "render_test",
-    srcs = ["tests/render_test.rs"],
+    srcs = ["tests/unit/render_test.rs"],
     size = "small",
     edition = "2021",
     deps = all_crate_deps(
@@ -55,7 +49,33 @@ rust_test(
 
 rust_test(
     name = "profiler_test",
-    srcs = ["tests/profiler_test.rs"],
+    srcs = ["tests/unit/profiler_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_profile",
+    ],
+)
+
+rust_test(
+    name = "wrapped_test",
+    srcs = ["tests/unit/wrapped_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_profile",
+    ],
+)
+
+rust_test(
+    name = "augmented_test",
+    srcs = ["tests/unit/augmented_test.rs"],
     size = "small",
     edition = "2021",
     deps = all_crate_deps(
@@ -68,7 +88,7 @@ rust_test(
 
 rust_test(
     name = "backend_test",
-    srcs = ["tests/backend/mod_test.rs"],
+    srcs = ["tests/unit/backend/mod_test.rs"],
     size = "small",
     edition = "2021",
     deps = all_crate_deps(
@@ -80,8 +100,54 @@ rust_test(
 )
 
 rust_test(
+    name = "pyspy_unit_test",
+    srcs = ["tests/unit/backend/pyspy_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_profile",
+    ],
+)
+
+rust_test(
+    name = "perf_unit_test",
+    srcs = ["tests/unit/backend/perf_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_profile",
+    ],
+)
+
+rust_test(
+    name = "dotnet_trace_unit_test",
+    srcs = ["tests/unit/backend/dotnet_trace_test.rs"],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_profile",
+    ],
+)
+
+csharp_binary(
+    name = "dotnet_busy_loop",
+    target_frameworks = ["net8.0"],
+    srcs = ["tests/component/dotnet_busy_loop/Program.cs"],
+    visibility = ["//visibility:private"],
+)
+
+rust_test(
     name = "perf_component_test",
-    srcs = ["tests/perf_component_test.rs"],
+    srcs = ["tests/component/perf_component_test.rs"],
     size = "small",
     edition = "2021",
     tags = ["component_test"],
@@ -99,7 +165,7 @@ rust_test(
 
 rust_test(
     name = "async_profiler_component_test",
-    srcs = ["tests/async_profiler_component_test.rs"],
+    srcs = ["tests/component/async_profiler_component_test.rs"],
     size = "small",
     edition = "2021",
     tags = ["component_test"],
@@ -117,10 +183,29 @@ rust_test(
 
 rust_test(
     name = "pyspy_component_test",
-    srcs = ["tests/pyspy_component_test.rs"],
+    srcs = ["tests/component/pyspy_component_test.rs"],
     size = "small",
     edition = "2021",
     tags = ["component_test"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_profile",
+    ],
+)
+
+rust_test(
+    name = "dotnet_trace_component_test",
+    srcs = ["tests/component/dotnet_trace_component_test.rs"],
+    size = "small",
+    edition = "2021",
+    tags = ["component_test"],
+    data = [":dotnet_busy_loop"],
     target_compatible_with = select({
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],

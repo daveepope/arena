@@ -297,9 +297,6 @@ public final class ComponentTestSuite {
     }
   }
 
-  private static final boolean CPU_PROFILING_SUPPORTED =
-      System.getProperty("os.name", "").startsWith("Linux");
-
   private static ExecutableComponent buildWebApp(String name, int port) {
     String appLauncher;
     try {
@@ -308,15 +305,6 @@ public final class ComponentTestSuite {
       throw new IllegalStateException("failed to locate web app launcher runfile", e);
     }
     assertTrue(!appLauncher.isEmpty(), "web app launcher must be present under Bazel runfiles");
-    String cpuProfileOutputPath =
-        Path.of(
-                System.getProperty("java.io.tmpdir"),
-                "arena-spring-boot-example-cpu-profile-"
-                    + name
-                    + "-"
-                    + ProcessHandle.current().pid()
-                    + ".html")
-            .toString();
     ExecutableComponentBuilder builder =
         new ExecutableComponentBuilder(name)
             .withExecutablePath(appLauncher)
@@ -367,14 +355,6 @@ public final class ComponentTestSuite {
             .withEnvVar("EVENT_SOURCE", EVENT_SOURCE)
             .withReadinessCheck(
                 HttpReadinessCheck.create(), "http://127.0.0.1:" + port + "/health", 30_000L);
-
-    if (CPU_PROFILING_SUPPORTED) {
-      builder =
-          builder
-              .withCpuProfile(cpuProfileOutputPath)
-              .withCpuProfileAutoOpen()
-              .withHotspots();
-    }
 
     return builder.build();
   }

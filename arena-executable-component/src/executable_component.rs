@@ -4,7 +4,7 @@ use crate::builder::ExecutableComponentBuilder;
 use arena::component::RunnableComponent;
 use arena::component::Component;
 use arena::healthcheck::ReadinessCheck;
-use arena_profile::{AugmentedProfileSession, PreparedLaunch, ShutdownSignal, WrappedProfileSession};
+use arena_profile::{PreparedLaunch, ProfileSession, ShutdownSignal};
 use arena::lifecycle::{Fault, RunnableState};
 use async_trait::async_trait;
 use std::io::{BufRead, BufReader};
@@ -13,8 +13,8 @@ use std::process::{Child, Command, Stdio};
 use std::thread;
 
 enum ActiveCpuProfile {
-    Wrapped(WrappedProfileSession),
-    ArgAugmented(AugmentedProfileSession, ShutdownSignal),
+    Wrapped(Box<dyn ProfileSession>),
+    ArgAugmented(Box<dyn ProfileSession>, ShutdownSignal),
 }
 
 pub(crate) struct CpuProfileConfig {

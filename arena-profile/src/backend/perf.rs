@@ -1,6 +1,6 @@
 use super::{map_spawn_error, resolve_binary, scratch_path, signal_interrupt, wait_bounded};
 use crate::profiler::{CpuProfileError, LaunchRequest};
-use crate::sampler::{WrapState, WrappingSampler};
+use crate::wrapped::{WrapState, WrappingSampler};
 use inferno::collapse::perf::Folder;
 use inferno::collapse::Collapse;
 use std::io::{BufReader, Read, Write};
@@ -13,7 +13,20 @@ const INSTALL_HINT: &str =
     "install the linux-tools package matching your running kernel (e.g. linux-tools-generic)";
 const PERF_RLOCATIONS: &[&str] = &["perf"];
 
-pub(crate) struct PerfSampler;
+pub struct PerfSampler;
+
+pub fn record_args(data_path: &Path, request: &LaunchRequest) -> Vec<String> {
+    let mut args: Vec<String> = vec![
+        "record".into(),
+        "-g".into(),
+        "-o".into(),
+        data_path.to_string_lossy().into_owned(),
+        "--".into(),
+    ];
+    args.push(request.program.to_string_lossy().into_owned());
+    args.extend(request.args.iter().cloned());
+    args
+}
 
 impl WrappingSampler for PerfSampler {
     fn wrap(
@@ -23,16 +36,7 @@ impl WrappingSampler for PerfSampler {
     ) -> Result<(PathBuf, Vec<String>, WrapState), CpuProfileError> {
         let perf = resolve_binary(PERF_RLOCATIONS, PERF_BINARY, PERF_BINARY, INSTALL_HINT)?;
         let data_path = scratch_path("arena-profile-perf", "data");
-
-        let mut args: Vec<String> = vec![
-            "record".into(),
-            "-g".into(),
-            "-o".into(),
-            data_path.to_string_lossy().into_owned(),
-            "--".into(),
-        ];
-        args.push(request.program.to_string_lossy().into_owned());
-        args.extend(request.args.iter().cloned());
+        let args = record_args(&data_path, request);
 
         Ok((PathBuf::from(perf), args, WrapState::Perf { data_path }))
     }

@@ -46,10 +46,8 @@ pub fn build(config: &ExecutableComponentConfig) -> Result<Component, String> {
     if let Some(source_path) = &config.source_path {
         builder = builder.with_source_path(source_path);
     }
-    let mut cpu_profile_supported = false;
     if let Some(build_tool) = &config.build_tool {
         let bt = build_tool_from_config(build_tool)?;
-        cpu_profile_supported = matches!(&bt, BuildTool::Cargo | BuildTool::Maven | BuildTool::Gradle | BuildTool::Python);
         builder = builder.with_build_tool(bt);
     }
     if let Some(env_vars) = &config.env_vars {
@@ -63,12 +61,6 @@ pub fn build(config: &ExecutableComponentConfig) -> Result<Component, String> {
         }
     }
     if let Some(output_path) = &config.cpu_profile_output {
-        if !cpu_profile_supported {
-            return Err(format!(
-                "{}: cpu_profile_output requires build_tool to be one of cargo, maven, gradle, or python (got {:?})",
-                config.identifier, config.build_tool
-            ));
-        }
         builder = builder.with_cpu_profile(output_path);
         if config.cpu_profile_auto_open {
             builder = builder.with_cpu_profile_auto_open();

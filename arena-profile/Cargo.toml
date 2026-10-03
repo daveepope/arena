@@ -13,6 +13,8 @@ path = "src/lib.rs"
 base64 = { workspace = true }
 inferno = { workspace = true }
 runfiles = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

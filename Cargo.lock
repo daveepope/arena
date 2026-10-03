@@ -409,6 +409,8 @@ dependencies = [
  "base64 0.22.1",
  "inferno",
  "runfiles",
+ "serde",
+ "serde_json",
  "tokio",
  "tracing",
 ]

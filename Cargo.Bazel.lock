@@ -1,5 +1,5 @@
 {
-  "checksum": "666dc2d4068e59e9e04ff43daeb983338cfe5cd5d04fe092795c85898f681753",
+  "checksum": "9f794699f675c3711ea80f8c56072615abaa42110ec097e67becc71d4fade3af",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -2110,6 +2110,14 @@
             {
               "id": "runfiles 0.2.0",
               "target": "runfiles"
+            },
+            {
+              "id": "serde 1.0.228",
+              "target": "serde"
+            },
+            {
+              "id": "serde_json 1.0.149",
+              "target": "serde_json"
             },
             {
               "id": "tracing 0.1.44",

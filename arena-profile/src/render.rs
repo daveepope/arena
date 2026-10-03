@@ -80,7 +80,7 @@ pub fn render_folded_to_html(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum Severity {
+pub enum Severity {
     Low,
     Medium,
     High,
@@ -92,7 +92,7 @@ impl Severity {
     const HIGH_THRESHOLD_PCT: f64 = 10.0;
     const MEDIUM_THRESHOLD_PCT: f64 = 5.0;
 
-    fn for_self_pct(self_pct: f64) -> Self {
+    pub fn for_self_pct(self_pct: f64) -> Self {
         if self_pct >= Self::CRITICAL_THRESHOLD_PCT {
             Severity::Critical
         } else if self_pct >= Self::HIGH_THRESHOLD_PCT {
@@ -132,14 +132,14 @@ impl Severity {
     }
 }
 
-struct Hotspot {
-    function: String,
-    self_count: u64,
-    self_pct: f64,
-    severity: Severity,
+pub struct Hotspot {
+    pub function: String,
+    pub self_count: u64,
+    pub self_pct: f64,
+    pub severity: Severity,
 }
 
-fn top_hotspots(folded: &str, limit: usize) -> Vec<Hotspot> {
+pub fn top_hotspots(folded: &str, limit: usize) -> Vec<Hotspot> {
     let mut self_counts: HashMap<&str, u64> = HashMap::new();
     let mut total: u64 = 0;
 
@@ -215,7 +215,7 @@ fn write_hotspots_table(html: &mut impl Write, hotspots: &[Hotspot]) -> std::io:
     Ok(())
 }
 
-fn html_escape(s: &str) -> String {
+pub fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
@@ -243,99 +243,9 @@ pub fn open_report(path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-fn is_wsl() -> bool {
+pub fn is_wsl() -> bool {
     std::env::var_os("WSL_DISTRO_NAME").is_some()
         || std::fs::read_to_string("/proc/version")
             .map(|v| v.to_lowercase().contains("microsoft"))
             .unwrap_or(false)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn is_wsl_matches_wsl_distro_env_or_proc_version() {
-        let expected = std::env::var_os("WSL_DISTRO_NAME").is_some()
-            || std::fs::read_to_string("/proc/version")
-                .map(|v| v.to_lowercase().contains("microsoft"))
-                .unwrap_or(false);
-
-        assert_eq!(is_wsl(), expected);
-    }
-
-    #[test]
-    fn top_hotspots_ranks_by_leaf_self_time_descending() {
-        let folded = "main;foo;compute 10\nmain;bar;compute 40\nmain;bar;idle 5\n";
-
-        let hotspots = top_hotspots(folded, 10);
-
-        assert_eq!(hotspots[0].function, "compute");
-        assert_eq!(hotspots[0].self_count, 50);
-        assert_eq!(hotspots[1].function, "idle");
-        assert_eq!(hotspots[1].self_count, 5);
-    }
-
-    #[test]
-    fn top_hotspots_computes_self_percentage_of_total_samples() {
-        let folded = "main;a 3\nmain;b 1\n";
-
-        let hotspots = top_hotspots(folded, 10);
-
-        let a = hotspots.iter().find(|h| h.function == "a").unwrap();
-        assert!((a.self_pct - 75.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn top_hotspots_limit_truncates_result() {
-        let folded = "main;a 3\nmain;b 2\nmain;c 1\n";
-
-        let hotspots = top_hotspots(folded, 2);
-
-        assert_eq!(hotspots.len(), 2);
-    }
-
-    #[test]
-    fn top_hotspots_empty_folded_returns_empty() {
-        let hotspots = top_hotspots("", 10);
-
-        assert!(hotspots.is_empty());
-    }
-
-    #[test]
-    fn html_escape_reserved_characters_are_escaped() {
-        assert_eq!(html_escape("a<b> && c"), "a&lt;b&gt; &amp;&amp; c");
-    }
-
-    #[test]
-    fn severity_for_self_pct_below_medium_threshold_returns_low() {
-        assert_eq!(Severity::for_self_pct(4.9), Severity::Low);
-    }
-
-    #[test]
-    fn severity_for_self_pct_at_medium_threshold_returns_medium() {
-        assert_eq!(Severity::for_self_pct(5.0), Severity::Medium);
-    }
-
-    #[test]
-    fn severity_for_self_pct_at_high_threshold_returns_high() {
-        assert_eq!(Severity::for_self_pct(10.0), Severity::High);
-    }
-
-    #[test]
-    fn severity_for_self_pct_at_critical_threshold_returns_critical() {
-        assert_eq!(Severity::for_self_pct(20.0), Severity::Critical);
-    }
-
-    #[test]
-    fn top_hotspots_assigns_severity_from_self_pct() {
-        let folded = "main;hot 93\nmain;cold 7\n";
-
-        let hotspots = top_hotspots(folded, 10);
-
-        let hot = hotspots.iter().find(|h| h.function == "hot").unwrap();
-        let cold = hotspots.iter().find(|h| h.function == "cold").unwrap();
-        assert_eq!(hot.severity, Severity::Critical);
-        assert_eq!(cold.severity, Severity::Medium);
-    }
 }

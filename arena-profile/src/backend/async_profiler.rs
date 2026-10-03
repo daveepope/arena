@@ -1,6 +1,6 @@
 use super::{resolve_binary, scratch_path};
 use crate::profiler::{CpuProfileError, LaunchRequest};
-use crate::sampler::{ArgAugmentingSampler, AugmentState};
+use crate::augmented::{ArgAugmentingSampler, AugmentState};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 

@@ -358,8 +358,14 @@ impl OpenArena {
         identifier: &str,
     ) -> Option<Result<Box<dyn crate::playbook::ActivePlaybook>, Fault>> {
         for m in &self.matches {
-            if let Some(active) = m.run_playbook(identifier).await {
-                return Some(active);
+            let outcome = AssertUnwindSafe(m.run_playbook(identifier)).catch_unwind().await;
+            match outcome {
+                Ok(Some(active)) => return Some(active),
+                Ok(None) => continue,
+                Err(payload) => {
+                    return Some(Err(Fault::playbook(identifier, message::playbook_failed())
+                        .caused_by(Fault::from_panic(identifier, Subject::Playbook, payload.as_ref()))));
+                }
             }
         }
         None
