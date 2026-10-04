@@ -1,4 +1,4 @@
-use arena_executable_component::platform::resolve_executable_extension;
+use arena_executable_component::platform::{resolve_configured_executable_path, resolve_executable_extension};
 use std::path::PathBuf;
 
 fn unique_temp_dir() -> PathBuf {
@@ -60,4 +60,67 @@ fn resolve_executable_extension_nonwindows_returnsunchanged() {
     let resolved = resolve_executable_extension(path.clone());
 
     assert_eq!(resolved, path);
+}
+
+#[test]
+fn resolve_configured_executable_path_barecommandname_returnsunchanged() {
+    let current_dir = unique_temp_dir();
+    let bare_name = PathBuf::from("powershell");
+
+    let resolved = resolve_configured_executable_path(bare_name.clone(), &current_dir);
+
+    assert_eq!(resolved, bare_name);
+    let _ = std::fs::remove_dir_all(&current_dir);
+}
+
+#[test]
+fn resolve_configured_executable_path_absolutepath_returnsunchanged() {
+    let current_dir = unique_temp_dir();
+    let absolute = current_dir.join("some-binary");
+
+    let resolved = resolve_configured_executable_path(absolute.clone(), &current_dir);
+
+    assert_eq!(resolved, absolute);
+    let _ = std::fs::remove_dir_all(&current_dir);
+}
+
+#[test]
+fn resolve_configured_executable_path_relativepathfoundinancestor_returnsancestorjoined() {
+    let current_dir = unique_temp_dir();
+    let nested_dir = current_dir.join("nested");
+    std::fs::create_dir_all(&nested_dir).expect("create nested dir");
+    let relative = PathBuf::from("nested/some-binary");
+    let expected = current_dir.join(&relative);
+    std::fs::write(&expected, b"").expect("write probe binary");
+
+    let resolved = resolve_configured_executable_path(relative, &nested_dir);
+
+    assert_eq!(resolved, expected);
+    let _ = std::fs::remove_dir_all(&current_dir);
+}
+
+#[cfg(windows)]
+#[test]
+fn resolve_configured_executable_path_absolutepathmissingextension_appendsplatformextension() {
+    let dir = unique_temp_dir();
+    let with_extension = dir.join("probe.exe");
+    std::fs::write(&with_extension, b"").expect("write probe file");
+    let absolute = dir.join("probe");
+
+    let resolved = resolve_configured_executable_path(absolute, &dir);
+
+    assert_eq!(resolved, with_extension);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn resolve_configured_executable_path_relativepathmissingeverywhere_returnscurrentdirjoined() {
+    let current_dir = unique_temp_dir();
+    let relative = PathBuf::from("nested/does-not-exist");
+    let expected = current_dir.join(&relative);
+
+    let resolved = resolve_configured_executable_path(relative, &current_dir);
+
+    assert_eq!(resolved, expected);
+    let _ = std::fs::remove_dir_all(&current_dir);
 }

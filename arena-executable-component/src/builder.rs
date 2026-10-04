@@ -1,5 +1,5 @@
 use crate::executable_component::{CpuProfileConfig, ExecutableComponent};
-use crate::platform::resolve_executable_extension;
+use crate::platform::resolve_configured_executable_path;
 use arena::healthcheck::ReadinessCheck;
 use arena::Component;
 use arena::Fault;
@@ -176,24 +176,8 @@ impl ExecutableComponentBuilder {
 
         let executable_path = match self.executable_path {
             Some(path) => {
-                let resolved = if path.is_absolute() {
-                    path
-                } else {
-                    let current_dir = current_dir_fault(&self.identifier)?;
-
-                    current_dir
-                        .ancestors()
-                        .find_map(|ancestor| {
-                            let candidate = ancestor.join(&path);
-                            if candidate.exists() {
-                                Some(candidate)
-                            } else {
-                                None
-                            }
-                        })
-                        .unwrap_or_else(|| current_dir.join(&path))
-                };
-                Some(resolve_executable_extension(resolved))
+                let current_dir = current_dir_fault(&self.identifier)?;
+                Some(resolve_configured_executable_path(path, &current_dir))
             }
             None => None,
         };
