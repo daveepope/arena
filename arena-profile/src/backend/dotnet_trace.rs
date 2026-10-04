@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
-const DOTNET_TRACE_RLOCATIONS: &[&str] = &[];
+const DOTNET_TRACE_RLOCATIONS: &[&str] = &["_main/tools/dotnet_trace/dotnet_trace_tool.sh"];
 const DOTNET_TRACE_PATH_FALLBACK: &str = "dotnet-trace";
 const INSTALL_HINT: &str = "install the dotnet-trace global tool: `dotnet tool install -g dotnet-trace`";
 

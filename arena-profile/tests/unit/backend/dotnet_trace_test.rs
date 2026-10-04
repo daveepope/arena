@@ -60,9 +60,14 @@ fn collect_non_zero_exit_status_with_trace_file_present_is_not_treated_as_failur
     let result = DotnetTraceSampler.collect(state, &mut child, Duration::from_secs(5));
 
     // Past the exit-status/file-exists checks, collect() proceeds to `dotnet-trace convert`,
-    // which fails with MissingBinary here since the real tool isn't installed for this unit
-    // test — the important assertion is that it is NOT a "non-zero exit status" Finish error.
-    assert!(matches!(result, Err(CpuProfileError::MissingBinary { binary: "dotnet-trace", .. })));
+    // which fails either because the tool isn't resolvable (MissingBinary) or because it
+    // rejects the placeholder file's contents (Finish) — either way, the important assertion
+    // is that it is not a "non-zero exit status" short-circuit.
+    match result {
+        Err(CpuProfileError::MissingBinary { binary: "dotnet-trace", .. }) => {}
+        Err(CpuProfileError::Finish(ref msg)) if msg.contains("convert") => {}
+        other => panic!("expected collect() to proceed to dotnet-trace convert, got {other:?}"),
+    }
     let _ = std::fs::remove_file(&nettrace_path);
 }
 

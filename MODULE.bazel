@@ -292,6 +292,14 @@ nuget_archive(
     version = "8.0.1",
 )
 
+# dotnet-trace CPU profiler tool
+nuget_archive(
+    name = "dotnet_trace",
+    id = "dotnet-trace",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.547301",
+)
+
 nuget_archive(
     name = "ms_logging_console",
     id = "Microsoft.Extensions.Logging.Console",

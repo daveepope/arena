@@ -29,6 +29,7 @@ rust_library(
         "//conditions:default": [],
     }) + [
         "@profiling_tools//:py-spy__py-spy",
+        "//tools/dotnet_trace:dotnet_trace_tool",
     ],
     deps = all_crate_deps(normal = True),
     visibility = ["//visibility:public"],
