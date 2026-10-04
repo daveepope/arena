@@ -50,13 +50,18 @@ impl WrappingSampler for PySpySampler {
 
         signal_interrupt(wrapping_child)
             .map_err(|e| CpuProfileError::Finish(format!("failed to signal py-spy record: {e}")))?;
-        let status = wait_bounded(wrapping_child, budget).map_err(|e| {
+        wait_bounded(wrapping_child, budget).map_err(|e| {
             CpuProfileError::Finish(format!("py-spy record did not exit cleanly: {e}"))
         })?;
 
-        if !status.success() {
+        // py-spy's own exit status reflects how the SIGINT we send to stop sampling was
+        // delivered (often a raw signal termination rather than a caught exit(0)), not
+        // whether sampling itself succeeded, so success is judged by whether it actually
+        // wrote the folded stacks file.
+        if !folded_path.exists() {
             return Err(CpuProfileError::Finish(format!(
-                "py-spy record exited with {status}"
+                "py-spy did not write folded stacks at {}",
+                folded_path.display()
             )));
         }
 
