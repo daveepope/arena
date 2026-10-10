@@ -16,11 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena-pytest`, `arena-junit`, `arena-xunit`: `with_cpu_profile`/`with_cpu_profile_auto_open`/`with_hotspots` bindings
 - `arena-junit`, `arena-xunit`: `BuildTool.PYTHON`/`BuildTool.Python`
 - async-profiler and py-spy vendored through Bazel, so no host install is required
+- `arena-dashboard`: a service that ingests `ArenaLifecycleObserver` state over HTTP (`HttpForwardingObserver`) and streams it live to a browser-based dependency-graph viewer
+- `arena-pytest`: `ClosedArena.observe(callback)` registers a lifecycle-state observer for the open arena
+- `arena-profile`'s HTML flamegraph report gets a filter/search toolbar and a resizable, togglable side-by-side layout for the flamegraph and hotspots panel
 
 ### Changed
 
 - `rustls` 0.23.43 -> 0.23.45 (RUSTSEC-2026-0285)
 - Example apps: `anyio` 4.14.2 (CVE-2026-63374, CVE-2026-64847), `netty-handler` 4.1.137.Final (CVE-2026-75595, CVE-2026-75596)
+- `pyjwt` 2.13.0 -> 2.15.1, `urllib3` 2.7.0 -> 2.8.0 (multiple PyJWT and urllib3 CVEs)
+- `aws-smithy-json` 0.62.5 -> 0.62.7 (GHSA-8ffr-xgwf-xj56, stack overflow via recursive unknown-key skipping)
+- Example Spring Boot app and the Maven bench tool: `jackson-databind`/`jackson-core` pinned to 2.21.7/2.22.3
+- `at.yawk.lz4:lz4-java` 1.11.1 -> 1.11.4 (multiple CVEs, pulled in transitively via `kafka-clients`)
+- Known-unfixable or false-positive CVEs (py-spy's `mach`/`lru` deps, vitest/tinypool, Spring Framework SSE/XsltView, PyJWT's `decode()` options-reuse bypass, `braces`) documented and suppressed with risk rationale in `osv-scanner.toml` instead of silently ignored
 
 ### Fixed
 
@@ -28,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scripts/repin.py` no longer leaves `MODULE.bazel.lock` stale: `CARGO_BAZEL_REPIN` is scoped to the crate repin step and the lockfile is recorded last
 - `OpenArena::run_playbook` now records a panicking playbook as a `Fault` instead of letting it unwind out of the arena
 - `arena-ffi`'s executable component config no longer duplicates the `cpu_profile_output` build-tool allow-list; it relies solely on `ExecutableComponentBuilder`'s own validation
+- Executable components no longer mis-resolve a bare command name (e.g. `powershell`, `sh`) against the working directory; PATH-resolved commands are left alone
+- `arena-profile`'s py-spy backend judges success by whether the folded-stacks file was written, not by py-spy's SIGINT exit status
+- Flaky `dotnet-trace` unit and component tests wait on a busy-loop readiness marker instead of a fixed sleep
+- CI installs the .NET profiler and resolves it correctly on the dotnet-trace workflow
+- `requirements_windows.txt` for `examples` and `arena-pytest` regenerated to carry the same `pyjwt`/`urllib3` fixes as the other platform lockfiles
 
 ## [7.0.1]
 

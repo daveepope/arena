@@ -20,6 +20,7 @@ venv/
 /.bazelrc.user
 /arena-junit/prebuilt/
 /arena-pytest/prebuilt/
+/arena-pytest/prebuilt-dashboard/
 
 /fuzz/target/
 

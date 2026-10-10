@@ -104,6 +104,41 @@ alias(
     tags = ["manual"],
 )
 
+copy_file(
+    name = "arena_dashboard_server_for_wheel_linux",
+    src = "prebuilt-dashboard/linux-x86-64/arena-dashboard-server",
+    out = "src/arena_pytest/arena-dashboard-server-linux",
+    tags = ["manual"],
+)
+
+copy_file(
+    name = "arena_dashboard_server_for_wheel_macos",
+    src = select({
+        ":macos_aarch64": "prebuilt-dashboard/darwin-aarch64/arena-dashboard-server",
+        ":macos_x86_64": "prebuilt-dashboard/darwin-x86-64/arena-dashboard-server",
+    }),
+    out = "src/arena_pytest/arena-dashboard-server-macos",
+    tags = ["manual"],
+)
+
+copy_file(
+    name = "arena_dashboard_server_for_wheel_windows",
+    src = "prebuilt-dashboard/windows-x86-64/arena-dashboard-server.exe",
+    out = "src/arena_pytest/arena-dashboard-server.exe",
+    tags = ["manual"],
+)
+
+alias(
+    name = "arena_dashboard_server_for_wheel",
+    actual = select({
+        "@platforms//os:linux": ":arena_dashboard_server_for_wheel_linux",
+        "@platforms//os:macos": ":arena_dashboard_server_for_wheel_macos",
+        "@platforms//os:windows": ":arena_dashboard_server_for_wheel_windows",
+        "//conditions:default": ":arena_dashboard_server_for_wheel_linux",
+    }),
+    tags = ["manual"],
+)
+
 py_library(
     name = "arena_pytest_lib",
     srcs = glob(["src/arena_pytest/**/*.py"]),
@@ -230,6 +265,7 @@ py_wheel(
     deps = [
         ":arena_pytest_lib",
         ":arena_ffi_shared_for_wheel",
+        ":arena_dashboard_server_for_wheel",
         ":arena_pytest_version_synced",
     ],
     tags = ["manual"],

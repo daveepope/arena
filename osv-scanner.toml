@@ -31,17 +31,5 @@ id = "GHSA-85c8-ppgw-ccpr"
 reason = "Same tinypool prototype-pollution class as GHSA-5gmw-xhrv-c9v3 (fixed in 2.1.2+), same vitest-imposed ^1.1.1 constraint and same no-untrusted-input reasoning."
 
 [[IgnoredVulns]]
-id = "GHSA-j9f9-w8pj-32f8"
-reason = "Spring Framework SSE stream corruption rendering fragments (spring-webmvc/spring-webflux), examples/src/example_readings_spring_boot_web_app. No fix exists in the 6.2.x line (last_affected 6.2.19); the only fix is Spring Framework 7.0.9, which means a Spring Boot 4 major migration, not a patch bump. Revisit when doing that migration deliberately."
-
-[[IgnoredVulns]]
-id = "GHSA-pc63-qcmh-9cmg"
-reason = "Spring Framework XsltView path limitation bug, same spring-webmvc dependency and same Spring Boot 4 migration blocker as GHSA-j9f9-w8pj-32f8. The example app does not use XsltView at all."
-
-[[IgnoredVulns]]
-id = "PYSEC-2026-4146"
-reason = "PyJWT decode() options-dict mutation enabling claim-verification bypass, but only when caller code reuses the same options dict object across a verify_signature=False call and a later verify_signature=True call. examples/src/example_readings_fastapi_web_app/app.py always passes a fresh options={\"verify_aud\": False} literal per call and never sets verify_signature=False, so the vulnerable reuse pattern cannot occur. No fixed PyJWT release exists yet."
-
-[[IgnoredVulns]]
 id = "GHSA-vfj7-8cjw-p6xm"
 reason = "braces 3.0.3 stack-exhaustion DoS via deeply nested glob patterns. No fixed release exists upstream (OSV lists no fixed version). Transitive dev dependency of the dashboard's test/build toolchain; patterns it processes come from our own fixed source globs in BUILD/vite config, not external input."

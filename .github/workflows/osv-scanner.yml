@@ -72,6 +72,7 @@ jobs:
       download-artifact: arena-sboms
       scan-args: |-
         -r
+        --config=./osv-scanner.toml
         ./
   scan-pr:
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
@@ -84,4 +85,5 @@ jobs:
       fail-on-vuln: true
       scan-args: |-
         -r
+        --config=./osv-scanner.toml
         ./

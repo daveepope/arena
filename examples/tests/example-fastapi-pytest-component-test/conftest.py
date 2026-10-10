@@ -198,29 +198,6 @@ def _wait_sqs_reading_created(
     )
 
 
-def _arena_dashboard_forwarder(dashboard_url: str):
-    import queue
-    import threading
-
-    q: "queue.Queue[str]" = queue.Queue()
-
-    def _drain() -> None:
-        while True:
-            document = q.get()
-            try:
-                requests.post(
-                    f"{dashboard_url.rstrip('/')}/ingest",
-                    data=document,
-                    headers={"Content-Type": "application/json"},
-                    timeout=2,
-                )
-            except requests.RequestException:
-                pass
-
-    threading.Thread(target=_drain, daemon=True).start()
-    return q.put_nowait
-
-
 @pytest.fixture(scope="session")
 def closed_arena() -> ClosedArena:
     global _OAUTH_CA_FILE, _OAUTH
@@ -353,7 +330,7 @@ def closed_arena() -> ClosedArena:
     )
     ls_ep = f"http://127.0.0.1:{LOCALSTACK_HOST_PORT}"
 
-    fastapi_component = (
+    fastapi_component_builder = (
         ExecutableComponentBuilder(COMPONENT_NAME_EXECUTABLE)
         .with_executable_path(exe)
         .with_build_tool(BuildTool.PYTHON)
@@ -377,8 +354,18 @@ def closed_arena() -> ClosedArena:
         .with_readiness_check(
             HttpReadinessCheck.create(), f"http://127.0.0.1:{WEB_APP_PORT}/health", 30_000
         )
-        .build()
     )
+    if os.environ.get("ARENA_VISUALIZE") == "1":
+        profile_output = os.path.join(
+            tempfile.gettempdir(), f"arena-cpu-profile-{uuid.uuid4().hex[:8]}.html"
+        )
+        fastapi_component_builder = (
+            fastapi_component_builder
+            .with_cpu_profile(profile_output)
+            .with_cpu_profile_auto_open()
+            .with_hotspots()
+        )
+    fastapi_component = fastapi_component_builder.build()
 
     a_match = (
         MatchBuilder(MATCH_NAME)
@@ -407,18 +394,12 @@ def closed_arena() -> ClosedArena:
         .build()
     )
 
-    closed = ClosedArena(
+    return ClosedArena(
         CLOSED_ARENA_NAME,
         [a_match],
         log_level=ArenaLogLevel.INFO,
         logger=_LOG
     )
-
-    dashboard_url = os.environ.get("ARENA_DASHBOARD_URL")
-    if dashboard_url:
-        closed = closed.observe(_arena_dashboard_forwarder(dashboard_url))
-
-    return closed
 
 
 @pytest.fixture(scope="session")

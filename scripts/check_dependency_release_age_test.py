@@ -45,6 +45,14 @@ requests==2.34.2
             {("pip", "pytest", "9.0.3"), ("pip", "requests", "2.34.2")},
         )
 
+    def test_parse_requirements_lock_line_with_extras_strips_bracket(self) -> None:
+        text = "pyjwt[crypto]==2.15.1\n"
+
+        self.assertEqual(
+            parse_requirements_lock(text),
+            {("pip", "pyjwt", "2.15.1")},
+        )
+
 
 class ParseModuleBazelTest(unittest.TestCase):
     def test_parse_module_bazel_coords_returns_maven_and_bcr(self) -> None:

@@ -101,6 +101,7 @@ vitest_bin.vitest_test(
         ":node_modules/jsdom",
         ":node_modules/react",
         ":node_modules/react-dom",
+        ":node_modules/vite",
         ":node_modules/vitest",
         ":node_modules/zustand",
     ],

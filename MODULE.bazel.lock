@@ -859,7 +859,7 @@
           "@@//Cargo.toml": "35a1d2107ef7c426dd2e8e7fdfe45bdc4a6c67ef5f3cd7edc1be7c92b3ac786f",
           "@@//Cargo.Bazel.lock": "c64c3736a97f572fa0fb24afd84bc5283aeab339ef827371378234d83b3a9a3c",
           "@@//Cargo.lock": "6b22558c3aba91fe7dbd30a58b02b02c557f651fd4360e62a1a45b9ae05b4033",
-          "@@//MODULE.bazel": "6e51443e2e4633b98c137d031aa0cf378a1ea95fc1d802b88507633abc0fafe8",
+          "@@//MODULE.bazel": "3291ae1cd4f982a02e0c97b4a3373d8cf73ad45f0c1b611632bdd1269065dc64",
           "@@rules_rust~~rust_host_tools~rust_host_tools//rust_host_tools": "ENOENT"
         },
         "recordedDirentsInputs": {},
