@@ -198,6 +198,29 @@ def _wait_sqs_reading_created(
     )
 
 
+def _arena_dashboard_forwarder(dashboard_url: str):
+    import queue
+    import threading
+
+    q: "queue.Queue[str]" = queue.Queue()
+
+    def _drain() -> None:
+        while True:
+            document = q.get()
+            try:
+                requests.post(
+                    f"{dashboard_url.rstrip('/')}/ingest",
+                    data=document,
+                    headers={"Content-Type": "application/json"},
+                    timeout=2,
+                )
+            except requests.RequestException:
+                pass
+
+    threading.Thread(target=_drain, daemon=True).start()
+    return q.put_nowait
+
+
 @pytest.fixture(scope="session")
 def closed_arena() -> ClosedArena:
     global _OAUTH_CA_FILE, _OAUTH
@@ -384,12 +407,18 @@ def closed_arena() -> ClosedArena:
         .build()
     )
 
-    return ClosedArena(
+    closed = ClosedArena(
         CLOSED_ARENA_NAME,
         [a_match],
         log_level=ArenaLogLevel.INFO,
         logger=_LOG
     )
+
+    dashboard_url = os.environ.get("ARENA_DASHBOARD_URL")
+    if dashboard_url:
+        closed = closed.observe(_arena_dashboard_forwarder(dashboard_url))
+
+    return closed
 
 
 @pytest.fixture(scope="session")

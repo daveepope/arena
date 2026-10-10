@@ -16,8 +16,10 @@ from arena_pytest.ffi._ffi import (
     register_default_dispatcher_logging_target,
     register_dispatcher_logging_target_for_logger,
     register_dispatcher_logging_target_for_logger_factory,
+    register_lifecycle_observer,
     set_dispatcher_component_allow_json,
     set_dispatcher_dependency_allow_json,
+    unregister_lifecycle_observer,
 )
 
 
@@ -48,6 +50,22 @@ class ClosedArena:
         self._logger_factory = logger_factory
         self._log_dependency_ids = _normalize_optional_id_seq(log_dependency_ids)
         self._log_component_ids = _normalize_optional_id_seq(log_component_ids)
+        self._observers: List[Callable[[str], None]] = []
+
+    def observe(self, callback: Callable[[str], None]) -> "ClosedArena":
+        self._observers.append(callback)
+        return self
+
+    def _observer_token_for(self, ffi, callback: Callable[[str], None]) -> int:
+        def _filtered(document: str) -> None:
+            try:
+                arena_id = json.loads(document).get("id")
+            except (ValueError, TypeError):
+                return
+            if arena_id == self.name:
+                callback(document)
+
+        return register_lifecycle_observer(ffi, _filtered)
 
     def _config(self) -> str:
         if not self._matches:
@@ -76,26 +94,37 @@ class ClosedArena:
         )
         await asyncio.to_thread(set_dispatcher_dependency_allow_json, ffi, dep_json)
         await asyncio.to_thread(set_dispatcher_component_allow_json, ffi, comp_json)
-        if self._logger_factory is not None:
-            log_tok = await asyncio.to_thread(
-                register_dispatcher_logging_target_for_logger_factory,
-                ffi,
-                self._logger_factory,
-                arena_log_level=self._log_level,
-            )
-        elif self._logger is not None:
-            log_tok = await asyncio.to_thread(
-                register_dispatcher_logging_target_for_logger,
-                ffi,
-                self._logger,
-                arena_log_level=self._log_level,
-            )
-        else:
-            log_tok = await asyncio.to_thread(
-                register_default_dispatcher_logging_target,
-                ffi,
-                arena_log_level=self._log_level,
-            )
+        observer_tokens = []
+        try:
+            for callback in self._observers:
+                observer_tokens.append(
+                    await asyncio.to_thread(self._observer_token_for, ffi, callback)
+                )
+            observer_tokens = tuple(observer_tokens)
+            if self._logger_factory is not None:
+                log_tok = await asyncio.to_thread(
+                    register_dispatcher_logging_target_for_logger_factory,
+                    ffi,
+                    self._logger_factory,
+                    arena_log_level=self._log_level,
+                )
+            elif self._logger is not None:
+                log_tok = await asyncio.to_thread(
+                    register_dispatcher_logging_target_for_logger,
+                    ffi,
+                    self._logger,
+                    arena_log_level=self._log_level,
+                )
+            else:
+                log_tok = await asyncio.to_thread(
+                    register_default_dispatcher_logging_target,
+                    ffi,
+                    arena_log_level=self._log_level,
+                )
+        except Exception:
+            for token in observer_tokens:
+                await asyncio.to_thread(unregister_lifecycle_observer, ffi, token)
+            raise
         try:
             handle = await asyncio.to_thread(
                 ffi_open_arena,
@@ -105,9 +134,11 @@ class ClosedArena:
                 log_level=self._log_level,
             )
         except ArenaBindingError as e:
+            for token in observer_tokens:
+                await asyncio.to_thread(unregister_lifecycle_observer, ffi, token)
             await asyncio.to_thread(
                 close_arena, ffi, 0, dispatcher_logging_target_token=log_tok
             )
             raise as_lifecycle_error(e) from None
 
-        return OpenArena(ffi, handle, log_tok)
+        return OpenArena(ffi, handle, log_tok, lifecycle_observer_tokens=observer_tokens)

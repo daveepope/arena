@@ -23,6 +23,7 @@ fn record_args_builds_py_spy_record_invocation() {
             "/tmp/arena-profile-pyspy-test-sample.folded",
             "--format",
             "raw",
+            "--idle",
             "--",
             "/usr/bin/python3",
             "-c",

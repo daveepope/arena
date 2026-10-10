@@ -1,5 +1,5 @@
 {
-  "checksum": "9f794699f675c3711ea80f8c56072615abaa42110ec097e67becc71d4fade3af",
+  "checksum": "3db19b6c77ee239cdf8ddca08c0b2ebed5b7daafc7085443b71a06ce18796064",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -594,7 +594,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.60.2",
                 "target": "windows_sys"
               }
             ]
@@ -653,7 +653,7 @@
                 "target": "once_cell_polyfill"
               },
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.60.2",
                 "target": "windows_sys"
               }
             ]
@@ -1123,6 +1123,74 @@
             {
               "id": "rcgen 0.14.7",
               "target": "rcgen"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "7.1.0"
+      },
+      "license": "todo",
+      "license_ids": [],
+      "license_file": null
+    },
+    "arena-dashboard 7.1.0": {
+      "name": "arena-dashboard",
+      "version": "7.1.0",
+      "package_url": null,
+      "repository": null,
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "arena_dashboard",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "arena_dashboard",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "axum 0.8.9",
+              "target": "axum"
+            },
+            {
+              "id": "futures 0.3.32",
+              "target": "futures"
+            },
+            {
+              "id": "reqwest 0.12.28",
+              "target": "reqwest"
+            },
+            {
+              "id": "runfiles 0.2.0",
+              "target": "runfiles"
+            },
+            {
+              "id": "serde 1.0.228",
+              "target": "serde"
+            },
+            {
+              "id": "serde_json 1.0.149",
+              "target": "serde_json"
+            },
+            {
+              "id": "tokio 1.52.1",
+              "target": "tokio"
+            },
+            {
+              "id": "tower-http 0.6.8",
+              "target": "tower_http"
             }
           ],
           "selects": {}
@@ -1674,7 +1742,7 @@
               "target": "aws_smithy_http_client"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3021,7 +3089,7 @@
               "target": "aws_smithy_http"
             },
             {
-              "id": "aws-smithy-json 0.62.5",
+              "id": "aws-smithy-json 0.62.7",
               "target": "aws_smithy_json"
             },
             {
@@ -3029,11 +3097,11 @@
               "target": "aws_smithy_runtime"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3122,11 +3190,11 @@
               "target": "aws_smithy_async"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3207,11 +3275,11 @@
               "target": "aws_smithy_runtime"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3323,7 +3391,7 @@
               "target": "aws_smithy_http"
             },
             {
-              "id": "aws-smithy-json 0.62.5",
+              "id": "aws-smithy-json 0.62.7",
               "target": "aws_smithy_json"
             },
             {
@@ -3335,11 +3403,11 @@
               "target": "aws_smithy_runtime"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3442,7 +3510,7 @@
               "target": "aws_smithy_http"
             },
             {
-              "id": "aws-smithy-json 0.62.5",
+              "id": "aws-smithy-json 0.62.7",
               "target": "aws_smithy_json"
             },
             {
@@ -3454,11 +3522,11 @@
               "target": "aws_smithy_runtime"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3557,7 +3625,7 @@
               "target": "aws_smithy_http"
             },
             {
-              "id": "aws-smithy-json 0.62.5",
+              "id": "aws-smithy-json 0.62.7",
               "target": "aws_smithy_json"
             },
             {
@@ -3569,11 +3637,11 @@
               "target": "aws_smithy_runtime"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3665,7 +3733,7 @@
               "target": "aws_smithy_http"
             },
             {
-              "id": "aws-smithy-json 0.62.5",
+              "id": "aws-smithy-json 0.62.7",
               "target": "aws_smithy_json"
             },
             {
@@ -3681,11 +3749,11 @@
               "target": "aws_smithy_runtime"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3783,11 +3851,11 @@
               "target": "aws_smithy_http"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3936,7 +4004,7 @@
         "deps": {
           "common": [
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -4002,11 +4070,11 @@
               "target": "aws_smithy_eventstream"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -4110,11 +4178,11 @@
               "target": "aws_smithy_async"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -4182,14 +4250,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "aws-smithy-json 0.62.5": {
+    "aws-smithy-json 0.62.7": {
       "name": "aws-smithy-json",
-      "version": "0.62.5",
+      "version": "0.62.7",
       "package_url": "https://github.com/smithy-lang/smithy-rs",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/aws-smithy-json/0.62.5/download",
-          "sha256": "9648b0bb82a2eedd844052c6ad2a1a822d1f8e3adee5fbf668366717e428856a"
+          "url": "https://static.crates.io/crates/aws-smithy-json/0.62.7/download",
+          "sha256": "701a947f4797e52a911e114a898667c746c39feea467bbd1abd7b3721f702ffa"
         }
       },
       "targets": [
@@ -4214,14 +4282,22 @@
         "deps": {
           "common": [
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-runtime-api 1.12.3",
+              "target": "aws_smithy_runtime_api"
+            },
+            {
+              "id": "aws-smithy-schema 0.1.0",
+              "target": "aws_smithy_schema"
+            },
+            {
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             }
           ],
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.62.5"
+        "version": "0.62.7"
       },
       "license": "Apache-2.0",
       "license_ids": [
@@ -4261,7 +4337,7 @@
         "deps": {
           "common": [
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             }
           ],
@@ -4308,7 +4384,7 @@
         "deps": {
           "common": [
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -4378,11 +4454,11 @@
               "target": "aws_smithy_observability"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -4445,14 +4521,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "aws-smithy-runtime-api 1.12.0": {
+    "aws-smithy-runtime-api 1.12.3": {
       "name": "aws-smithy-runtime-api",
-      "version": "1.12.0",
+      "version": "1.12.3",
       "package_url": "https://github.com/smithy-lang/smithy-rs",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/aws-smithy-runtime-api/1.12.0/download",
-          "sha256": "b71a13df6ada0aafbf21a73bdfcdf9324cfa9df77d96b8446045be3cde61b42e"
+          "url": "https://static.crates.io/crates/aws-smithy-runtime-api/1.12.3/download",
+          "sha256": "9db177daa6ba8afb9ee1aefcf548c907abcf52065e394ee11a92780057fe0e8c"
         }
       },
       "targets": [
@@ -4491,7 +4567,7 @@
               "target": "aws_smithy_async"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -4537,7 +4613,7 @@
           ],
           "selects": {}
         },
-        "version": "1.12.0"
+        "version": "1.12.3"
       },
       "license": "Apache-2.0",
       "license_ids": [
@@ -4600,14 +4676,69 @@
       ],
       "license_file": "LICENSE"
     },
-    "aws-smithy-types 1.4.7": {
-      "name": "aws-smithy-types",
-      "version": "1.4.7",
+    "aws-smithy-schema 0.1.0": {
+      "name": "aws-smithy-schema",
+      "version": "0.1.0",
       "package_url": "https://github.com/smithy-lang/smithy-rs",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/aws-smithy-types/1.4.7/download",
-          "sha256": "9d73dbfbaa8e4bc57b9045137680b958d274823509a360abfd8e1d514d40c95c"
+          "url": "https://static.crates.io/crates/aws-smithy-schema/0.1.0/download",
+          "sha256": "7442cb268338f0eb8278140a107c046756aa01093d8ef5e99628d34ae09c94f5"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "aws_smithy_schema",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "aws_smithy_schema",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "aws-smithy-runtime-api 1.12.3",
+              "target": "aws_smithy_runtime_api"
+            },
+            {
+              "id": "aws-smithy-types 1.8.1",
+              "target": "aws_smithy_types"
+            },
+            {
+              "id": "http 1.4.0",
+              "target": "http"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.1.0"
+      },
+      "license": "Apache-2.0",
+      "license_ids": [
+        "Apache-2.0"
+      ],
+      "license_file": "LICENSE"
+    },
+    "aws-smithy-types 1.8.1": {
+      "name": "aws-smithy-types",
+      "version": "1.8.1",
+      "package_url": "https://github.com/smithy-lang/smithy-rs",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/aws-smithy-types/1.8.1/download",
+          "sha256": "69bb407740a197147da48238ecc94498493c9e85445732360cec180296ca45f1"
         }
       },
       "targets": [
@@ -4723,7 +4854,7 @@
           }
         },
         "edition": "2021",
-        "version": "1.4.7"
+        "version": "1.8.1"
       },
       "license": "Apache-2.0",
       "license_ids": [
@@ -4830,11 +4961,11 @@
               "target": "aws_smithy_async"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -10448,7 +10579,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ]
@@ -13227,6 +13358,44 @@
         },
         "edition": "2018",
         "version": "0.1.3"
+      },
+      "license": "MIT",
+      "license_ids": [
+        "MIT"
+      ],
+      "license_file": "LICENSE"
+    },
+    "http-range-header 0.4.2": {
+      "name": "http-range-header",
+      "version": "0.4.2",
+      "package_url": "https://github.com/MarcusGrass/parse-range-headers",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/http-range-header/0.4.2/download",
+          "sha256": "9171a2ea8a68358193d15dd5d70c1c10a2afc3e7e4c5bc92bc9f025cebd7359c"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "http_range_header",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "http_range_header",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "edition": "2018",
+        "version": "0.4.2"
       },
       "license": "MIT",
       "license_ids": [
@@ -16538,6 +16707,93 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
+    "mime_guess 2.0.5": {
+      "name": "mime_guess",
+      "version": "2.0.5",
+      "package_url": "https://github.com/abonander/mime_guess",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/mime_guess/2.0.5/download",
+          "sha256": "f7c44f8e672c00fe5308fa235f821cb4198414e1c77935c1ab6948d3fd78550e"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "mime_guess",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        },
+        {
+          "BuildScript": {
+            "crate_name": "build_script_build",
+            "crate_root": "build.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "mime_guess",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "mime 0.3.17",
+              "target": "mime"
+            },
+            {
+              "id": "mime_guess 2.0.5",
+              "target": "build_script_build"
+            },
+            {
+              "id": "unicase 2.9.0",
+              "target": "unicase"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2015",
+        "version": "2.0.5"
+      },
+      "build_script_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "compile_data_glob_excludes": [
+          "**/*.rs"
+        ],
+        "data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "unicase 2.9.0",
+              "target": "unicase"
+            }
+          ],
+          "selects": {}
+        }
+      },
+      "license": "MIT",
+      "license_ids": [
+        "MIT"
+      ],
+      "license_file": "LICENSE"
+    },
     "minimal-lexical 0.2.1": {
       "name": "minimal-lexical",
       "version": "0.2.1",
@@ -16986,7 +17242,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.60.2",
                 "target": "windows_sys",
                 "alias": "windows"
               }
@@ -22052,10 +22308,12 @@
             "__rustls",
             "__rustls-ring",
             "__tls",
+            "blocking",
             "json",
             "rustls-tls",
             "rustls-tls-webpki-roots",
-            "rustls-tls-webpki-roots-no-provider"
+            "rustls-tls-webpki-roots-no-provider",
+            "stream"
           ],
           "selects": {}
         },
@@ -22070,8 +22328,16 @@
               "target": "bytes"
             },
             {
+              "id": "futures-channel 0.3.32",
+              "target": "futures_channel"
+            },
+            {
               "id": "futures-core 0.3.32",
               "target": "futures_core"
+            },
+            {
+              "id": "futures-util 0.3.32",
+              "target": "futures_util"
             },
             {
               "id": "http 1.4.0",
@@ -22108,6 +22374,10 @@
             {
               "id": "tokio-rustls 0.26.4",
               "target": "tokio_rustls"
+            },
+            {
+              "id": "tokio-util 0.7.18",
+              "target": "tokio_util"
             },
             {
               "id": "url 2.5.8",
@@ -23033,7 +23303,7 @@
                 "alias": "libc_errno"
               },
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ],
@@ -25762,7 +26032,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.60.2",
                 "target": "windows_sys"
               }
             ]
@@ -28661,10 +28931,22 @@
         ],
         "crate_features": {
           "common": [
+            "default",
             "follow-redirect",
+            "fs",
+            "futures-core",
             "futures-util",
+            "httpdate",
             "iri-string",
-            "tower"
+            "mime",
+            "mime_guess",
+            "percent-encoding",
+            "set-header",
+            "set-status",
+            "tokio",
+            "tokio-util",
+            "tower",
+            "tracing"
           ],
           "selects": {}
         },
@@ -28679,6 +28961,10 @@
               "target": "bytes"
             },
             {
+              "id": "futures-core 0.3.32",
+              "target": "futures_core"
+            },
+            {
               "id": "futures-util 0.3.32",
               "target": "futures_util"
             },
@@ -28691,12 +28977,44 @@
               "target": "http_body"
             },
             {
+              "id": "http-body-util 0.1.3",
+              "target": "http_body_util"
+            },
+            {
+              "id": "http-range-header 0.4.2",
+              "target": "http_range_header"
+            },
+            {
+              "id": "httpdate 1.0.3",
+              "target": "httpdate"
+            },
+            {
               "id": "iri-string 0.7.12",
               "target": "iri_string"
             },
             {
+              "id": "mime 0.3.17",
+              "target": "mime"
+            },
+            {
+              "id": "mime_guess 2.0.5",
+              "target": "mime_guess"
+            },
+            {
+              "id": "percent-encoding 2.3.2",
+              "target": "percent_encoding"
+            },
+            {
               "id": "pin-project-lite 0.2.17",
               "target": "pin_project_lite"
+            },
+            {
+              "id": "tokio 1.52.1",
+              "target": "tokio"
+            },
+            {
+              "id": "tokio-util 0.7.18",
+              "target": "tokio_util"
             },
             {
               "id": "tower 0.5.3",
@@ -28709,6 +29027,10 @@
             {
               "id": "tower-service 0.3.3",
               "target": "tower_service"
+            },
+            {
+              "id": "tracing 0.1.44",
+              "target": "tracing"
             }
           ],
           "selects": {}
@@ -29229,6 +29551,45 @@
         "MIT"
       ],
       "license_file": "LICENSE"
+    },
+    "unicase 2.9.0": {
+      "name": "unicase",
+      "version": "2.9.0",
+      "package_url": "https://github.com/seanmonstar/unicase",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/unicase/2.9.0/download",
+          "sha256": "dbc4bc3a9f746d862c45cb89d705aa10f187bb96c76001afab07a0d35ce60142"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "unicase",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "unicase",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "edition": "2018",
+        "version": "2.9.0"
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
     },
     "unicode-bidi 0.3.18": {
       "name": "unicode-bidi",
@@ -30903,6 +31264,70 @@
       ],
       "license_file": null
     },
+    "wasm-streams 0.4.2": {
+      "name": "wasm-streams",
+      "version": "0.4.2",
+      "package_url": "https://github.com/MattiasBuelens/wasm-streams/",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/wasm-streams/0.4.2/download",
+          "sha256": "15053d8d85c7eccdbefef60f06769760a563c7f0a9d6902a13d35c7800b0ad65"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "wasm_streams",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "wasm_streams",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "futures-util 0.3.32",
+              "target": "futures_util"
+            },
+            {
+              "id": "js-sys 0.3.95",
+              "target": "js_sys"
+            },
+            {
+              "id": "wasm-bindgen 0.2.118",
+              "target": "wasm_bindgen"
+            },
+            {
+              "id": "wasm-bindgen-futures 0.4.68",
+              "target": "wasm_bindgen_futures"
+            },
+            {
+              "id": "web-sys 0.3.95",
+              "target": "web_sys"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.4.2"
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
     "wasmparser 0.244.0": {
       "name": "wasmparser",
       "version": "0.244.0",
@@ -31410,7 +31835,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ]
@@ -31842,6 +32267,19 @@
         "compile_data_glob": [
           "**"
         ],
+        "crate_features": {
+          "common": [
+            "Win32",
+            "Win32_Foundation",
+            "Win32_Storage",
+            "Win32_Storage_FileSystem",
+            "Win32_System",
+            "Win32_System_Console",
+            "Win32_System_SystemInformation",
+            "default"
+          ],
+          "selects": {}
+        },
         "deps": {
           "common": [
             {
@@ -31890,6 +32328,24 @@
         "compile_data_glob": [
           "**"
         ],
+        "crate_features": {
+          "common": [
+            "Win32",
+            "Win32_Foundation",
+            "Win32_Networking",
+            "Win32_Networking_WinSock",
+            "Win32_Security",
+            "Win32_Storage",
+            "Win32_Storage_FileSystem",
+            "Win32_System",
+            "Win32_System_Console",
+            "Win32_System_IO",
+            "Win32_System_Threading",
+            "Win32_System_WindowsProgramming",
+            "default"
+          ],
+          "selects": {}
+        },
         "deps": {
           "common": [
             {
@@ -35411,6 +35867,7 @@
     "arena-container 7.1.0": "arena-container",
     "arena-containerized-component 7.1.0": "arena-containerized-component",
     "arena-cryptography 7.1.0": "arena-cryptography",
+    "arena-dashboard 7.1.0": "arena-dashboard",
     "arena-examples 7.1.0": "examples",
     "arena-executable-component 7.1.0": "arena-executable-component",
     "arena-ffi 7.1.0": "arena-ffi",
@@ -35618,7 +36075,7 @@
     "aws-sdk-lambda 1.122.0",
     "aws-sdk-sqs 1.98.0",
     "aws-smithy-http-client 1.1.12",
-    "aws-smithy-types 1.4.7",
+    "aws-smithy-types 1.8.1",
     "axum 0.8.9",
     "axum-server 0.8.0",
     "base64 0.22.1",
@@ -35649,6 +36106,7 @@
     "tokio-util 0.7.18",
     "tonic 0.14.6",
     "tonic-health 0.14.6",
+    "tower-http 0.6.8",
     "tracing 0.1.44",
     "tracing-subscriber 0.3.23",
     "zip 2.4.2"

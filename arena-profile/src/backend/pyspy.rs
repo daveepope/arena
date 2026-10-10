@@ -18,6 +18,7 @@ pub fn record_args(folded_path: &Path, request: &LaunchRequest) -> Vec<String> {
         folded_path.to_string_lossy().into_owned(),
         "--format".into(),
         "raw".into(),
+        "--idle".into(),
         "--".into(),
     ];
     args.push(request.program.to_string_lossy().into_owned());

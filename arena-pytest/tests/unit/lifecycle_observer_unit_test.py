@@ -158,3 +158,111 @@ def test_arena_state_document_closed_handle_raises_binding_error(arena_ffi):
 
     with pytest.raises(ArenaBindingError, match="closed arena"):
         arena_state_document(arena_ffi, 0)
+
+
+def test_observe_single_callback_invoked_on_matching_state(arena_ffi):
+    documents: list[str] = []
+    closed = ClosedArena("py-observe-single", []).observe(documents.append)
+
+    async def run():
+        opened = await closed.open()
+        await opened.close()
+
+    asyncio.run(run())
+
+    assert documents, "no transitions were observed"
+    assert all(json.loads(d)["id"] == "py-observe-single" for d in documents)
+
+
+def test_observe_multiple_callbacks_all_invoked(arena_ffi):
+    first: list[str] = []
+    second: list[str] = []
+    closed = (
+        ClosedArena("py-observe-multiple", [])
+        .observe(first.append)
+        .observe(second.append)
+    )
+
+    async def run():
+        opened = await closed.open()
+        await opened.close()
+
+    asyncio.run(run())
+
+    assert first
+    assert second
+    assert _states_of(first) == _states_of(second)
+
+
+def test_observe_different_arena_id_not_invoked(arena_ffi):
+    other_arena_documents: list[str] = []
+    closed_other = ClosedArena("py-observe-other", []).observe(
+        other_arena_documents.append
+    )
+
+    async def run():
+        opened = await closed_other.open()
+        await opened.close()
+        _open_and_close_plain_arena(arena_ffi, b"py-observe-unrelated")
+
+    asyncio.run(run())
+
+    assert other_arena_documents
+    assert all(
+        json.loads(d)["id"] == "py-observe-other" for d in other_arena_documents
+    )
+
+
+def test_open_registrationfailure_unregisters_prior_observers(arena_ffi, monkeypatch):
+    import arena_pytest.closed_arena as closed_arena_module
+    from arena_pytest.ffi._ffi import ArenaBindingError
+
+    real_register = closed_arena_module.register_lifecycle_observer
+    real_unregister = closed_arena_module.unregister_lifecycle_observer
+    registrations = 0
+    issued_tokens: list[int] = []
+    unregistered_tokens: list[int] = []
+
+    def flaky_register(ffi, callback):
+        nonlocal registrations
+        registrations += 1
+        if registrations == 2:
+            raise ArenaBindingError("registration refused")
+        token = real_register(ffi, callback)
+        issued_tokens.append(token)
+        return token
+
+    def tracking_unregister(ffi, token):
+        unregistered_tokens.append(token)
+        real_unregister(ffi, token)
+
+    monkeypatch.setattr(closed_arena_module, "register_lifecycle_observer", flaky_register)
+    monkeypatch.setattr(closed_arena_module, "unregister_lifecycle_observer", tracking_unregister)
+
+    closed = (
+        ClosedArena("py-observe-registration-failure", [])
+        .observe(lambda _: None)
+        .observe(lambda _: None)
+    )
+
+    with pytest.raises(ArenaBindingError):
+        asyncio.run(closed.open())
+
+    assert issued_tokens
+    assert unregistered_tokens == issued_tokens
+
+
+def test_close_after_observe_unregisters_cleanly(arena_ffi):
+    documents: list[str] = []
+    closed = ClosedArena("py-observe-teardown", []).observe(documents.append)
+
+    async def run():
+        opened = await closed.open()
+        await opened.close()
+
+    asyncio.run(run())
+    count_after_first_close = len(documents)
+
+    _open_and_close_plain_arena(arena_ffi, b"py-observe-teardown-unrelated")
+
+    assert len(documents) == count_after_first_close

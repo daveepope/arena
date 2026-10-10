@@ -17,6 +17,7 @@ members = [
     "arena-host",
     "arena-containerized-component",
     "arena-profile",
+    "arena-dashboard",
     "arena-ffi",
     "tools/arena-ffi-bench",
     "examples"
@@ -45,6 +46,7 @@ inferno = "0.12.8"
 runfiles = "0.2.0"
 arena-ffi = { path = "arena-ffi" }
 axum = "0.8.8"
+tower-http = "0.6"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_urlencoded = "0.7.1"

@@ -1,0 +1,5 @@
+# @generated
+# Input hashes for repository rule npm_translate_lock(name = "npm", pnpm_lock = "@@//arena-dashboard/web:pnpm-lock.yaml").
+# This file should be checked into version control along with the pnpm-lock.yaml file.
+arena-dashboard/web/package.json=-1445208246
+arena-dashboard/web/pnpm-lock.yaml=-1474700827

@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
+
+html,
+body {
+  background-color: #0a0a0a;
+  margin: 0;
+  padding: 0;
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2.4s ease-in-out infinite;
+}

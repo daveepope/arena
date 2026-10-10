@@ -25,6 +25,27 @@ bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 bazel_dep(name = "rules_dotnet", version = "0.20.0")
 bazel_dep(name = "rules_pkg", version = "1.0.1")
 
+bazel_dep(name = "aspect_rules_js", version = "2.9.3")
+bazel_dep(name = "aspect_rules_ts", version = "3.10.1")
+
+typescript = use_extension("@aspect_rules_ts//ts:extensions.bzl", "typescript")
+typescript.deps(version = "5.9.3")
+use_repo(typescript, "npm_typescript")
+
+pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm")
+pnpm.pnpm(name = "pnpm")
+use_repo(pnpm, "pnpm", "pnpm__links")
+
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm", dev_dependency = True)
+npm.npm_translate_lock(
+    name = "npm",
+    data = ["//arena-dashboard/web:package.json"],
+    pnpm_lock = "//arena-dashboard/web:pnpm-lock.yaml",
+    update_pnpm_lock = True,
+    verify_node_modules_ignored = "//:.bazelignore",
+)
+use_repo(npm, "npm")
+
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 _TRIVY_VERSION = "0.72.0"
@@ -48,6 +69,31 @@ http_archive(
     build_file_content = """exports_files(["trivy"])""",
     sha256 = "88f208680dc05da2b459e19b4f5aa2b4dc7c2117892ba4aab2ae63baba330016",
     urls = ["https://github.com/aquasecurity/trivy/releases/download/v{v}/trivy_{v}_macOS-ARM64.tar.gz".format(v = _TRIVY_VERSION)],
+)
+
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+
+_OSV_SCANNER_VERSION = "2.6.0"
+
+http_file(
+    name = "osv_scanner_linux_x86_64",
+    executable = True,
+    sha256 = "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108",
+    urls = ["https://github.com/google/osv-scanner/releases/download/v{v}/osv-scanner_linux_amd64".format(v = _OSV_SCANNER_VERSION)],
+)
+
+http_file(
+    name = "osv_scanner_macos_x86_64",
+    executable = True,
+    sha256 = "60c5296637e977b28eeda5c7f13573e447659a632922737f94d11fa7e30ad6ca",
+    urls = ["https://github.com/google/osv-scanner/releases/download/v{v}/osv-scanner_darwin_amd64".format(v = _OSV_SCANNER_VERSION)],
+)
+
+http_file(
+    name = "osv_scanner_macos_arm64",
+    executable = True,
+    sha256 = "98c460dcd37de25819babd757d04542045b6243113e209edcd4d89fedb0256b4",
+    urls = ["https://github.com/google/osv-scanner/releases/download/v{v}/osv-scanner_darwin_arm64".format(v = _OSV_SCANNER_VERSION)],
 )
 
 http_archive(
@@ -95,7 +141,7 @@ arena_java_maven.install(
     artifacts = [
         "net.java.dev.jna:jna:5.14.0",
         "org.slf4j:slf4j-api:2.0.16",
-        "com.fasterxml.jackson.core:jackson-databind:2.22.2",
+        "com.fasterxml.jackson.core:jackson-databind:2.22.3",
         "org.junit.jupiter:junit-jupiter-api:5.11.4",
         "org.junit.jupiter:junit-jupiter-params:5.11.4",
         "org.junit.jupiter:junit-jupiter-engine:5.11.4",

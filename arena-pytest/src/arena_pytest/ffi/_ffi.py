@@ -729,8 +729,14 @@ def register_lifecycle_observer(
         try:
             addr = _ffi_ptr_addr(state_ptr)
             document = _utf8_zterm_at(addr) if addr else ""
-            if document:
+            if not document:
+                return
+            try:
                 on_state_document(document)
+            except Exception:
+                logging.getLogger(_ARENA_ROOT_LOGGER_NAME).exception(
+                    "lifecycle observer callback raised"
+                )
         finally:
             _ARENA_PY_GIL_RELEASE(gil_state)
 
