@@ -35,15 +35,12 @@ def main() -> int:
     )
     audit_arena_ffi_binary(root)
     vet_rust_dependencies(root)
-    if os.environ.get("ARENA_SKIP_OSV_SCAN") == "1":
-        print("WARNING: skipping osv-scanner (ARENA_SKIP_OSV_SCAN=1) - re-enable before committing")
-    else:
-        print("scanning repinned lockfiles for known CVEs (Rust, JS, Python, Maven, .NET)")
-        scan_status = run_osv_scan()
-        if scan_status != 0:
-            raise RuntimeError(
-                f"osv-scanner found vulnerabilities (exit code {scan_status}); see output above"
-            )
+    print("scanning repinned lockfiles for known CVEs (Rust, JS, Python, Maven, .NET)")
+    scan_status = run_osv_scan()
+    if scan_status != 0:
+        raise RuntimeError(
+            f"osv-scanner found vulnerabilities (exit code {scan_status}); see output above"
+        )
     regenerate_windows_pip_locks(root)
     record_bazel_lockfiles(root)
     print("recorded Cargo.lock and MODULE.bazel.lock against the final Bazel resolution")
