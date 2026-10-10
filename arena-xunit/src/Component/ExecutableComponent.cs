@@ -116,6 +116,24 @@ public sealed class ExecutableComponentBuilder
         return this;
     }
 
+    public ExecutableComponentBuilder WithCpuProfile(string outputPath)
+    {
+        throw new System.NotSupportedException(
+            "CPU profiling is not yet supported by the .NET client");
+    }
+
+    public ExecutableComponentBuilder WithCpuProfileAutoOpen()
+    {
+        throw new System.NotSupportedException(
+            "CPU profiling is not yet supported by the .NET client");
+    }
+
+    public ExecutableComponentBuilder WithHotspots()
+    {
+        throw new System.NotSupportedException(
+            "CPU profiling is not yet supported by the .NET client");
+    }
+
     public ExecutableComponentBuilder WithReadinessCheck(IArenaReadinessCheck check, string target)
     {
         return WithReadinessCheck(check, target, ReadinessCheckWireFormat.DefaultTimeoutMs);

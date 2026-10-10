@@ -20,6 +20,7 @@ venv/
 /.bazelrc.user
 /arena-junit/prebuilt/
 /arena-pytest/prebuilt/
+/arena-pytest/prebuilt-dashboard/
 
 /fuzz/target/
 
@@ -28,3 +29,6 @@ venv/
 /tools/benches/dotnet/obj/
 
 /.claude/worktrees/
+
+# arena-explain-diff skill output (should normally be saved under /tmp, outside the repo)
+arena-explain-*.html

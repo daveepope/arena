@@ -122,7 +122,7 @@ def parse_requirements_lock(text: str) -> set[tuple[str, str, str]]:
         if not stripped or stripped.startswith("#") or "==" not in stripped:
             continue
         left, right = stripped.split("==", 1)
-        name = left.strip().split()[0].lower()
+        name = left.strip().split()[0].split("[")[0].lower()
         version = right.strip().split()[0]
         pairs.add(("pip", name, version))
     return pairs

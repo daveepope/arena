@@ -25,6 +25,7 @@ jobs:
       only_non_publishable: ${{ steps.classify.outputs.only_non_publishable }}
       has_publishable: ${{ steps.classify.outputs.has_publishable }}
       has_ci_relevant: ${{ steps.classify.outputs.has_ci_relevant }}
+      has_client_surface_change: ${{ steps.classify.outputs.has_client_surface_change }}
       version_changed: ${{ steps.filter.outputs.version_changed }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -56,14 +57,21 @@ jobs:
           build_process_path() {
             [[ "$1" == .github/workflows/* || "$1" == .github/dependabot.yml || "$1" == supply-chain/* ]]
           }
+          client_surface_path() {
+            [[ "$1" == arena-ffi/* || "$1" == arena-pytest/* || "$1" == arena-junit/* ]]
+          }
           only_non_publishable=false
           has_publishable=false
           has_ci_relevant=false
+          has_client_surface_change=false
           if [ -n "$CHANGED" ]; then
             only_non_publishable=true
             for path in $CHANGED; do
               if docs_path "$path"; then
                 continue
+              fi
+              if client_surface_path "$path"; then
+                has_client_surface_change=true
               fi
               only_non_publishable=false
               has_ci_relevant=true
@@ -76,8 +84,9 @@ jobs:
           echo "only_non_publishable=${only_non_publishable}" >> "$GITHUB_OUTPUT"
           echo "has_publishable=${has_publishable}" >> "$GITHUB_OUTPUT"
           echo "has_ci_relevant=${has_ci_relevant}" >> "$GITHUB_OUTPUT"
+          echo "has_client_surface_change=${has_client_surface_change}" >> "$GITHUB_OUTPUT"
           echo "changed=${CHANGED:-<none>}"
-          echo "only_non_publishable=${only_non_publishable} has_publishable=${has_publishable} has_ci_relevant=${has_ci_relevant}"
+          echo "only_non_publishable=${only_non_publishable} has_publishable=${has_publishable} has_ci_relevant=${has_ci_relevant} has_client_surface_change=${has_client_surface_change}"
 
   dependabot_awaiting_version_bump:
     name: Awaiting Dependabot version bump
@@ -122,7 +131,7 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       (
         needs.changes.outputs.version_changed == 'true' ||
-        needs.changes.outputs.has_publishable == 'true'
+        needs.changes.outputs.has_client_surface_change == 'true'
       ) &&
       !(
         github.event.pull_request.user.login == 'dependabot[bot]' &&
@@ -275,7 +284,7 @@ jobs:
           steps.paths.outputs.rust_crates == 'true' ||
           steps.paths.outputs.version_file == 'true'
         run: |
-          CARGO_BAZEL_REPIN=1 bazel build //... --config=ci
+          CARGO_BAZEL_REPIN=1 bazel build //... --config=ci --lockfile_mode=update
           bazel mod deps --lockfile_mode=update
           if ! git diff --quiet Cargo.Bazel.lock Cargo.lock MODULE.bazel.lock; then
             echo "Lockfiles are out of date. Run: CARGO_BAZEL_REPIN=1 bazel build //... && bazel mod deps --lockfile_mode=update"
@@ -460,6 +469,14 @@ jobs:
       - name: Install mold
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
+
+      - name: Enable CPU profiling samplers
+        run: |
+          sudo apt-get install -y linux-tools-common "linux-tools-$(uname -r)" \
+            || sudo apt-get install -y linux-tools-common linux-tools-generic
+          sudo sysctl -w kernel.perf_event_paranoid=1
+          sudo sysctl -w kernel.kptr_restrict=0
+          perf --version || echo "perf is unavailable for this kernel; CPU profiling tests will report it"
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
@@ -658,6 +675,14 @@ jobs:
             --install amd64
           docker run --rm --platform=linux/amd64 alpine:3.22 uname -m
 
+      - name: Enable CPU profiling samplers
+        run: |
+          sudo apt-get install -y linux-tools-common "linux-tools-$(uname -r)" \
+            || sudo apt-get install -y linux-tools-common linux-tools-generic
+          sudo sysctl -w kernel.perf_event_paranoid=1
+          sudo sysctl -w kernel.kptr_restrict=0
+          perf --version || echo "perf is unavailable for this kernel; CPU profiling tests will report it"
+
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
@@ -721,6 +746,14 @@ jobs:
       - name: Install mold
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
+
+      - name: Enable CPU profiling samplers
+        run: |
+          sudo apt-get install -y linux-tools-common "linux-tools-$(uname -r)" \
+            || sudo apt-get install -y linux-tools-common linux-tools-generic
+          sudo sysctl -w kernel.perf_event_paranoid=1
+          sudo sysctl -w kernel.kptr_restrict=0
+          perf --version || echo "perf is unavailable for this kernel; CPU profiling tests will report it"
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
@@ -1341,13 +1374,91 @@ jobs:
           name: ${{ matrix.artifact }}
           path: staged-arena-ffi/${{ matrix.staged-lib-name }}
 
+  build_arena_dashboard_server:
+    name: Build arena-dashboard server (${{ matrix.runner }})
+    needs: [changes, publish_gate]
+    if: >-
+      always() && !cancelled() &&
+      needs.publish_gate.result == 'success'
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            artifact: arena-dashboard-server-linux-x86-64
+            disk-cache: build-test-publish-arena-ubuntu-24.04
+            built-bin-name: server
+            staged-bin-name: arena-dashboard-server
+          - runner: macos-latest
+            artifact: arena-dashboard-server-darwin-aarch64
+            disk-cache: build-test-publish-arena-macos-arm64
+            built-bin-name: server
+            staged-bin-name: arena-dashboard-server
+          - runner: macos-15-intel
+            artifact: arena-dashboard-server-darwin-x86-64
+            disk-cache: build-test-publish-arena-macos-intel
+            built-bin-name: server
+            staged-bin-name: arena-dashboard-server
+          - runner: windows-latest
+            artifact: arena-dashboard-server-windows-x86-64
+            disk-cache: build-test-publish-arena-windows
+            built-bin-name: server.exe
+            staged-bin-name: arena-dashboard-server.exe
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
+
+      - name: Install mold
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mold
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ matrix.disk-cache }}
+          repository-cache: true
+
+      - name: Configure BuildBuddy remote cache
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          if [ -n "$BUILDBUDDY_API_KEY" ]; then
+            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+          else
+            echo "common:ci --remote_cache=" >> .bazelrc.user
+            echo "common:ci --bes_backend=" >> .bazelrc.user
+          fi
+        shell: bash
+
+      - name: Build arena-dashboard server
+        run: bazel build //arena-dashboard:server --config=ci --config=release
+
+      - name: Stage arena-dashboard server for release bundling
+        shell: bash
+        run: |
+          mkdir -p staged-arena-dashboard-server
+          cp bazel-bin/arena-dashboard/${{ matrix.built-bin-name }} staged-arena-dashboard-server/${{ matrix.staged-bin-name }}
+
+      - name: Upload arena-dashboard server artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ matrix.artifact }}
+          path: staged-arena-dashboard-server/${{ matrix.staged-bin-name }}
+
   wheel:
     name: Build wheel (${{ matrix.runner }})
-    needs: [changes, publish_gate, build_arena_ffi]
+    needs: [changes, publish_gate, build_arena_ffi, build_arena_dashboard_server]
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
-      needs.build_arena_ffi.result == 'success'
+      needs.build_arena_ffi.result == 'success' &&
+      needs.build_arena_dashboard_server.result == 'success'
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -1360,21 +1471,29 @@ jobs:
             disk-cache: build-test-publish-arena-ubuntu-24.04
             arena-ffi-artifact: arena-ffi-linux-x86-64
             arena-ffi-prebuilt-dir: linux-x86-64
+            dashboard-server-artifact: arena-dashboard-server-linux-x86-64
+            dashboard-server-prebuilt-dir: linux-x86-64
           - runner: macos-latest
             artifact: arena-pytest-wheel-macos-arm64
             disk-cache: build-test-publish-arena-macos-arm64
             arena-ffi-artifact: arena-ffi-darwin-aarch64
             arena-ffi-prebuilt-dir: darwin-aarch64
+            dashboard-server-artifact: arena-dashboard-server-darwin-aarch64
+            dashboard-server-prebuilt-dir: darwin-aarch64
           - runner: macos-15-intel
             artifact: arena-pytest-wheel-macos-x86-64
             disk-cache: build-test-publish-arena-macos-intel
             arena-ffi-artifact: arena-ffi-darwin-x86-64
             arena-ffi-prebuilt-dir: darwin-x86-64
+            dashboard-server-artifact: arena-dashboard-server-darwin-x86-64
+            dashboard-server-prebuilt-dir: darwin-x86-64
           - runner: windows-latest
             artifact: arena-pytest-wheel-windows-x86-64
             disk-cache: build-test-publish-arena-windows
             arena-ffi-artifact: arena-ffi-windows-x86-64
             arena-ffi-prebuilt-dir: windows-x86-64
+            dashboard-server-artifact: arena-dashboard-server-windows-x86-64
+            dashboard-server-prebuilt-dir: windows-x86-64
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -1405,6 +1524,17 @@ jobs:
         with:
           name: ${{ matrix.arena-ffi-artifact }}
           path: arena-pytest/prebuilt/${{ matrix.arena-ffi-prebuilt-dir }}
+
+      - name: Download arena-dashboard server
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ matrix.dashboard-server-artifact }}
+          path: arena-pytest/prebuilt-dashboard/${{ matrix.dashboard-server-prebuilt-dir }}
+
+      - name: Mark arena-dashboard server executable
+        if: matrix.runner != 'windows-latest'
+        shell: bash
+        run: chmod +x arena-pytest/prebuilt-dashboard/${{ matrix.dashboard-server-prebuilt-dir }}/arena-dashboard-server
 
       - name: Unique version for TestPyPI
         if: github.event_name == 'pull_request'
@@ -1452,13 +1582,14 @@ jobs:
               print(f"expected exactly one wheel, found: {wheels}", file=sys.stderr)
               sys.exit(1)
 
-          expected = "arena_pytest/arena_ffi_shared.dll"
+          expected = ["arena_pytest/arena_ffi_shared.dll", "arena_pytest/arena-dashboard-server.exe"]
           with zipfile.ZipFile(wheels[0]) as zf:
               names = set(zf.namelist())
 
-          if expected not in names:
-              print(f"FAILED: {wheels[0]} is missing {expected}", file=sys.stderr)
-              print(f"actual entries: {sorted(n for n in names if 'arena_ffi' in n)}", file=sys.stderr)
+          missing = [e for e in expected if e not in names]
+          if missing:
+              print(f"FAILED: {wheels[0]} is missing {missing}", file=sys.stderr)
+              print(f"actual entries: {sorted(n for n in names if 'arena_ffi' in n or 'dashboard' in n)}", file=sys.stderr)
               sys.exit(1)
 
           print(f"PASSED: {wheels[0]} contains {expected}")

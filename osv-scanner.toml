@@ -17,3 +17,19 @@ reason = "rustls-webpki 0.101.7 name-constraint parsing bug, pulled in via tiber
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0099"
 reason = "rustls-webpki 0.101.7 CRL-parsing bug, pulled in via tiberius 0.12.3 (arena-mssql). Same tiberius chain as RUSTSEC-2026-0098; no fixed release exists upstream."
+
+[[IgnoredVulns]]
+id = "GHSA-82fw-gwwq-j7x9"
+reason = "@vitest/mocker path traversal / arbitrary file read via an unauthenticated redirect-mock registered over Vite's dev-server HMR WebSocket. Fixed only in vitest 4.1.11+/5.0.0+; the 2.1.x/3.x lines are not maintained and will not receive a backport. Arena's dashboard tests run via `vitest run` (one-shot, no persistent dev server, never network-exposed) and do not use Vitest's module-mocking feature at all, so the vulnerable interceptor path is never registered."
+
+[[IgnoredVulns]]
+id = "GHSA-5gmw-xhrv-c9v3"
+reason = "tinypool prototype-pollution gadget in worker options leading to RCE. tinypool is pinned by vitest's own dependency range (^1.1.1); vitest 3.x (current latest supporting our vite/plugin-react versions) has not bumped it to the fixed 2.1.1+ line. The worker options tinypool receives come only from vitest's own trusted internal config in our `vitest run` invocation, never from external or attacker-controlled input."
+
+[[IgnoredVulns]]
+id = "GHSA-85c8-ppgw-ccpr"
+reason = "Same tinypool prototype-pollution class as GHSA-5gmw-xhrv-c9v3 (fixed in 2.1.2+), same vitest-imposed ^1.1.1 constraint and same no-untrusted-input reasoning."
+
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm"
+reason = "braces 3.0.3 stack-exhaustion DoS via deeply nested glob patterns. No fixed release exists upstream (OSV lists no fixed version). Transitive dev dependency of the dashboard's test/build toolchain; patterns it processes come from our own fixed source globs in BUILD/vite config, not external input."

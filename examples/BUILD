@@ -5,6 +5,22 @@ load("@rules_java//java:defs.bzl", "java_binary", "java_library", "java_test")
 load("@rules_dotnet//dotnet:defs.bzl", "csharp_library", "csharp_binary", "csharp_test", "import_library")
 load("@crates//:defs.bzl", "all_crate_deps")
 
+config_setting(
+    name = "linux_x86_64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "linux_aarch64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
 import_library(
     name = "xunit_assert_lib",
     library_name = "xunit.assert",
@@ -619,6 +635,7 @@ py_test(
         "tests/pytest-shared",
     ],
     data = [
+        "//arena-dashboard:server",
         "//arena-ffi:arena_ffi_shared",
         "//examples:example-readings-fastapi-web-app",
         "//examples:instrument_reading_db_schema",
@@ -726,14 +743,15 @@ java_library(
     visibility = ["//visibility:public"],
     deps = [
         "@arena_java_maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_core",
-        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:tools_jackson_core_jackson_core",
+        "@arena_java_maven//:tools_jackson_core_jackson_databind",
         "@arena_java_maven//:com_microsoft_sqlserver_mssql_jdbc",
         "@arena_java_maven//:com_oracle_database_jdbc_ojdbc11",
         "@arena_java_maven//:jakarta_validation_jakarta_validation_api",
         "@arena_java_maven//:org_postgresql_postgresql",
         "@arena_java_maven//:org_springframework_boot_spring_boot",
         "@arena_java_maven//:org_springframework_boot_spring_boot_autoconfigure",
+        "@arena_java_maven//:org_springframework_boot_spring_boot_jdbc",
         "@arena_java_maven//:org_springframework_boot_spring_boot_starter_jdbc",
         "@arena_java_maven//:org_springframework_boot_spring_boot_starter_mail",
         "@arena_java_maven//:org_springframework_boot_spring_boot_starter_oauth2_resource_server",
@@ -802,7 +820,11 @@ java_test(
         ":instrument_reading_db_schema",
         ":validation_db_schema",
         ":weather_db_schema",
-    ],
+    ] + select({
+        ":linux_x86_64": ["@async_profiler_linux_x64//:lib/libasyncProfiler.so"],
+        ":linux_aarch64": ["@async_profiler_linux_arm64//:lib/libasyncProfiler.so"],
+        "//conditions:default": [],
+    }),
     jvm_flags = ["-Djna.nosys=true"],
     runtime_deps = [
         ":example_spring_boot_component_test_logging_resources",

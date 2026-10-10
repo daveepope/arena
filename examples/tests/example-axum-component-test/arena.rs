@@ -217,6 +217,7 @@ pub fn setup_exec_component() -> Component {
 
     let mut builder = ExecutableComponent::builder("example-api-web-app")
         .with_executable_path(binary)
+        .with_build_tool(arena_executable_component::BuildTool::Cargo)
         .with_env_var("RUST_LOG", "info")
         .with_env_var("OAUTH_TLS_CA_PEM", oauth_server_tls_cert_pem())
         .with_env_var("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
@@ -244,9 +245,7 @@ pub fn setup_exec_component() -> Component {
         .with_readiness_check_timeout(HttpReadinessCheck::new(), healthcheck_url, 30_000);
 
     if !is_bazel {
-        builder = builder
-            .with_source_path("examples")
-            .with_build_tool(arena_executable_component::BuildTool::Cargo);
+        builder = builder.with_source_path("examples");
     }
 
     Box::new(builder.build().expect("build web app component"))

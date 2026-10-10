@@ -32,6 +32,7 @@ import requests
 
 from arena_pytest import (
     ArenaLogLevel,
+    BuildTool,
     ClosedArena,
     Custom,
     EventRuleSpec,
@@ -329,9 +330,10 @@ def closed_arena() -> ClosedArena:
     )
     ls_ep = f"http://127.0.0.1:{LOCALSTACK_HOST_PORT}"
 
-    fastapi_component = (
+    fastapi_component_builder = (
         ExecutableComponentBuilder(COMPONENT_NAME_EXECUTABLE)
         .with_executable_path(exe)
+        .with_build_tool(BuildTool.PYTHON)
         .with_env_var("WEB_APP_PORT", str(WEB_APP_PORT))
         .with_env_var("POSTGRES_CONNECTION_STRING", pg_cs)
         .with_env_var("CALIBRATION_URL", f"http://127.0.0.1:{CALIBRATION_HOST_PORT}")
@@ -352,8 +354,18 @@ def closed_arena() -> ClosedArena:
         .with_readiness_check(
             HttpReadinessCheck.create(), f"http://127.0.0.1:{WEB_APP_PORT}/health", 30_000
         )
-        .build()
     )
+    if os.environ.get("ARENA_VISUALIZE") == "1":
+        profile_output = os.path.join(
+            tempfile.gettempdir(), f"arena-cpu-profile-{uuid.uuid4().hex[:8]}.html"
+        )
+        fastapi_component_builder = (
+            fastapi_component_builder
+            .with_cpu_profile(profile_output)
+            .with_cpu_profile_auto_open()
+            .with_hotspots()
+        )
+    fastapi_component = fastapi_component_builder.build()
 
     a_match = (
         MatchBuilder(MATCH_NAME)

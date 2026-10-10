@@ -1,12 +1,12 @@
 module(
     name = "arena",
-    version = "7.0.1",
+    version = "7.1.0",
 )
 
 arena_version_ext = use_extension("//tools:arena_version.bzl", "arena_version")
 use_repo(arena_version_ext, "arena_version")
 
-bazel_dep(name = "rules_python", version = "0.34.0")
+bazel_dep(name = "rules_python", version = "1.4.1")
 bazel_dep(name = "rules_rust", version = "0.71.0")
 single_version_override(
     module_name = "rules_rust",
@@ -20,10 +20,31 @@ single_version_override(
 )
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "rules_java", version = "9.0.0")
-bazel_dep(name = "rules_jvm_external", version = "6.6")
+bazel_dep(name = "rules_jvm_external", version = "6.7")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 bazel_dep(name = "rules_dotnet", version = "0.20.0")
 bazel_dep(name = "rules_pkg", version = "1.0.1")
+
+bazel_dep(name = "aspect_rules_js", version = "2.9.3")
+bazel_dep(name = "aspect_rules_ts", version = "3.10.1")
+
+typescript = use_extension("@aspect_rules_ts//ts:extensions.bzl", "typescript")
+typescript.deps(version = "5.9.3")
+use_repo(typescript, "npm_typescript")
+
+pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm")
+pnpm.pnpm(name = "pnpm")
+use_repo(pnpm, "pnpm", "pnpm__links")
+
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm", dev_dependency = True)
+npm.npm_translate_lock(
+    name = "npm",
+    data = ["//arena-dashboard/web:package.json"],
+    pnpm_lock = "//arena-dashboard/web:pnpm-lock.yaml",
+    update_pnpm_lock = True,
+    verify_node_modules_ignored = "//:.bazelignore",
+)
+use_repo(npm, "npm")
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
@@ -48,6 +69,31 @@ http_archive(
     build_file_content = """exports_files(["trivy"])""",
     sha256 = "88f208680dc05da2b459e19b4f5aa2b4dc7c2117892ba4aab2ae63baba330016",
     urls = ["https://github.com/aquasecurity/trivy/releases/download/v{v}/trivy_{v}_macOS-ARM64.tar.gz".format(v = _TRIVY_VERSION)],
+)
+
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+
+_OSV_SCANNER_VERSION = "2.6.0"
+
+http_file(
+    name = "osv_scanner_linux_x86_64",
+    executable = True,
+    sha256 = "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108",
+    urls = ["https://github.com/google/osv-scanner/releases/download/v{v}/osv-scanner_linux_amd64".format(v = _OSV_SCANNER_VERSION)],
+)
+
+http_file(
+    name = "osv_scanner_macos_x86_64",
+    executable = True,
+    sha256 = "60c5296637e977b28eeda5c7f13573e447659a632922737f94d11fa7e30ad6ca",
+    urls = ["https://github.com/google/osv-scanner/releases/download/v{v}/osv-scanner_darwin_amd64".format(v = _OSV_SCANNER_VERSION)],
+)
+
+http_file(
+    name = "osv_scanner_macos_arm64",
+    executable = True,
+    sha256 = "98c460dcd37de25819babd757d04542045b6243113e209edcd4d89fedb0256b4",
+    urls = ["https://github.com/google/osv-scanner/releases/download/v{v}/osv-scanner_darwin_arm64".format(v = _OSV_SCANNER_VERSION)],
 )
 
 http_archive(
@@ -95,7 +141,8 @@ arena_java_maven.install(
     artifacts = [
         "net.java.dev.jna:jna:5.14.0",
         "org.slf4j:slf4j-api:2.0.16",
-        "com.fasterxml.jackson.core:jackson-databind:2.22.2",
+        "com.fasterxml.jackson.core:jackson-databind:2.22.3",
+        "tools.jackson.core:jackson-databind:3.1.7",
         "org.junit.jupiter:junit-jupiter-api:5.11.4",
         "org.junit.jupiter:junit-jupiter-params:5.11.4",
         "org.junit.jupiter:junit-jupiter-engine:5.11.4",
@@ -103,13 +150,13 @@ arena_java_maven.install(
         "org.junit.platform:junit-platform-suite-api:1.11.4",
         "org.junit.platform:junit-platform-suite-engine:1.11.4",
         "org.apache.kafka:kafka-clients:3.9.2",
-        "at.yawk.lz4:lz4-java:1.11.1",
+        "at.yawk.lz4:lz4-java:1.11.4",
         "io.micrometer:micrometer-core:1.15.12",
-        "org.springframework.boot:spring-boot-starter-web:3.5.16",
-        "org.springframework.boot:spring-boot-starter-jdbc:3.5.16",
-        "org.springframework.boot:spring-boot-starter-validation:3.5.16",
-        "org.springframework.boot:spring-boot-starter-oauth2-resource-server:3.5.16",
-        "org.springframework.boot:spring-boot-starter-mail:3.5.16",
+        "org.springframework.boot:spring-boot-starter-web:4.1.1",
+        "org.springframework.boot:spring-boot-starter-jdbc:4.1.1",
+        "org.springframework.boot:spring-boot-starter-validation:4.1.1",
+        "org.springframework.boot:spring-boot-starter-oauth2-resource-server:4.1.1",
+        "org.springframework.boot:spring-boot-starter-mail:4.1.1",
         "org.postgresql:postgresql:42.7.12",
         "com.microsoft.sqlserver:mssql-jdbc:12.8.2.jre11",
         "com.oracle.database.jdbc:ojdbc11:23.4.0.24.05",
@@ -118,7 +165,7 @@ arena_java_maven.install(
         "software.amazon.awssdk:auth:2.29.29",
         "software.amazon.awssdk:regions:2.29.29",
         "software.amazon.awssdk:url-connection-client:2.29.29",
-        "org.springframework.boot:spring-boot-starter-logging:3.5.16",
+        "org.springframework.boot:spring-boot-starter-logging:4.1.1",
         "ch.qos.logback:logback-classic:1.5.38",
         "io.temporal:temporal-sdk:1.30.1",
         "io.grpc:grpc-netty-shaded:1.75.0",
@@ -126,9 +173,9 @@ arena_java_maven.install(
         "io.netty:netty-codec-http:4.1.137.Final",
         "io.netty:netty-codec-http2:4.1.136.Final",
         "org.apache.logging.log4j:log4j-api:2.25.5",
-        "org.apache.tomcat.embed:tomcat-embed-core:10.1.59",
-        "org.apache.tomcat.embed:tomcat-embed-el:10.1.59",
-        "org.apache.tomcat.embed:tomcat-embed-websocket:10.1.59",
+        "org.apache.tomcat.embed:tomcat-embed-core:11.0.24",
+        "org.apache.tomcat.embed:tomcat-embed-el:11.0.24",
+        "org.apache.tomcat.embed:tomcat-embed-websocket:11.0.24",
     ],
     fail_on_missing_checksum = False,
     lock_file = "//:arena_java_maven_install.json",
@@ -290,6 +337,14 @@ nuget_archive(
     id = "Microsoft.Extensions.Logging",
     sources = ["https://api.nuget.org/v3/index.json"],
     version = "8.0.1",
+)
+
+# dotnet-trace CPU profiler tool
+nuget_archive(
+    name = "dotnet_trace",
+    id = "dotnet-trace",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.547301",
 )
 
 nuget_archive(
@@ -549,4 +604,44 @@ nuget_archive(
     id = "NexusRpc",
     sources = ["https://api.nuget.org/v3/index.json"],
     version = "0.3.0",
+)
+# py-spy is a binary-only crate (no library target), so it cannot be a normal
+# workspace Cargo.toml dependency of arena-profile; crate.from_specs vendors
+# and builds its binary from source independently of the Cargo.lock graph.
+crate.spec(
+    package = "py-spy",
+    version = "=0.4.2",
+    repositories = ["profiling_tools"],
+)
+crate.annotation(
+    crate = "py-spy",
+    repositories = ["profiling_tools"],
+    gen_all_binaries = True,
+)
+crate.from_specs(name = "profiling_tools")
+use_repo(crate, "profiling_tools")
+
+# async-profiler ships prebuilt release tarballs (not a Cargo crate), vendored
+# here with a checksum-pinned download so no host install is required. The
+# archive has no Bazel BUILD file of its own, so one is supplied inline
+# exposing the asprof launcher and its native agent library.
+_ASYNC_PROFILER_VERSION = "4.5"
+_ASYNC_PROFILER_BUILD_FILE_CONTENT = """
+exports_files(["bin/asprof", "lib/libasyncProfiler.so"])
+"""
+
+http_archive(
+    name = "async_profiler_linux_x64",
+    url = "https://github.com/async-profiler/async-profiler/releases/download/v{v}/async-profiler-{v}-linux-x64.tar.gz".format(v = _ASYNC_PROFILER_VERSION),
+    sha256 = "89546fbb9ee0fc5496c7edd4099b0709489bc78b0d8057ccbb4b801f6b032b62",
+    strip_prefix = "async-profiler-{}-linux-x64".format(_ASYNC_PROFILER_VERSION),
+    build_file_content = _ASYNC_PROFILER_BUILD_FILE_CONTENT,
+)
+
+http_archive(
+    name = "async_profiler_linux_arm64",
+    url = "https://github.com/async-profiler/async-profiler/releases/download/v{v}/async-profiler-{v}-linux-arm64.tar.gz".format(v = _ASYNC_PROFILER_VERSION),
+    sha256 = "64c41d1465d60097439c50d7e924b4946f1f62b1cbd21ce5b034fad09c0d6979",
+    strip_prefix = "async-profiler-{}-linux-arm64".format(_ASYNC_PROFILER_VERSION),
+    build_file_content = _ASYNC_PROFILER_BUILD_FILE_CONTENT,
 )
