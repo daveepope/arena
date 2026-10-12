@@ -308,6 +308,24 @@ fn on_event_dependency_allowlist_matches_before_field_suppression() {
 }
 
 #[test]
+fn on_event_arena_dashboard_target_without_subject_is_delivered() {
+    let record = record_emitted_within("arena-dashboard-no-subject-probe", || {
+        tracing::info!(target: "arena_dashboard::launcher", "arena-dashboard-no-subject-probe");
+    });
+
+    assert_eq!(record.message, "arena-dashboard-no-subject-probe");
+}
+
+#[test]
+fn on_event_arena_profile_target_without_subject_is_delivered() {
+    let record = record_emitted_within("arena-profile-no-subject-probe", || {
+        tracing::info!(target: "arena_profile::profiler", "arena-profile-no-subject-probe");
+    });
+
+    assert_eq!(record.message, "arena-profile-no-subject-probe");
+}
+
+#[test]
 fn install_panic_reporter_panic_inside_boundary_delivers_a_log_record() {
     let captured = records_emitted_within(|| {
         let outcome = call_across_boundary(|| panic!("boundary-panic-probe"));

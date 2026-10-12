@@ -5,6 +5,7 @@ mod active_playbook;
 mod arena_state;
 mod lifecycle_observer;
 mod closed_arena;
+mod dashboard;
 mod dependency_reset;
 pub mod error;
 mod find_available_port;
@@ -25,6 +26,7 @@ pub use active_playbook::{
 };
 pub use arena_state::arena_state_json;
 pub use closed_arena::{arena_open, OpenArenaHandle};
+pub use dashboard::{arena_dashboard_ensure_running, arena_register_dashboard_observer};
 pub use lifecycle_observer::{
     arena_add_lifecycle_observer, arena_remove_lifecycle_observer, ArenaLifecycleCallback,
 };

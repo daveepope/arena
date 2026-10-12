@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { dagreLayout } from "./dagreLayout";
+import { dagreLayout, estimateNodeWidth } from "./dagreLayout";
 import type { LayoutEdge, LayoutNode } from "./layout";
 
 function node(id: string): LayoutNode {
-  return { id, label: id, kind: "dependency", state: "started", faults: [], childCount: 0, visible: true, dependencyIds: [], depth: 0 };
+  return { id, label: id, kind: "dependency", state: "started", faults: [], childCount: 0, visible: true, componentIds: [], depth: 0 };
 }
 
 function edge(source: string, target: string): LayoutEdge {
@@ -37,5 +37,19 @@ describe("dagreLayout", () => {
     const positions = dagreLayout([node("isolated")], []);
 
     expect(positions.get("isolated")).toBeDefined();
+  });
+});
+
+describe("estimateNodeWidth", () => {
+  it("short label clamps to the minimum width", () => {
+    expect(estimateNodeWidth("a")).toBe(100);
+  });
+
+  it("long label clamps to the maximum width", () => {
+    expect(estimateNodeWidth("arena-executable-component-example-api-web-app-khr7yx")).toBe(220);
+  });
+
+  it("mid-length label scales with its character count", () => {
+    expect(estimateNodeWidth("orders-db (postgres)")).toBe(140);
   });
 });

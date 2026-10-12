@@ -98,6 +98,26 @@ fn builder_with_container_tag_sets_image_tag() {
 }
 
 #[test]
+fn builder_with_component_id_populates_component_ids() {
+    let dep = PostgresDependency::builder("component-linked")
+        .with_impl(FakePostgresImpl { conn_str: None })
+        .with_component_id("parent-component")
+        .with_component_id("child-component")
+        .build();
+
+    assert_eq!(dep.component_ids(), ["parent-component", "child-component"]);
+}
+
+#[test]
+fn builder_without_component_id_defaults_to_empty() {
+    let dep = PostgresDependency::builder("no-component")
+        .with_impl(FakePostgresImpl { conn_str: None })
+        .build();
+
+    assert!(dep.component_ids().is_empty());
+}
+
+#[test]
 fn builder_with_child_dependencies_populates_children() {
     let dep = PostgresDependency::builder("with-children")
         .with_impl(FakePostgresImpl { conn_str: None })

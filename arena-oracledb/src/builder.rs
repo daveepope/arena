@@ -35,6 +35,7 @@ pub struct OracleDependencyBuilder {
     readiness_check: Option<Box<dyn ReadinessCheck>>,
     sql_readiness_timeout: Option<std::time::Duration>,
     setup_mode: OracleSetupMode,
+    component_ids: Vec<String>,
 }
 
 impl OracleDependencyBuilder {
@@ -64,6 +65,7 @@ impl OracleDependencyBuilder {
             readiness_check: None,
             sql_readiness_timeout: None,
             setup_mode: OracleSetupMode::Fast,
+            component_ids: Vec::new(),
         }
     }
 
@@ -169,6 +171,11 @@ impl OracleDependencyBuilder {
         self
     }
 
+    pub fn with_component_id(mut self, component_id: impl Into<String>) -> Self {
+        self.component_ids.push(component_id.into());
+        self
+    }
+
     pub fn build(self) -> Result<OracleDependency, Fault> {
         let oracle_impl = self
             .oracle_impl
@@ -225,6 +232,7 @@ impl OracleDependencyBuilder {
             image_name,
             image_tag,
             container_name,
+            self.component_ids,
         );
 
         if let Some(check) = readiness_check {

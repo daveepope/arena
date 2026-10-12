@@ -36,6 +36,7 @@ pub struct OauthDependency {
     state: RunnableState,
     faults: Vec<Fault>,
     build_fault: Option<Fault>,
+    component_ids: Vec<String>,
 }
 
 pub fn ephemeral_tls_hosts(listen_ip: IpAddr) -> Vec<String> {
@@ -59,6 +60,7 @@ impl OauthDependency {
         token_ttl_secs: u64,
         tls_plan: OauthTlsPlan,
         metadata_base_url: Option<String>,
+        component_ids: Vec<String>,
     ) -> Self {
         let (active_server_tls, build_fault) = match &tls_plan {
             OauthTlsPlan::Disabled => (None, None),
@@ -94,6 +96,7 @@ impl OauthDependency {
             state: RunnableState::NotStarted,
             faults: Vec::new(),
             build_fault,
+            component_ids,
         }
     }
 
@@ -326,6 +329,10 @@ impl RunnableDependency for OauthDependency {
 
     fn children(&self) -> &[Dependency] {
         self.dependencies.as_deref().unwrap_or(&[])
+    }
+
+    fn component_ids(&self) -> &[String] {
+        &self.component_ids
     }
 
     fn children_mut(&mut self) -> &mut [Dependency] {

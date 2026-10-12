@@ -20,6 +20,7 @@ fn base_config(identifier: &str) -> OauthFfiDependencyConfig {
         metadata_base_url: None,
         transport: None,
         issuers: Vec::new(),
+        component_ids: Vec::new(),
     }
 }
 

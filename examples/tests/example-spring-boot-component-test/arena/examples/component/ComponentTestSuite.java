@@ -135,6 +135,12 @@ public final class ComponentTestSuite {
   private static String sqsQueueUrl;
   static long readingsDeviceId;
 
+  @ArenaComponent(logs = false)
+  static final ExecutableComponent WEB_APP = buildWebApp("example-api-web-app", WEB_APP_PORT);
+
+  @ArenaComponent(logs = false)
+  static final ExecutableComponent WEB_APP_2 = buildWebApp("example-api-web-app-2", WEB_APP_2_PORT);
+
   @ArenaDependency(logs = false)
   static final OauthDependency OAUTH =
       new OauthDependencyBuilder("example-api-oauth")
@@ -154,6 +160,8 @@ public final class ComponentTestSuite {
           .withDatabaseUsername(POSTGRES_DB_USER)
           .withDatabasePassword(POSTGRES_DB_PASS)
           .withStartupSqlScripts(readSchema("instrument_reading_db_schema.sql"))
+          .withComponentId(WEB_APP.identifier())
+          .withComponentId(WEB_APP_2.identifier())
           .build();
 
   @ArenaDependency(logs = false)
@@ -164,6 +172,7 @@ public final class ComponentTestSuite {
           .withDatabaseUsername(MSSQL_DB_USER)
           .withDatabasePassword(MSSQL_DB_PASS)
           .withStartupSqlScripts(readSchema("validation_db_schema.sql"))
+          .withComponentId(WEB_APP.identifier())
           .build();
 
   @ArenaDependency(logs = false)
@@ -180,7 +189,11 @@ public final class ComponentTestSuite {
 
   @ArenaDependency(logs = false)
   static final HttpDependency CALIBRATION =
-      new HttpDependencyBuilder("example-api-calibration").withPort(CALIBRATION_HOST_PORT).build();
+      new HttpDependencyBuilder("example-api-calibration")
+          .withPort(CALIBRATION_HOST_PORT)
+          .withComponentId(WEB_APP.identifier())
+          .withComponentId(WEB_APP_2.identifier())
+          .build();
 
   @ArenaDependency(logs = false)
   static final LocalstackDependency LOCALSTACK = buildLocalstack();
@@ -230,12 +243,6 @@ public final class ComponentTestSuite {
   @ArenaPlaybook(execOnDependencyStart = false)
   static final ResetWeatherDbPlaybook RESET_WEATHER_DB =
       new ResetWeatherDbPlaybook(ORACLE.identifier());
-
-  @ArenaComponent(logs = false)
-  static final ExecutableComponent WEB_APP = buildWebApp("example-api-web-app", WEB_APP_PORT);
-
-  @ArenaComponent(logs = false)
-  static final ExecutableComponent WEB_APP_2 = buildWebApp("example-api-web-app-2", WEB_APP_2_PORT);
 
   @ArenaAfterOpen
   static void afterOpen() throws Exception {
@@ -291,6 +298,7 @@ public final class ComponentTestSuite {
                       new LocalstackModels.EventRuleTarget(
                           "target-queue", new LocalstackModels.SqsQueueTarget(QUEUE_NAME))),
                   EVENT_BUS_NAME))
+          .withComponentId(WEB_APP.identifier())
           .build();
     } catch (IOException e) {
       throw new UncheckedIOException(e);

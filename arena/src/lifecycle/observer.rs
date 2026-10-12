@@ -78,6 +78,17 @@ impl LifecycleContext {
         snapshot
     }
 
+    pub fn notify_progress(&self, dependencies: Vec<DependencyState>, components: Vec<ComponentState>) {
+        let snapshot = ArenaState::new(
+            self.arena_id.clone(),
+            self.current(),
+            dependencies,
+            components,
+            self.recorded_faults(),
+        );
+        self.notify(&snapshot);
+    }
+
     pub fn finish(
         &self,
         dependencies: Vec<DependencyState>,

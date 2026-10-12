@@ -18,6 +18,7 @@ public sealed class OauthDependency : IArenaDependency
     public string? Transport { get; }
     [JsonProperty("server_tls_certificate_pem")] public string? ServerTlsCert { get; }
     [JsonProperty("server_tls_private_key_pem")] public string? ServerTlsKey { get; }
+    public IReadOnlyList<string> ComponentIds { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
     [JsonProperty("issuers")] public List<JObject>? Issuers { get; }
 
@@ -25,7 +26,7 @@ public sealed class OauthDependency : IArenaDependency
 
     internal OauthDependency(string identifier, int port, string? listenIp, string? metadataBaseUrl,
         string? transport, string? serverTlsCert, string? serverTlsKey, IReadOnlyList<IArenaDependency> children,
-        List<JObject>? issuers)
+        List<JObject>? issuers, IReadOnlyList<string> componentIds)
     {
         Identifier = identifier;
         Port = port;
@@ -36,6 +37,7 @@ public sealed class OauthDependency : IArenaDependency
         ServerTlsKey = serverTlsKey;
         _children = children;
         Issuers = issuers;
+        ComponentIds = componentIds;
     }
 
     public string ForFfi()
@@ -75,6 +77,7 @@ public sealed class OauthDependencyBuilder
     private string? _serverTlsKey;
     private readonly List<IArenaDependency> _children = new();
     private readonly List<JObject> _issuers = new();
+    private readonly List<string> _componentIds = new();
 
     public OauthDependencyBuilder(string name)
     {
@@ -150,11 +153,17 @@ public sealed class OauthDependencyBuilder
         return this;
     }
 
+    public OauthDependencyBuilder WithComponentId(string componentId)
+    {
+        _componentIds.Add(componentId);
+        return this;
+    }
+
     public OauthDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-oauth", _name);
         var metadataBaseUrl = string.IsNullOrWhiteSpace(_metadataBaseUrl) ? OauthIssuer : _metadataBaseUrl;
         var issuers = _issuers.Count > 0 ? _issuers : null;
-        return new OauthDependency(identifier, _port, _listenIp, metadataBaseUrl, _transport, _serverTlsCert, _serverTlsKey, _children, issuers);
+        return new OauthDependency(identifier, _port, _listenIp, metadataBaseUrl, _transport, _serverTlsCert, _serverTlsKey, _children, issuers, _componentIds);
     }
 }

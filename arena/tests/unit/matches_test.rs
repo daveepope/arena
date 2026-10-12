@@ -49,13 +49,102 @@ async fn start_healthy_match_emits_every_start_state() {
         recorder.states(),
         vec![
             ArenaLifecycleState::DependenciesStarting,
+            ArenaLifecycleState::DependenciesStarting,
             ArenaLifecycleState::DependenciesStarted,
             ArenaLifecycleState::PlaybooksRunning,
             ArenaLifecycleState::PlaybooksComplete,
             ArenaLifecycleState::ComponentsStarting,
+            ArenaLifecycleState::ComponentsStarting,
             ArenaLifecycleState::ComponentsStarted,
         ]
     );
+}
+
+#[tokio::test]
+async fn start_two_dependencies_progress_snapshot_shows_one_complete_one_pending() {
+    let mut a_match = Match::new(
+        "healthy",
+        vec![
+            probe_dependency("dep-a").into_dependency(),
+            probe_dependency("dep-b").into_dependency(),
+        ],
+        vec![],
+    );
+    let (ctx, recorder) = context();
+
+    a_match.start(&ctx).await.expect("match should start");
+
+    let progress = recorder
+        .snapshots()
+        .into_iter()
+        .find(|s| {
+            s.state == ArenaLifecycleState::DependenciesStarting
+                && s.dependencies.iter().any(|d| d.state == RunnableState::Started)
+                && s.dependencies.iter().any(|d| d.state == RunnableState::NotStarted)
+        })
+        .expect("expected an interim progress snapshot with one dependency started and one still pending");
+
+    assert_eq!(progress.dependencies.len(), 2);
+    let started: Vec<&str> = progress
+        .dependencies
+        .iter()
+        .filter(|d| d.state == RunnableState::Started)
+        .map(|d| d.id.as_str())
+        .collect();
+    let pending: Vec<&str> = progress
+        .dependencies
+        .iter()
+        .filter(|d| d.state == RunnableState::NotStarted)
+        .map(|d| d.id.as_str())
+        .collect();
+    assert_eq!(started.len(), 1, "{progress}");
+    assert_eq!(pending.len(), 1, "{progress}");
+    assert!(["dep-a", "dep-b"].contains(&started[0]));
+    assert!(["dep-a", "dep-b"].contains(&pending[0]));
+    assert_ne!(started[0], pending[0]);
+}
+
+#[tokio::test]
+async fn stop_two_dependencies_progress_snapshot_shows_one_complete_one_pending() {
+    let mut a_match = Match::new(
+        "healthy",
+        vec![
+            probe_dependency("dep-a").into_dependency(),
+            probe_dependency("dep-b").into_dependency(),
+        ],
+        vec![],
+    );
+    let (ctx, recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    a_match.stop(&ctx).await.expect("match should stop");
+
+    let progress = recorder
+        .snapshots()
+        .into_iter()
+        .find(|s| {
+            s.state == ArenaLifecycleState::DependenciesStopping
+                && s.dependencies.iter().any(|d| d.state == RunnableState::Stopped)
+                && s.dependencies.iter().any(|d| d.state == RunnableState::Started)
+        })
+        .expect("expected an interim progress snapshot with one dependency stopped and one still started");
+
+    assert_eq!(progress.dependencies.len(), 2);
+    let stopped: Vec<&str> = progress
+        .dependencies
+        .iter()
+        .filter(|d| d.state == RunnableState::Stopped)
+        .map(|d| d.id.as_str())
+        .collect();
+    let still_started: Vec<&str> = progress
+        .dependencies
+        .iter()
+        .filter(|d| d.state == RunnableState::Started)
+        .map(|d| d.id.as_str())
+        .collect();
+    assert_eq!(stopped.len(), 1, "{progress}");
+    assert_eq!(still_started.len(), 1, "{progress}");
+    assert_ne!(stopped[0], still_started[0]);
 }
 
 #[tokio::test]
@@ -291,6 +380,31 @@ async fn dependency_states_nested_tree_mirrors_children() {
 }
 
 #[tokio::test]
+async fn dependency_states_undeclared_component_ids_defaults_to_empty() {
+    let a_match = Match::new("healthy", vec![probe_dependency("postgres-1").into_dependency()], vec![]);
+
+    let states = a_match.dependency_states();
+
+    assert!(states[0].component_ids.is_empty());
+}
+
+#[tokio::test]
+async fn dependency_states_declared_component_ids_carries_through_the_snapshot() {
+    let dependency = probe_dependency("postgres-1")
+        .with_component_id("parent-component")
+        .with_component_id("child-component")
+        .into_dependency();
+    let a_match = Match::new("healthy", vec![dependency], vec![]);
+
+    let states = a_match.dependency_states();
+
+    assert_eq!(
+        states[0].component_ids,
+        vec!["parent-component".to_string(), "child-component".to_string()]
+    );
+}
+
+#[tokio::test]
 async fn component_states_nested_tree_mirrors_children() {
     let child = probe_component("worker").into_component();
     let parent = probe_component("api").with_child(child).into_component();
@@ -408,6 +522,46 @@ async fn force_stop_all_panicking_subject_still_reaches_the_rest() {
         1,
         "a panicking forced teardown must not abandon the remaining subjects"
     );
+}
+
+#[tokio::test]
+async fn stop_two_same_level_dependencies_each_stop_exactly_once() {
+    let dep_a = probe_dependency("dep-a");
+    let counts_a = dep_a.counts();
+    let dep_b = probe_dependency("dep-b");
+    let counts_b = dep_b.counts();
+    let mut a_match = Match::new(
+        "healthy",
+        vec![dep_a.into_dependency(), dep_b.into_dependency()],
+        vec![],
+    );
+    let (ctx, _recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    a_match.stop(&ctx).await.expect("match should stop");
+
+    assert_eq!(counts_a.stops(), 1);
+    assert_eq!(counts_b.stops(), 1);
+}
+
+#[tokio::test]
+async fn stop_two_same_level_components_each_stop_exactly_once() {
+    let comp_a = probe_component("comp-a");
+    let counts_a = comp_a.counts();
+    let comp_b = probe_component("comp-b");
+    let counts_b = comp_b.counts();
+    let mut a_match = Match::new(
+        "healthy",
+        vec![],
+        vec![comp_a.into_component(), comp_b.into_component()],
+    );
+    let (ctx, _recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    a_match.stop(&ctx).await.expect("match should stop");
+
+    assert_eq!(counts_a.stops(), 1);
+    assert_eq!(counts_b.stops(), 1);
 }
 
 #[tokio::test]

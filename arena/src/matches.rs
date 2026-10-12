@@ -5,11 +5,12 @@ use super::playbook::{ActivePlaybook, Playbook};
 use crate::lifecycle::message;
 use crate::lifecycle::{
     panic_message, ArenaLifecycleState, ComponentState, DependencyState, Fault, LifecycleContext,
-    Subject,
+    RunnableState, Subject,
 };
 use async_trait::async_trait;
 use futures::future::join_all;
-use futures::FutureExt;
+use futures::stream::FuturesUnordered;
+use futures::{FutureExt, StreamExt};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::time::Instant;
 use tracing::Instrument;
@@ -267,7 +268,7 @@ impl Match {
         ctx.transition(state, dependencies, components);
     }
 
-    async fn start_dependencies(&mut self) -> Vec<Fault> {
+    async fn start_dependencies(&mut self, ctx: &LifecycleContext) -> Vec<Fault> {
         let dep_count = self.dependencies.len();
         if dep_count > 0 {
             tracing::debug!(
@@ -280,52 +281,56 @@ impl Match {
         let sw_batch = Instant::now();
         let match_label = self.name.clone();
         let deps = std::mem::take(&mut self.dependencies);
+        let pending_ids: Vec<String> = deps.iter().map(|d| d.identifier().to_string()).collect();
 
-        let outcomes = join_all(deps.into_iter().enumerate().map(|(i, mut dep)| {
-            let match_label = match_label.clone();
-            async move {
-                let id = dep.identifier().to_string();
-                let span = dependency_span(&id);
+        let mut in_flight: FuturesUnordered<_> = deps
+            .into_iter()
+            .enumerate()
+            .map(|(i, mut dep)| {
+                let match_label = match_label.clone();
                 async move {
-                    let sw_one = Instant::now();
-                    let outcome = AssertUnwindSafe(dep.start()).catch_unwind().await;
-                    match &outcome {
-                        Ok(Err(fault)) => tracing::error!(
-                            match_name = %match_label,
-                            dependency = %id,
-                            reason = %fault_reason(fault),
-                            phase = "dependency_start_faulted",
-                            "dependency failed to start"
-                        ),
-                        Err(payload) => tracing::error!(
-                            match_name = %match_label,
-                            dependency = %id,
-                            panic_message = %panic_message(payload.as_ref()),
-                            phase = "dependency_start_panic",
-                            "dependency panicked while starting"
-                        ),
-                        Ok(Ok(())) => {}
+                    let id = dep.identifier().to_string();
+                    let span = dependency_span(&id);
+                    async move {
+                        let sw_one = Instant::now();
+                        let outcome = AssertUnwindSafe(dep.start()).catch_unwind().await;
+                        match &outcome {
+                            Ok(Err(fault)) => tracing::error!(
+                                match_name = %match_label,
+                                dependency = %id,
+                                reason = %fault_reason(fault),
+                                phase = "dependency_start_faulted",
+                                "dependency failed to start"
+                            ),
+                            Err(payload) => tracing::error!(
+                                match_name = %match_label,
+                                dependency = %id,
+                                panic_message = %panic_message(payload.as_ref()),
+                                phase = "dependency_start_panic",
+                                "dependency panicked while starting"
+                            ),
+                            Ok(Ok(())) => {}
+                        }
+                        if matches!(outcome, Ok(Ok(()))) {
+                            tracing::debug!(
+                                match_name = %match_label,
+                                dependency = %id,
+                                elapsed = ?sw_one.elapsed(),
+                                phase = "dependency_start_complete",
+                                "dependency started"
+                            );
+                        }
+                        (i, id, dep, outcome)
                     }
-                    if matches!(outcome, Ok(Ok(()))) {
-                        tracing::debug!(
-                            match_name = %match_label,
-                            dependency = %id,
-                            elapsed = ?sw_one.elapsed(),
-                            phase = "dependency_start_complete",
-                            "dependency started"
-                        );
-                    }
-                    (i, id, dep, outcome)
+                    .instrument(span)
+                    .await
                 }
-                .instrument(span)
-                .await
-            }
-        }))
-        .await;
+            })
+            .collect();
 
         let mut faults = Vec::new();
-        let mut started = Vec::with_capacity(dep_count);
-        for (i, id, dep, outcome) in outcomes {
+        let mut slots: Vec<Option<Dependency>> = (0..dep_count).map(|_| None).collect();
+        while let Some((i, id, dep, outcome)) = in_flight.next().await {
             match outcome {
                 Ok(Ok(())) => {}
                 Ok(Err(fault)) => faults.push(fault),
@@ -337,11 +342,23 @@ impl Match {
                     )),
                 ),
             }
-            started.push((i, dep));
+            slots[i] = Some(dep);
+
+            let progress: Vec<DependencyState> = slots
+                .iter()
+                .enumerate()
+                .map(|(j, slot)| match slot {
+                    Some(dep) => dependency_state(dep.as_ref()),
+                    None => DependencyState::new(pending_ids[j].clone(), RunnableState::NotStarted, Vec::new(), Vec::new(), Vec::new()),
+                })
+                .collect();
+            ctx.notify_progress(progress, self.component_states());
         }
 
-        started.sort_by_key(|(i, _)| *i);
-        self.dependencies = started.into_iter().map(|(_, dep)| dep).collect();
+        self.dependencies = slots
+            .into_iter()
+            .map(|slot| slot.expect("every dependency slot filled by its own future"))
+            .collect();
 
         if dep_count > 0 && faults.is_empty() {
             tracing::debug!(
@@ -447,7 +464,7 @@ impl Match {
         faults
     }
 
-    async fn start_components(&mut self) -> Vec<Fault> {
+    async fn start_components(&mut self, ctx: &LifecycleContext) -> Vec<Fault> {
         let comp_count = self.components.len();
         if comp_count > 0 {
             tracing::debug!(
@@ -460,52 +477,56 @@ impl Match {
         let sw_batch = Instant::now();
         let match_label = self.name.clone();
         let comps = std::mem::take(&mut self.components);
+        let pending_ids: Vec<String> = comps.iter().map(|c| c.identifier().to_string()).collect();
 
-        let outcomes = join_all(comps.into_iter().enumerate().map(|(i, mut comp)| {
-            let match_label = match_label.clone();
-            async move {
-                let id = comp.identifier().to_string();
-                let span = component_span(&id);
+        let mut in_flight: FuturesUnordered<_> = comps
+            .into_iter()
+            .enumerate()
+            .map(|(i, mut comp)| {
+                let match_label = match_label.clone();
                 async move {
-                    let sw_one = Instant::now();
-                    let outcome = AssertUnwindSafe(comp.start()).catch_unwind().await;
-                    match &outcome {
-                        Ok(Err(fault)) => tracing::error!(
-                            match_name = %match_label,
-                            component = %id,
-                            reason = %fault_reason(fault),
-                            phase = "component_start_faulted",
-                            "component failed to start"
-                        ),
-                        Err(payload) => tracing::error!(
-                            match_name = %match_label,
-                            component = %id,
-                            panic_message = %panic_message(payload.as_ref()),
-                            phase = "component_start_panic",
-                            "component panicked while starting"
-                        ),
-                        Ok(Ok(())) => {}
+                    let id = comp.identifier().to_string();
+                    let span = component_span(&id);
+                    async move {
+                        let sw_one = Instant::now();
+                        let outcome = AssertUnwindSafe(comp.start()).catch_unwind().await;
+                        match &outcome {
+                            Ok(Err(fault)) => tracing::error!(
+                                match_name = %match_label,
+                                component = %id,
+                                reason = %fault_reason(fault),
+                                phase = "component_start_faulted",
+                                "component failed to start"
+                            ),
+                            Err(payload) => tracing::error!(
+                                match_name = %match_label,
+                                component = %id,
+                                panic_message = %panic_message(payload.as_ref()),
+                                phase = "component_start_panic",
+                                "component panicked while starting"
+                            ),
+                            Ok(Ok(())) => {}
+                        }
+                        if matches!(outcome, Ok(Ok(()))) {
+                            tracing::debug!(
+                                match_name = %match_label,
+                                component = %id,
+                                elapsed = ?sw_one.elapsed(),
+                                phase = "component_start_complete",
+                                "component started"
+                            );
+                        }
+                        (i, id, comp, outcome)
                     }
-                    if matches!(outcome, Ok(Ok(()))) {
-                        tracing::debug!(
-                            match_name = %match_label,
-                            component = %id,
-                            elapsed = ?sw_one.elapsed(),
-                            phase = "component_start_complete",
-                            "component started"
-                        );
-                    }
-                    (i, id, comp, outcome)
+                    .instrument(span)
+                    .await
                 }
-                .instrument(span)
-                .await
-            }
-        }))
-        .await;
+            })
+            .collect();
 
         let mut faults = Vec::new();
-        let mut started = Vec::with_capacity(comp_count);
-        for (i, id, comp, outcome) in outcomes {
+        let mut slots: Vec<Option<Component>> = (0..comp_count).map(|_| None).collect();
+        while let Some((i, id, comp, outcome)) = in_flight.next().await {
             match outcome {
                 Ok(Ok(())) => {}
                 Ok(Err(fault)) => faults.push(fault),
@@ -517,11 +538,23 @@ impl Match {
                     )),
                 ),
             }
-            started.push((i, comp));
+            slots[i] = Some(comp);
+
+            let progress: Vec<ComponentState> = slots
+                .iter()
+                .enumerate()
+                .map(|(j, slot)| match slot {
+                    Some(comp) => component_state(comp.as_ref()),
+                    None => ComponentState::new(pending_ids[j].clone(), RunnableState::NotStarted, Vec::new(), Vec::new()),
+                })
+                .collect();
+            ctx.notify_progress(self.dependency_states(), progress);
         }
 
-        started.sort_by_key(|(i, _)| *i);
-        self.components = started.into_iter().map(|(_, comp)| comp).collect();
+        self.components = slots
+            .into_iter()
+            .map(|slot| slot.expect("every component slot filled by its own future"))
+            .collect();
 
         if comp_count > 0 && faults.is_empty() {
             tracing::debug!(
@@ -545,11 +578,39 @@ impl Match {
             "stopping components"
         );
         let sw_comps = Instant::now();
-        for comp in self.components.iter_mut().rev() {
-            if let Some(fault) = graceful_stop_component(comp).await {
+        let comps = std::mem::take(&mut self.components);
+        let comp_count = comps.len();
+        let pending_ids: Vec<String> = comps.iter().map(|c| c.identifier().to_string()).collect();
+        let pending_states: Vec<RunnableState> = comps.iter().map(|c| c.state()).collect();
+        let mut in_flight: FuturesUnordered<_> = comps
+            .into_iter()
+            .enumerate()
+            .map(|(i, mut comp)| async move {
+                let fault = graceful_stop_component(&mut comp).await;
+                (i, comp, fault)
+            })
+            .collect();
+        let mut slots: Vec<Option<Component>> = (0..comp_count).map(|_| None).collect();
+        while let Some((i, comp, fault)) = in_flight.next().await {
+            if let Some(fault) = fault {
                 faults.push(fault);
             }
+            slots[i] = Some(comp);
+
+            let progress: Vec<ComponentState> = slots
+                .iter()
+                .enumerate()
+                .map(|(j, slot)| match slot {
+                    Some(comp) => component_state(comp.as_ref()),
+                    None => ComponentState::new(pending_ids[j].clone(), pending_states[j], Vec::new(), Vec::new()),
+                })
+                .collect();
+            ctx.notify_progress(self.dependency_states(), progress);
         }
+        self.components = slots
+            .into_iter()
+            .map(|slot| slot.expect("every component slot filled by its own future"))
+            .collect();
         tracing::debug!(
             match_name = %self.name,
             elapsed = ?sw_comps.elapsed(),
@@ -568,11 +629,39 @@ impl Match {
             "stopping dependencies"
         );
         let sw_deps = Instant::now();
-        for dep in self.dependencies.iter_mut().rev() {
-            if let Some(fault) = graceful_stop_dependency(dep).await {
+        let deps = std::mem::take(&mut self.dependencies);
+        let dep_count = deps.len();
+        let pending_ids: Vec<String> = deps.iter().map(|d| d.identifier().to_string()).collect();
+        let pending_states: Vec<RunnableState> = deps.iter().map(|d| d.state()).collect();
+        let mut in_flight: FuturesUnordered<_> = deps
+            .into_iter()
+            .enumerate()
+            .map(|(i, mut dep)| async move {
+                let fault = graceful_stop_dependency(&mut dep).await;
+                (i, dep, fault)
+            })
+            .collect();
+        let mut slots: Vec<Option<Dependency>> = (0..dep_count).map(|_| None).collect();
+        while let Some((i, dep, fault)) = in_flight.next().await {
+            if let Some(fault) = fault {
                 faults.push(fault);
             }
+            slots[i] = Some(dep);
+
+            let progress: Vec<DependencyState> = slots
+                .iter()
+                .enumerate()
+                .map(|(j, slot)| match slot {
+                    Some(dep) => dependency_state(dep.as_ref()),
+                    None => DependencyState::new(pending_ids[j].clone(), pending_states[j], Vec::new(), Vec::new(), Vec::new()),
+                })
+                .collect();
+            ctx.notify_progress(progress, self.component_states());
         }
+        self.dependencies = slots
+            .into_iter()
+            .map(|slot| slot.expect("every dependency slot filled by its own future"))
+            .collect();
         tracing::debug!(
             match_name = %self.name,
             elapsed = ?sw_deps.elapsed(),
@@ -595,7 +684,7 @@ impl MatchTrait for Match {
         let sw = Instant::now();
 
         self.transition(ctx, ArenaLifecycleState::DependenciesStarting);
-        let mut faults = self.start_dependencies().await;
+        let mut faults = self.start_dependencies(ctx).await;
         if !faults.is_empty() {
             faults.extend(self.graceful_teardown(ctx).await);
             return Err(faults);
@@ -611,7 +700,7 @@ impl MatchTrait for Match {
         self.transition(ctx, ArenaLifecycleState::PlaybooksComplete);
 
         self.transition(ctx, ArenaLifecycleState::ComponentsStarting);
-        let mut faults = self.start_components().await;
+        let mut faults = self.start_components(ctx).await;
         if !faults.is_empty() {
             faults.extend(self.graceful_teardown(ctx).await);
             return Err(faults);

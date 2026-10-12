@@ -10,7 +10,7 @@ export interface LayoutNode {
   faults: Fault[];
   childCount: number;
   visible: boolean;
-  dependencyIds: string[];
+  componentIds: string[];
   depth: number;
 }
 
@@ -53,14 +53,11 @@ function walk(
       faults: subject.faults,
       childCount: subject.children.length,
       visible,
-      dependencyIds: subject.dependency_ids ?? [],
+      componentIds: subject.component_ids ?? [],
       depth,
     });
 
-    // Edge points from the nested child toward its structural parent: the
-    // child must be ready first, the parent waits on it - same "tip = the
-    // thing that waits" convention as the dependency mesh below.
-    if (depth > 0 && parentId) {
+    if (parentId) {
       edges.push({
         id: `edge:${id}`,
         source: id,
@@ -77,22 +74,6 @@ function walk(
   });
 }
 
-// Arena's lifecycle snapshot has no field recording which dependencies a
-// given component actually uses - ComponentState only has id/state/faults/
-// children. A real arena never sends dependency_ids, so no link is drawn at
-// all for it: that's more honest than guessing. A link is only drawn when a
-// subject explicitly declares dependency_ids (e.g. the demo script, for
-// illustration) - resolved by raw dependency id, tip at the component that
-// declared it (the component waits on its declared dependencies).
-//
-// Only top-level (depth 0) dependencies are resolvable targets: a nested
-// dependency (e.g. http-dep-2 under postgres) already has its own real
-// structural edge to its parent, so a component-level link must stop at
-// that parent rather than skip past it to reach the nested one directly.
-//
-// Positions are not computed here - ArenaGraph lays the tree out with
-// dagre (bottom-to-top: dependencies/children at the bottom, the
-// components/parents that wait on them above).
 export function computeLayout(state: ArenaState): Layout {
   const nodes: LayoutNode[] = [];
   const edges: LayoutEdge[] = [];
@@ -100,15 +81,13 @@ export function computeLayout(state: ArenaState): Layout {
   walk(state.dependencies, 0, null, "dependency", "root", nodes, edges);
   walk(state.components, 0, null, "component", "root", nodes, edges);
 
-  const depByRawId = new Map(
-    nodes.filter((n) => n.kind === "dependency" && n.depth === 0).map((n) => [n.label, n])
-  );
-  const comps = nodes.filter((n) => n.kind === "component");
+  const compByRawId = new Map(nodes.filter((n) => n.kind === "component").map((n) => [n.label, n]));
+  const deps = nodes.filter((n) => n.kind === "dependency");
 
-  comps.forEach((comp) => {
-    comp.dependencyIds.forEach((rawId) => {
-      const dep = depByRawId.get(rawId);
-      if (!dep) return;
+  deps.forEach((dep) => {
+    dep.componentIds.forEach((rawId) => {
+      const comp = compByRawId.get(rawId);
+      if (!comp) return;
       edges.push({
         id: `link:${dep.id}>${comp.id}`,
         source: dep.id,

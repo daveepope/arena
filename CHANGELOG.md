@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Flaky `dotnet-trace` unit and component tests wait on a busy-loop readiness marker instead of a fixed sleep
 - CI installs the .NET profiler and resolves it correctly on the dotnet-trace workflow
 - `requirements_windows.txt` for `examples` and `arena-pytest` regenerated to carry the same `pyjwt`/`urllib3` fixes as the other platform lockfiles
+- `arena-ffi`'s `HttpReadinessCheck` now requires a successful (2xx) status instead of treating any HTTP response, including 404/500, as ready
 
 ## [7.0.1]
 

@@ -42,6 +42,7 @@ arena-cryptography = { path = "arena-cryptography" }
 arena-host = { path = "arena-host" }
 arena-containerized-component = { path = "arena-containerized-component" }
 arena-profile = { path = "arena-profile" }
+arena-dashboard = { path = "arena-dashboard" }
 inferno = "0.12.8"
 runfiles = "0.2.0"
 arena-ffi = { path = "arena-ffi" }

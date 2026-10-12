@@ -222,100 +222,6 @@ def closed_arena() -> ClosedArena:
     mssql_startup_sql = [open(mssql_schema_path, encoding="utf-8").read()]
     oracle_startup_sql = [open(oracle_schema_path, encoding="utf-8").read()]
 
-    oauth = (
-        OauthDependencyBuilder(DEP_NAME_OAUTH)
-        .with_port(OAUTH_PORT)
-        .with_listen_ip("0.0.0.0")
-        .with_server_tls_pem(ca_pem, server_key_pem)
-        .with_metadata_base_url(OAUTH_ISSUER)
-        .build()
-    )
-    _OAUTH = oauth
-
-    postgres = (
-        PostgresDependencyBuilder(DEP_NAME_POSTGRES)
-        .with_container_name(POSTGRES_CONTAINER_NAME)
-        .with_image("14.20-trixie")
-        .with_port(POSTGRES_PORT)
-        .with_database_name(POSTGRES_DB_NAME)
-        .with_database_username(POSTGRES_DB_USER)
-        .with_database_password(POSTGRES_DB_PASS)
-        .with_startup_sql_scripts(startup_sql)
-        .build()
-    )
-
-    mssql = (
-        MssqlDependencyBuilder(DEP_NAME_MSSQL)
-        .with_container_name(MSSQL_CONTAINER_NAME)
-        .with_port(MSSQL_PORT)
-        .with_database_name(MSSQL_DB_NAME)
-        .with_database_username(MSSQL_DB_USER)
-        .with_database_password(MSSQL_DB_PASS)
-        .with_startup_sql_scripts(mssql_startup_sql)
-        .build()
-    )
-
-    oracle = (
-        OracleDependencyBuilder(DEP_NAME_ORACLE)
-        .with_container_name(ORACLE_CONTAINER_NAME)
-        .with_port(ORACLE_PORT)
-        .with_database_username(ORACLE_DB_USER)
-        .with_database_password(ORACLE_DB_PASS)
-        .with_admin_password(ORACLE_ADMIN_PASS)
-        .with_startup_sql_scripts(oracle_startup_sql)
-        # Oracle container start times are inconsistent across CI runners, so a longer timeout is required.
-        .with_sql_readiness_timeout(timedelta(minutes=2))
-        .build()
-    )
-
-    calibration = (
-        HttpDependencyBuilder(DEP_NAME_CALIBRATION_HTTP)
-        .with_container_name(CALIBRATION_CONTAINER_NAME)
-        .with_port(CALIBRATION_HOST_PORT)
-        .build()
-    )
-
-    temporal = (
-        TemporalDependencyBuilder(DEP_NAME_TEMPORAL)
-        .with_container_name(TEMPORAL_CONTAINER_NAME)
-        .with_image("1.8.0")
-        .with_port(TEMPORAL_GRPC_PORT)
-        .with_ui_port(TEMPORAL_UI_PORT)
-        .build()
-    )
-
-    smtp = (
-        SmtpDependencyBuilder(DEP_NAME_SMTP)
-        .with_container_name(SMTP_CONTAINER_NAME)
-        .with_port(SMTP_HOST_PORT)
-        .with_ui_port(SMTP_UI_PORT)
-        .with_starttls()
-        .build()
-    )
-
-    ls_id = f"ls-example-api-{uuid.uuid4().hex[:8]}"
-    localstack = (
-        LocalstackDependencyBuilder(ls_id)
-        .with_port(LOCALSTACK_HOST_PORT)
-        .with_services(["sqs", "events"])
-        .with_queue(QUEUE_NAME)
-        .with_event_bus(EVENT_BUS_NAME)
-        .with_event_rule(
-            EventRuleSpec(
-                name=EVENT_RULE_NAME,
-                event_bus=EVENT_BUS_NAME,
-                event_pattern=json.dumps({"source": [EVENT_SOURCE]}),
-                targets=[
-                    EventRuleTarget(
-                        target_id="target-queue",
-                        kind=SqsQueueTarget(queue_name=QUEUE_NAME),
-                    ),
-                ],
-            )
-        )
-        .build()
-    )
-
     exe = _find_fastapi_executable()
     if not exe:
         pytest.fail(
@@ -330,7 +236,7 @@ def closed_arena() -> ClosedArena:
     )
     ls_ep = f"http://127.0.0.1:{LOCALSTACK_HOST_PORT}"
 
-    fastapi_component_builder = (
+    fastapi_component = (
         ExecutableComponentBuilder(COMPONENT_NAME_EXECUTABLE)
         .with_executable_path(exe)
         .with_build_tool(BuildTool.PYTHON)
@@ -354,18 +260,110 @@ def closed_arena() -> ClosedArena:
         .with_readiness_check(
             HttpReadinessCheck.create(), f"http://127.0.0.1:{WEB_APP_PORT}/health", 30_000
         )
+        .build()
     )
-    if os.environ.get("ARENA_VISUALIZE") == "1":
-        profile_output = os.path.join(
-            tempfile.gettempdir(), f"arena-cpu-profile-{uuid.uuid4().hex[:8]}.html"
+
+    oauth = (
+        OauthDependencyBuilder(DEP_NAME_OAUTH)
+        .with_port(OAUTH_PORT)
+        .with_listen_ip("0.0.0.0")
+        .with_server_tls_pem(ca_pem, server_key_pem)
+        .with_metadata_base_url(OAUTH_ISSUER)
+        .with_component_id(fastapi_component.identifier)
+        .build()
+    )
+    _OAUTH = oauth
+
+    postgres = (
+        PostgresDependencyBuilder(DEP_NAME_POSTGRES)
+        .with_container_name(POSTGRES_CONTAINER_NAME)
+        .with_image("14.20-trixie")
+        .with_port(POSTGRES_PORT)
+        .with_database_name(POSTGRES_DB_NAME)
+        .with_database_username(POSTGRES_DB_USER)
+        .with_database_password(POSTGRES_DB_PASS)
+        .with_startup_sql_scripts(startup_sql)
+        .with_component_id(fastapi_component.identifier)
+        .build()
+    )
+
+    mssql = (
+        MssqlDependencyBuilder(DEP_NAME_MSSQL)
+        .with_container_name(MSSQL_CONTAINER_NAME)
+        .with_port(MSSQL_PORT)
+        .with_database_name(MSSQL_DB_NAME)
+        .with_database_username(MSSQL_DB_USER)
+        .with_database_password(MSSQL_DB_PASS)
+        .with_startup_sql_scripts(mssql_startup_sql)
+        .with_component_id(fastapi_component.identifier)
+        .build()
+    )
+
+    oracle = (
+        OracleDependencyBuilder(DEP_NAME_ORACLE)
+        .with_container_name(ORACLE_CONTAINER_NAME)
+        .with_port(ORACLE_PORT)
+        .with_database_username(ORACLE_DB_USER)
+        .with_database_password(ORACLE_DB_PASS)
+        .with_admin_password(ORACLE_ADMIN_PASS)
+        .with_startup_sql_scripts(oracle_startup_sql)
+        # Oracle container start times are inconsistent across CI runners, so a longer timeout is required.
+        .with_sql_readiness_timeout(timedelta(minutes=2))
+        .with_component_id(fastapi_component.identifier)
+        .build()
+    )
+
+    calibration = (
+        HttpDependencyBuilder(DEP_NAME_CALIBRATION_HTTP)
+        .with_container_name(CALIBRATION_CONTAINER_NAME)
+        .with_port(CALIBRATION_HOST_PORT)
+        .with_component_id(fastapi_component.identifier)
+        .build()
+    )
+
+    temporal = (
+        TemporalDependencyBuilder(DEP_NAME_TEMPORAL)
+        .with_container_name(TEMPORAL_CONTAINER_NAME)
+        .with_image("1.8.0")
+        .with_port(TEMPORAL_GRPC_PORT)
+        .with_ui_port(TEMPORAL_UI_PORT)
+        .with_component_id(fastapi_component.identifier)
+        .build()
+    )
+
+    smtp = (
+        SmtpDependencyBuilder(DEP_NAME_SMTP)
+        .with_container_name(SMTP_CONTAINER_NAME)
+        .with_port(SMTP_HOST_PORT)
+        .with_ui_port(SMTP_UI_PORT)
+        .with_starttls()
+        .with_component_id(fastapi_component.identifier)
+        .build()
+    )
+
+    ls_id = f"ls-example-api-{uuid.uuid4().hex[:8]}"
+    localstack = (
+        LocalstackDependencyBuilder(ls_id)
+        .with_port(LOCALSTACK_HOST_PORT)
+        .with_services(["sqs", "events"])
+        .with_queue(QUEUE_NAME)
+        .with_event_bus(EVENT_BUS_NAME)
+        .with_event_rule(
+            EventRuleSpec(
+                name=EVENT_RULE_NAME,
+                event_bus=EVENT_BUS_NAME,
+                event_pattern=json.dumps({"source": [EVENT_SOURCE]}),
+                targets=[
+                    EventRuleTarget(
+                        target_id="target-queue",
+                        kind=SqsQueueTarget(queue_name=QUEUE_NAME),
+                    ),
+                ],
+            )
         )
-        fastapi_component_builder = (
-            fastapi_component_builder
-            .with_cpu_profile(profile_output)
-            .with_cpu_profile_auto_open()
-            .with_hotspots()
-        )
-    fastapi_component = fastapi_component_builder.build()
+        .with_component_id(fastapi_component.identifier)
+        .build()
+    )
 
     a_match = (
         MatchBuilder(MATCH_NAME)
@@ -394,12 +392,15 @@ def closed_arena() -> ClosedArena:
         .build()
     )
 
-    return ClosedArena(
+    closed = ClosedArena(
         CLOSED_ARENA_NAME,
         [a_match],
         log_level=ArenaLogLevel.INFO,
         logger=_LOG
     )
+    if os.environ.get("ARENA_VISUALIZE") == "1":
+        closed = closed.with_lifecycle_dashboard()
+    return closed
 
 
 @pytest.fixture(scope="session")

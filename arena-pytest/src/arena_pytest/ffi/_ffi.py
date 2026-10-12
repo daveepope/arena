@@ -520,6 +520,16 @@ def load_ffi() -> Optional[ArenaNativeLib]:
     lib.arena_remove_lifecycle_observer.argtypes = [ctypes.c_uint64]
     lib.arena_remove_lifecycle_observer.restype = None
 
+    lib.arena_dashboard_ensure_running.argtypes = [
+        ctypes.c_uint16,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    lib.arena_dashboard_ensure_running.restype = ctypes.c_void_p
+
+    lib.arena_register_dashboard_observer.argtypes = [ctypes.c_char_p]
+    lib.arena_register_dashboard_observer.restype = ctypes.c_uint64
+
     lib.arena_soft_reset.argtypes = [
         ctypes.c_void_p,
         ctypes.c_char_p,
@@ -755,6 +765,30 @@ def unregister_lifecycle_observer(ffi: ArenaNativeLib, token: int) -> None:
     if closure is None:
         return
     ffi.lib.arena_remove_lifecycle_observer(ctypes.c_uint64(token))
+
+
+def dashboard_ensure_running(
+    ffi: ArenaNativeLib, port: int, search_dir: Optional[str] = None
+) -> str:
+    err = ctypes.c_void_p()
+    search_dir_bytes = search_dir.encode("utf-8") if search_dir else None
+    raw = ffi.lib.arena_dashboard_ensure_running(port, search_dir_bytes, ctypes.byref(err))
+    if not raw:
+        message = _take_out_string(err, ffi) or "arena_dashboard_ensure_running failed"
+        raise ArenaBindingError(message)
+    url = ctypes.string_at(raw).decode("utf-8")
+    ffi.lib.arena_free_string(raw)
+    return url
+
+
+def register_dashboard_observer(ffi: ArenaNativeLib, dashboard_url: str) -> int:
+    token = int(
+        ffi.lib.arena_register_dashboard_observer(dashboard_url.encode("utf-8"))
+    )
+    if token == 0:
+        raise ArenaBindingError("arena_register_dashboard_observer rejected url")
+    _lifecycle_observers[token] = True
+    return token
 
 
 def _reset(

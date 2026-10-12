@@ -24,6 +24,7 @@ public sealed class MssqlDependency : IArenaDependency
     public string? Image { get; }
     public string? ContainerName { get; }
     public IReadOnlyList<string> StartupSqlScripts { get; }
+    public IReadOnlyList<string> ComponentIds { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
     private readonly IReadOnlyList<IArenaDependency> _children;
@@ -39,6 +40,7 @@ public sealed class MssqlDependency : IArenaDependency
         string? image,
         string? containerName,
         IReadOnlyList<string> startupSqlScripts,
+        IReadOnlyList<string> componentIds,
         IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
@@ -51,6 +53,7 @@ public sealed class MssqlDependency : IArenaDependency
         Image = image;
         ContainerName = containerName;
         StartupSqlScripts = startupSqlScripts;
+        ComponentIds = componentIds;
         _children = children;
     }
 
@@ -73,6 +76,7 @@ public sealed class MssqlDependencyBuilder
     private string? _image;
     private string? _containerName;
     private readonly List<string> _startupSqlScripts = new();
+    private readonly List<string> _componentIds = new();
     private readonly List<IArenaDependency> _children = new();
 
     public MssqlDependencyBuilder(string name)
@@ -134,6 +138,12 @@ public sealed class MssqlDependencyBuilder
         return this;
     }
 
+    public MssqlDependencyBuilder WithComponentId(string componentId)
+    {
+        _componentIds.Add(componentId);
+        return this;
+    }
+
     public MssqlDependencyBuilder AddChildDependency(IArenaDependency child)
     {
         _children.Add(child);
@@ -155,7 +165,7 @@ public sealed class MssqlDependencyBuilder
     public MssqlDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-mssql", _name);
-        var built = new MssqlDependency(identifier, _port, _encryption, _databaseName, _databaseUsername, _databasePassword, _imageName, _image, _containerName, _startupSqlScripts, _children);
+        var built = new MssqlDependency(identifier, _port, _encryption, _databaseName, _databaseUsername, _databasePassword, _imageName, _image, _containerName, _startupSqlScripts, _componentIds, _children);
         built.ExpirySeconds = _expirySeconds;
         return built;
     }

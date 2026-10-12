@@ -14,28 +14,44 @@ import {
 } from "@xyflow/react";
 
 import { ArenaEdge, type ArenaEdgeData } from "./ArenaEdge";
-import { dagreLayout } from "./dagreLayout";
+import { dagreLayout, estimateNodeWidth } from "./dagreLayout";
 import { computeLayout, type LayoutNode } from "./layout";
-import { arenaClasses, formatDetail, nodeClasses } from "./presentation";
+import { arenaClasses, formatDetail, isActiveState, nodeClasses } from "./presentation";
 import { useDashboardStore } from "./store";
 
 const edgeTypes = { arena: ArenaEdge };
 
 const HIDDEN_HANDLE_STYLE = { opacity: 0, width: 1, height: 1, border: "none" };
 
+const PULSE_DURATION_MS = 2000;
+const PULSE_SOFT_DURATION_MS = 2400;
+
+function syncedAnimationDelay(durationMs: number): string {
+  return `-${Date.now() % durationMs}ms`;
+}
+
+function pulseStyle(isPulsing: boolean, isStrongPulse: boolean): Record<string, unknown> {
+  if (!isPulsing) return {};
+  return { animationDelay: syncedAnimationDelay(isStrongPulse ? PULSE_DURATION_MS : PULSE_SOFT_DURATION_MS) };
+}
+
 function ArenaNode({ data }: NodeProps) {
   const node = data as unknown as LayoutNode;
   const select = useDashboardStore((s) => s.select);
+  const hasFaults = node.faults.length > 0;
+  const isPulsing = hasFaults || isActiveState(node.state);
 
   return (
     <div
-      className={`flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-full border-2 text-center text-[11px] transition-all duration-300 ${
+      style={{ width: estimateNodeWidth(node.label), ...pulseStyle(isPulsing, hasFaults) }}
+      className={`flex min-h-[70px] cursor-pointer flex-col items-center justify-center gap-0.5 break-words rounded-xl border-2 px-3 py-2 text-center text-[11px] transition-all duration-300 ${
         node.visible ? "scale-100 opacity-100" : "pointer-events-none scale-[0.3] opacity-0"
-      } ${nodeClasses(node.state)}`}
-      onClick={() =>
+      } ${nodeClasses(node.kind, node.state, hasFaults)}`}
+      onClick={(e) =>
         select({
           title: node.label,
           detail: formatDetail(node.label, node.kind, node.state, node.faults, node.childCount),
+          position: { x: e.clientX, y: e.clientY },
         })
       }
     >
@@ -88,7 +104,7 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
   }, [snapshot, setNodes, setEdges]);
 
   return (
-    <div className="h-[480px] w-full overflow-hidden rounded-md bg-neutral-950">
+    <div className="h-[480px] w-full overflow-hidden rounded-md bg-[#0e1330]">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -99,11 +115,11 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
         fitView
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#2a2a2a" gap={24} />
+        <Background color="#232a4f" gap={24} />
         <Panel position="top-left">
           <button
             type="button"
-            onClick={() =>
+            onClick={(e) =>
               snapshot &&
               select({
                 title: `${snapshot.id} — state: ${snapshot.state}`,
@@ -114,10 +130,12 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
                   snapshot.faults,
                   snapshot.dependencies.length + snapshot.components.length
                 ),
+                position: { x: e.clientX, y: e.clientY },
               })
             }
-            className={`rounded-md border px-3 py-1.5 text-xs uppercase tracking-wide ${
-              snapshot ? arenaClasses(snapshot.state) : "border-neutral-700 text-neutral-500"
+            style={snapshot ? pulseStyle(true, snapshot.state === "arena_faulted") : {}}
+            className={`cursor-pointer rounded-md border px-3 py-1.5 text-xs uppercase tracking-wide ${
+              snapshot ? arenaClasses(snapshot.state) : "border-slate-700 text-slate-500"
             }`}
           >
             {snapshot ? `${snapshot.id} — state: ${snapshot.state}` : "waiting for events..."}

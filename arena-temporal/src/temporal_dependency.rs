@@ -45,6 +45,7 @@ pub struct TemporalDependency {
     readiness_check: Box<dyn ReadinessCheck>,
     state: RunnableState,
     faults: Vec<Fault>,
+    component_ids: Vec<String>,
 }
 
 impl TemporalDependency {
@@ -58,6 +59,7 @@ impl TemporalDependency {
         image_name: String,
         image_tag: String,
         container_name: Option<String>,
+        component_ids: Vec<String>,
     ) -> Self {
         Self {
             identifier,
@@ -74,6 +76,7 @@ impl TemporalDependency {
             readiness_check: Box::new(DefaultTemporalReadinessCheck),
             state: RunnableState::NotStarted,
             faults: Vec::new(),
+            component_ids,
         }
     }
 
@@ -321,6 +324,10 @@ impl RunnableDependency for TemporalDependency {
 
     fn children(&self) -> &[Dependency] {
         self.dependencies.as_deref().unwrap_or(&[])
+    }
+
+    fn component_ids(&self) -> &[String] {
+        &self.component_ids
     }
 
     fn children_mut(&mut self) -> &mut [Dependency] {

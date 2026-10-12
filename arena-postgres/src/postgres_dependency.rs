@@ -35,6 +35,7 @@ pub struct PostgresDependency {
     managed_tables: Vec<(String, String)>,
     state: RunnableState,
     faults: Vec<Fault>,
+    component_ids: Vec<String>,
 }
 
 impl PostgresDependency {
@@ -50,6 +51,7 @@ impl PostgresDependency {
         image_name: String,
         image_tag: String,
         container_name: Option<String>,
+        component_ids: Vec<String>,
     ) -> Self {
         Self {
             identifier,
@@ -70,6 +72,7 @@ impl PostgresDependency {
             managed_tables: Vec::new(),
             state: RunnableState::NotStarted,
             faults: Vec::new(),
+            component_ids,
         }
     }
 
@@ -353,6 +356,10 @@ impl RunnableDependency for PostgresDependency {
 
     fn add_child(&mut self, dep: Box<dyn RunnableDependency>) {
         self.dependencies.get_or_insert_with(Vec::new).push(dep);
+    }
+
+    fn component_ids(&self) -> &[String] {
+        &self.component_ids
     }
 
     fn children(&self) -> &[Dependency] {

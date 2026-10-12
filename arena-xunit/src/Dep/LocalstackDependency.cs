@@ -139,6 +139,7 @@ public sealed class LocalstackDependency : IArenaDependency
     private readonly string? _imageName;
     private readonly string? _imageTag;
     private readonly string? _containerName;
+    private readonly List<string> _componentIds;
     private readonly List<IArenaDependency> _children;
 
     internal LocalstackDependency(
@@ -152,6 +153,7 @@ public sealed class LocalstackDependency : IArenaDependency
         string? imageName,
         string? imageTag,
         string? containerName,
+        List<string> componentIds,
         List<IArenaDependency> children)
     {
         Identifier = identifier;
@@ -165,6 +167,7 @@ public sealed class LocalstackDependency : IArenaDependency
         _imageName = imageName;
         _imageTag = imageTag;
         _containerName = containerName;
+        _componentIds = componentIds;
         _children = children;
     }
 
@@ -208,6 +211,7 @@ public sealed class LocalstackDependency : IArenaDependency
         if (!string.IsNullOrEmpty(_imageName)) config.ImageName = _imageName;
         if (!string.IsNullOrEmpty(_imageTag)) config.ImageTag = _imageTag;
         if (!string.IsNullOrEmpty(_containerName)) config.ContainerName = _containerName;
+        if (_componentIds.Count > 0) config.ComponentIds = _componentIds;
         config.Children = ChildrenWireFormat.Build(_children);
 
         return ArenaJson.Serialize(config);
@@ -228,6 +232,7 @@ public sealed class LocalstackDependency : IArenaDependency
         [JsonProperty("image_name")] public string? ImageName { get; set; }
         [JsonProperty("image_tag")] public string? ImageTag { get; set; }
         [JsonProperty("container_name")] public string? ContainerName { get; set; }
+        [JsonProperty("component_ids")] public List<string>? ComponentIds { get; set; }
         [JsonProperty("children")] public List<JToken>? Children { get; set; }
     }
 }
@@ -245,6 +250,7 @@ public sealed class LocalstackDependencyBuilder
     private string? _imageName;
     private string? _imageTag;
     private string? _containerName;
+    private readonly List<string> _componentIds = new();
     private readonly List<IArenaDependency> _children = new();
 
     public LocalstackDependencyBuilder(string name)
@@ -301,6 +307,12 @@ public sealed class LocalstackDependencyBuilder
     public LocalstackDependencyBuilder WithEventRule(EventRuleSpec spec)
     {
         _eventRules.Add(spec);
+        return this;
+    }
+
+    public LocalstackDependencyBuilder WithComponentId(string componentId)
+    {
+        _componentIds.Add(componentId);
         return this;
     }
 
@@ -389,6 +401,7 @@ public sealed class LocalstackDependencyBuilder
             _imageName,
             _imageTag,
             _containerName,
+            new List<string>(_componentIds),
             _children);
         built.ExpirySeconds = _expirySeconds;
         return built;

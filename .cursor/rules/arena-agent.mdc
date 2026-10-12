@@ -42,6 +42,7 @@ alwaysApply: true
 - Do not leak **implementation details** in public Rust surface area: exported types, traits, inherent methods, builder methods, and user-visible panic or error strings. Callers should not need to know which concrete tool backs a dependency so implementations can be swapped without breaking the public API.
 - Prefer **neutral names** in public identifiers, consistent with the naming rules above.
 - **Default container image** registry strings may still name upstream images; that is a default, not a Rust identifier you control—prefer neutral names in code that refers to them.
+- **No environment variables in Arena code** (Rust, FFI, or client libraries), for ports or anything else. All configuration—ports, URLs, toggles—is **code-driven**: passed explicitly through builder methods, not read from `std::env`/`os.environ` inside Arena itself. A caller's own test or application code may read its own environment variables and pass the result into a builder; that is the caller's choice, not Arena's.
 
 ## Comments and documentation
 

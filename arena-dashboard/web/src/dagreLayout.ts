@@ -2,7 +2,14 @@ import dagre from "dagre";
 
 import type { LayoutEdge, LayoutNode } from "./layout";
 
-const NODE_SIZE = 90;
+const MIN_NODE_WIDTH = 100;
+const MAX_NODE_WIDTH = 220;
+const NODE_HEIGHT = 70;
+const CHAR_WIDTH_PX = 7;
+
+export function estimateNodeWidth(label: string): number {
+  return Math.min(MAX_NODE_WIDTH, Math.max(MIN_NODE_WIDTH, label.length * CHAR_WIDTH_PX));
+}
 
 // Ported from xyflow's own official "Layouting" example
 // (examples/react/src/examples/Layouting/index.tsx in xyflow/xyflow) - the
@@ -16,7 +23,7 @@ export function dagreLayout(nodes: LayoutNode[], edges: LayoutEdge[]): Map<strin
   g.setGraph({ rankdir: "BT", nodesep: 60, ranksep: 90 });
 
   nodes.forEach((n) => {
-    g.setNode(n.id, { width: NODE_SIZE, height: NODE_SIZE });
+    g.setNode(n.id, { width: estimateNodeWidth(n.label), height: NODE_HEIGHT });
   });
   edges.forEach((e) => {
     g.setEdge(e.source, e.target);

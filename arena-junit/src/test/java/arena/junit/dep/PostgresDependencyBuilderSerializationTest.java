@@ -79,4 +79,18 @@ final class PostgresDependencyBuilderSerializationTest {
     PostgresDependency dep = new PostgresDependencyBuilder("pg").build();
     assertTrue(dep.identifier().startsWith("arena-postgres-pg-"));
   }
+
+  @Test
+  void withComponentId_repeatable_serializesComponentIdsArray() {
+    ObjectNode config =
+        new PostgresDependencyBuilder("pg")
+            .withComponentId("service-a")
+            .withComponentId("service-b")
+            .build()
+            .forFfi();
+    ArrayNode componentIds = (ArrayNode) config.path("component_ids");
+    assertEquals(2, componentIds.size());
+    assertEquals("service-a", componentIds.get(0).asText());
+    assertEquals("service-b", componentIds.get(1).asText());
+  }
 }

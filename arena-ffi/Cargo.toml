@@ -131,6 +131,14 @@ name = "ffi_lifecycle_observer_test"
 path = "tests/unit/lifecycle_observer_test.rs"
 
 [[test]]
+name = "ffi_dashboard_test"
+path = "tests/unit/dashboard_test.rs"
+
+[[test]]
+name = "ffi_dashboard_component_test"
+path = "tests/component/dashboard/dashboard_component_test.rs"
+
+[[test]]
 name = "ffi_temporal_dependency_test"
 path = "tests/unit/dependency/temporal/temporal_dependency_test.rs"
 
@@ -141,6 +149,7 @@ path = "tests/unit/dependency/smtp/smtp_dependency_test.rs"
 [dependencies]
 arc-swap = { workspace = true }
 arena = { workspace = true }
+arena-dashboard = { workspace = true }
 arena-http = { workspace = true }
 async-trait = { workspace = true }
 arena-containerized-component = { workspace = true }
@@ -161,3 +170,6 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "time", "net"] }
+
+[dev-dependencies]
+axum = { workspace = true, features = ["macros", "json"] }

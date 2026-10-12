@@ -62,6 +62,7 @@ pub struct ProbeDependency {
     behaviour: Behaviour,
     counts: Arc<CallCounts>,
     order: Arc<Mutex<Vec<String>>>,
+    component_ids: Vec<String>,
 }
 
 pub fn probe_dependency(identifier: &str) -> ProbeDependency {
@@ -73,6 +74,7 @@ pub fn probe_dependency(identifier: &str) -> ProbeDependency {
         behaviour: Behaviour::Healthy,
         counts: Arc::new(CallCounts::default()),
         order: Arc::new(Mutex::new(Vec::new())),
+        component_ids: Vec::new(),
     }
 }
 
@@ -89,6 +91,11 @@ impl ProbeDependency {
 
     pub fn with_child(mut self, child: Dependency) -> Self {
         self.children.push(child);
+        self
+    }
+
+    pub fn with_component_id(mut self, component_id: impl Into<String>) -> Self {
+        self.component_ids.push(component_id.into());
         self
     }
 
@@ -237,6 +244,10 @@ impl RunnableDependency for ProbeDependency {
 
     fn children_mut(&mut self) -> &mut [Dependency] {
         &mut self.children
+    }
+
+    fn component_ids(&self) -> &[String] {
+        &self.component_ids
     }
 
     async fn soft_reset(&self) -> Result<(), Fault> {

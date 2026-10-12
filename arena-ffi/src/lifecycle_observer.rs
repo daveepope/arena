@@ -59,6 +59,23 @@ pub(crate) fn registered_observers() -> Vec<Arc<dyn ArenaLifecycleObserver>> {
         .collect()
 }
 
+fn insert_observer(token: u64, recipient: Arc<dyn ArenaLifecycleObserver>) {
+    REGISTERED_OBSERVERS.rcu(|current| {
+        let mut next = (**current).clone();
+        next.push(RegisteredObserver {
+            token,
+            recipient: Arc::clone(&recipient),
+        });
+        next
+    });
+}
+
+pub(crate) fn register_observer(recipient: Arc<dyn ArenaLifecycleObserver>) -> u64 {
+    let token = NEXT_OBSERVER_TOKEN.fetch_add(1, Ordering::Relaxed);
+    insert_observer(token, recipient);
+    token
+}
+
 #[no_mangle]
 pub extern "C" fn arena_add_lifecycle_observer(
     callback: Option<ArenaLifecycleCallback>,
@@ -75,14 +92,7 @@ pub extern "C" fn arena_add_lifecycle_observer(
             func: callback,
             binding: binding as *mut c_void,
         });
-        REGISTERED_OBSERVERS.rcu(|current| {
-            let mut next = (**current).clone();
-            next.push(RegisteredObserver {
-                token,
-                recipient: Arc::clone(&recipient),
-            });
-            next
-        });
+        insert_observer(token, recipient);
         token
     })
     .unwrap_or(0)

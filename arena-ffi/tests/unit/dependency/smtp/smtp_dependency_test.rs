@@ -10,6 +10,7 @@ fn minimal_smtp_config() -> SmtpDependencyConfig {
         ui_port: None,
         container_name: None,
         tls_mode: None,
+        component_ids: Vec::new(),
     }
 }
 

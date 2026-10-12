@@ -1,5 +1,5 @@
 {
-  "checksum": "3db19b6c77ee239cdf8ddca08c0b2ebed5b7daafc7085443b71a06ce18796064",
+  "checksum": "64e92c3de1aad2b4a2333d91547bec7f03f2a87dff8c3ef72b206e9b0d7c898b",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -1169,6 +1169,10 @@
               "target": "futures"
             },
             {
+              "id": "rand 0.8.6",
+              "target": "rand"
+            },
+            {
               "id": "reqwest 0.12.28",
               "target": "reqwest"
             },
@@ -1191,11 +1195,24 @@
             {
               "id": "tower-http 0.6.8",
               "target": "tower_http"
+            },
+            {
+              "id": "tracing 0.1.44",
+              "target": "tracing"
             }
           ],
           "selects": {}
         },
         "edition": "2021",
+        "proc_macro_deps": {
+          "common": [
+            {
+              "id": "async-trait 0.1.89",
+              "target": "async_trait"
+            }
+          ],
+          "selects": {}
+        },
         "version": "7.1.0"
       },
       "license": "todo",
@@ -1445,6 +1462,15 @@
             {
               "id": "tracing-subscriber 0.3.23",
               "target": "tracing_subscriber"
+            }
+          ],
+          "selects": {}
+        },
+        "deps_dev": {
+          "common": [
+            {
+              "id": "axum 0.8.9",
+              "target": "axum"
             }
           ],
           "selects": {}

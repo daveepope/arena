@@ -670,6 +670,7 @@ py_test(
         "tests/pytest-shared",
     ],
     data = [
+        "//arena-dashboard:server",
         "//arena-ffi:arena_ffi_shared",
         "//examples:example-readings-fastapi-web-app",
         "//examples:instrument_reading_db_schema",

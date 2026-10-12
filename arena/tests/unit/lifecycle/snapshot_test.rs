@@ -4,7 +4,7 @@ use arena::lifecycle::{
 };
 
 fn dependency(id: &str, state: RunnableState, faults: Vec<Fault>) -> DependencyState {
-    DependencyState::new(id, state, faults, Vec::new())
+    DependencyState::new(id, state, faults, Vec::new(), Vec::new())
 }
 
 fn component(id: &str, state: RunnableState, faults: Vec<Fault>) -> ComponentState {
@@ -19,7 +19,7 @@ fn stamped(mut fault: Fault, millis: i64) -> Fault {
 #[test]
 fn has_faulted_subject_faulted_child_returns_true() {
     let child = dependency("child", RunnableState::Faulted, Vec::new());
-    let parent = DependencyState::new("parent", RunnableState::Stopped, Vec::new(), vec![child]);
+    let parent = DependencyState::new("parent", RunnableState::Stopped, Vec::new(), vec![child], Vec::new());
 
     let state = ArenaState::new(
         "test-arena",
@@ -124,14 +124,16 @@ fn aggregate_faults_nested_children_collects_every_level() {
         RunnableState::Stopped,
         vec![stamped(Fault::dependency("grandchild", "deep"), 1_000)],
         Vec::new(),
+        Vec::new(),
     );
     let child = DependencyState::new(
         "child",
         RunnableState::Stopped,
         vec![stamped(Fault::dependency("child", "middle"), 2_000)],
         vec![grandchild],
+        Vec::new(),
     );
-    let parent = DependencyState::new("parent", RunnableState::Stopped, Vec::new(), vec![child]);
+    let parent = DependencyState::new("parent", RunnableState::Stopped, Vec::new(), vec![child], Vec::new());
 
     let faults = aggregate_faults(&[parent], &[], Vec::new());
 
@@ -140,14 +142,15 @@ fn aggregate_faults_nested_children_collects_every_level() {
 
 #[test]
 fn dependency_nested_identifier_returns_grandchild() {
-    let grandchild = DependencyState::new("grandchild", RunnableState::Stopped, Vec::new(), Vec::new());
+    let grandchild = DependencyState::new("grandchild", RunnableState::Stopped, Vec::new(), Vec::new(), Vec::new());
     let child = DependencyState::new(
         "child",
         RunnableState::Stopped,
         Vec::new(),
         vec![grandchild],
+        Vec::new(),
     );
-    let parent = DependencyState::new("parent", RunnableState::Stopped, Vec::new(), vec![child]);
+    let parent = DependencyState::new("parent", RunnableState::Stopped, Vec::new(), vec![child], Vec::new());
 
     let state = ArenaState::new(
         "test-arena",
@@ -208,12 +211,14 @@ fn display_nested_children_indents_each_level() {
         RunnableState::Stopped,
         Vec::new(),
         Vec::new(),
+        Vec::new(),
     );
     let parent = DependencyState::new(
         "postgres-1",
         RunnableState::Faulted,
         Vec::new(),
         vec![child],
+        Vec::new(),
     );
     let state = ArenaState::new(
         "test-arena",
@@ -289,12 +294,13 @@ fn serialize_state_at_returns_the_display_timestamp() {
 
 #[test]
 fn serialize_nested_children_returns_the_full_tree() {
-    let grandchild = DependencyState::new("seed", RunnableState::Stopped, Vec::new(), Vec::new());
+    let grandchild = DependencyState::new("seed", RunnableState::Stopped, Vec::new(), Vec::new(), Vec::new());
     let child = DependencyState::new(
         "postgres-1",
         RunnableState::Stopped,
         Vec::new(),
         vec![grandchild],
+        Vec::new(),
     );
     let state = ArenaState::new(
         "test-arena",

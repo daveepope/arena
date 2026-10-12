@@ -17,6 +17,7 @@ pub struct SmtpDependencyBuilder {
     network: Option<String>,
     tls_mode: Option<SmtpTlsMode>,
     readiness_check: Option<Box<dyn ReadinessCheck>>,
+    component_ids: Vec<String>,
 }
 
 impl SmtpDependencyBuilder {
@@ -37,6 +38,7 @@ impl SmtpDependencyBuilder {
             network: None,
             tls_mode: None,
             readiness_check: None,
+            component_ids: Vec::new(),
         }
     }
 
@@ -122,6 +124,11 @@ impl SmtpDependencyBuilder {
         self
     }
 
+    pub fn with_component_id(mut self, component_id: impl Into<String>) -> Self {
+        self.component_ids.push(component_id.into());
+        self
+    }
+
     pub fn build(self) -> SmtpDependency {
         let mut smtp_impl = self
             .smtp_impl
@@ -147,6 +154,7 @@ impl SmtpDependencyBuilder {
             image_tag,
             self.container_name,
             self.tls_mode,
+            self.component_ids,
         );
 
         if let Some(check) = self.readiness_check {

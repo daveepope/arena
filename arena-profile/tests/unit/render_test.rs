@@ -1,7 +1,4 @@
 use arena_profile::render::{html_escape, is_wsl, render_folded_to_html, top_hotspots, RenderError, Severity};
-use std::sync::Mutex;
-
-static WSL_DISTRO_NAME_ENV_LOCK: Mutex<()> = Mutex::new(());
 
 fn temp_html_path(name: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("arena-profile-render-test-{name}-{}.html", std::process::id()))
@@ -94,37 +91,15 @@ fn render_folded_to_html_unwritable_output_path_returns_io_error() {
 }
 
 #[test]
-fn is_wsl_distro_name_env_unset_falls_back_to_proc_version() {
-    let _guard = WSL_DISTRO_NAME_ENV_LOCK.lock().unwrap();
-    let had_distro_name = std::env::var_os("WSL_DISTRO_NAME");
-    std::env::remove_var("WSL_DISTRO_NAME");
-
+fn is_wsl_matches_proc_version_microsoft_check() {
     let result = is_wsl();
 
-    if let Some(value) = had_distro_name {
-        std::env::set_var("WSL_DISTRO_NAME", value);
-    }
     assert_eq!(
         result,
         std::fs::read_to_string("/proc/version")
             .map(|v| v.to_lowercase().contains("microsoft"))
             .unwrap_or(false)
     );
-}
-
-#[test]
-fn is_wsl_distro_name_env_set_returns_true() {
-    let _guard = WSL_DISTRO_NAME_ENV_LOCK.lock().unwrap();
-    let had_distro_name = std::env::var_os("WSL_DISTRO_NAME");
-    std::env::set_var("WSL_DISTRO_NAME", "Ubuntu");
-
-    let result = is_wsl();
-
-    match had_distro_name {
-        Some(value) => std::env::set_var("WSL_DISTRO_NAME", value),
-        None => std::env::remove_var("WSL_DISTRO_NAME"),
-    }
-    assert!(result);
 }
 
 #[test]

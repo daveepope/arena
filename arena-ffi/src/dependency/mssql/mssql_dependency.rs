@@ -42,6 +42,8 @@ pub struct MssqlDependencyConfig {
     pub startup_sql_scripts: Option<Vec<String>>,
     #[serde(default)]
     pub encryption: Option<EncryptionConfig>,
+    #[serde(default)]
+    pub component_ids: Vec<String>,
 }
 
 pub fn build(config: &MssqlDependencyConfig, network: Option<&str>) -> Result<Dependency, String> {
@@ -78,6 +80,9 @@ pub fn build(config: &MssqlDependencyConfig, network: Option<&str>) -> Result<De
             builder = builder.with_expiry(expiry);
         }
         None => {}
+    }
+    for component_id in &config.component_ids {
+        builder = builder.with_component_id(component_id);
     }
 
     Ok(Box::new(builder.build()))

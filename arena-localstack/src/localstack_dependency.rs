@@ -61,6 +61,7 @@ pub struct LocalstackDependency {
     lambda_arns: HashMap<String, String>,
     state: RunnableState,
     faults: Vec<Fault>,
+    component_ids: Vec<String>,
 }
 
 impl LocalstackDependency {
@@ -78,6 +79,7 @@ impl LocalstackDependency {
         lambdas: Vec<LambdaSpec>,
         event_buses: Vec<EventBusSpec>,
         event_rules: Vec<EventRuleSpec>,
+        component_ids: Vec<String>,
     ) -> Self {
         LocalstackDependency {
             identifier,
@@ -101,6 +103,7 @@ impl LocalstackDependency {
             lambda_arns: HashMap::new(),
             state: RunnableState::NotStarted,
             faults: Vec::new(),
+            component_ids,
         }
     }
 
@@ -447,6 +450,10 @@ impl RunnableDependency for LocalstackDependency {
 
     fn children(&self) -> &[Dependency] {
         self.dependencies.as_deref().unwrap_or(&[])
+    }
+
+    fn component_ids(&self) -> &[String] {
+        &self.component_ids
     }
 
     fn children_mut(&mut self) -> &mut [Dependency] {

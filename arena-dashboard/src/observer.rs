@@ -27,7 +27,7 @@ impl ArenaLifecycleObserver for HttpForwardingObserver {
     fn on_state(&self, state: &ArenaState) {
         if let Some(sender) = &self.sender {
             if sender.send(state.clone()).is_err() {
-                eprintln!("arena-dashboard: lifecycle forwarding thread is gone, dropping state update");
+                tracing::warn!("arena-dashboard forwarding thread is gone, dropping state update");
             }
         }
     }

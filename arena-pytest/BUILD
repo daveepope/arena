@@ -147,7 +147,6 @@ py_library(
         "@pip//kafka_python_ng",
         "@pip//pytest",
         "@pip//pytest_asyncio",
-        "@pip//requests",
     ],
     visibility = ["//visibility:public"],
 )
@@ -256,7 +255,6 @@ py_wheel(
     requires = [
         "pytest>=7.0.0",
         "pytest-asyncio>=0.21.0",
-        "requests>=2.28.0",
         "kafka-python-ng>=2.0.0",
     ],
     entry_points = {

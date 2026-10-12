@@ -16,6 +16,7 @@ pub struct TemporalDependencyBuilder {
     container_name: Option<String>,
     network: Option<String>,
     readiness_check: Option<Box<dyn ReadinessCheck>>,
+    component_ids: Vec<String>,
 }
 
 impl TemporalDependencyBuilder {
@@ -35,6 +36,7 @@ impl TemporalDependencyBuilder {
             container_name: None,
             network: None,
             readiness_check: None,
+            component_ids: Vec::new(),
         }
     }
 
@@ -110,6 +112,11 @@ impl TemporalDependencyBuilder {
         self
     }
 
+    pub fn with_component_id(mut self, component_id: impl Into<String>) -> Self {
+        self.component_ids.push(component_id.into());
+        self
+    }
+
     pub fn build(self) -> TemporalDependency {
         let mut temporal_impl = self
             .temporal_impl
@@ -134,6 +141,7 @@ impl TemporalDependencyBuilder {
             image_name,
             image_tag,
             self.container_name,
+            self.component_ids,
         );
 
         if let Some(check) = self.readiness_check {

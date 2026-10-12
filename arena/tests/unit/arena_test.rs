@@ -48,9 +48,11 @@ async fn open_happy_path_emits_states_in_order() {
         vec![
             ArenaLifecycleState::ArenaStarting,
             ArenaLifecycleState::DependenciesStarting,
+            ArenaLifecycleState::DependenciesStarting,
             ArenaLifecycleState::DependenciesStarted,
             ArenaLifecycleState::PlaybooksRunning,
             ArenaLifecycleState::PlaybooksComplete,
+            ArenaLifecycleState::ComponentsStarting,
             ArenaLifecycleState::ComponentsStarting,
             ArenaLifecycleState::ComponentsStarted,
             ArenaLifecycleState::ArenaOpen,

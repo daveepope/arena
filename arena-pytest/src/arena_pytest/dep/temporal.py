@@ -13,6 +13,7 @@ class TemporalDependencyBuilder:
         self._config: Dict[str, Any] = {
             "type": "temporal",
             "identifier": _build_identifier("arena-temporal", name),
+            "component_ids": [],
         }
         self._children: List[Any] = []
 
@@ -46,6 +47,10 @@ class TemporalDependencyBuilder:
 
     def with_child_dependencies(self, children: List[Any]) -> "TemporalDependencyBuilder":
         self._children.extend(children)
+        return self
+
+    def with_component_id(self, component_id: str) -> "TemporalDependencyBuilder":
+        self._config["component_ids"].append(component_id)
         return self
 
     def build(self) -> "TemporalDependency":

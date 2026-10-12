@@ -29,6 +29,8 @@ pub struct OracleDependencyConfig {
     pub setup_mode: Option<String>,
     #[serde(default)]
     pub sql_readiness_timeout_ms: Option<u64>,
+    #[serde(default)]
+    pub component_ids: Vec<String>,
 }
 
 pub fn build(config: &OracleDependencyConfig, network: Option<&str>) -> Result<Dependency, String> {
@@ -79,6 +81,9 @@ pub fn build(config: &OracleDependencyConfig, network: Option<&str>) -> Result<D
             builder = builder.with_expiry(expiry);
         }
         None => {}
+    }
+    for component_id in &config.component_ids {
+        builder = builder.with_component_id(component_id);
     }
 
     Ok(Box::new(builder.build().map_err(|fault| fault.to_string())?))

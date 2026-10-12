@@ -144,6 +144,8 @@ fn dispatcher_allowlist_always_admits(metadata_target: &str) -> bool {
     metadata_target.starts_with("arena::")
         || metadata_target.starts_with("arena_container::")
         || metadata_target.starts_with("arena_ffi::")
+        || metadata_target.starts_with("arena_dashboard::")
+        || metadata_target.starts_with("arena_profile::")
         || metadata_target == "ffi_logging_test"
         || metadata_target.starts_with("ffi_logging_test::")
 }

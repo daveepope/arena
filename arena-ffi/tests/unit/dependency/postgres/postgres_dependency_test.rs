@@ -12,6 +12,7 @@ fn minimal_postgres_config() -> PostgresDependencyConfig {
         database_password: None,
         container_name: None,
         startup_sql_scripts: None,
+        component_ids: Vec::new(),
     }
 }
 
@@ -27,4 +28,14 @@ fn build_image_overrides_apply() {
     config.image_name = Some("postgres".to_string());
     config.container_name = Some("pg-box".to_string());
     assert!(build(&config, Some("arena-net")).is_ok());
+}
+
+#[test]
+fn build_component_ids_thread_through_to_the_dependency() {
+    let mut config = minimal_postgres_config();
+    config.component_ids = vec!["parent-component".to_string(), "child-component".to_string()];
+
+    let dep = build(&config, None).expect("build dependency");
+
+    assert_eq!(dep.component_ids(), ["parent-component", "child-component"]);
 }

@@ -46,6 +46,81 @@ async fn ingest_validstate_appearsonevents() {
 }
 
 #[tokio::test]
+async fn events_connect_after_two_arenas_ingested_replays_in_insertion_order() {
+    let base_url = spawn_server().await;
+    let client = reqwest::Client::new();
+
+    let first = r#"{"id":"arena-first","state":"arena_open","at":"2026-01-01T00:00:00.000Z"}"#;
+    let second = r#"{"id":"arena-second","state":"arena_open","at":"2026-01-01T00:00:01.000Z"}"#;
+    client.post(format!("{base_url}/ingest")).body(first).send().await.expect("post first");
+    client.post(format!("{base_url}/ingest")).body(second).send().await.expect("post second");
+
+    let events_response = client
+        .get(format!("{base_url}/events"))
+        .send()
+        .await
+        .expect("connect to events");
+    let mut stream = events_response.bytes_stream();
+
+    let chunk1 = tokio::time::timeout(Duration::from_secs(5), stream.next())
+        .await
+        .expect("sse event within timeout")
+        .expect("sse stream item")
+        .expect("sse chunk bytes");
+    let chunk2 = tokio::time::timeout(Duration::from_secs(5), stream.next())
+        .await
+        .expect("sse event within timeout")
+        .expect("sse stream item")
+        .expect("sse chunk bytes");
+
+    assert!(String::from_utf8_lossy(&chunk1).contains("arena-first"));
+    assert!(String::from_utf8_lossy(&chunk2).contains("arena-second"));
+}
+
+#[tokio::test]
+async fn clear_afteringest_broadcastsclearandemptiesreplay() {
+    let base_url = spawn_server().await;
+    let client = reqwest::Client::new();
+
+    let body = r#"{"id":"test-arena","state":"arena_open","at":"2026-01-01T00:00:00.000Z"}"#;
+    client.post(format!("{base_url}/ingest")).body(body).send().await.expect("post ingest");
+
+    let events_response = client
+        .get(format!("{base_url}/events"))
+        .send()
+        .await
+        .expect("connect to events");
+    let mut stream = events_response.bytes_stream();
+
+    let replay_chunk = tokio::time::timeout(Duration::from_secs(5), stream.next())
+        .await
+        .expect("sse event within timeout")
+        .expect("sse stream item")
+        .expect("sse chunk bytes");
+    assert!(String::from_utf8_lossy(&replay_chunk).contains("test-arena"));
+
+    let clear_response = client.post(format!("{base_url}/clear")).send().await.expect("post clear");
+    assert_eq!(clear_response.status(), 204);
+
+    let clear_chunk = tokio::time::timeout(Duration::from_secs(5), stream.next())
+        .await
+        .expect("sse event within timeout")
+        .expect("sse stream item")
+        .expect("sse chunk bytes");
+    assert!(String::from_utf8_lossy(&clear_chunk).contains(r#""type":"clear""#));
+
+    let replay_after_clear = client
+        .get(format!("{base_url}/events"))
+        .send()
+        .await
+        .expect("connect to events again");
+    let mut stream_after_clear = replay_after_clear.bytes_stream();
+    let next_after_clear =
+        tokio::time::timeout(Duration::from_millis(500), stream_after_clear.next()).await;
+    assert!(next_after_clear.is_err(), "replay buffer should be empty after clear");
+}
+
+#[tokio::test]
 async fn ingest_malformedbody_returnsbadrequest() {
     let base_url = spawn_server().await;
     let client = reqwest::Client::new();
@@ -73,7 +148,7 @@ async fn root_noassets_servesfallbackhtml() {
 
     assert_eq!(response.status(), 200);
     let body = response.text().await.expect("read body");
-    assert!(body.contains("Arena Dashboard"));
+    assert!(body.contains("Arena Topology Dashboard"));
 }
 
 #[tokio::test]

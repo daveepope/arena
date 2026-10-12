@@ -4,6 +4,7 @@ import arena.junit.support.ArenaIdentifiers;
 import arena.junit.support.ArenaJson;
 import arena.junit.support.ChildrenFfi;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,6 +47,11 @@ public final class HttpDependencyBuilder {
 
   public HttpDependencyBuilder withImageTag(String imageTag) {
     config.put("image_tag", imageTag);
+    return this;
+  }
+
+  public HttpDependencyBuilder withComponentId(String componentId) {
+    ((ArrayNode) config.withArray("component_ids")).add(componentId);
     return this;
   }
 

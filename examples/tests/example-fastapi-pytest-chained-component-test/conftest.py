@@ -206,12 +206,38 @@ def closed_arena() -> ClosedArena:
     mssql_startup_sql = [open(mssql_schema_path, encoding="utf-8").read()]
     oracle_startup_sql = [open(oracle_schema_path, encoding="utf-8").read()]
 
+    exe = _find_fastapi_executable()
+    if not exe:
+        pytest.fail(
+            "example-readings-fastapi-web-app not found (build //examples:example-readings-fastapi-web-app)"
+        )
+
+    mssql_cs = MSSQL_CONNECTION_STRING_LOCAL
+    oracle_cs = ORACLE_CONNECTION_STRING_LOCAL
+    pg_cs = (
+        f"host=localhost port={POSTGRES_PORT} user={POSTGRES_DB_USER} "
+        f"password={POSTGRES_DB_PASS} dbname={POSTGRES_DB_NAME}"
+    )
+    ls_ep = f"http://127.0.0.1:{LOCALSTACK_HOST_PORT}"
+
+    web_app_name = "example-api-chained-web-app"
+    web_app_child_name = "example-api-chained-web-app-child"
+    fastapi_component_child = _build_web_app(
+        web_app_child_name, exe, WEB_APP_CHILD_PORT, pg_cs, mssql_cs, oracle_cs, oauth_ca_file, ls_ep, None
+    )
+    fastapi_component = _build_web_app(
+        web_app_name, exe, WEB_APP_PORT, pg_cs, mssql_cs, oracle_cs, oauth_ca_file, ls_ep, [fastapi_component_child]
+    )
+    component_ids = [fastapi_component.identifier, fastapi_component_child.identifier]
+
     oauth = (
         OauthDependencyBuilder("example-api-chained-oauth")
         .with_port(OAUTH_PORT)
         .with_listen_ip("0.0.0.0")
         .with_server_tls_pem(ca_pem, server_key_pem)
         .with_metadata_base_url(OAUTH_ISSUER)
+        .with_component_id(component_ids[0])
+        .with_component_id(component_ids[1])
         .build()
     )
     _OAUTH = oauth
@@ -225,6 +251,8 @@ def closed_arena() -> ClosedArena:
         .with_database_username(POSTGRES_DB_USER)
         .with_database_password(POSTGRES_DB_PASS)
         .with_startup_sql_scripts(startup_sql)
+        .with_component_id(component_ids[0])
+        .with_component_id(component_ids[1])
         .build()
     )
 
@@ -236,6 +264,8 @@ def closed_arena() -> ClosedArena:
         .with_database_username(MSSQL_DB_USER)
         .with_database_password(MSSQL_DB_PASS)
         .with_startup_sql_scripts(mssql_startup_sql)
+        .with_component_id(component_ids[0])
+        .with_component_id(component_ids[1])
         .build()
     )
 
@@ -249,6 +279,8 @@ def closed_arena() -> ClosedArena:
         .with_startup_sql_scripts(oracle_startup_sql)
         # Oracle container start times are inconsistent across CI runners, so a longer timeout is required.
         .with_sql_readiness_timeout(timedelta(minutes=2))
+        .with_component_id(component_ids[0])
+        .with_component_id(component_ids[1])
         .build()
     )
 
@@ -256,6 +288,8 @@ def closed_arena() -> ClosedArena:
         HttpDependencyBuilder("example-api-chained-calibration")
         .with_container_name(RUNTIME.container_name("example-api-chained-calibration"))
         .with_port(CALIBRATION_HOST_PORT)
+        .with_component_id(component_ids[0])
+        .with_component_id(component_ids[1])
         .build()
     )
 
@@ -266,6 +300,8 @@ def closed_arena() -> ClosedArena:
         .with_port(TEMPORAL_GRPC_PORT)
         .with_ui_port(TEMPORAL_UI_PORT)
         .with_child_dependencies([postgres])
+        .with_component_id(component_ids[0])
+        .with_component_id(component_ids[1])
         .build()
     )
 
@@ -275,6 +311,8 @@ def closed_arena() -> ClosedArena:
         .with_port(SMTP_HOST_PORT)
         .with_ui_port(SMTP_UI_PORT)
         .with_starttls()
+        .with_component_id(component_ids[0])
+        .with_component_id(component_ids[1])
         .build()
     )
 
@@ -298,30 +336,9 @@ def closed_arena() -> ClosedArena:
                 ],
             )
         )
+        .with_component_id(component_ids[0])
+        .with_component_id(component_ids[1])
         .build()
-    )
-
-    exe = _find_fastapi_executable()
-    if not exe:
-        pytest.fail(
-            "example-readings-fastapi-web-app not found (build //examples:example-readings-fastapi-web-app)"
-        )
-
-    mssql_cs = MSSQL_CONNECTION_STRING_LOCAL
-    oracle_cs = ORACLE_CONNECTION_STRING_LOCAL
-    pg_cs = (
-        f"host=localhost port={POSTGRES_PORT} user={POSTGRES_DB_USER} "
-        f"password={POSTGRES_DB_PASS} dbname={POSTGRES_DB_NAME}"
-    )
-    ls_ep = f"http://127.0.0.1:{LOCALSTACK_HOST_PORT}"
-
-    web_app_name = "example-api-chained-web-app"
-    web_app_child_name = "example-api-chained-web-app-child"
-    fastapi_component_child = _build_web_app(
-        web_app_child_name, exe, WEB_APP_CHILD_PORT, pg_cs, mssql_cs, oracle_cs, oauth_ca_file, ls_ep, None
-    )
-    fastapi_component = _build_web_app(
-        web_app_name, exe, WEB_APP_PORT, pg_cs, mssql_cs, oracle_cs, oauth_ca_file, ls_ep, [fastapi_component_child]
     )
 
     a_match = (
@@ -346,7 +363,7 @@ def closed_arena() -> ClosedArena:
         .build()
     )
 
-    return ClosedArena(
+    closed = ClosedArena(
         CLOSED_ARENA_NAME,
         [a_match],
         log_level=ArenaLogLevel.INFO,
@@ -361,6 +378,9 @@ def closed_arena() -> ClosedArena:
             smtp.identifier,
         ),
     )
+    if os.environ.get("ARENA_VISUALIZE") == "1":
+        closed = closed.with_lifecycle_dashboard()
+    return closed
 
 
 @pytest.fixture(scope="session")

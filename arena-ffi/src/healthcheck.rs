@@ -44,13 +44,22 @@ impl ReadinessCheck for HttpReadinessCheck {
 
         while start.elapsed() < timeout {
             match reqwest::get(target).await {
-                Ok(_) => {
+                Ok(response) if response.status().is_success() => {
                     tracing::debug!(
                         identifier = %identifier,
                         target = %target,
+                        status = %response.status(),
                         "http readiness passed"
                     );
                     return Ok(());
+                }
+                Ok(response) => {
+                    tracing::trace!(
+                        identifier = %identifier,
+                        target = %target,
+                        status = %response.status(),
+                        "http readiness poll returned non-success status"
+                    );
                 }
                 Err(e) => {
                     tracing::trace!(

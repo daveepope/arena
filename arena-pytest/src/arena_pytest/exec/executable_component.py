@@ -107,6 +107,10 @@ class ExecutableComponent:
         self._readiness_checks = readiness_checks or []
         self._children = children or []
 
+    @property
+    def identifier(self) -> str:
+        return self._config["identifier"]
+
     def _for_ffi(self) -> Dict[str, Any]:
         d = dict(self._config)
         rc = readiness_checks_for_ffi(self._readiness_checks)

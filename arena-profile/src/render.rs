@@ -428,8 +428,7 @@ pub fn open_report(path: &Path) -> std::io::Result<()> {
 }
 
 pub fn is_wsl() -> bool {
-    std::env::var_os("WSL_DISTRO_NAME").is_some()
-        || std::fs::read_to_string("/proc/version")
-            .map(|v| v.to_lowercase().contains("microsoft"))
-            .unwrap_or(false)
+    std::fs::read_to_string("/proc/version")
+        .map(|v| v.to_lowercase().contains("microsoft"))
+        .unwrap_or(false)
 }

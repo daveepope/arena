@@ -100,6 +100,7 @@ fn finish_clean_subjects_returns_arena_closed() {
             RunnableState::Stopped,
             Vec::new(),
             Vec::new(),
+            Vec::new(),
         )],
         Vec::new(),
     );

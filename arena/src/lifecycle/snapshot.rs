@@ -11,6 +11,8 @@ pub struct DependencyState {
     pub state: RunnableState,
     pub faults: Vec<Fault>,
     pub children: Vec<DependencyState>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub component_ids: Vec<String>,
 }
 
 impl DependencyState {
@@ -19,12 +21,14 @@ impl DependencyState {
         state: RunnableState,
         faults: Vec<Fault>,
         children: Vec<DependencyState>,
+        component_ids: Vec<String>,
     ) -> Self {
         Self {
             id: id.into(),
             state,
             faults,
             children,
+            component_ids,
         }
     }
 

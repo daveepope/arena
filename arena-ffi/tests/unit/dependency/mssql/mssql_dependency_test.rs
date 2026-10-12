@@ -13,6 +13,7 @@ fn minimal_mssql_config() -> MssqlDependencyConfig {
         container_name: None,
         startup_sql_scripts: None,
         encryption: None,
+        component_ids: Vec::new(),
     }
 }
 

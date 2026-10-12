@@ -68,6 +68,7 @@ class OauthDependencyBuilder:
             "type": "oauth",
             "identifier": _build_identifier("arena-oauth", name),
             "port": DEFAULT_OAUTH_PORT,
+            "component_ids": [],
         }
         self._children: List[Any] = []
 
@@ -95,6 +96,10 @@ class OauthDependencyBuilder:
 
     def with_child_dependencies(self, children: List[Any]) -> "OauthDependencyBuilder":
         self._children.extend(children)
+        return self
+
+    def with_component_id(self, component_id: str) -> "OauthDependencyBuilder":
+        self._config["component_ids"].append(component_id)
         return self
 
     def with_issuer_cognito(self, pool_id: str) -> "OauthDependencyBuilder":

@@ -11,18 +11,54 @@ describe("nodeClasses", () => {
     ["started", "emerald"],
     ["stopping", "orange"],
     ["stopped", "neutral"],
-    ["faulted", "red"],
     ["some_unknown_state", "neutral"],
   ])("state %s returns classes containing %s", (state: string, expectedColor: string) => {
-    expect(nodeClasses(state)).toContain(expectedColor);
+    expect(nodeClasses("dependency", state)).toContain(expectedColor);
   });
 
   it("started state includes a pulse animation class", () => {
-    expect(nodeClasses("started")).toContain("animate-pulse-soft");
+    expect(nodeClasses("dependency", "started")).toContain("animate-pulse-soft");
   });
 
-  it("faulted state includes a pulse animation class", () => {
-    expect(nodeClasses("faulted")).toContain("animate-pulse");
+  it("starting state includes a pulse animation class", () => {
+    expect(nodeClasses("dependency", "starting")).toContain("animate-pulse-soft");
+  });
+
+  it("not_started state has no pulse animation class", () => {
+    expect(nodeClasses("dependency", "not_started")).not.toContain("animate-pulse");
+  });
+
+  it("recorded faults return red classes with a pulse animation", () => {
+    const classes = nodeClasses("dependency", "stopped", true);
+    expect(classes).toContain("red");
+    expect(classes).toContain("animate-pulse");
+  });
+
+  it("dependency kind uses a sky border regardless of state", () => {
+    expect(nodeClasses("dependency", "started")).toContain("border-sky-400");
+  });
+
+  it("component kind uses a fuchsia border regardless of state", () => {
+    expect(nodeClasses("component", "started")).toContain("border-fuchsia-400");
+  });
+
+  it("dependency and component borders differ for the same state", () => {
+    const dependency = nodeClasses("dependency", "faulted", true);
+    const component = nodeClasses("component", "faulted", true);
+    expect(dependency).toContain("border-sky-400");
+    expect(component).toContain("border-fuchsia-400");
+  });
+
+  it("stopped state with recorded faults still returns red classes", () => {
+    expect(nodeClasses("dependency", "stopped", true)).toContain("red");
+  });
+
+  it("started state with recorded faults still returns red classes", () => {
+    expect(nodeClasses("dependency", "started", true)).toContain("red");
+  });
+
+  it("stopped state with no faults returns neutral classes", () => {
+    expect(nodeClasses("dependency", "stopped", false)).toContain("neutral");
   });
 });
 
@@ -49,7 +85,7 @@ describe("formatDetail", () => {
     expect(detail).toContain("kind: dependency");
     expect(detail).toContain("state: started");
     expect(detail).toContain("children: 0");
-    expect(detail).toContain("faults:\nnone");
+    expect(detail).toContain("faults: none");
   });
 
   it("with faults lists each fault on its own line", () => {

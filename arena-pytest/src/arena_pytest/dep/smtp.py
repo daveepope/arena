@@ -13,6 +13,7 @@ class SmtpDependencyBuilder:
         self._config: Dict[str, Any] = {
             "type": "smtp",
             "identifier": _build_identifier("arena-smtp", name),
+            "component_ids": [],
         }
         self._children: List[Any] = []
 
@@ -54,6 +55,10 @@ class SmtpDependencyBuilder:
 
     def with_child_dependencies(self, children: List[Any]) -> "SmtpDependencyBuilder":
         self._children.extend(children)
+        return self
+
+    def with_component_id(self, component_id: str) -> "SmtpDependencyBuilder":
+        self._config["component_ids"].append(component_id)
         return self
 
     def build(self) -> "SmtpDependency":

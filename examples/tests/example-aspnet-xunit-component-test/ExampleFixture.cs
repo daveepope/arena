@@ -63,6 +63,8 @@ public sealed class ExampleFixture : ArenaCollectionFixture
             .WithDatabaseUsername(PostgresDbUser)
             .WithDatabasePassword(PostgresDbPassword)
             .WithStartupSqlScripts(new[] { ResolveSchemaScript("instrument_reading_db_schema.sql") })
+            .WithComponentId("example-api-web-app")
+            .WithComponentId("example-api-web-app-2")
             .Build();
 
     [ArenaDependency]
@@ -73,6 +75,7 @@ public sealed class ExampleFixture : ArenaCollectionFixture
             .WithDatabaseUsername(MssqlDbUser)
             .WithDatabasePassword(MssqlDbPassword)
             .WithStartupSqlScripts(new[] { ResolveSchemaScript("validation_db_schema.sql") })
+            .WithComponentId("example-api-web-app")
             .Build();
 
     [ArenaDependency]
@@ -104,6 +107,7 @@ public sealed class ExampleFixture : ArenaCollectionFixture
                     EventRuleTargetBuilder.SqsQueue("target-queue", QueueName),
                 },
             })
+            .WithComponentId("example-api-web-app")
             .Build();
 
     [ArenaDependency]
@@ -125,7 +129,11 @@ public sealed class ExampleFixture : ArenaCollectionFixture
 
     [ArenaDependency]
     private static readonly HttpDependency Calibration =
-        new HttpDependencyBuilder("test-calibration").WithPort(CalibrationPort).Build();
+        new HttpDependencyBuilder("test-calibration")
+            .WithPort(CalibrationPort)
+            .WithComponentId("example-api-web-app")
+            .WithComponentId("example-api-web-app-2")
+            .Build();
 
     [ArenaPlaybook(ExecOnDependencyStart = true)]
     private static readonly Playbooks.CalibrationHappyPathPlaybook CalibrationHappyPath =

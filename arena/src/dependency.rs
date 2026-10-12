@@ -20,6 +20,10 @@ pub trait RunnableDependency: Send + Sync {
     fn children_mut(&mut self) -> &mut [Dependency];
     async fn soft_reset(&self) -> Result<(), Fault>;
     async fn hard_reset(&mut self) -> Result<(), Fault>;
+
+    fn component_ids(&self) -> &[String] {
+        &[]
+    }
 }
 
 pub type Dependency = Box<dyn RunnableDependency>;
@@ -66,5 +70,6 @@ pub fn dependency_state(dep: &dyn RunnableDependency) -> DependencyState {
         dep.state(),
         dep.faults().to_vec(),
         dep.children().iter().map(|c| dependency_state(c.as_ref())).collect(),
+        dep.component_ids().to_vec(),
     )
 }

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from typing import Callable, List, Optional, Sequence
 
 from arena_pytest.arena import OpenArena
@@ -11,8 +12,10 @@ from arena_pytest.ffi._ffi import (
     ArenaBindingError,
     ArenaLogLevel,
     close_arena,
+    dashboard_ensure_running,
     load_ffi,
     open_arena as ffi_open_arena,
+    register_dashboard_observer,
     register_default_dispatcher_logging_target,
     register_dispatcher_logging_target_for_logger,
     register_dispatcher_logging_target_for_logger_factory,
@@ -21,6 +24,8 @@ from arena_pytest.ffi._ffi import (
     set_dispatcher_dependency_allow_json,
     unregister_lifecycle_observer,
 )
+
+_DEFAULT_DASHBOARD_PORT = 4873
 
 
 def _normalize_optional_id_seq(
@@ -51,9 +56,26 @@ class ClosedArena:
         self._log_dependency_ids = _normalize_optional_id_seq(log_dependency_ids)
         self._log_component_ids = _normalize_optional_id_seq(log_component_ids)
         self._observers: List[Callable[[str], None]] = []
+        self._dashboard_url: Optional[str] = None
+        self._dashboard_port: int = _DEFAULT_DASHBOARD_PORT
+        self._dashboard_search_dir: Optional[str] = None
+        self._lifecycle_dashboard = False
 
     def observe(self, callback: Callable[[str], None]) -> "ClosedArena":
         self._observers.append(callback)
+        return self
+
+    def with_lifecycle_dashboard(
+        self,
+        url: Optional[str] = None,
+        *,
+        port: int = _DEFAULT_DASHBOARD_PORT,
+        search_dir: Optional[str] = None,
+    ) -> "ClosedArena":
+        self._lifecycle_dashboard = True
+        self._dashboard_url = url
+        self._dashboard_port = port
+        self._dashboard_search_dir = search_dir
         return self
 
     def _observer_token_for(self, ffi, callback: Callable[[str], None]) -> int:
@@ -96,11 +118,6 @@ class ClosedArena:
         await asyncio.to_thread(set_dispatcher_component_allow_json, ffi, comp_json)
         observer_tokens = []
         try:
-            for callback in self._observers:
-                observer_tokens.append(
-                    await asyncio.to_thread(self._observer_token_for, ffi, callback)
-                )
-            observer_tokens = tuple(observer_tokens)
             if self._logger_factory is not None:
                 log_tok = await asyncio.to_thread(
                     register_dispatcher_logging_target_for_logger_factory,
@@ -121,6 +138,23 @@ class ClosedArena:
                     ffi,
                     arena_log_level=self._log_level,
                 )
+            if self._lifecycle_dashboard:
+                dashboard_url = self._dashboard_url
+                if not dashboard_url:
+                    search_dir = self._dashboard_search_dir or os.path.dirname(
+                        os.path.abspath(__file__)
+                    )
+                    dashboard_url = await asyncio.to_thread(
+                        dashboard_ensure_running, ffi, self._dashboard_port, search_dir
+                    )
+                observer_tokens.append(
+                    await asyncio.to_thread(register_dashboard_observer, ffi, dashboard_url)
+                )
+            for callback in self._observers:
+                observer_tokens.append(
+                    await asyncio.to_thread(self._observer_token_for, ffi, callback)
+                )
+            observer_tokens = tuple(observer_tokens)
         except Exception:
             for token in observer_tokens:
                 await asyncio.to_thread(unregister_lifecycle_observer, ffi, token)

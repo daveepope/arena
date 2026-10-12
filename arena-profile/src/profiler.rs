@@ -99,6 +99,7 @@ pub fn prepare_cpu_profile(
     output_path: impl Into<PathBuf>,
 ) -> Result<PreparedLaunch, CpuProfileError> {
     let output_path = output_path.into();
+    tracing::info!(backend = ?backend, output = %output_path.display(), "starting cpu profile capture");
     match backend {
         CpuProfilerBackend::Perf | CpuProfilerBackend::PySpy | CpuProfilerBackend::DotnetTrace => crate::wrapped::prepare_wrapped(
             crate::wrapped::wrapping_sampler_for(backend),
@@ -118,6 +119,7 @@ pub fn render_collected(
     output_path: &std::path::Path,
     include_hotspots: bool,
 ) -> Result<(), CpuProfileError> {
+    tracing::debug!(folded = %folded_path.display(), "reading collected profile samples");
     let folded_file = std::fs::File::open(folded_path).map_err(|e| {
         CpuProfileError::Finish(format!(
             "failed to read folded stacks at {}: {e}",
@@ -127,5 +129,6 @@ pub fn render_collected(
     let render_result = crate::render::render_folded_to_html(folded_file, output_path, include_hotspots);
     let _ = std::fs::remove_file(folded_path);
     render_result?;
+    tracing::info!(output = %output_path.display(), "cpu profile report rendered");
     Ok(())
 }

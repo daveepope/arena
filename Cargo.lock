@@ -185,14 +185,17 @@ name = "arena-dashboard"
 version = "7.1.0"
 dependencies = [
  "arena",
+ "async-trait",
  "axum",
  "futures",
+ "rand 0.8.6",
  "reqwest",
  "runfiles",
  "serde",
  "serde_json",
  "tokio",
  "tower-http",
+ "tracing",
 ]
 
 [[package]]
@@ -248,6 +251,7 @@ dependencies = [
  "arc-swap",
  "arena",
  "arena-containerized-component",
+ "arena-dashboard",
  "arena-executable-component",
  "arena-host",
  "arena-http",
@@ -260,6 +264,7 @@ dependencies = [
  "arena-smtp",
  "arena-temporal",
  "async-trait",
+ "axum",
  "futures",
  "reqwest",
  "serde",
