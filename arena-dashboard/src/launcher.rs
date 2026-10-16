@@ -14,6 +14,11 @@ const EXECUTABLE_NAMES: [&str; 3] = [
 
 const RUNFILES_BASES: [&str; 3] = ["_main", "arena", ""];
 
+const RUNFILES_EXECUTABLE_NAMES: [&str; 2] = [
+    "arena-dashboard/server.exe",
+    "arena-dashboard/server",
+];
+
 #[derive(Debug)]
 pub enum LaunchError {
     ExecutableNotFound,
@@ -87,14 +92,16 @@ pub fn find_executable(search_dir: Option<&Path>) -> Option<PathBuf> {
     clear_stale_runfiles_manifest_env();
     let runfiles = runfiles::Runfiles::create().ok()?;
     for base in RUNFILES_BASES {
-        let rel = if base.is_empty() {
-            "arena-dashboard/server".to_string()
-        } else {
-            format!("{base}/arena-dashboard/server")
-        };
-        if let Some(path) = runfiles.rlocation(rel) {
-            if path.is_file() {
-                return Some(path);
+        for name in RUNFILES_EXECUTABLE_NAMES {
+            let rel = if base.is_empty() {
+                name.to_string()
+            } else {
+                format!("{base}/{name}")
+            };
+            if let Some(path) = runfiles.rlocation(rel) {
+                if path.is_file() {
+                    return Some(path);
+                }
             }
         }
     }

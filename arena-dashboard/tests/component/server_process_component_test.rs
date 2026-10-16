@@ -29,9 +29,10 @@ fn announced_port(stderr: ChildStderr) -> u16 {
 
 async fn spawn_server_process() -> (KillOnDrop, u16) {
     let runfiles = runfiles::Runfiles::create().expect("runfiles available under bazel test");
-    let server_path = runfiles
-        .rlocation("_main/arena-dashboard/server")
-        .filter(|p| p.is_file())
+    let server_path = ["_main/arena-dashboard/server.exe", "_main/arena-dashboard/server"]
+        .into_iter()
+        .filter_map(|candidate| runfiles.rlocation(candidate))
+        .find(|p| p.is_file())
         .expect("arena-dashboard server binary present in runfiles");
 
     let mut child = Command::new(server_path)

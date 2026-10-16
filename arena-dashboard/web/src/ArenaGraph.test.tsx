@@ -61,6 +61,30 @@ describe("ArenaGraph", () => {
     expect(screen.getByText("api")).toBeDefined();
   });
 
+  it("nested child subjects render as their own nodes beneath their parent", () => {
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    act(() => {
+      useDashboardStore.getState().ingest(
+        arenaState({
+          dependencies: [
+            {
+              id: "postgres",
+              state: "started",
+              faults: [],
+              children: [{ id: "postgres-replica", state: "started", faults: [], children: [] }],
+            },
+          ],
+          components: [{ id: "api", state: "started", faults: [], children: [], component_ids: [] }],
+        })
+      );
+    });
+
+    expect(screen.getByText("postgres")).toBeDefined();
+    expect(screen.getByText("postgres-replica")).toBeDefined();
+    expect(screen.getByText("api")).toBeDefined();
+  });
+
   it("clicking a node sets the store selection to that subject's detail", () => {
     render(<ArenaGraph arenaId="arena-1" />);
 

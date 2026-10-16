@@ -46,4 +46,30 @@ describe("getEdgeParams", () => {
     expect(Number.isFinite(params.sx)).toBe(true);
     expect(Number.isFinite(params.tx)).toBe(true);
   });
+
+  it("coincident nodes fall back to a top position on both ends", () => {
+    const params = getEdgeParams(fakeNode(50, 50), fakeNode(50, 50));
+
+    expect(params.sourcePos).toBe(Position.Top);
+    expect(params.targetPos).toBe(Position.Top);
+  });
+
+  it.each([
+    ["left of", -200, 0, Position.Left, Position.Right],
+    ["above", 0, -200, Position.Top, Position.Bottom],
+  ])("target %s the source anchors the ends on the facing sides", (_label, tx, ty, sourcePos, targetPos) => {
+    const params = getEdgeParams(fakeNode(0, 0), fakeNode(tx as number, ty as number));
+
+    expect(params.sourcePos).toBe(sourcePos);
+    expect(params.targetPos).toBe(targetPos);
+  });
+
+  it("zero sized nodes yield no usable geometry and fall back to a top position", () => {
+    const params = getEdgeParams(fakeNode(0, 0, 0), fakeNode(200, 0, 0));
+
+    expect(Number.isFinite(params.sx)).toBe(false);
+    expect(Number.isFinite(params.tx)).toBe(false);
+    expect(params.sourcePos).toBe(Position.Top);
+    expect(params.targetPos).toBe(Position.Top);
+  });
 });

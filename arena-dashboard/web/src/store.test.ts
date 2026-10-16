@@ -300,4 +300,29 @@ describe("useDashboardStore ingestHistory", () => {
     expect(entry?.replayIndex).toBe(0);
     expect(entry?.snapshot.state).toBe("arena_starting");
   });
+
+  it("empty history is ignored", () => {
+    useDashboardStore.getState().ingestHistory([]);
+
+    expect(useDashboardStore.getState().arenas.size).toBe(0);
+  });
+
+  it("longer history arriving while scrubbed extends the timeline without moving the display", () => {
+    useDashboardStore.getState().ingestHistory([
+      arenaState({ state: "arena_starting", at: "2026-01-01T00:00:00.000Z" }),
+      arenaState({ state: "arena_open", at: "2026-01-01T00:00:01.000Z" }),
+    ]);
+    useDashboardStore.getState().scrubArena("arena-1", 0);
+
+    useDashboardStore.getState().ingestHistory([
+      arenaState({ state: "arena_starting", at: "2026-01-01T00:00:00.000Z" }),
+      arenaState({ state: "arena_open", at: "2026-01-01T00:00:01.000Z" }),
+      arenaState({ state: "arena_closed", at: "2026-01-01T00:00:02.000Z" }),
+    ]);
+
+    const entry = useDashboardStore.getState().arenas.get("arena-1");
+    expect(entry?.history.length).toBe(3);
+    expect(entry?.replayIndex).toBe(0);
+    expect(entry?.snapshot.state).toBe("arena_starting");
+  });
 });

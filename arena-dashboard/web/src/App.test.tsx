@@ -676,4 +676,128 @@ describe("App", () => {
 
     expect(useDashboardStore.getState().arenas.size).toBe(0);
   });
+
+  it.each([
+    ["cancelling the drag", "pointerCancel"],
+    ["blurring the slider", "blur"],
+  ])("%s settles it onto the nearest index", (_label, endEvent) => {
+    vi.useFakeTimers();
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_starting" })) });
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_open" })) });
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_closed" })) });
+    });
+
+    const slider = screen.getByRole("slider") as HTMLInputElement;
+
+    act(() => {
+      fireEvent.pointerDown(slider);
+      fireEvent.change(slider, { target: { value: "1.4" } });
+    });
+    expect(slider.value).toBe("1.4");
+
+    act(() => {
+      if (endEvent === "pointerCancel") fireEvent.pointerCancel(slider);
+      else fireEvent.blur(slider);
+    });
+    act(() => {
+      vi.advanceTimersByTime(SLIDER_SETTLE_MS);
+    });
+
+    expect(slider.value).toBe("1");
+
+    vi.useRealTimers();
+  });
+
+  it("clicking stop replay during a replay halts it at the current index", () => {
+    vi.useFakeTimers();
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_starting" })) });
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_open" })) });
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_closed" })) });
+    });
+
+    act(() => {
+      screen.getByText("Replay").click();
+    });
+    expect(useDashboardStore.getState().arenas.get("arena-1")?.isReplaying).toBe(true);
+
+    act(() => {
+      screen.getByText("Stop replay").click();
+    });
+
+    expect(useDashboardStore.getState().arenas.get("arena-1")?.isReplaying).toBe(false);
+    expect(screen.getByText("Replay")).toBeDefined();
+
+    vi.useRealTimers();
+  });
+
+  it("clicking inside the detail popover leaves it open", () => {
+    render(<App />);
+
+    act(() => {
+      useDashboardStore.getState().select({ title: "postgres", detail: "id: postgres", position: { x: 50, y: 60 } });
+    });
+    const popover = screen.getByText("postgres").parentElement as HTMLElement;
+
+    act(() => {
+      popover.click();
+    });
+
+    expect(useDashboardStore.getState().selected).not.toBeNull();
+  });
+
+  it("clicking the backdrop dismisses the detail popover", () => {
+    render(<App />);
+
+    act(() => {
+      useDashboardStore.getState().select({ title: "postgres", detail: "id: postgres", position: { x: 50, y: 60 } });
+    });
+    const backdrop = screen.getByText("postgres").parentElement?.previousElementSibling as HTMLElement;
+
+    act(() => {
+      backdrop.click();
+    });
+
+    expect(useDashboardStore.getState().selected).toBeNull();
+  });
+
+  it("a rejected shutdown request reports the server as stopped", async () => {
+    render(<App />);
+    act(() => {
+      latestEventSource().onopen?.();
+    });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("connection reset")));
+
+    act(() => {
+      screen.getByText("Stop server").click();
+    });
+    await act(async () => {
+      within(screen.getByRole("dialog")).getByText("Stop server").click();
+    });
+
+    const feedback = screen.getByText("Server stopped");
+    expect(feedback.className).toContain("text-teal-300");
+    expect(feedback.className).not.toContain("text-rose-400");
+  });
+
+  it("a rejected clear request shows a clear failure", async () => {
+    render(<App />);
+    act(() => {
+      latestEventSource().onopen?.();
+    });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+
+    await act(async () => {
+      screen.getByText("Clear server state").click();
+    });
+
+    expect(screen.getByText("Failed to clear")).toBeDefined();
+  });
 });
