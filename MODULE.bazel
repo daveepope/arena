@@ -45,9 +45,7 @@ npm.npm_translate_lock(
     name = "npm",
     data = ["//arena-dashboard/web:package.json"],
     lifecycle_hooks = {
-        "*": ["preinstall", "install", "postinstall"],
-        "playwright": [],
-        "playwright-core": [],
+        "*": [],
     },
     pnpm_lock = "//arena-dashboard/web:pnpm-lock.yaml",
     update_pnpm_lock = True,

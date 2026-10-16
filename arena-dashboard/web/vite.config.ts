@@ -1,7 +1,7 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   build: {
     outDir: ".",
@@ -14,6 +14,7 @@ export default defineConfig({
       },
     },
   },
+  resolve: mode === "test" ? { preserveSymlinks: true } : {},
   test: {
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
@@ -26,4 +27,4 @@ export default defineConfig({
       reportOnFailure: true,
     },
   },
-});
+}));
