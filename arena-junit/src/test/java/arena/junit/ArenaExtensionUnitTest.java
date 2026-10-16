@@ -81,6 +81,9 @@ final class ArenaExtensionUnitTest {
 
   static final class NoArenaFieldsTopology {}
 
+  @ArenaVisualize
+  static final class VisualizeAnnotatedTopology {}
+
   static final class NonStaticDependencyFieldTopology {
     @ArenaDependency final StubMatchPiece dependency = new StubMatchPiece();
   }
@@ -359,6 +362,18 @@ final class ArenaExtensionUnitTest {
   }
 
   @Test
+  void applyVisualize_annotationAbsent_returnsSameClosedArena() throws Exception {
+    ClosedArena closedArena = new ClosedArena("no-visualize", List.<Match>of());
+    assertSame(closedArena, invokeApplyVisualize(NoArenaFieldsTopology.class, closedArena));
+  }
+
+  @Test
+  void applyVisualize_annotationPresent_returnsDifferentClosedArenaWithDashboardEnabled() throws Exception {
+    ClosedArena closedArena = new ClosedArena("with-visualize", List.<Match>of());
+    assertNotSame(closedArena, invokeApplyVisualize(VisualizeAnnotatedTopology.class, closedArena));
+  }
+
+  @Test
   void warnIfExplicitRootMissingSelectClasses_noExplicitRoot_doesNotWarn() throws Exception {
     invokeWarnIfExplicitRootMissingSelectClasses(NoArenaFieldsTopology.class, NoArenaFieldsTopology.class);
     assertFalse(warnedMissingSelectClasses().contains(NoArenaFieldsTopology.class));
@@ -494,6 +509,12 @@ final class ArenaExtensionUnitTest {
     Method m = ArenaExtension.class.getDeclaredMethod("expectedSuiteMembers", Class.class);
     m.setAccessible(true);
     return (Integer) m.invoke(null, root);
+  }
+
+  private static ClosedArena invokeApplyVisualize(Class<?> root, ClosedArena closedArena) throws Exception {
+    Method m = ArenaExtension.class.getDeclaredMethod("applyVisualize", Class.class, ClosedArena.class);
+    m.setAccessible(true);
+    return (ClosedArena) m.invoke(null, root, closedArena);
   }
 
   private static void invokeWarnIfExplicitRootMissingSelectClasses(Class<?> testClass, Class<?> root)

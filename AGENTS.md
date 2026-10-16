@@ -18,6 +18,7 @@
 ## AI communication
 
 - **VERY SHORT ANSWERS.** Default to one or two sentences, or a bare command. No essays, no summaries of what you just did, no restating the question. Expand only when the developer explicitly asks for detail.
+- **After a coding task, keep the wrap-up to one or two sentences:** what changed and the verification result (e.g. which `bazel build`/`test` passed). Do not list every edit, walk through each finding, or explain the reasoning unless the developer asks. Still report new or changed third-party dependencies in that one line, since other rules require it.
 - **No unsolicited tables, headings, or bullet lists** in chat replies. Prose only, and as little of it as possible.
 - Answer the question that was asked. Nothing adjacent, nothing extra.
 - Keep replies **consistent** in tone and structure.

@@ -1,3 +1,5 @@
+import "./testSetup";
+
 import { describe, expect, it } from "vitest";
 
 import { dagreLayout, estimateNodeWidth } from "./dagreLayout";

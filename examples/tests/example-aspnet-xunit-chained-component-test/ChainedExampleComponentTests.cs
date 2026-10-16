@@ -9,14 +9,14 @@ using Xunit;
 
 namespace ArenaExamples.ComponentTest;
 
-public class ChainedExampleComponentTests : IClassFixture<ChainedExampleFixture>
+public class ChainedExampleComponentTests : IClassFixture<DotnetChainedComponentTestSuite>
 {
     private static OpenArena Arena { get; set; } = null!;
 
     private readonly ApiClient api;
     private readonly ApiClient api2;
 
-    public ChainedExampleComponentTests(ChainedExampleFixture fixture)
+    public ChainedExampleComponentTests(DotnetChainedComponentTestSuite fixture)
     {
         Arena = fixture.Arena;
         api = fixture.ApiClient;

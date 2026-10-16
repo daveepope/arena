@@ -6,6 +6,10 @@ function kindBorderClass(kind: NodeKind): string {
   return kind === "dependency" ? "border-sky-400" : "border-fuchsia-400";
 }
 
+function kindShapeClass(kind: NodeKind): string {
+  return kind === "dependency" ? "rounded-md" : "rounded-full";
+}
+
 export function isActiveState(state: string): boolean {
   return state === "starting" || state === "readiness_check" || state === "started" || state === "stopping";
 }
@@ -20,21 +24,22 @@ function fillClasses(state: string): string {
     case "stopping":
       return "bg-orange-500/60 text-orange-50";
     case "stopped":
-      return "bg-neutral-700/60 text-neutral-300";
+      return "bg-slate-700/60 text-slate-200";
     case "not_started":
     default:
-      return "bg-neutral-800/60 text-neutral-400";
+      return "bg-slate-800/60 text-slate-300";
   }
 }
 
 export function nodeClasses(kind: NodeKind, state: string, hasFaults = false): string {
   const border = kindBorderClass(kind);
+  const shape = kindShapeClass(kind);
   if (hasFaults) {
-    return `${border} bg-red-600/30 text-red-100 animate-pulse`;
+    return `${border} ${shape} bg-rose-600/30 text-rose-100 animate-pulse`;
   }
   const fill = fillClasses(state);
   const pulse = isActiveState(state) ? "animate-pulse-soft" : "";
-  return `${border} ${fill} ${pulse}`.trim();
+  return `${border} ${shape} ${fill} ${pulse}`.trim();
 }
 
 export function arenaClasses(state: string): string {
@@ -42,9 +47,9 @@ export function arenaClasses(state: string): string {
     case "arena_open":
       return "border-emerald-400 bg-emerald-500/60 text-emerald-50 animate-pulse-soft";
     case "arena_faulted":
-      return "border-red-500 bg-red-600/30 text-red-100 animate-pulse";
+      return "border-rose-500 bg-rose-600/30 text-rose-100 animate-pulse";
     case "arena_closed":
-      return "border-neutral-500 bg-neutral-800/60 text-neutral-300";
+      return "border-slate-500 bg-slate-800/60 text-slate-200";
     case "arena_closing":
     case "components_stopping":
     case "components_stopped":

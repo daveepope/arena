@@ -12,12 +12,21 @@ copy_file(
     out = "src/main/resources/linux-x86-64/libarena_ffi_shared.so",
 )
 
+copy_file(
+    name = "arena_dashboard_server_for_maven_linux_x86_64",
+    src = "//arena-dashboard:server",
+    out = "src/main/resources/linux-x86-64/arena-dashboard-server-linux",
+)
+
 _ARENA_JUNIT_CLASSIFIER_ARTIFACTS = {}
 
 arena_junit_classifier_native_lib(
     name = "arena_junit_native_linux_x86_64",
     classifier = "linux-x86_64",
-    resources = [":arena_ffi_shared_for_maven_linux_x86_64"],
+    resources = [
+        ":arena_ffi_shared_for_maven_linux_x86_64",
+        ":arena_dashboard_server_for_maven_linux_x86_64",
+    ],
     classifier_artifacts = _ARENA_JUNIT_CLASSIFIER_ARTIFACTS,
 )
 
@@ -202,6 +211,36 @@ java_test(
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
         "@arena_java_maven//:org_slf4j_slf4j_api",
     ],
+)
+
+java_test(
+    name = "arena_junit_closed_arena_dashboard_component_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/ClosedArenaDashboardComponentTest.java"],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.ClosedArenaDashboardComponentTest",
+    ],
+    tags = ["component_test"],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@arena_java_maven//:net_java_dev_jna_jna",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+    data = ["//arena-ffi:arena_ffi_shared"],
+    jvm_flags = ["-Djna.nosys=true"],
 )
 
 java_test(
@@ -1029,6 +1068,33 @@ java_test(
 )
 
 java_test(
+    name = "arena_junit_arena_dashboard_paths_unit_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/ffi/ArenaDashboardPathsUnitTest.java"],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.ffi.ArenaDashboardPathsUnitTest",
+    ],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:net_java_dev_jna_jna",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+    jvm_flags = ["-Djna.nosys=true"],
+)
+
+java_test(
     name = "arena_junit_arena_bindings_unit_test",
     size = "small",
     srcs = ["src/test/java/arena/junit/ffi/ArenaBindingsUnitTest.java"],
@@ -1078,6 +1144,37 @@ java_test(
     ],
     deps = [
         ":arena_junit_lib",
+        "@arena_java_maven//:net_java_dev_jna_jna",
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
+        "@arena_java_maven//:org_slf4j_slf4j_api",
+    ],
+    data = ["//arena-ffi:arena_ffi_shared"],
+    jvm_flags = ["-Djna.nosys=true"],
+)
+
+java_test(
+    name = "arena_junit_arena_dashboard_bindings_component_test",
+    size = "small",
+    srcs = ["src/test/java/arena/junit/ffi/ArenaDashboardBindingsComponentTest.java"],
+    javacopts = [
+        "--release",
+        "25",
+    ],
+    use_testrunner = False,
+    main_class = "org.junit.platform.console.ConsoleLauncher",
+    args = [
+        "--include-engine=junit-jupiter",
+        "--select-class=arena.junit.ffi.ArenaDashboardBindingsComponentTest",
+    ],
+    tags = ["component_test"],
+    runtime_deps = [
+        "@arena_java_maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@arena_java_maven//:org_junit_platform_junit_platform_console",
+        "@arena_java_maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    deps = [
+        ":arena_junit_lib",
+        "@arena_java_maven//:com_fasterxml_jackson_core_jackson_databind",
         "@arena_java_maven//:net_java_dev_jna_jna",
         "@arena_java_maven//:org_junit_jupiter_junit_jupiter_api",
         "@arena_java_maven//:org_slf4j_slf4j_api",

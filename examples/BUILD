@@ -817,6 +817,7 @@ java_test(
     ],
     data = [
         ":example-readings-spring-boot-web-app",
+        "//arena-dashboard:server",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
         ":validation_db_schema",
@@ -871,6 +872,7 @@ java_test(
     ],
     data = [
         ":example-readings-spring-boot-web-app",
+        "//arena-dashboard:server",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
         ":validation_db_schema",
@@ -1043,6 +1045,7 @@ csharp_test(
     srcs = glob(["tests/example-aspnet-xunit-component-test/**/*.cs"]),
     data = [
         ":example-readings-aspnet-web-app",
+        "//arena-dashboard:server",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
         ":arena_config",
@@ -1090,6 +1093,7 @@ csharp_test(
     srcs = glob(["tests/example-aspnet-xunit-chained-component-test/**/*.cs"]),
     data = [
         ":example-readings-aspnet-web-app",
+        "//arena-dashboard:server",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
         ":arena_config",

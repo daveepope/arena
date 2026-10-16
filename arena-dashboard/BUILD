@@ -1,9 +1,21 @@
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
 load("@crates//:defs.bzl", "all_crate_deps")
 
+_WEB_ASSETS = {
+    "ARENA_DASHBOARD_INDEX_HTML": "//arena-dashboard/web:index_html_for_embed",
+    "ARENA_DASHBOARD_BUNDLE_JS": "//arena-dashboard/web:bundle",
+    "ARENA_DASHBOARD_STYLES_CSS": "//arena-dashboard/web:css",
+}
+
 rust_library(
     name = "arena_dashboard",
     srcs = glob(["src/**/*.rs"], exclude = ["src/bin/**/*.rs"]),
+    compile_data = _WEB_ASSETS.values(),
+    rustc_env = {name: "$(execpath %s)" % target for name, target in _WEB_ASSETS.items()},
+    rustc_flags = [
+        "--cfg=arena_embedded_web_assets",
+        "--check-cfg=cfg(arena_embedded_web_assets)",
+    ],
     edition = "2021",
     deps = all_crate_deps(normal = True) + ["//arena"],
     proc_macro_deps = all_crate_deps(proc_macro = True),
@@ -13,7 +25,6 @@ rust_library(
 rust_binary(
     name = "server",
     srcs = ["src/bin/server.rs"],
-    data = ["//arena-dashboard/web:dist"],
     edition = "2021",
     deps = all_crate_deps(normal = True) + [
         ":arena_dashboard",
@@ -111,6 +122,23 @@ rust_test(
         normal = True,
         normal_dev = True,
     ) + [":arena_dashboard", "//arena"],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "server_process_component_test",
+    srcs = ["tests/component/server_process_component_test.rs"],
+    size = "small",
+    data = [":server"],
+    edition = "2021",
+    tags = ["component_test"],
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [":arena_dashboard"],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,
         proc_macro_dev = True,

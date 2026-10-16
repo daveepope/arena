@@ -6,6 +6,9 @@ authors = ["David Pope"]
 description = "Language-agnostic live visualizer for a running Arena's lifecycle events"
 license = "todo"
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(arena_embedded_web_assets)'] }
+
 [dependencies]
 arena = { workspace = true }
 async-trait = { workspace = true }

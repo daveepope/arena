@@ -68,6 +68,11 @@ cat > "$PROJECT_DIR/probe.csproj" <<EOF
 EOF
 
 cat > "$PROJECT_DIR/SmokeTest.cs" <<'CSEOF'
+using System;
+using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
+using System.Threading.Tasks;
 using ArenaDotnet.Xunit;
 using Xunit;
 
@@ -78,6 +83,69 @@ public class SmokeTest
     {
         using var fixture = new SmokeTestFixture();
         Assert.NotNull(fixture.Arena);
+    }
+
+    [Fact]
+    public async Task Dashboard_RealNugetPackage_ServesDashboard()
+    {
+        var port = PickFreePort();
+        var closed = new ClosedArena(
+                "nuget-dashboard-smoke-test-arena",
+                new MatchBuilder("nuget-dashboard-smoke-test-match").Build())
+            .WithLifecycleDashboard(port, null);
+
+        var arena = await closed.OpenAsync();
+        try
+        {
+            var index = await ReadAsync(port, "/");
+            Assert.NotNull(index);
+            Assert.Contains("bundle.js", index);
+            Assert.NotNull(await ReadAsync(port, "/bundle.js"));
+            Assert.NotNull(await ReadAsync(port, "/styles.css"));
+        }
+        finally
+        {
+            arena.Dispose();
+            await StopDashboardAsync(port);
+        }
+    }
+
+    private static int PickFreePort()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
+    private static async Task<string?> ReadAsync(int port, string path)
+    {
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        try
+        {
+            var response = await client.GetAsync($"http://127.0.0.1:{port}{path}");
+            if (!response.IsSuccessStatusCode)
+                return null;
+            var body = await response.Content.ReadAsStringAsync();
+            return body.Length == 0 ? null : body;
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    private static async Task StopDashboardAsync(int port)
+    {
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        try
+        {
+            await client.PostAsync($"http://127.0.0.1:{port}/shutdown", null);
+        }
+        catch (HttpRequestException)
+        {
+        }
     }
 }
 
@@ -103,4 +171,4 @@ if ! grep -q "Passed!" <<<"$OUTPUT"; then
   exit 1
 fi
 
-echo "smoke test PASSED: $PACKAGE_ID $VERSION restored from NuGet via a real xunit test project run with 'dotnet test', opened and closed a real arena"
+echo "smoke test PASSED: $PACKAGE_ID $VERSION restored from NuGet via a real xunit test project run with 'dotnet test', opened and closed a real arena, and served the packaged dashboard"

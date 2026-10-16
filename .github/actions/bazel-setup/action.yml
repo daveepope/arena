@@ -1,0 +1,30 @@
+name: Set up Bazel and remote cache
+description: Install Bazelisk with caching and configure the BuildBuddy remote cache from the BUILDBUDDY_API_KEY secret.
+inputs:
+  disk-cache:
+    description: Key for the Bazel disk cache partition.
+    required: true
+  buildbuddy-api-key:
+    description: BuildBuddy API key; when empty the remote cache and BES backend are disabled.
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      with:
+        bazelisk-cache: true
+        disk-cache: ${{ inputs.disk-cache }}
+        repository-cache: true
+
+    - name: Configure BuildBuddy remote cache
+      shell: bash
+      env:
+        BUILDBUDDY_API_KEY: ${{ inputs.buildbuddy-api-key }}
+      run: |
+        if [ -n "$BUILDBUDDY_API_KEY" ]; then
+          echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
+        else
+          echo "common:ci --remote_cache=" >> .bazelrc.user
+          echo "common:ci --bes_backend=" >> .bazelrc.user
+        fi

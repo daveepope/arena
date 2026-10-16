@@ -1,5 +1,5 @@
 {
-  "checksum": "64e92c3de1aad2b4a2333d91547bec7f03f2a87dff8c3ef72b206e9b0d7c898b",
+  "checksum": "ddbc6105277e3ed5cff19c5ffd4b14e1c605e89d1517aa397777b2db3bc3177b",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -594,7 +594,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.60.2",
+                "id": "windows-sys 0.61.2",
                 "target": "windows_sys"
               }
             ]
@@ -653,7 +653,7 @@
                 "target": "once_cell_polyfill"
               },
               {
-                "id": "windows-sys 0.60.2",
+                "id": "windows-sys 0.61.2",
                 "target": "windows_sys"
               }
             ]
@@ -1968,7 +1968,7 @@
               "target": "rsa"
             },
             {
-              "id": "rustls 0.23.45",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -4237,7 +4237,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "rustls 0.23.45",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -5434,7 +5434,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "rustls 0.23.45",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -5995,7 +5995,7 @@
               "target": "rand"
             },
             {
-              "id": "rustls 0.23.45",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -10605,7 +10605,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.52.0",
+                "id": "windows-sys 0.61.2",
                 "target": "windows_sys"
               }
             ]
@@ -13831,7 +13831,7 @@
               "target": "hyper_util"
             },
             {
-              "id": "rustls 0.23.45",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -17268,7 +17268,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.60.2",
+                "id": "windows-sys 0.61.2",
                 "target": "windows_sys",
                 "alias": "windows"
               }
@@ -20815,7 +20815,7 @@
               "target": "build_script_build"
             },
             {
-              "id": "quinn-proto 0.11.15",
+              "id": "quinn-proto 0.11.19",
               "target": "quinn_proto",
               "alias": "proto"
             },
@@ -20886,14 +20886,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "quinn-proto 0.11.15": {
+    "quinn-proto 0.11.19": {
       "name": "quinn-proto",
-      "version": "0.11.15",
+      "version": "0.11.19",
       "package_url": "https://github.com/quinn-rs/quinn",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/quinn-proto/0.11.15/download",
-          "sha256": "4fcb935c5bec503c2f0e306bdd3e58bb9029dcb14fa8d9ac76e3a5256ac0763e"
+          "url": "https://static.crates.io/crates/quinn-proto/0.11.19/download",
+          "sha256": "0e750cca55fe4f0439a15d0bb529da9651e79993e8e72c61a899a36d462befbe"
         }
       },
       "targets": [
@@ -20926,8 +20926,12 @@
               "target": "lru_slab"
             },
             {
-              "id": "rand 0.9.4",
+              "id": "rand 0.10.1",
               "target": "rand"
+            },
+            {
+              "id": "rand_pcg 0.10.2",
+              "target": "rand_pcg"
             },
             {
               "id": "rustc-hash 2.1.2",
@@ -20953,7 +20957,7 @@
           "selects": {
             "cfg(all(target_family = \"wasm\", target_os = \"unknown\"))": [
               {
-                "id": "getrandom 0.3.4",
+                "id": "getrandom 0.4.2",
                 "target": "getrandom"
               },
               {
@@ -20972,7 +20976,7 @@
           }
         },
         "edition": "2021",
-        "version": "0.11.15"
+        "version": "0.11.19"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -21728,6 +21732,54 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
+    "rand_pcg 0.10.2": {
+      "name": "rand_pcg",
+      "version": "0.10.2",
+      "package_url": "https://github.com/rust-random/rngs",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/rand_pcg/0.10.2/download",
+          "sha256": "caa0f4137e1c0a72f4c651489402276c8e8e1cf081f3b0ba156d2cbeef09e86a"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "rand_pcg",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "rand_pcg",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "rand_core 0.10.1",
+              "target": "rand_core"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2024",
+        "version": "0.10.2"
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
     "rcgen 0.14.7": {
       "name": "rcgen",
       "version": "0.14.7",
@@ -22374,7 +22426,7 @@
               "target": "hyper_rustls"
             },
             {
-              "id": "rustls 0.23.45",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -23329,7 +23381,7 @@
                 "alias": "libc_errno"
               },
               {
-                "id": "windows-sys 0.52.0",
+                "id": "windows-sys 0.61.2",
                 "target": "windows_sys"
               }
             ],
@@ -23473,14 +23525,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "rustls 0.23.45": {
+    "rustls 0.23.46": {
       "name": "rustls",
-      "version": "0.23.45",
+      "version": "0.23.46",
       "package_url": "https://github.com/rustls/rustls",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/rustls/0.23.45/download",
-          "sha256": "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634"
+          "url": "https://static.crates.io/crates/rustls/0.23.46/download",
+          "sha256": "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
         }
       },
       "targets": [
@@ -23539,7 +23591,7 @@
               "target": "ring"
             },
             {
-              "id": "rustls 0.23.45",
+              "id": "rustls 0.23.46",
               "target": "build_script_build"
             },
             {
@@ -23563,7 +23615,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.23.45"
+        "version": "0.23.46"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -26058,7 +26110,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.60.2",
+                "id": "windows-sys 0.61.2",
                 "target": "windows_sys"
               }
             ]
@@ -28386,7 +28438,7 @@
         "deps": {
           "common": [
             {
-              "id": "rustls 0.23.45",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -29941,7 +29993,7 @@
               "target": "percent_encoding"
             },
             {
-              "id": "rustls 0.23.45",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -31861,7 +31913,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.52.0",
+                "id": "windows-sys 0.61.2",
                 "target": "windows_sys"
               }
             ]
@@ -32293,19 +32345,6 @@
         "compile_data_glob": [
           "**"
         ],
-        "crate_features": {
-          "common": [
-            "Win32",
-            "Win32_Foundation",
-            "Win32_Storage",
-            "Win32_Storage_FileSystem",
-            "Win32_System",
-            "Win32_System_Console",
-            "Win32_System_SystemInformation",
-            "default"
-          ],
-          "selects": {}
-        },
         "deps": {
           "common": [
             {
@@ -32354,24 +32393,6 @@
         "compile_data_glob": [
           "**"
         ],
-        "crate_features": {
-          "common": [
-            "Win32",
-            "Win32_Foundation",
-            "Win32_Networking",
-            "Win32_Networking_WinSock",
-            "Win32_Security",
-            "Win32_Storage",
-            "Win32_Storage_FileSystem",
-            "Win32_System",
-            "Win32_System_Console",
-            "Win32_System_IO",
-            "Win32_System_Threading",
-            "Win32_System_WindowsProgramming",
-            "default"
-          ],
-          "selects": {}
-        },
         "deps": {
           "common": [
             {
@@ -36120,7 +36141,7 @@
     "rsa 0.9.10",
     "rskafka 0.6.0",
     "runfiles 0.2.0",
-    "rustls 0.23.45",
+    "rustls 0.23.46",
     "serde 1.0.228",
     "serde_json 1.0.149",
     "serde_urlencoded 0.7.1",

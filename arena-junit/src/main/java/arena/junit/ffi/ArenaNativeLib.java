@@ -39,6 +39,11 @@ interface ArenaNativeLib extends Library {
   int arena_find_available_port(
       int rangeStart, int rangeEnd, int strategy, IntByReference portOut, PointerByReference errOut);
 
+  Pointer arena_dashboard_ensure_running(
+      short port, String searchDirUtf8, PointerByReference errOut);
+
+  long arena_register_dashboard_observer(String dashboardUrlUtf8);
+
   void arena_free_string(Pointer p);
 
   Pointer arena_oauth_loopback_tls_pem_json(PointerByReference errOut);

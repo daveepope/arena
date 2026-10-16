@@ -1,3 +1,5 @@
+import "./testSetup";
+
 import type { InternalNode } from "@xyflow/react";
 import { Position } from "@xyflow/react";
 import { describe, expect, it } from "vitest";

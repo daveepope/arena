@@ -108,6 +108,20 @@ def test_closed_arena_with_lifecycle_dashboard_open_and_close_forwards_state_via
     assert any(d.get("id") == "py-visualize-forward" for d in documents)
 
 
+def test_closed_arena_with_lifecycle_dashboard_dashboard_unavailable_opens_arena_anyway(
+    arena_ffi,
+):
+    closed = ClosedArena("py-visualize-unavailable", []).with_lifecycle_dashboard(
+        port=1, search_dir="/nonexistent-search-dir"
+    )
+
+    async def run():
+        opened = await closed.open()
+        await opened.close()
+
+    asyncio.run(run())
+
+
 def test_closed_arena_with_lifecycle_dashboard_close_unregisters_forwarding(
     arena_ffi, capture_server
 ):

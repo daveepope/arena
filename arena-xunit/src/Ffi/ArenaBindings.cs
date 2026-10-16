@@ -85,6 +85,35 @@ internal static class ArenaBindings
         return portOut;
     }
 
+    internal static string DashboardEnsureRunning(int port, string? searchDir)
+    {
+        if (port < 0 || port > 65535)
+            throw new ArenaBindingError($"dashboard port out of range (0-65535): {port}");
+        var ptr = ArenaNativeLib.arena_dashboard_ensure_running((ushort)port, searchDir, out var errOut);
+        if (ptr == IntPtr.Zero)
+            throw TakeErr(errOut, "arena_dashboard_ensure_running failed");
+        var url = ArenaNativeStrings.FromUtf8Ptr(ptr);
+        ArenaNativeLib.arena_free_string(ptr);
+        return url;
+    }
+
+    internal static ulong RegisterDashboardObserver(string dashboardUrl)
+    {
+        if (string.IsNullOrEmpty(dashboardUrl))
+            throw new ArenaBindingError("dashboard url is null or empty");
+        var token = ArenaNativeLib.arena_register_dashboard_observer(dashboardUrl);
+        if (token == 0)
+            throw new ArenaBindingError("arena_register_dashboard_observer rejected url");
+        return token;
+    }
+
+    internal static void RemoveLifecycleObserver(ulong token)
+    {
+        if (token == 0)
+            return;
+        ArenaNativeLib.arena_remove_lifecycle_observer(token);
+    }
+
     internal static void SetDispatcherDependencyAllowJson(string? json)
     {
         ArenaNativeLib.arena_dispatcher_dependency_allow_json_set(json);

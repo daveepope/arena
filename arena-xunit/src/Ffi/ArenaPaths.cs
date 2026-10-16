@@ -85,6 +85,41 @@ internal static class ArenaPaths
         return null;
     }
 
+    public static string? ResolveDashboardSearchDirectory()
+    {
+        var assemblyDir = Path.GetDirectoryName(typeof(ArenaPaths).Assembly.Location);
+        var alongsideAssembly = DirectoryHoldingDashboardExecutable(assemblyDir);
+        if (!string.IsNullOrEmpty(alongsideAssembly))
+            return alongsideAssembly;
+
+        var sharedLibrary = ResolveArenaSharedLibrary();
+        if (string.IsNullOrEmpty(sharedLibrary))
+            return null;
+        return DirectoryHoldingDashboardExecutable(Path.GetDirectoryName(sharedLibrary));
+    }
+
+    internal static string? DirectoryHoldingDashboardExecutable(string? directory)
+    {
+        if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
+            return null;
+
+        foreach (var name in PlatformDashboardExecutableNames())
+        {
+            if (File.Exists(Path.Combine(directory, name)))
+                return directory;
+        }
+        return null;
+    }
+
+    internal static string[] PlatformDashboardExecutableNames()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return new[] { "arena-dashboard-server.exe" };
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            return new[] { "arena-dashboard-server-macos" };
+        return new[] { "arena-dashboard-server-linux" };
+    }
+
     private static string[] UnmanagedLibraryNames() => new[] { "arena_ffi_shared", "arena_ffi" };
 
     internal static string[] PlatformLibraryNames()

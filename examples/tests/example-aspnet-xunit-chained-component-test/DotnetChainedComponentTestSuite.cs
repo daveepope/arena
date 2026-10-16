@@ -11,7 +11,8 @@ using Microsoft.Extensions.Logging;
 
 namespace ArenaExamples.ComponentTest;
 
-public sealed class ChainedExampleFixture : ArenaCollectionFixture
+[ArenaVisualize]
+public sealed class DotnetChainedComponentTestSuite : ArenaCollectionFixture
 {
     public const string QueueName = "readings-events-chained-queue";
     private const string EventBusName = "example-api-chained-events";
@@ -38,7 +39,7 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
     [ArenaLogger(Level = ArenaLogLevel.Debug)]
     private static readonly ILogger Log =
         LoggerFactory.Create(builder => builder.SetMinimumLevel(LogLevel.Debug).AddConsole())
-            .CreateLogger(nameof(ChainedExampleFixture));
+            .CreateLogger(nameof(DotnetChainedComponentTestSuite));
 
     private static readonly OauthLoopbackTlsPemPair OauthPem = OauthLoopbackTls.OauthLoopbackTlsPemPair();
 
@@ -62,6 +63,13 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
             .WithStartupSqlScripts(new[] { ResolveSchemaScript("instrument_reading_db_schema.sql") })
             .Build();
 
+    private static readonly ExecutableComponent WebAppChild =
+        BuildWebApp("example-api-chained-web-app-child", WebAppChildPort, Array.Empty<IArenaComponent>());
+
+    [ArenaComponent(Logs = false)]
+    private static readonly ExecutableComponent WebApp =
+        BuildWebApp("example-api-chained-web-app", WebAppPort, new IArenaComponent[] { WebAppChild });
+
     [ArenaDependency]
     private static readonly MssqlDependency Mssql =
         new MssqlDependencyBuilder("test-chained-mssql")
@@ -70,6 +78,7 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
             .WithDatabaseUsername(MssqlDbUser)
             .WithDatabasePassword(MssqlDbPassword)
             .WithStartupSqlScripts(new[] { ResolveSchemaScript("validation_db_schema.sql") })
+            .WithComponentId(WebApp.Identifier)
             .Build();
 
     [ArenaDependency]
@@ -82,6 +91,7 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
             .WithStartupSqlScripts(new[] { ResolveSchemaScript("weather_db_schema.sql") })
             // Oracle container start times are inconsistent across CI runners, so a longer timeout is required.
             .WithSqlReadinessTimeout(TimeSpan.FromMinutes(2))
+            .WithComponentId(WebApp.Identifier)
             .Build();
 
     [ArenaDependency]
@@ -101,6 +111,7 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
                     EventRuleTargetBuilder.SqsQueue("target-queue", QueueName),
                 },
             })
+            .WithComponentId(WebApp.Identifier)
             .Build();
 
     [ArenaDependency]
@@ -109,6 +120,7 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
             .WithPort(TemporalPort)
             .WithUiPort(TemporalUiPort)
             .AddChildDependency(Postgres)
+            .WithComponentId(WebApp.Identifier)
             .Build();
 
     [ArenaDependency]
@@ -117,15 +129,24 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
             .WithPort(OauthPort)
             .WithServerTlsPem(OauthPem.CertificatePem, OauthPem.PrivateKeyPem)
             .WithMetadataBaseUrl($"https://127.0.0.1:{OauthPort}")
+            .WithComponentId(WebApp.Identifier)
             .Build();
 
     [ArenaDependency]
     private static readonly SmtpDependency Smtp =
-        new SmtpDependencyBuilder("test-chained-smtp").WithPort(SmtpPort).WithUiPort(SmtpUiPort).WithStarttls().Build();
+        new SmtpDependencyBuilder("test-chained-smtp")
+            .WithPort(SmtpPort)
+            .WithUiPort(SmtpUiPort)
+            .WithStarttls()
+            .WithComponentId(WebApp.Identifier)
+            .Build();
 
     [ArenaDependency]
     private static readonly HttpDependency Calibration =
-        new HttpDependencyBuilder("test-chained-calibration").WithPort(CalibrationPort).Build();
+        new HttpDependencyBuilder("test-chained-calibration")
+            .WithPort(CalibrationPort)
+            .WithComponentId(WebApp.Identifier)
+            .Build();
 
     [ArenaPlaybook(ExecOnDependencyStart = true)]
     private static readonly Playbooks.CalibrationHappyPathPlaybook CalibrationHappyPath =
@@ -142,13 +163,6 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
     [ArenaPlaybook(ExecOnDependencyStart = false)]
     private static readonly Playbooks.ResetWeatherDbPlaybook ResetWeatherDb =
         new(Oracle.Identifier);
-
-    private static readonly ExecutableComponent WebAppChild =
-        BuildWebApp("example-api-chained-web-app-child", WebAppChildPort, Array.Empty<IArenaComponent>());
-
-    [ArenaComponent(Logs = false)]
-    private static readonly ExecutableComponent WebApp =
-        BuildWebApp("example-api-chained-web-app", WebAppPort, new IArenaComponent[] { WebAppChild });
 
     private static ExecutableComponent BuildWebApp(string name, int port, IEnumerable<IArenaComponent> children)
     {
@@ -205,7 +219,7 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
     public ApiClient ApiClient { get; }
     public ApiClient ApiClient2 { get; }
 
-    public ChainedExampleFixture() : base()
+    public DotnetChainedComponentTestSuite() : base()
     {
         var authToken = Signer.Sign(new Provider.Custom(), ClaimsWithScope("readings"));
         ApiClient = new ApiClient($"http://127.0.0.1:{WebAppPort}", authToken);
@@ -237,7 +251,7 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
         var runfilesRoot = Environment.GetEnvironmentVariable("RUNFILES_DIR");
         if (string.IsNullOrEmpty(runfilesRoot))
         {
-            var assemblyDir = Path.GetDirectoryName(typeof(ChainedExampleFixture).Assembly.Location);
+            var assemblyDir = Path.GetDirectoryName(typeof(DotnetChainedComponentTestSuite).Assembly.Location);
             var parent = !string.IsNullOrEmpty(assemblyDir) ? Directory.GetParent(assemblyDir!)?.FullName : null;
             if (!string.IsNullOrEmpty(parent) && parent!.Contains(".runfiles"))
                 runfilesRoot = parent;

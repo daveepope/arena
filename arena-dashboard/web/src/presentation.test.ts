@@ -1,3 +1,5 @@
+import "./testSetup";
+
 import { describe, expect, it } from "vitest";
 
 import { arenaClasses, formatDetail, nodeClasses } from "./presentation";
@@ -5,13 +7,13 @@ import type { Fault } from "./types";
 
 describe("nodeClasses", () => {
   it.each([
-    ["not_started", "neutral"],
+    ["not_started", "slate"],
     ["starting", "amber"],
     ["readiness_check", "amber"],
     ["started", "emerald"],
     ["stopping", "orange"],
-    ["stopped", "neutral"],
-    ["some_unknown_state", "neutral"],
+    ["stopped", "slate"],
+    ["some_unknown_state", "slate"],
   ])("state %s returns classes containing %s", (state: string, expectedColor: string) => {
     expect(nodeClasses("dependency", state)).toContain(expectedColor);
   });
@@ -28,45 +30,60 @@ describe("nodeClasses", () => {
     expect(nodeClasses("dependency", "not_started")).not.toContain("animate-pulse");
   });
 
-  it("recorded faults return red classes with a pulse animation", () => {
+  it("recorded faults return rose classes with a pulse animation", () => {
     const classes = nodeClasses("dependency", "stopped", true);
-    expect(classes).toContain("red");
+    expect(classes).toContain("rose");
     expect(classes).toContain("animate-pulse");
+  });
+
+  it("dependency kind uses a square shape", () => {
+    expect(nodeClasses("dependency", "started")).toContain("rounded-md");
+  });
+
+  it("component kind uses a pill shape", () => {
+    expect(nodeClasses("component", "started")).toContain("rounded-full");
+  });
+
+  it("dependency and component shapes differ for the same state", () => {
+    const dependency = nodeClasses("dependency", "faulted", true);
+    const component = nodeClasses("component", "faulted", true);
+    expect(dependency).toContain("rounded-md");
+    expect(component).toContain("rounded-full");
   });
 
   it("dependency kind uses a sky border regardless of state", () => {
     expect(nodeClasses("dependency", "started")).toContain("border-sky-400");
+    expect(nodeClasses("dependency", "not_started")).toContain("border-sky-400");
   });
 
   it("component kind uses a fuchsia border regardless of state", () => {
     expect(nodeClasses("component", "started")).toContain("border-fuchsia-400");
+    expect(nodeClasses("component", "not_started")).toContain("border-fuchsia-400");
   });
 
-  it("dependency and component borders differ for the same state", () => {
-    const dependency = nodeClasses("dependency", "faulted", true);
-    const component = nodeClasses("component", "faulted", true);
-    expect(dependency).toContain("border-sky-400");
-    expect(component).toContain("border-fuchsia-400");
+  it("kind border is the only border class so state fill cannot override it", () => {
+    const classes = nodeClasses("dependency", "started").split(" ").filter((c) => c.startsWith("border-"));
+    expect(classes).toEqual(["border-sky-400"]);
   });
 
-  it("stopped state with recorded faults still returns red classes", () => {
-    expect(nodeClasses("dependency", "stopped", true)).toContain("red");
+  it("stopped state with recorded faults still returns rose classes", () => {
+    expect(nodeClasses("dependency", "stopped", true)).toContain("rose");
   });
 
-  it("started state with recorded faults still returns red classes", () => {
-    expect(nodeClasses("dependency", "started", true)).toContain("red");
+  it("started state with recorded faults still returns rose classes", () => {
+    expect(nodeClasses("dependency", "started", true)).toContain("rose");
   });
 
-  it("stopped state with no faults returns neutral classes", () => {
-    expect(nodeClasses("dependency", "stopped", false)).toContain("neutral");
+  it("stopped state with no faults returns slate classes", () => {
+    expect(nodeClasses("dependency", "stopped", false)).toContain("slate");
   });
 });
 
 describe("arenaClasses", () => {
   it.each([
     ["arena_open", "emerald"],
-    ["arena_faulted", "red"],
-    ["arena_closed", "neutral"],
+    ["arena_faulted", "rose"],
+    ["arena_closed", "slate"],
     ["arena_closing", "orange"],
     ["components_stopping", "orange"],
     ["dependencies_stopped", "orange"],

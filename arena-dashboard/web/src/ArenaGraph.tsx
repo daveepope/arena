@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import {
   Background,
+  BackgroundVariant,
   Handle,
   MarkerType,
   Panel,
@@ -23,6 +24,9 @@ const edgeTypes = { arena: ArenaEdge };
 
 const HIDDEN_HANDLE_STYLE = { opacity: 0, width: 1, height: 1, border: "none" };
 
+const GRID_LINE_COLOR = "rgba(226, 232, 240, 0.1)";
+const GRID_LINE_WIDTH = 0.5;
+
 const PULSE_DURATION_MS = 2000;
 const PULSE_SOFT_DURATION_MS = 2400;
 
@@ -44,7 +48,7 @@ function ArenaNode({ data }: NodeProps) {
   return (
     <div
       style={{ width: estimateNodeWidth(node.label), ...pulseStyle(isPulsing, hasFaults) }}
-      className={`flex min-h-[70px] cursor-pointer flex-col items-center justify-center gap-0.5 break-words rounded-xl border-2 px-3 py-2 text-center text-[11px] transition-all duration-300 ${
+      className={`flex min-h-[70px] cursor-pointer flex-col items-center justify-center gap-0.5 break-words border-2 px-3 py-2 text-center text-[11px] transition-all duration-300 ${
         node.visible ? "scale-100 opacity-100" : "pointer-events-none scale-[0.3] opacity-0"
       } ${nodeClasses(node.kind, node.state, hasFaults)}`}
       onClick={(e) =>
@@ -115,14 +119,19 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
         fitView
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#232a4f" gap={24} />
+        <Background
+          variant={BackgroundVariant.Lines}
+          color={GRID_LINE_COLOR}
+          gap={24}
+          lineWidth={GRID_LINE_WIDTH}
+        />
         <Panel position="top-left">
           <button
             type="button"
             onClick={(e) =>
               snapshot &&
               select({
-                title: `${snapshot.id} — state: ${snapshot.state}`,
+                title: `${snapshot.id} · state: ${snapshot.state}`,
                 detail: formatDetail(
                   snapshot.id,
                   "arena",
@@ -138,7 +147,7 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
               snapshot ? arenaClasses(snapshot.state) : "border-slate-700 text-slate-500"
             }`}
           >
-            {snapshot ? `${snapshot.id} — state: ${snapshot.state}` : "waiting for events..."}
+            {snapshot ? `${snapshot.id} · state: ${snapshot.state}` : "waiting for events..."}
           </button>
         </Panel>
       </ReactFlow>

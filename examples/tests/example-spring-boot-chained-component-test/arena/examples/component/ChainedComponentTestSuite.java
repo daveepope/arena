@@ -14,6 +14,7 @@ import arena.junit.ArenaComponent;
 import arena.junit.ArenaDependency;
 import arena.junit.ArenaLogger;
 import arena.junit.ArenaPlaybook;
+import arena.junit.ArenaVisualize;
 import arena.junit.dep.HttpDependency;
 import arena.junit.dep.HttpDependencyBuilder;
 import arena.junit.dep.LocalstackDependency;
@@ -58,6 +59,7 @@ import org.slf4j.LoggerFactory;
 @Suite
 @SelectClasses({ChainedDeviceLifecycleComponentTest.class})
 @Arena
+@ArenaVisualize
 public final class ChainedComponentTestSuite {
 
   static final ObjectMapper MAPPER = new ObjectMapper();
@@ -103,6 +105,13 @@ public final class ChainedComponentTestSuite {
       OauthLoopbackTls.oauthLoopbackTlsPemPair();
   private static final String OAUTH_CA_PATH = writeOauthCaPemFile();
 
+  private static final ExecutableComponent WEB_APP_CHILD =
+      buildWebApp("example-api-chained-web-app-child", WEB_APP_CHILD_PORT, List.of());
+
+  @ArenaComponent(logs = true)
+  static final ExecutableComponent WEB_APP =
+      buildWebApp("example-api-chained-web-app", WEB_APP_PORT, List.of(WEB_APP_CHILD));
+
   @ArenaDependency(logs = false)
   static final OauthDependency OAUTH =
       new OauthDependencyBuilder("example-api-chained-oauth")
@@ -110,6 +119,7 @@ public final class ChainedComponentTestSuite {
           .withListenIp("0.0.0.0")
           .withServerTlsPem(OAUTH_PEM.certificatePem(), OAUTH_PEM.privateKeyPem())
           .withMetadataBaseUrl(OAUTH_ISSUER)
+          .withComponentId(WEB_APP.identifier())
           .build();
 
   private static final PostgresDependency POSTGRES =
@@ -130,6 +140,7 @@ public final class ChainedComponentTestSuite {
           .withDatabaseUsername(MSSQL_DB_USER)
           .withDatabasePassword(MSSQL_DB_PASS)
           .withStartupSqlScripts(readSchema("validation_db_schema.sql"))
+          .withComponentId(WEB_APP.identifier())
           .build();
 
   @ArenaDependency(logs = false)
@@ -142,12 +153,14 @@ public final class ChainedComponentTestSuite {
           .withStartupSqlScripts(readSchema("weather_db_schema.sql"))
           // Oracle container start times are inconsistent across CI runners, so a longer timeout is required.
           .withSqlReadinessTimeout(Duration.ofMinutes(2))
+          .withComponentId(WEB_APP.identifier())
           .build();
 
   @ArenaDependency(logs = false)
   static final HttpDependency CALIBRATION =
       new HttpDependencyBuilder("example-api-chained-calibration")
           .withPort(CALIBRATION_HOST_PORT)
+          .withComponentId(WEB_APP.identifier())
           .build();
 
   @ArenaDependency(logs = false)
@@ -160,6 +173,7 @@ public final class ChainedComponentTestSuite {
           .withPort(TEMPORAL_GRPC_PORT)
           .withUiPort(TEMPORAL_UI_PORT)
           .addChildDependency(POSTGRES)
+          .withComponentId(WEB_APP.identifier())
           .build();
 
   @ArenaDependency(logs = false)
@@ -168,6 +182,7 @@ public final class ChainedComponentTestSuite {
           .withPort(SMTP_HOST_PORT)
           .withUiPort(SMTP_UI_PORT)
           .withStarttls()
+          .withComponentId(WEB_APP.identifier())
           .build();
 
   @ArenaPlaybook
@@ -183,13 +198,6 @@ public final class ChainedComponentTestSuite {
   @ArenaPlaybook(execOnDependencyStart = false)
   static final ResetWeatherDbPlaybook RESET_WEATHER_DB =
       new ResetWeatherDbPlaybook(ORACLE.identifier());
-
-  private static final ExecutableComponent WEB_APP_CHILD =
-      buildWebApp("example-api-chained-web-app-child", WEB_APP_CHILD_PORT, List.of());
-
-  @ArenaComponent(logs = true)
-  static final ExecutableComponent WEB_APP =
-      buildWebApp("example-api-chained-web-app", WEB_APP_PORT, List.of(WEB_APP_CHILD));
 
   private static String writeOauthCaPemFile() {
     try {
@@ -217,6 +225,7 @@ public final class ChainedComponentTestSuite {
                       new LocalstackModels.EventRuleTarget(
                           "target-queue", new LocalstackModels.SqsQueueTarget(QUEUE_NAME))),
                   EVENT_BUS_NAME))
+          .withComponentId(WEB_APP.identifier())
           .build();
     } catch (IOException e) {
       throw new UncheckedIOException(e);

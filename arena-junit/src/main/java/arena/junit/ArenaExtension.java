@@ -226,6 +226,10 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
     return new MatchBuild(matchBuilder, new LogIdentifiers(dependencyIds, componentIds));
   }
 
+  private static ClosedArena applyVisualize(Class<?> root, ClosedArena closedArena) {
+    return root.isAnnotationPresent(ArenaVisualize.class) ? closedArena.withLifecycleDashboard() : closedArena;
+  }
+
   private static ClosedArena closedArenaFor(Class<?> root, Match match, LogIdentifiers logIdentifiers) {
     Field loggerField = findLoggerField(root);
     ArenaLogLevel level =
@@ -354,7 +358,7 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
     registerLifecycleObserverOnce();
     MatchBuild matchBuild = buildMatchBuilder(root);
     Match match = matchBuild.matchBuilder().build();
-    ClosedArena closedArena = closedArenaFor(root, match, matchBuild.logIdentifiers());
+    ClosedArena closedArena = applyVisualize(root, closedArenaFor(root, match, matchBuild.logIdentifiers()));
     OpenArena openArena;
     try {
       openArena = closedArena.open();

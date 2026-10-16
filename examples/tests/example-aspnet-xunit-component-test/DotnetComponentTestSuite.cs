@@ -11,7 +11,8 @@ using Microsoft.Extensions.Logging;
 
 namespace ArenaExamples.ComponentTest;
 
-public sealed class ExampleFixture : ArenaCollectionFixture
+[ArenaVisualize]
+public sealed class DotnetComponentTestSuite : ArenaCollectionFixture
 {
     public const string QueueName = "readings-events-queue";
     private const string EventBusName = "example-api-events";
@@ -40,7 +41,7 @@ public sealed class ExampleFixture : ArenaCollectionFixture
     [ArenaLogger(Level = ArenaLogLevel.Info)]
     private static readonly ILogger Log =
         LoggerFactory.Create(builder => builder.SetMinimumLevel(LogLevel.Debug).AddConsole())
-            .CreateLogger(nameof(ExampleFixture));
+            .CreateLogger(nameof(DotnetComponentTestSuite));
 
     private static readonly OauthLoopbackTlsPemPair OauthPem = OauthLoopbackTls.OauthLoopbackTlsPemPair();
 
@@ -55,6 +56,12 @@ public sealed class ExampleFixture : ArenaCollectionFixture
     private static readonly string OracleDbPassword = "pw_" + EphemeralTestRuntime.RandomToken(12);
     private static readonly string OracleAdminPassword = "pw_" + EphemeralTestRuntime.RandomToken(12);
 
+    [ArenaComponent(Logs = false)]
+    private static readonly ExecutableComponent WebApp = BuildWebApp("example-api-web-app", WebAppPort);
+
+    [ArenaComponent(Logs = false)]
+    private static readonly ExecutableComponent WebApp2 = BuildWebApp("example-api-web-app-2", WebApp2Port);
+
     [ArenaDependency]
     private static readonly PostgresDependency Postgres =
         new PostgresDependencyBuilder("test-postgres")
@@ -63,8 +70,8 @@ public sealed class ExampleFixture : ArenaCollectionFixture
             .WithDatabaseUsername(PostgresDbUser)
             .WithDatabasePassword(PostgresDbPassword)
             .WithStartupSqlScripts(new[] { ResolveSchemaScript("instrument_reading_db_schema.sql") })
-            .WithComponentId("example-api-web-app")
-            .WithComponentId("example-api-web-app-2")
+            .WithComponentId(WebApp.Identifier)
+            .WithComponentId(WebApp2.Identifier)
             .Build();
 
     [ArenaDependency]
@@ -75,7 +82,7 @@ public sealed class ExampleFixture : ArenaCollectionFixture
             .WithDatabaseUsername(MssqlDbUser)
             .WithDatabasePassword(MssqlDbPassword)
             .WithStartupSqlScripts(new[] { ResolveSchemaScript("validation_db_schema.sql") })
-            .WithComponentId("example-api-web-app")
+            .WithComponentId(WebApp.Identifier)
             .Build();
 
     [ArenaDependency]
@@ -88,6 +95,8 @@ public sealed class ExampleFixture : ArenaCollectionFixture
             .WithStartupSqlScripts(new[] { ResolveSchemaScript("weather_db_schema.sql") })
             // Oracle container start times are inconsistent across CI runners, so a longer timeout is required.
             .WithSqlReadinessTimeout(TimeSpan.FromMinutes(2))
+            .WithComponentId(WebApp.Identifier)
+            .WithComponentId(WebApp2.Identifier)
             .Build();
 
     [ArenaDependency]
@@ -107,12 +116,17 @@ public sealed class ExampleFixture : ArenaCollectionFixture
                     EventRuleTargetBuilder.SqsQueue("target-queue", QueueName),
                 },
             })
-            .WithComponentId("example-api-web-app")
+            .WithComponentId(WebApp.Identifier)
             .Build();
 
     [ArenaDependency]
     private static readonly TemporalDependency Temporal =
-        new TemporalDependencyBuilder("test-temporal").WithPort(TemporalPort).WithUiPort(TemporalUiPort).Build();
+        new TemporalDependencyBuilder("test-temporal")
+            .WithPort(TemporalPort)
+            .WithUiPort(TemporalUiPort)
+            .WithComponentId(WebApp.Identifier)
+            .WithComponentId(WebApp2.Identifier)
+            .Build();
 
     [ArenaDependency]
     private static readonly OauthDependency Oauth =
@@ -121,18 +135,26 @@ public sealed class ExampleFixture : ArenaCollectionFixture
             .WithServerTlsPem(OauthPem.CertificatePem, OauthPem.PrivateKeyPem)
             .WithMetadataBaseUrl($"https://127.0.0.1:{OauthPort}")
             .WithIssuerCognito(OauthCognitoPoolId)
+            .WithComponentId(WebApp.Identifier)
+            .WithComponentId(WebApp2.Identifier)
             .Build();
 
     [ArenaDependency]
     private static readonly SmtpDependency Smtp =
-        new SmtpDependencyBuilder("test-smtp").WithPort(SmtpPort).WithUiPort(SmtpUiPort).WithStarttls().Build();
+        new SmtpDependencyBuilder("test-smtp")
+            .WithPort(SmtpPort)
+            .WithUiPort(SmtpUiPort)
+            .WithStarttls()
+            .WithComponentId(WebApp.Identifier)
+            .WithComponentId(WebApp2.Identifier)
+            .Build();
 
     [ArenaDependency]
     private static readonly HttpDependency Calibration =
         new HttpDependencyBuilder("test-calibration")
             .WithPort(CalibrationPort)
-            .WithComponentId("example-api-web-app")
-            .WithComponentId("example-api-web-app-2")
+            .WithComponentId(WebApp.Identifier)
+            .WithComponentId(WebApp2.Identifier)
             .Build();
 
     [ArenaPlaybook(ExecOnDependencyStart = true)]
@@ -158,12 +180,6 @@ public sealed class ExampleFixture : ArenaCollectionFixture
     [ArenaPlaybook(ExecOnDependencyStart = true)]
     private static readonly Playbooks.EventsPurgePlaybook EventsPurge =
         new(Localstack.Identifier);
-
-    [ArenaComponent(Logs = false)]
-    private static readonly ExecutableComponent WebApp = BuildWebApp("example-api-web-app", WebAppPort);
-
-    [ArenaComponent(Logs = false)]
-    private static readonly ExecutableComponent WebApp2 = BuildWebApp("example-api-web-app-2", WebApp2Port);
 
     private static ExecutableComponent BuildWebApp(string name, int port) =>
         new ExecutableComponentBuilder(name)
@@ -215,7 +231,7 @@ public sealed class ExampleFixture : ArenaCollectionFixture
     public ApiClient ApiClient { get; }
     public ApiClient ApiClient2 { get; }
 
-    public ExampleFixture() : base()
+    public DotnetComponentTestSuite() : base()
     {
         var authToken = Signer.Sign(OauthProvider(), ClaimsWithScope("readings"));
         ApiClient = new ApiClient($"http://127.0.0.1:{WebAppPort}", authToken);
@@ -249,7 +265,7 @@ public sealed class ExampleFixture : ArenaCollectionFixture
         var runfilesRoot = Environment.GetEnvironmentVariable("RUNFILES_DIR");
         if (string.IsNullOrEmpty(runfilesRoot))
         {
-            var assemblyDir = Path.GetDirectoryName(typeof(ExampleFixture).Assembly.Location);
+            var assemblyDir = Path.GetDirectoryName(typeof(DotnetComponentTestSuite).Assembly.Location);
             var parent = !string.IsNullOrEmpty(assemblyDir) ? Directory.GetParent(assemblyDir!)?.FullName : null;
             if (!string.IsNullOrEmpty(parent) && parent!.Contains(".runfiles"))
                 runfilesRoot = parent;

@@ -106,6 +106,7 @@ interface DashboardStore {
   arenas: Map<string, ArenaEntry>;
   selected: Selected | null;
   ingest: (next: ArenaState) => void;
+  ingestHistory: (snapshots: ArenaState[]) => void;
   select: (selected: Selected) => void;
   clearSelected: () => void;
   clearArenas: () => void;
@@ -121,12 +122,41 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   ingest: (next) => {
     const { arenas } = get();
     const prev = arenas.get(next.id);
-    const history = [...(prev?.history ?? []), { at: Date.now(), snapshot: next }].slice(-MAX_HISTORY);
+    const lastRecorded = prev?.history[prev.history.length - 1]?.snapshot;
+    const isDuplicateOfLastRecorded =
+      lastRecorded !== undefined && JSON.stringify(lastRecorded) === JSON.stringify(next);
+    const history = isDuplicateOfLastRecorded
+      ? prev?.history ?? []
+      : [...(prev?.history ?? []), { at: Date.now(), snapshot: next }].slice(-MAX_HISTORY);
     const updated = new Map(arenas);
     if (prev && prev.replayIndex !== null) {
       updated.set(next.id, { ...prev, history });
     } else {
       updated.set(next.id, { ...diffEntry(prev, next), history, isReplaying: false, replayIndex: null });
+    }
+    set({ arenas: updated });
+  },
+
+  ingestHistory: (snapshots) => {
+    if (snapshots.length === 0) return;
+    const arenaId = snapshots[0].id;
+    const { arenas } = get();
+    const prev = arenas.get(arenaId);
+    const history = snapshots.map((snapshot) => ({ at: Date.parse(snapshot.at), snapshot }));
+    const newerLocally = (prev?.history ?? []).filter((entry) => entry.snapshot.at > snapshots[snapshots.length - 1].at);
+    const merged = [...history, ...newerLocally].slice(-MAX_HISTORY);
+    if (prev && prev.history.length >= merged.length) return;
+
+    const updated = new Map(arenas);
+    if (prev && (prev.isReplaying || prev.replayIndex !== null)) {
+      updated.set(arenaId, { ...prev, history: merged });
+    } else {
+      updated.set(arenaId, {
+        ...diffUpTo(merged, merged.length - 1),
+        history: merged,
+        isReplaying: false,
+        replayIndex: null,
+      });
     }
     set({ arenas: updated });
   },

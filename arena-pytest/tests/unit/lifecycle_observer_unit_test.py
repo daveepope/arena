@@ -252,6 +252,37 @@ def test_open_registrationfailure_unregisters_prior_observers(arena_ffi, monkeyp
     assert unregistered_tokens == issued_tokens
 
 
+def test_open_registrationfailure_unregisters_logging_target(arena_ffi, monkeypatch):
+    import arena_pytest.closed_arena as closed_arena_module
+    from arena_pytest.ffi._ffi import ArenaBindingError
+
+    real_unregister_log_target = closed_arena_module.unregister_dispatcher_logging_target
+    unregistered_log_tokens: list[int] = []
+
+    def tracking_unregister_log_target(ffi, token):
+        unregistered_log_tokens.append(token)
+        real_unregister_log_target(ffi, token)
+
+    def failing_observer_token_for(self, ffi, callback):
+        raise ArenaBindingError("observer registration refused")
+
+    monkeypatch.setattr(
+        closed_arena_module,
+        "unregister_dispatcher_logging_target",
+        tracking_unregister_log_target,
+    )
+    monkeypatch.setattr(
+        ClosedArena, "_observer_token_for", failing_observer_token_for
+    )
+
+    closed = ClosedArena("py-log-target-registration-failure", []).observe(lambda _: None)
+
+    with pytest.raises(ArenaBindingError):
+        asyncio.run(closed.open())
+
+    assert unregistered_log_tokens, "log target should be unregistered after a later registration failure"
+
+
 def test_close_after_observe_unregisters_cleanly(arena_ffi):
     documents: list[str] = []
     closed = ClosedArena("py-observe-teardown", []).observe(documents.append)

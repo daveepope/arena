@@ -22,8 +22,11 @@ from arena_pytest.ffi._ffi import (
     register_lifecycle_observer,
     set_dispatcher_component_allow_json,
     set_dispatcher_dependency_allow_json,
+    unregister_dispatcher_logging_target,
     unregister_lifecycle_observer,
 )
+
+_LOG = logging.getLogger(__name__)
 
 _DEFAULT_DASHBOARD_PORT = 4873
 
@@ -78,6 +81,23 @@ class ClosedArena:
         self._dashboard_search_dir = search_dir
         return self
 
+    async def _register_dashboard(self, ffi) -> Optional[int]:
+        if not self._lifecycle_dashboard:
+            return None
+        try:
+            dashboard_url = self._dashboard_url
+            if not dashboard_url:
+                search_dir = self._dashboard_search_dir or os.path.dirname(
+                    os.path.abspath(__file__)
+                )
+                dashboard_url = await asyncio.to_thread(
+                    dashboard_ensure_running, ffi, self._dashboard_port, search_dir
+                )
+            return await asyncio.to_thread(register_dashboard_observer, ffi, dashboard_url)
+        except ArenaBindingError:
+            _LOG.warning("lifecycle dashboard unavailable, continuing without it", exc_info=True)
+            return None
+
     def _observer_token_for(self, ffi, callback: Callable[[str], None]) -> int:
         def _filtered(document: str) -> None:
             try:
@@ -117,6 +137,7 @@ class ClosedArena:
         await asyncio.to_thread(set_dispatcher_dependency_allow_json, ffi, dep_json)
         await asyncio.to_thread(set_dispatcher_component_allow_json, ffi, comp_json)
         observer_tokens = []
+        log_tok = None
         try:
             if self._logger_factory is not None:
                 log_tok = await asyncio.to_thread(
@@ -138,18 +159,9 @@ class ClosedArena:
                     ffi,
                     arena_log_level=self._log_level,
                 )
-            if self._lifecycle_dashboard:
-                dashboard_url = self._dashboard_url
-                if not dashboard_url:
-                    search_dir = self._dashboard_search_dir or os.path.dirname(
-                        os.path.abspath(__file__)
-                    )
-                    dashboard_url = await asyncio.to_thread(
-                        dashboard_ensure_running, ffi, self._dashboard_port, search_dir
-                    )
-                observer_tokens.append(
-                    await asyncio.to_thread(register_dashboard_observer, ffi, dashboard_url)
-                )
+            dashboard_token = await self._register_dashboard(ffi)
+            if dashboard_token:
+                observer_tokens.append(dashboard_token)
             for callback in self._observers:
                 observer_tokens.append(
                     await asyncio.to_thread(self._observer_token_for, ffi, callback)
@@ -158,6 +170,8 @@ class ClosedArena:
         except Exception:
             for token in observer_tokens:
                 await asyncio.to_thread(unregister_lifecycle_observer, ffi, token)
+            if log_tok is not None:
+                await asyncio.to_thread(unregister_dispatcher_logging_target, ffi, log_tok)
             raise
         try:
             handle = await asyncio.to_thread(

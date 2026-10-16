@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena-dashboard`: a service that ingests `ArenaLifecycleObserver` state over HTTP (`HttpForwardingObserver`) and streams it live to a browser-based dependency-graph viewer
 - `arena-pytest`: `ClosedArena.observe(callback)` registers a lifecycle-state observer for the open arena
 - `arena-profile`'s HTML flamegraph report gets a filter/search toolbar and a resizable, togglable side-by-side layout for the flamegraph and hotspots panel
+- `arena-dashboard`: browser test driving the packaged server binary and real arena lifecycle events in Chrome
 
 ### Changed
 
@@ -28,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `aws-smithy-json` 0.62.5 -> 0.62.7 (GHSA-8ffr-xgwf-xj56, stack overflow via recursive unknown-key skipping)
 - Example Spring Boot app and the Maven bench tool: `jackson-databind`/`jackson-core` pinned to 2.21.7/2.22.3
 - `at.yawk.lz4:lz4-java` 1.11.1 -> 1.11.4 (multiple CVEs, pulled in transitively via `kafka-clients`)
+- `arena-dashboard` web dependencies on latest: React 19, vite 7, vitest 5, `@vitest/coverage-v8` 5, jsdom 30, `@xyflow/react` 12.12, TypeScript 7
+- Bazel Node toolchain pinned to 24.20.0 via `rules_nodejs` 6.7.6, replacing the end-of-life Node 18 default
 - Known-unfixable or false-positive CVEs (py-spy's `mach`/`lru` deps, vitest/tinypool, Spring Framework SSE/XsltView, PyJWT's `decode()` options-reuse bypass, `braces`) documented and suppressed with risk rationale in `osv-scanner.toml` instead of silently ignored
 
 ### Fixed

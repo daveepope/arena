@@ -20,6 +20,7 @@ import arena.junit.ArenaComponent;
 import arena.junit.ArenaDependency;
 import arena.junit.ArenaLogger;
 import arena.junit.ArenaPlaybook;
+import arena.junit.ArenaVisualize;
 import arena.junit.dep.HttpDependency;
 import arena.junit.dep.HttpDependencyBuilder;
 import arena.junit.dep.LocalstackDependency;
@@ -80,6 +81,7 @@ import software.amazon.awssdk.services.sqs.model.GetQueueUrlRequest;
   WeatherCrudComponentTest.class
 })
 @Arena
+@ArenaVisualize
 public final class ComponentTestSuite {
 
   static final ObjectMapper MAPPER = new ObjectMapper();
@@ -149,6 +151,8 @@ public final class ComponentTestSuite {
           .withServerTlsPem(OAUTH_PEM.certificatePem(), OAUTH_PEM.privateKeyPem())
           .withMetadataBaseUrl(OAUTH_ISSUER)
           .withIssuerCognito(OAUTH_COGNITO_POOL_ID)
+          .withComponentId(WEB_APP.identifier())
+          .withComponentId(WEB_APP_2.identifier())
           .build();
 
   @ArenaDependency(logs = false)
@@ -185,6 +189,8 @@ public final class ComponentTestSuite {
           .withStartupSqlScripts(readSchema("weather_db_schema.sql"))
           // Oracle container start times are inconsistent across CI runners, so a longer timeout is required.
           .withSqlReadinessTimeout(Duration.ofMinutes(2))
+          .withComponentId(WEB_APP.identifier())
+          .withComponentId(WEB_APP_2.identifier())
           .build();
 
   @ArenaDependency(logs = false)
@@ -204,6 +210,8 @@ public final class ComponentTestSuite {
           .withImage("1.8.0")
           .withPort(TEMPORAL_GRPC_PORT)
           .withUiPort(TEMPORAL_UI_PORT)
+          .withComponentId(WEB_APP.identifier())
+          .withComponentId(WEB_APP_2.identifier())
           .build();
 
   @ArenaDependency(logs = false)
@@ -212,6 +220,8 @@ public final class ComponentTestSuite {
           .withPort(SMTP_HOST_PORT)
           .withUiPort(SMTP_UI_PORT)
           .withStarttls()
+          .withComponentId(WEB_APP.identifier())
+          .withComponentId(WEB_APP_2.identifier())
           .build();
 
   @ArenaPlaybook

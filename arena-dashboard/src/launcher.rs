@@ -1,6 +1,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Once;
 use std::time::{Duration, Instant};
 
 pub const DEFAULT_PORT: u16 = 4873;
@@ -61,6 +62,18 @@ pub fn poll_ready(url: &str, timeout: Duration) -> bool {
     }
 }
 
+static CLEAR_STALE_RUNFILES_MANIFEST_ENV_ONCE: Once = Once::new();
+
+fn clear_stale_runfiles_manifest_env() {
+    CLEAR_STALE_RUNFILES_MANIFEST_ENV_ONCE.call_once(|| {
+        if let Some(manifest) = std::env::var_os("RUNFILES_MANIFEST_FILE") {
+            if !manifest.is_empty() && !Path::new(&manifest).exists() {
+                std::env::remove_var("RUNFILES_MANIFEST_FILE");
+            }
+        }
+    });
+}
+
 pub fn find_executable(search_dir: Option<&Path>) -> Option<PathBuf> {
     if let Some(dir) = search_dir {
         for name in EXECUTABLE_NAMES {
@@ -71,6 +84,7 @@ pub fn find_executable(search_dir: Option<&Path>) -> Option<PathBuf> {
         }
     }
 
+    clear_stale_runfiles_manifest_env();
     let runfiles = runfiles::Runfiles::create().ok()?;
     for base in RUNFILES_BASES {
         let rel = if base.is_empty() {

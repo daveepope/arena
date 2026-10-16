@@ -1,3 +1,5 @@
+import "./testSetup";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useDashboardStore } from "./store";
@@ -132,6 +134,17 @@ describe("useDashboardStore replay", () => {
     expect(typeof history?.[0].at).toBe("number");
   });
 
+  it("ingesting the same snapshot again (e.g. replayed on an SSE reconnect) does not duplicate history", () => {
+    useDashboardStore.getState().ingest(arenaState({ state: "arena_starting" }));
+    useDashboardStore.getState().ingest(arenaState({ state: "arena_open" }));
+    useDashboardStore.getState().ingest(arenaState({ state: "arena_open" }));
+    useDashboardStore.getState().ingest(arenaState({ state: "arena_open" }));
+
+    const history = useDashboardStore.getState().arenas.get("arena-1")?.history;
+    expect(history?.length).toBe(2);
+    expect(history?.map((h) => h.snapshot.state)).toEqual(["arena_starting", "arena_open"]);
+  });
+
   it("replayArena replays recorded snapshots back through the same log, ending not replaying", () => {
     useDashboardStore.getState().ingest(arenaState({ state: "arena_starting" }));
     useDashboardStore.getState().ingest(arenaState({ state: "arena_open" }));
@@ -228,5 +241,63 @@ describe("useDashboardStore replay", () => {
     const entry = useDashboardStore.getState().arenas.get("arena-1");
     expect(entry?.snapshot.state).toBe("arena_starting");
     expect(entry?.history.length).toBe(3);
+  });
+});
+
+describe("useDashboardStore ingestHistory", () => {
+  it("server history rebuilds the full timeline and event log", () => {
+    useDashboardStore.getState().ingestHistory([
+      arenaState({ state: "arena_starting", at: "2026-01-01T00:00:00.000Z" }),
+      arenaState({
+        state: "arena_open",
+        at: "2026-01-01T00:00:01.000Z",
+        dependencies: [{ id: "postgres", state: "started", faults: [], children: [] }],
+      }),
+      arenaState({ state: "arena_closed", at: "2026-01-01T00:00:02.000Z" }),
+    ]);
+
+    const entry = useDashboardStore.getState().arenas.get("arena-1");
+    expect(entry?.history.length).toBe(3);
+    expect(entry?.snapshot.state).toBe("arena_closed");
+    expect(entry?.log.some((e) => e.text.includes("(new) -> arena_starting"))).toBe(true);
+    expect(entry?.log.some((e) => e.text.includes("arena_open -> arena_closed"))).toBe(true);
+  });
+
+  it("history arriving after a live snapshot keeps the newer live entry", () => {
+    useDashboardStore.getState().ingest(arenaState({ state: "arena_closed", at: "2026-01-01T00:00:09.000Z" }));
+    useDashboardStore.getState().ingestHistory([
+      arenaState({ state: "arena_starting", at: "2026-01-01T00:00:00.000Z" }),
+      arenaState({ state: "arena_open", at: "2026-01-01T00:00:01.000Z" }),
+    ]);
+
+    const entry = useDashboardStore.getState().arenas.get("arena-1");
+    expect(entry?.history.length).toBe(3);
+    expect(entry?.history[2].snapshot.state).toBe("arena_closed");
+  });
+
+  it("history no longer than what is already recorded is ignored", () => {
+    useDashboardStore.getState().ingestHistory([
+      arenaState({ state: "arena_starting", at: "2026-01-01T00:00:00.000Z" }),
+      arenaState({ state: "arena_closed", at: "2026-01-01T00:00:02.000Z" }),
+    ]);
+    useDashboardStore.getState().ingestHistory([
+      arenaState({ state: "arena_starting", at: "2026-01-01T00:00:00.000Z" }),
+    ]);
+
+    expect(useDashboardStore.getState().arenas.get("arena-1")?.history.length).toBe(2);
+  });
+
+  it("scrubbing works on a timeline restored from server history", () => {
+    useDashboardStore.getState().ingestHistory([
+      arenaState({ state: "arena_starting", at: "2026-01-01T00:00:00.000Z" }),
+      arenaState({ state: "arena_open", at: "2026-01-01T00:00:01.000Z" }),
+      arenaState({ state: "arena_closed", at: "2026-01-01T00:00:02.000Z" }),
+    ]);
+
+    useDashboardStore.getState().scrubArena("arena-1", 0);
+
+    const entry = useDashboardStore.getState().arenas.get("arena-1");
+    expect(entry?.replayIndex).toBe(0);
+    expect(entry?.snapshot.state).toBe("arena_starting");
   });
 });

@@ -1,9 +1,13 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import "./testSetup";
+
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 import { useDashboardStore } from "./store";
 import type { ArenaState } from "./types";
+
+const SLIDER_SETTLE_MS = 400;
 
 class FakeEventSource {
   static CONNECTING = 0;
@@ -15,9 +19,24 @@ class FakeEventSource {
   onopen: (() => void) | null = null;
   onerror: (() => void) | null = null;
   onmessage: ((evt: { data: string }) => void) | null = null;
+  private listeners = new Map<string, Set<() => void>>();
 
   constructor(public url: string) {
     FakeEventSource.instances.push(this);
+  }
+
+  addEventListener(type: string, listener: () => void): void {
+    const forType = this.listeners.get(type) ?? new Set();
+    forType.add(listener);
+    this.listeners.set(type, forType);
+  }
+
+  removeEventListener(type: string, listener: () => void): void {
+    this.listeners.get(type)?.delete(listener);
+  }
+
+  dispatchEvent(type: string): void {
+    this.listeners.get(type)?.forEach((listener) => listener());
   }
 
   close(): void {
@@ -82,6 +101,80 @@ describe("App", () => {
     expect(screen.getByText("connected")).toBeDefined();
   });
 
+  it("shows disconnected after missing one heartbeat, even without an error event", () => {
+    vi.useFakeTimers();
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onopen?.();
+    });
+    expect(screen.getByText("connected")).toBeDefined();
+
+    act(() => {
+      vi.advanceTimersByTime(1600);
+    });
+
+    expect(screen.getByText("disconnected")).toBeDefined();
+    expect(screen.queryByText("Clear server state")).toBeNull();
+    expect(screen.queryByText("Stop server")).toBeNull();
+
+    vi.useRealTimers();
+  });
+
+  it("returns to connected as soon as a heartbeat arrives again", () => {
+    vi.useFakeTimers();
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onopen?.();
+      vi.advanceTimersByTime(1600);
+    });
+    expect(screen.getByText("disconnected")).toBeDefined();
+
+    act(() => {
+      source.dispatchEvent("heartbeat");
+    });
+
+    expect(screen.getByText("connected")).toBeDefined();
+
+    vi.useRealTimers();
+  });
+
+  it("repeated heartbeats within the interval keep the connection marked as connected", () => {
+    vi.useFakeTimers();
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onopen?.();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(400);
+      source.dispatchEvent("heartbeat");
+      vi.advanceTimersByTime(400);
+      source.dispatchEvent("heartbeat");
+      vi.advanceTimersByTime(400);
+    });
+
+    expect(screen.getByText("connected")).toBeDefined();
+
+    vi.useRealTimers();
+  });
+
+  it("clear server state and stop server buttons appear once connected", () => {
+    render(<App />);
+
+    act(() => {
+      latestEventSource().onopen?.();
+    });
+
+    expect(screen.getByText("Clear server state")).toBeDefined();
+    expect(screen.getByText("Stop server")).toBeDefined();
+  });
+
   it("shows an error message when the event source errors while open", () => {
     render(<App />);
     const source = latestEventSource();
@@ -95,6 +188,47 @@ describe("App", () => {
     expect(screen.getByText(/Lost connection/)).toBeDefined();
   });
 
+  it("appErroredShowsServerStartCommand", () => {
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.readyState = FakeEventSource.CLOSED;
+      source.onerror?.();
+    });
+
+    expect(screen.getByText("bazel run //arena-dashboard:server")).toBeDefined();
+  });
+
+  it("appDisconnectedShowsServerStartCommand", () => {
+    vi.useFakeTimers();
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onopen?.();
+    });
+    act(() => {
+      vi.advanceTimersByTime(1600);
+    });
+
+    expect(screen.getByText("disconnected")).toBeDefined();
+    expect(screen.getByRole("alert").textContent).toContain("Lost connection");
+    expect(screen.getByText("bazel run //arena-dashboard:server")).toBeDefined();
+    vi.useRealTimers();
+  });
+
+  it("appConnectedHidesLostConnectionBanner", () => {
+    render(<App />);
+
+    act(() => {
+      latestEventSource().onopen?.();
+    });
+
+    expect(screen.queryByText(/Lost connection/)).toBeNull();
+    expect(screen.queryByText("bazel run //arena-dashboard:server")).toBeNull();
+  });
+
   it("renders an arena panel once a state document is ingested", () => {
     render(<App />);
     const source = latestEventSource();
@@ -104,6 +238,45 @@ describe("App", () => {
     });
 
     expect(screen.getAllByText("arena-1").length).toBeGreaterThan(0);
+  });
+
+  it("new log entries scroll the event pane to the latest line", () => {
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_starting" })) });
+    });
+
+    const pane = screen.getByTestId("event-log-arena-1");
+    Object.defineProperty(pane, "scrollHeight", { value: 640, configurable: true });
+    pane.scrollTop = 0;
+
+    act(() => {
+      source.onmessage?.({
+        data: JSON.stringify(
+          arenaState({
+            state: "arena_open",
+            dependencies: [{ id: "postgres", state: "started", faults: [], children: [] }],
+          }),
+        ),
+      });
+    });
+
+    expect(pane.scrollTop).toBe(640);
+  });
+
+  it("arena panel labels the name as an arena", () => {
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onmessage?.({ data: JSON.stringify(arenaState()) });
+    });
+
+    const heading = screen.getByRole("heading", { level: 2 });
+    expect(heading.textContent).toContain("arena");
+    expect(heading.textContent).toContain("arena-1");
   });
 
   it("does not render the timeline slider before any state has been captured", () => {
@@ -127,6 +300,56 @@ describe("App", () => {
     });
 
     expect(screen.queryByRole("slider")).toBeNull();
+  });
+
+  it("history fetched on mount restores a scrubbable timeline", async () => {
+    const history = [
+      {
+        id: "arena-1",
+        states: [
+          arenaState({ state: "arena_starting", at: "2026-01-01T00:00:00.000Z" }),
+          arenaState({ state: "arena_open", at: "2026-01-01T00:00:01.000Z" }),
+          arenaState({ state: "arena_closed", at: "2026-01-01T00:00:02.000Z" }),
+        ],
+      },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(history), { status: 200 })),
+    );
+
+    render(<App />);
+    await act(async () => {});
+
+    expect(fetch).toHaveBeenCalledWith("/history");
+    const slider = screen.getByRole("slider") as HTMLInputElement;
+    expect(slider.max).toBe("2");
+    expect(screen.getByText("Replay")).toBeDefined();
+  });
+
+  it("does not render the replay button while the arena is still open", () => {
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_starting" })) });
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_open" })) });
+    });
+
+    expect(screen.queryByText("Replay")).toBeNull();
+  });
+
+  it("renders the replay button alongside the timeline slider on a terminal arena", () => {
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_starting" })) });
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_closed" })) });
+    });
+
+    expect(screen.getByRole("slider")).toBeDefined();
+    expect(screen.getByText("Replay")).toBeDefined();
   });
 
   it("renders a timeline slider once the arena reaches a terminal state", () => {
@@ -179,7 +402,7 @@ describe("App", () => {
     expect(useDashboardStore.getState().arenas.get("arena-1")?.replayIndex).toBe(0);
 
     act(() => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(10_000);
     });
 
     const entry = useDashboardStore.getState().arenas.get("arena-1");
@@ -210,6 +433,136 @@ describe("App", () => {
     });
 
     expect(screen.getByText(/state: arena_closed/)).toBeDefined();
+  });
+
+  it("dragging the slider holds a fractional position and scrubs to the nearest index", () => {
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_starting" })) });
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_open" })) });
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_closed" })) });
+    });
+
+    const slider = screen.getByRole("slider") as HTMLInputElement;
+    expect(slider.step).toBe("any");
+    expect(slider.className).toContain("timeline-slider");
+
+    act(() => {
+      fireEvent.pointerDown(slider);
+      fireEvent.change(slider, { target: { value: "1.4" } });
+    });
+
+    expect(slider.value).toBe("1.4");
+    expect(screen.getByText(/state: arena_open/)).toBeDefined();
+  });
+
+  it("releasing the slider settles it onto the nearest index", () => {
+    vi.useFakeTimers();
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_starting" })) });
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_open" })) });
+      source.onmessage?.({ data: JSON.stringify(arenaState({ state: "arena_closed" })) });
+    });
+
+    const slider = screen.getByRole("slider") as HTMLInputElement;
+
+    act(() => {
+      fireEvent.pointerDown(slider);
+      fireEvent.change(slider, { target: { value: "1.4" } });
+    });
+    expect(slider.value).toBe("1.4");
+
+    act(() => {
+      vi.advanceTimersByTime(SLIDER_SETTLE_MS);
+    });
+    expect(slider.value).toBe("1.4");
+
+    act(() => {
+      fireEvent.pointerUp(slider);
+    });
+    act(() => {
+      vi.advanceTimersByTime(SLIDER_SETTLE_MS);
+    });
+
+    expect(slider.value).toBe("1");
+    expect(screen.getByText(/state: arena_open/)).toBeDefined();
+
+    vi.useRealTimers();
+  });
+
+  it("stop server click asks for confirmation before shutting down", () => {
+    render(<App />);
+    const source = latestEventSource();
+    act(() => {
+      source.onopen?.();
+    });
+
+    act(() => {
+      screen.getByText("Stop server").click();
+    });
+
+    expect(screen.getByRole("dialog")).toBeDefined();
+    expect(screen.getByText("Stop the dashboard server?")).toBeDefined();
+    expect(fetch).not.toHaveBeenCalledWith("/shutdown", { method: "POST" });
+  });
+
+  it("confirming the dialog stops the server", async () => {
+    render(<App />);
+    const source = latestEventSource();
+    act(() => {
+      source.onopen?.();
+    });
+
+    act(() => {
+      screen.getByText("Stop server").click();
+    });
+    await act(async () => {
+      within(screen.getByRole("dialog")).getByText("Stop server").click();
+    });
+
+    expect(fetch).toHaveBeenCalledWith("/shutdown", { method: "POST" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("cancelling the dialog leaves the server running", () => {
+    render(<App />);
+    const source = latestEventSource();
+    act(() => {
+      source.onopen?.();
+    });
+
+    act(() => {
+      screen.getByText("Stop server").click();
+    });
+    act(() => {
+      screen.getByText("Cancel").click();
+    });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(fetch).not.toHaveBeenCalledWith("/shutdown", { method: "POST" });
+  });
+
+  it("escape key dismisses the confirmation dialog", () => {
+    render(<App />);
+    const source = latestEventSource();
+    act(() => {
+      source.onopen?.();
+    });
+
+    act(() => {
+      screen.getByText("Stop server").click();
+    });
+    act(() => {
+      fireEvent.keyDown(window, { key: "Escape" });
+    });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(fetch).not.toHaveBeenCalledWith("/shutdown", { method: "POST" });
   });
 
   it("selecting a subject renders the detail popover near the click position, not centered", () => {
@@ -245,12 +598,67 @@ describe("App", () => {
 
   it("clicking clear server state posts to the clear endpoint", async () => {
     render(<App />);
+    act(() => {
+      latestEventSource().onopen?.();
+    });
 
     await act(async () => {
       screen.getByText("Clear server state").click();
     });
 
     expect(fetch).toHaveBeenCalledWith("/clear", { method: "POST" });
+  });
+
+  it("clicking stop server posts to the shutdown endpoint once confirmed", async () => {
+    render(<App />);
+    act(() => {
+      latestEventSource().onopen?.();
+    });
+
+    act(() => {
+      screen.getByText("Stop server").click();
+    });
+    await act(async () => {
+      within(screen.getByRole("dialog")).getByText("Stop server").click();
+    });
+
+    expect(fetch).toHaveBeenCalledWith("/shutdown", { method: "POST" });
+  });
+
+  it("clicking clear server state shows feedback once the request resolves", async () => {
+    render(<App />);
+    act(() => {
+      latestEventSource().onopen?.();
+    });
+
+    await act(async () => {
+      screen.getByText("Clear server state").click();
+    });
+
+    expect(screen.getByText("Cleared")).toBeDefined();
+  });
+
+  it("confirmed stop server shows feedback once the request resolves", async () => {
+    render(<App />);
+    act(() => {
+      latestEventSource().onopen?.();
+    });
+
+    act(() => {
+      screen.getByText("Stop server").click();
+    });
+    await act(async () => {
+      within(screen.getByRole("dialog")).getByText("Stop server").click();
+    });
+
+    expect(screen.getByText("Server stopped")).toBeDefined();
+  });
+
+  it("clear server state and stop server buttons are hidden while not connected", () => {
+    render(<App />);
+
+    expect(screen.queryByText("Clear server state")).toBeNull();
+    expect(screen.queryByText("Stop server")).toBeNull();
   });
 
   it("a clear message from the server empties the arena map", () => {

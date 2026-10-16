@@ -58,7 +58,7 @@ jobs:
             [[ "$1" == .github/workflows/* || "$1" == .github/dependabot.yml || "$1" == supply-chain/* ]]
           }
           client_surface_path() {
-            [[ "$1" == arena-ffi/* || "$1" == arena-pytest/* || "$1" == arena-junit/* ]]
+            [[ "$1" == arena-ffi/* || "$1" == arena-pytest/* || "$1" == arena-junit/* || "$1" == arena-xunit/* ]]
           }
           only_non_publishable=false
           has_publishable=false
@@ -221,7 +221,10 @@ jobs:
 
       - name: Validate .codecov.yml
         run: |
-          response=$(curl -s --data-binary @.codecov.yml https://codecov.io/validate)
+          if ! response=$(curl -s --max-time 30 --retry 2 --data-binary @.codecov.yml https://codecov.io/validate); then
+            echo "::warning::could not reach Codecov to validate .codecov.yml; skipping"
+            exit 0
+          fi
           echo "$response"
           echo "$response" | grep -q "^Valid!" || { echo "::error::.codecov.yml failed Codecov schema validation"; exit 1; }
 
@@ -249,23 +252,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-ubuntu-24.04
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Verify VERSION sync
         run: >-
@@ -348,25 +339,12 @@ jobs:
               - '**/Cargo.toml'
               - 'MODULE.bazel'
 
-      - name: Setup Bazel
+      - name: Set up Bazel and remote cache
         if: steps.paths.outputs.rust_crates == 'true'
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-ubuntu-24.04
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        if: steps.paths.outputs.rust_crates == 'true'
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Audit and vet arena_ffi_shared's compiled dependency tree
         if: steps.paths.outputs.rust_crates == 'true'
@@ -410,23 +388,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-unit-ubuntu-24.04
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Build and test
         run: |
@@ -478,23 +444,11 @@ jobs:
           sudo sysctl -w kernel.kptr_restrict=0
           perf --version || echo "perf is unavailable for this kernel; CPU profiling tests will report it"
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-component-ubuntu-24.04
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Build and test
         run: |
@@ -542,23 +496,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-component-oracle-${{ matrix.runner }}
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Build and test
         run: |
@@ -609,23 +551,11 @@ jobs:
             --install amd64
           docker run --rm --platform=linux/amd64 alpine:3.22 uname -m
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-unit-ubuntu-24.04-arm64
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Build and test
         run: |
@@ -683,23 +613,11 @@ jobs:
           sudo sysctl -w kernel.kptr_restrict=0
           perf --version || echo "perf is unavailable for this kernel; CPU profiling tests will report it"
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-component-ubuntu-24.04-arm64
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Build and test
         run: |
@@ -755,23 +673,11 @@ jobs:
           sudo sysctl -w kernel.kptr_restrict=0
           perf --version || echo "perf is unavailable for this kernel; CPU profiling tests will report it"
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-ubuntu-24.04-examples
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Build and test
         run: bazel test //examples/... --config=ci --build_tests_only --test_tag_filters=component_test --local_test_jobs=2
@@ -813,34 +719,27 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-ubuntu-24.04
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Coverage
         run: |
           bazel coverage //... --config=coverage --build_tests_only --test_tag_filters=-component_test
           cp "$(bazel info output_path)/_coverage/_coverage_report.dat" lcov.info
 
+      - name: Coverage dashboard web
+        run: |
+          bazel build //arena-dashboard/web:coverage_lcov --config=ci
+          cp "$(bazel info bazel-bin)/arena-dashboard/web/coverage/lcov.info" lcov-dashboard-web.info
+
       - name: Upload to Codecov
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: lcov.info
+          files: lcov.info,lcov-dashboard-web.info
           flags: ubuntu-24.04
           name: arena-ubuntu-24.04
           fail_ci_if_error: false
@@ -879,23 +778,11 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-macos-intel
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Build and test
         run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
@@ -934,23 +821,11 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-macos-arm64
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Build and test
         run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
@@ -989,24 +864,11 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-unit-windows
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
-        shell: bash
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Build and test
         shell: bash
@@ -1047,24 +909,11 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-component-windows
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
-        shell: bash
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Setup WSL2 Docker
         shell: pwsh
@@ -1109,24 +958,11 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-windows-examples
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
-        shell: bash
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Setup WSL2 Docker
         shell: pwsh
@@ -1150,24 +986,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-windows
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
-        shell: bash
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Regenerate Windows pip lock files
         shell: pwsh
@@ -1340,24 +1163,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: ${{ matrix.disk-cache }}
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
-        shell: bash
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Build arena_ffi_shared
         run: bazel build //arena-ffi:arena_ffi_shared --config=ci --config=release
@@ -1367,6 +1177,11 @@ jobs:
         run: |
           mkdir -p staged-arena-ffi
           cp bazel-bin/arena-ffi/${{ matrix.built-lib-name }} staged-arena-ffi/${{ matrix.staged-lib-name }}
+
+      - name: Re-sign stripped macOS library (ad-hoc)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: codesign --force --sign - staged-arena-ffi/${{ matrix.staged-lib-name }}
 
       - name: Upload arena_ffi_shared artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -1417,24 +1232,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: ${{ matrix.disk-cache }}
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
-        shell: bash
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Build arena-dashboard server
         run: bazel build //arena-dashboard:server --config=ci --config=release
@@ -1444,6 +1246,11 @@ jobs:
         run: |
           mkdir -p staged-arena-dashboard-server
           cp bazel-bin/arena-dashboard/${{ matrix.built-bin-name }} staged-arena-dashboard-server/${{ matrix.staged-bin-name }}
+
+      - name: Re-sign stripped macOS binary (ad-hoc)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: codesign --force --sign - staged-arena-dashboard-server/${{ matrix.staged-bin-name }}
 
       - name: Upload arena-dashboard server artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -1500,24 +1307,11 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: ${{ matrix.disk-cache }}
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        shell: bash
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Download arena_ffi_shared
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -1662,11 +1456,12 @@ jobs:
 
   maven_smoke_test_cross_platform:
     name: Smoke test Maven (${{ matrix.runner }})
-    needs: [changes, publish_gate, build_arena_ffi]
+    needs: [changes, publish_gate, build_arena_ffi, build_arena_dashboard_server]
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
-      needs.build_arena_ffi.result == 'success'
+      needs.build_arena_ffi.result == 'success' &&
+      needs.build_arena_dashboard_server.result == 'success'
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -1677,11 +1472,13 @@ jobs:
           - runner: macos-latest
             disk-cache: build-test-publish-arena-macos-arm64
             arena-ffi-artifact: arena-ffi-darwin-aarch64
+            dashboard-server-artifact: arena-dashboard-server-darwin-aarch64
             prebuilt-dir: darwin-aarch64
             smoke-test-target: //tools/predeploy_smoke/maven:maven_snapshot_smoke_test_osx_aarch64
           - runner: macos-15-intel
             disk-cache: build-test-publish-arena-macos-intel
             arena-ffi-artifact: arena-ffi-darwin-x86-64
+            dashboard-server-artifact: arena-dashboard-server-darwin-x86-64
             prebuilt-dir: darwin-x86-64
             smoke-test-target: //tools/predeploy_smoke/maven:maven_snapshot_smoke_test_osx_x86_64
     steps:
@@ -1690,30 +1487,30 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: ${{ matrix.disk-cache }}
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        shell: bash
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Download arena_ffi_shared
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: ${{ matrix.arena-ffi-artifact }}
           path: arena-junit/prebuilt/src/main/resources/${{ matrix.prebuilt-dir }}
+
+      - name: Download arena-dashboard server
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ matrix.dashboard-server-artifact }}
+          path: arena-junit/prebuilt/src/main/resources/${{ matrix.prebuilt-dir }}
+
+      - name: Name staged arena-dashboard server
+        shell: bash
+        run: |
+          mv "arena-junit/prebuilt/src/main/resources/${{ matrix.prebuilt-dir }}/arena-dashboard-server" \
+            "arena-junit/prebuilt/src/main/resources/${{ matrix.prebuilt-dir }}/arena-dashboard-server-macos"
+          chmod +x "arena-junit/prebuilt/src/main/resources/${{ matrix.prebuilt-dir }}/arena-dashboard-server-macos"
 
       - name: Smoke test Maven artifact
         shell: bash
@@ -1725,6 +1522,7 @@ jobs:
       - changes
       - publish_gate
       - build_arena_ffi
+      - build_arena_dashboard_server
       - maven_smoke_test_cross_platform
     if: >-
       always() && !cancelled() &&
@@ -1747,23 +1545,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-ubuntu-24.04
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Download arena_ffi_shared (macOS ARM64)
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -1783,11 +1569,40 @@ jobs:
           name: arena-ffi-windows-x86-64
           path: arena-junit/prebuilt/src/main/resources/windows-x86-64
 
+      - name: Download arena-dashboard server (macOS ARM64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-darwin-aarch64
+          path: arena-junit/prebuilt/src/main/resources/darwin-aarch64
+
+      - name: Download arena-dashboard server (macOS Intel)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-darwin-x86-64
+          path: arena-junit/prebuilt/src/main/resources/darwin-x86-64
+
+      - name: Download arena-dashboard server (Windows x86-64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-windows-x86-64
+          path: arena-junit/prebuilt/src/main/resources/windows-x86-64
+
+      - name: Name staged arena-dashboard servers per platform
+        run: |
+          for dir in darwin-aarch64 darwin-x86-64; do
+            mv "arena-junit/prebuilt/src/main/resources/$dir/arena-dashboard-server" \
+              "arena-junit/prebuilt/src/main/resources/$dir/arena-dashboard-server-macos"
+            chmod +x "arena-junit/prebuilt/src/main/resources/$dir/arena-dashboard-server-macos"
+          done
+
       - name: Verify staged native libraries
         run: |
           test -s arena-junit/prebuilt/src/main/resources/darwin-aarch64/libarena_ffi_shared.dylib
           test -s arena-junit/prebuilt/src/main/resources/darwin-x86-64/libarena_ffi_shared.dylib
           test -s arena-junit/prebuilt/src/main/resources/windows-x86-64/arena_ffi_shared.dll
+          test -s arena-junit/prebuilt/src/main/resources/darwin-aarch64/arena-dashboard-server-macos
+          test -s arena-junit/prebuilt/src/main/resources/darwin-x86-64/arena-dashboard-server-macos
+          test -s arena-junit/prebuilt/src/main/resources/windows-x86-64/arena-dashboard-server.exe
 
       - name: Build Maven snapshot artifacts
         run: |
@@ -1811,6 +1626,7 @@ jobs:
       - changes
       - publish_gate
       - build_arena_ffi
+      - build_arena_dashboard_server
       - maven_smoke_test_cross_platform
     if: >-
       always() && !cancelled() &&
@@ -1833,23 +1649,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-ubuntu-24.04
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Download arena_ffi_shared (macOS ARM64)
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -1869,11 +1673,40 @@ jobs:
           name: arena-ffi-windows-x86-64
           path: arena-junit/prebuilt/src/main/resources/windows-x86-64
 
+      - name: Download arena-dashboard server (macOS ARM64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-darwin-aarch64
+          path: arena-junit/prebuilt/src/main/resources/darwin-aarch64
+
+      - name: Download arena-dashboard server (macOS Intel)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-darwin-x86-64
+          path: arena-junit/prebuilt/src/main/resources/darwin-x86-64
+
+      - name: Download arena-dashboard server (Windows x86-64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-windows-x86-64
+          path: arena-junit/prebuilt/src/main/resources/windows-x86-64
+
+      - name: Name staged arena-dashboard servers per platform
+        run: |
+          for dir in darwin-aarch64 darwin-x86-64; do
+            mv "arena-junit/prebuilt/src/main/resources/$dir/arena-dashboard-server" \
+              "arena-junit/prebuilt/src/main/resources/$dir/arena-dashboard-server-macos"
+            chmod +x "arena-junit/prebuilt/src/main/resources/$dir/arena-dashboard-server-macos"
+          done
+
       - name: Verify staged native libraries
         run: |
           test -s arena-junit/prebuilt/src/main/resources/darwin-aarch64/libarena_ffi_shared.dylib
           test -s arena-junit/prebuilt/src/main/resources/darwin-x86-64/libarena_ffi_shared.dylib
           test -s arena-junit/prebuilt/src/main/resources/windows-x86-64/arena_ffi_shared.dll
+          test -s arena-junit/prebuilt/src/main/resources/darwin-aarch64/arena-dashboard-server-macos
+          test -s arena-junit/prebuilt/src/main/resources/darwin-x86-64/arena-dashboard-server-macos
+          test -s arena-junit/prebuilt/src/main/resources/windows-x86-64/arena-dashboard-server.exe
 
       - name: Build release artifacts
         run: |
@@ -1912,7 +1745,7 @@ jobs:
 
   nuget_smoke_test_cross_platform:
     name: Smoke test NuGet (${{ matrix.runner }})
-    needs: [changes, publish_gate, build_arena_ffi]
+    needs: [changes, publish_gate, build_arena_ffi, build_arena_dashboard_server]
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
@@ -1934,24 +1767,11 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
           fetch-depth: 0
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: ${{ matrix.disk-cache }}
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        shell: bash
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Download arena_ffi_shared (Linux x86-64)
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -1977,6 +1797,41 @@ jobs:
           name: arena-ffi-windows-x86-64
           path: arena-xunit/prebuilt/windows-x86-64
 
+      - name: Download arena-dashboard server (Linux x86-64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-linux-x86-64
+          path: arena-xunit/prebuilt/linux-x86-64
+
+      - name: Download arena-dashboard server (macOS ARM64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-darwin-aarch64
+          path: arena-xunit/prebuilt/darwin-aarch64
+
+      - name: Download arena-dashboard server (macOS Intel)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-darwin-x86-64
+          path: arena-xunit/prebuilt/darwin-x86-64
+
+      - name: Download arena-dashboard server (Windows x86-64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-windows-x86-64
+          path: arena-xunit/prebuilt/windows-x86-64
+
+      - name: Name staged arena-dashboard servers per platform
+        run: |
+          mv arena-xunit/prebuilt/linux-x86-64/arena-dashboard-server \
+            arena-xunit/prebuilt/linux-x86-64/arena-dashboard-server-linux
+          chmod +x arena-xunit/prebuilt/linux-x86-64/arena-dashboard-server-linux
+          for dir in darwin-aarch64 darwin-x86-64; do
+            mv "arena-xunit/prebuilt/$dir/arena-dashboard-server" \
+              "arena-xunit/prebuilt/$dir/arena-dashboard-server-macos"
+            chmod +x "arena-xunit/prebuilt/$dir/arena-dashboard-server-macos"
+          done
+
       - name: Smoke test NuGet package
         shell: bash
         run: bazel run --config=ci --config=release --enable_runfiles //tools/predeploy_smoke/dotnet:nuget_snapshot_smoke_test
@@ -1987,7 +1842,7 @@ jobs:
 
   publish_nuget_snapshot:
     name: Publish NuGet snapshot (Ubuntu 24.04)
-    needs: [changes, publish_gate, build_arena_ffi, nuget_smoke_test_cross_platform]
+    needs: [changes, publish_gate, build_arena_ffi, build_arena_dashboard_server, nuget_smoke_test_cross_platform]
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
@@ -2013,23 +1868,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-ubuntu-24.04
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Download arena_ffi_shared (Linux x86-64)
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -2055,12 +1898,51 @@ jobs:
           name: arena-ffi-windows-x86-64
           path: arena-xunit/prebuilt/windows-x86-64
 
+      - name: Download arena-dashboard server (Linux x86-64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-linux-x86-64
+          path: arena-xunit/prebuilt/linux-x86-64
+
+      - name: Download arena-dashboard server (macOS ARM64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-darwin-aarch64
+          path: arena-xunit/prebuilt/darwin-aarch64
+
+      - name: Download arena-dashboard server (macOS Intel)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-darwin-x86-64
+          path: arena-xunit/prebuilt/darwin-x86-64
+
+      - name: Download arena-dashboard server (Windows x86-64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-windows-x86-64
+          path: arena-xunit/prebuilt/windows-x86-64
+
+      - name: Name staged arena-dashboard servers per platform
+        run: |
+          mv arena-xunit/prebuilt/linux-x86-64/arena-dashboard-server \
+            arena-xunit/prebuilt/linux-x86-64/arena-dashboard-server-linux
+          chmod +x arena-xunit/prebuilt/linux-x86-64/arena-dashboard-server-linux
+          for dir in darwin-aarch64 darwin-x86-64; do
+            mv "arena-xunit/prebuilt/$dir/arena-dashboard-server" \
+              "arena-xunit/prebuilt/$dir/arena-dashboard-server-macos"
+            chmod +x "arena-xunit/prebuilt/$dir/arena-dashboard-server-macos"
+          done
+
       - name: Verify staged native libraries
         run: |
           test -s arena-xunit/prebuilt/linux-x86-64/libarena_ffi_shared.so
           test -s arena-xunit/prebuilt/darwin-aarch64/libarena_ffi_shared.dylib
           test -s arena-xunit/prebuilt/darwin-x86-64/libarena_ffi_shared.dylib
           test -s arena-xunit/prebuilt/windows-x86-64/arena_ffi_shared.dll
+          test -s arena-xunit/prebuilt/linux-x86-64/arena-dashboard-server-linux
+          test -s arena-xunit/prebuilt/darwin-aarch64/arena-dashboard-server-macos
+          test -s arena-xunit/prebuilt/darwin-x86-64/arena-dashboard-server-macos
+          test -s arena-xunit/prebuilt/windows-x86-64/arena-dashboard-server.exe
 
       - name: Build NuGet snapshot package
         run: |
@@ -2091,7 +1973,7 @@ jobs:
 
   publish_nuget:
     name: Publish NuGet (Ubuntu 24.04)
-    needs: [changes, publish_gate, build_arena_ffi, nuget_smoke_test_cross_platform]
+    needs: [changes, publish_gate, build_arena_ffi, build_arena_dashboard_server, nuget_smoke_test_cross_platform]
     if: >-
       always() && !cancelled() &&
       needs.publish_gate.result == 'success' &&
@@ -2114,23 +1996,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y mold
 
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
+      - name: Set up Bazel and remote cache
+        uses: ./.github/actions/bazel-setup
         with:
-          bazelisk-cache: true
           disk-cache: build-test-publish-arena-ubuntu-24.04
-          repository-cache: true
-
-      - name: Configure BuildBuddy remote cache
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
-        run: |
-          if [ -n "$BUILDBUDDY_API_KEY" ]; then
-            echo "common:ci --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY" >> .bazelrc.user
-          else
-            echo "common:ci --remote_cache=" >> .bazelrc.user
-            echo "common:ci --bes_backend=" >> .bazelrc.user
-          fi
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Download arena_ffi_shared (Linux x86-64)
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -2156,12 +2026,51 @@ jobs:
           name: arena-ffi-windows-x86-64
           path: arena-xunit/prebuilt/windows-x86-64
 
+      - name: Download arena-dashboard server (Linux x86-64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-linux-x86-64
+          path: arena-xunit/prebuilt/linux-x86-64
+
+      - name: Download arena-dashboard server (macOS ARM64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-darwin-aarch64
+          path: arena-xunit/prebuilt/darwin-aarch64
+
+      - name: Download arena-dashboard server (macOS Intel)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-darwin-x86-64
+          path: arena-xunit/prebuilt/darwin-x86-64
+
+      - name: Download arena-dashboard server (Windows x86-64)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: arena-dashboard-server-windows-x86-64
+          path: arena-xunit/prebuilt/windows-x86-64
+
+      - name: Name staged arena-dashboard servers per platform
+        run: |
+          mv arena-xunit/prebuilt/linux-x86-64/arena-dashboard-server \
+            arena-xunit/prebuilt/linux-x86-64/arena-dashboard-server-linux
+          chmod +x arena-xunit/prebuilt/linux-x86-64/arena-dashboard-server-linux
+          for dir in darwin-aarch64 darwin-x86-64; do
+            mv "arena-xunit/prebuilt/$dir/arena-dashboard-server" \
+              "arena-xunit/prebuilt/$dir/arena-dashboard-server-macos"
+            chmod +x "arena-xunit/prebuilt/$dir/arena-dashboard-server-macos"
+          done
+
       - name: Verify staged native libraries
         run: |
           test -s arena-xunit/prebuilt/linux-x86-64/libarena_ffi_shared.so
           test -s arena-xunit/prebuilt/darwin-aarch64/libarena_ffi_shared.dylib
           test -s arena-xunit/prebuilt/darwin-x86-64/libarena_ffi_shared.dylib
           test -s arena-xunit/prebuilt/windows-x86-64/arena_ffi_shared.dll
+          test -s arena-xunit/prebuilt/linux-x86-64/arena-dashboard-server-linux
+          test -s arena-xunit/prebuilt/darwin-aarch64/arena-dashboard-server-macos
+          test -s arena-xunit/prebuilt/darwin-x86-64/arena-dashboard-server-macos
+          test -s arena-xunit/prebuilt/windows-x86-64/arena-dashboard-server.exe
 
       - name: Build NuGet package
         run: bazel build --config=ci --config=release //arena-xunit:arena_xunit_nuget

@@ -1,3 +1,5 @@
+import "./testSetup";
+
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -22,6 +24,21 @@ beforeEach(() => {
 });
 
 describe("ArenaGraph", () => {
+  it("canvas renders a thin line grid behind the topology", () => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState());
+    });
+    const { container } = render(<ArenaGraph arenaId="arena-1" />);
+
+    const pattern = container.querySelector(".react-flow__background-pattern");
+    expect(pattern?.classList.contains("lines")).toBe(true);
+    expect(pattern?.getAttribute("stroke-width")).toBe("0.5");
+    const canvas = container.querySelector(".react-flow__background") as SVGElement;
+    expect(canvas.style.getPropertyValue("--xy-background-pattern-color-props")).toBe(
+      "rgba(226, 232, 240, 0.1)",
+    );
+  });
+
   it("shows a waiting placeholder before any snapshot arrives", () => {
     render(<ArenaGraph arenaId="arena-1" />);
 

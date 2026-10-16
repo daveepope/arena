@@ -16,7 +16,14 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
-    setupFiles: ["./src/testSetup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
+    coverage: {
+      provider: "v8",
+      reporter: ["lcovonly"],
+      reportsDirectory: "coverage-raw",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.test.{ts,tsx}", "src/testSetup.ts", "src/main.tsx"],
+      reportOnFailure: true,
+    },
   },
 });

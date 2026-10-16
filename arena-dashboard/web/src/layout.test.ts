@@ -1,3 +1,5 @@
+import "./testSetup";
+
 import { describe, expect, it } from "vitest";
 
 import { computeLayout } from "./layout";

@@ -27,9 +27,13 @@ bazel_dep(name = "rules_pkg", version = "1.0.1")
 
 bazel_dep(name = "aspect_rules_js", version = "2.9.3")
 bazel_dep(name = "aspect_rules_ts", version = "3.10.1")
+bazel_dep(name = "rules_nodejs", version = "6.7.6", dev_dependency = True)
+
+node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
+node.toolchain(node_version = "24.20.0")
 
 typescript = use_extension("@aspect_rules_ts//ts:extensions.bzl", "typescript")
-typescript.deps(version = "5.9.3")
+typescript.deps(version = "7.0.2")
 use_repo(typescript, "npm_typescript")
 
 pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm")
@@ -40,6 +44,11 @@ npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm", dev_dependenc
 npm.npm_translate_lock(
     name = "npm",
     data = ["//arena-dashboard/web:package.json"],
+    lifecycle_hooks = {
+        "*": ["preinstall", "install", "postinstall"],
+        "playwright": [],
+        "playwright-core": [],
+    },
     pnpm_lock = "//arena-dashboard/web:pnpm-lock.yaml",
     update_pnpm_lock = True,
     verify_node_modules_ignored = "//:.bazelignore",
@@ -613,6 +622,11 @@ crate.spec(
     version = "=0.4.2",
     repositories = ["profiling_tools"],
 )
+crate.spec(
+    package = "remoteprocess",
+    version = "=0.5.3",
+    repositories = ["profiling_tools"],
+)
 crate.annotation(
     crate = "py-spy",
     repositories = ["profiling_tools"],
@@ -644,4 +658,22 @@ http_archive(
     sha256 = "64c41d1465d60097439c50d7e924b4946f1f62b1cbd21ce5b034fad09c0d6979",
     strip_prefix = "async-profiler-{}-linux-arm64".format(_ASYNC_PROFILER_VERSION),
     build_file_content = _ASYNC_PROFILER_BUILD_FILE_CONTENT,
+)
+
+_CHROME_FOR_TESTING_VERSION = "155.0.8059.84"
+
+http_archive(
+    name = "chrome_for_testing_linux_x86_64",
+    url = "https://storage.googleapis.com/chrome-for-testing-public/{v}/linux64/chrome-linux64.zip".format(v = _CHROME_FOR_TESTING_VERSION),
+    sha256 = "cf0f049892dea22e6a6db26d47ed0d7776b7158edcbec4634086633df8bafcbc",
+    strip_prefix = "chrome-linux64",
+    build_file_content = """
+filegroup(
+    name = "chrome_files",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+exports_files(["chrome"], visibility = ["//visibility:public"])
+""",
 )

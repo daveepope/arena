@@ -12,6 +12,7 @@ public sealed class OpenArena : IDisposable
     private readonly ArenaHandle _handle;
     private readonly ulong _logToken;
     private readonly ulong _lifecycleObserverToken;
+    private readonly ulong _dashboardObserverToken;
     private readonly ArenaLogRouting _routing;
     private readonly Match _match;
     private readonly Dictionary<Type, ActivePlaybook> _sessionPlaybooks;
@@ -26,10 +27,23 @@ public sealed class OpenArena : IDisposable
         ArenaLogRouting routing,
         Match match,
         Dictionary<Type, ActivePlaybook> sessionPlaybooks)
+        : this(handle, logToken, lifecycleObserverToken, 0, routing, match, sessionPlaybooks)
+    {
+    }
+
+    internal OpenArena(
+        IntPtr handle,
+        ulong logToken,
+        ulong lifecycleObserverToken,
+        ulong dashboardObserverToken,
+        ArenaLogRouting routing,
+        Match match,
+        Dictionary<Type, ActivePlaybook> sessionPlaybooks)
     {
         _handle = new ArenaHandle(handle);
         _logToken = logToken;
         _lifecycleObserverToken = lifecycleObserverToken;
+        _dashboardObserverToken = dashboardObserverToken;
         _routing = routing;
         _match = match;
         _sessionPlaybooks = sessionPlaybooks;
@@ -133,6 +147,7 @@ public sealed class OpenArena : IDisposable
         }
         finally
         {
+            ArenaBindings.RemoveLifecycleObserver(_dashboardObserverToken);
             ArenaLifecycleObservers.Unregister(_lifecycleObserverToken);
             ArenaLogTarget.Unregister(_logToken);
         }

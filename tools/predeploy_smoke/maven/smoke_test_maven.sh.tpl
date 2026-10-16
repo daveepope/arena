@@ -124,6 +124,11 @@ import arena.junit.OpenArena;
 import arena.junit.match.Match;
 import arena.junit.match.MatchBuilder;
 
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.ServerSocket;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public final class SmokeTest {
@@ -138,6 +143,66 @@ public final class SmokeTest {
         System.out.println("SMOKE_TEST_ARENA_OPENED");
         arena.close();
         System.out.println("SMOKE_TEST_ARENA_CLOSED");
+
+        int port = pickFreePort();
+        Match dashboardMatch = new MatchBuilder("maven-dashboard-smoke-test-match").build();
+        ClosedArena dashboardClosed =
+                new ClosedArena("maven-dashboard-smoke-test-arena", List.of(dashboardMatch))
+                        .withLifecycleDashboard(port, null);
+        OpenArena dashboardArena = dashboardClosed.open();
+        boolean serving = dashboardIsServing(port);
+        dashboardArena.close();
+        stopDashboard(port);
+        if (!serving) {
+            System.err.println(
+                    "smoke test: packaged dashboard server did not serve the dashboard on port " + port);
+            System.exit(1);
+        }
+        System.out.println("SMOKE_TEST_DASHBOARD_SERVED");
+    }
+
+    private static int pickFreePort() throws IOException {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            return socket.getLocalPort();
+        }
+    }
+
+    private static boolean dashboardIsServing(int port) {
+        String index = read(port, "/");
+        if (index == null || !index.contains("bundle.js")) {
+            return false;
+        }
+        return read(port, "/bundle.js") != null && read(port, "/styles.css") != null;
+    }
+
+    private static String read(int port, String path) {
+        try {
+            HttpURLConnection connection =
+                    (HttpURLConnection) URI.create("http://127.0.0.1:" + port + path).toURL().openConnection();
+            connection.setConnectTimeout(10_000);
+            connection.setReadTimeout(10_000);
+            if (connection.getResponseCode() != 200) {
+                return null;
+            }
+            byte[] body = connection.getInputStream().readAllBytes();
+            return body.length == 0 ? null : new String(body, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private static void stopDashboard(int port) {
+        try {
+            HttpURLConnection connection =
+                    (HttpURLConnection) URI.create("http://127.0.0.1:" + port + "/shutdown").toURL().openConnection();
+            connection.setRequestMethod("POST");
+            connection.setConnectTimeout(10_000);
+            connection.setReadTimeout(10_000);
+            connection.getResponseCode();
+            connection.disconnect();
+        } catch (IOException e) {
+            return;
+        }
     }
 }
 JAVAEOF
@@ -159,5 +224,9 @@ if ! grep -q "SMOKE_TEST_ARENA_OPENED" <<<"$OUTPUT" || ! grep -q "SMOKE_TEST_ARE
   echo "smoke test FAILED: did not see expected open/close markers in output" >&2
   exit 1
 fi
+if ! grep -q "SMOKE_TEST_DASHBOARD_SERVED" <<<"$OUTPUT"; then
+  echo "smoke test FAILED: packaged dashboard server did not serve the dashboard" >&2
+  exit 1
+fi
 
-echo "smoke test PASSED: $GROUP_ID:$ARTIFACT_ID:$VERSION (classifier=$NATIVE_CLASSIFIER) installed via mvn, opened and closed a real arena"
+echo "smoke test PASSED: $GROUP_ID:$ARTIFACT_ID:$VERSION (classifier=$NATIVE_CLASSIFIER) installed via mvn, opened and closed a real arena, and served the packaged dashboard"
