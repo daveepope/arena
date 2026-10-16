@@ -62,4 +62,26 @@ public class PostgresDependencyBuilderSerializationTest
         var obj = JObject.Parse(json);
         Assert.Equal("my-postgres", obj["container_name"]);
     }
+
+    [Fact]
+    public void Build_WithComponentIds_ExposesAndSerializesThemInOrder()
+    {
+        var dep = new PostgresDependencyBuilder("test")
+            .WithComponentId("parent-component")
+            .WithComponentId("child-component")
+            .Build();
+
+        Assert.Equal(new[] { "parent-component", "child-component" }, dep.ComponentIds);
+        Assert.Equal(
+            new[] { "parent-component", "child-component" },
+            JObject.Parse(dep.ForFfi())["component_ids"]!.Select(id => (string?)id));
+    }
+
+    [Fact]
+    public void Build_WithoutComponentIds_ExposesAnEmptyList()
+    {
+        var dep = new PostgresDependencyBuilder("test").Build();
+
+        Assert.Empty(dep.ComponentIds);
+    }
 }

@@ -44,4 +44,26 @@ public class HttpDependencyBuilderSerializationTest
         var dep = new HttpDependencyBuilder("test").Build();
         Assert.StartsWith("arena-http-", dep.Identifier);
     }
+
+    [Fact]
+    public void Build_WithComponentIds_ExposesAndSerializesThemInOrder()
+    {
+        var dep = new HttpDependencyBuilder("test")
+            .WithComponentId("parent-component")
+            .WithComponentId("child-component")
+            .Build();
+
+        Assert.Equal(new[] { "parent-component", "child-component" }, dep.ComponentIds);
+        Assert.Equal(
+            new[] { "parent-component", "child-component" },
+            JObject.Parse(dep.ForFfi())["component_ids"]!.Select(id => (string?)id));
+    }
+
+    [Fact]
+    public void Build_WithoutComponentIds_ExposesAnEmptyList()
+    {
+        var dep = new HttpDependencyBuilder("test").Build();
+
+        Assert.Empty(dep.ComponentIds);
+    }
 }

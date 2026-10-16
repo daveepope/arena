@@ -1,7 +1,10 @@
 use std::sync::mpsc::{channel, Sender};
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
 use arena::lifecycle::{ArenaLifecycleObserver, ArenaState};
+
+const INGEST_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub struct HttpForwardingObserver {
     sender: Option<Sender<ArenaState>>,
@@ -16,7 +19,7 @@ impl HttpForwardingObserver {
             let client = reqwest::blocking::Client::new();
             let ingest_url = format!("{}/ingest", dashboard_url.trim_end_matches('/'));
             for state in receiver {
-                let _ = client.post(&ingest_url).json(&state).send();
+                let _ = client.post(&ingest_url).timeout(INGEST_TIMEOUT).json(&state).send();
             }
         });
         Self { sender: Some(sender), handle: Some(handle) }

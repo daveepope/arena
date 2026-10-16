@@ -119,4 +119,26 @@ public class OracleDependencyBuilderSerializationTest
         Assert.Null(obj["setup_mode"]);
         Assert.Null(obj["sql_readiness_timeout_ms"]);
     }
+
+    [Fact]
+    public void Build_WithComponentIds_ExposesAndSerializesThemInOrder()
+    {
+        var dep = new OracleDependencyBuilder("test")
+            .WithComponentId("parent-component")
+            .WithComponentId("child-component")
+            .Build();
+
+        Assert.Equal(new[] { "parent-component", "child-component" }, dep.ComponentIds);
+        Assert.Equal(
+            new[] { "parent-component", "child-component" },
+            JObject.Parse(dep.ForFfi())["component_ids"]!.Select(id => (string?)id));
+    }
+
+    [Fact]
+    public void Build_WithoutComponentIds_ExposesAnEmptyList()
+    {
+        var dep = new OracleDependencyBuilder("test").Build();
+
+        Assert.Empty(dep.ComponentIds);
+    }
 }

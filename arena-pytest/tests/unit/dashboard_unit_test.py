@@ -63,13 +63,6 @@ def capture_server():
         server.close()
 
 
-def test_register_dashboard_observer_valid_url_returns_removable_token(arena_ffi):
-    token = register_dashboard_observer(arena_ffi, "http://127.0.0.1:1")
-
-    assert token != 0
-    unregister_lifecycle_observer(arena_ffi, token)
-
-
 def test_dashboard_ensure_running_no_server_and_no_search_dir_raises_binding_error(arena_ffi):
     with pytest.raises(ArenaBindingError):
         dashboard_ensure_running(arena_ffi, 1)

@@ -191,3 +191,23 @@ fn build_without_expiry_disables_expiry() {
 
     assert_eq!(*recorder.expiry.lock().unwrap(), Some(None));
 }
+
+#[test]
+fn builder_with_component_id_populates_component_ids() {
+    let dep = KafkaDependency::builder("component-linked")
+        .with_impl(NoopKafkaImpl)
+        .with_component_id("parent-component")
+        .with_component_id("child-component")
+        .build();
+
+    assert_eq!(dep.component_ids(), ["parent-component", "child-component"]);
+}
+
+#[test]
+fn builder_without_component_id_defaults_to_empty() {
+    let dep = KafkaDependency::builder("no-component")
+        .with_impl(NoopKafkaImpl)
+        .build();
+
+    assert!(dep.component_ids().is_empty());
+}

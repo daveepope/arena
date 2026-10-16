@@ -216,4 +216,25 @@ public class LocalstackDependencyBuilderSerializationTest
         Assert.Equal("lambda", eventTarget["kind"]);
         Assert.Equal("func1", eventTarget["function_name"]);
     }
+
+    [Fact]
+    public void Build_WithComponentIds_SerializesThemInOrder()
+    {
+        var dep = new LocalstackDependencyBuilder("test")
+            .WithComponentId("parent-component")
+            .WithComponentId("child-component")
+            .Build();
+
+        Assert.Equal(
+            new[] { "parent-component", "child-component" },
+            JObject.Parse(dep.ForFfi())["component_ids"]!.Select(id => (string?)id));
+    }
+
+    [Fact]
+    public void Build_WithoutComponentIds_OmitsTheField()
+    {
+        var dep = new LocalstackDependencyBuilder("test").Build();
+
+        Assert.Null(JObject.Parse(dep.ForFfi())["component_ids"]);
+    }
 }

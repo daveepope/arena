@@ -244,3 +244,23 @@ fn build_without_expiry_disables_expiry() {
 
     assert_eq!(*recorder.expiry.lock().unwrap(), Some(None));
 }
+
+#[test]
+fn builder_with_component_id_populates_component_ids() {
+    let dep = HttpDependency::builder("component-linked")
+        .with_impl(FakeHttpImpl { base_url: None })
+        .with_component_id("parent-component")
+        .with_component_id("child-component")
+        .build().expect("build http dependency");
+
+    assert_eq!(dep.component_ids(), ["parent-component", "child-component"]);
+}
+
+#[test]
+fn builder_without_component_id_defaults_to_empty() {
+    let dep = HttpDependency::builder("no-component")
+        .with_impl(FakeHttpImpl { base_url: None })
+        .build().expect("build http dependency");
+
+    assert!(dep.component_ids().is_empty());
+}

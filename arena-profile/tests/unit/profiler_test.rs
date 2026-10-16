@@ -126,3 +126,57 @@ fn render_collected_valid_folded_path_removes_folded_file_after_render() {
     assert!(!folded_path.exists());
     let _ = std::fs::remove_file(&output_path);
 }
+
+#[test]
+fn with_hotspots_wrapped_launch_preserves_program_and_args() {
+    let result = prepare_cpu_profile(
+        CpuProfilerBackend::Perf,
+        sample_request(),
+        temp_html_path("hotspots-perf"),
+    );
+
+    match result {
+        Ok(launch) => {
+            let PreparedLaunch::Wrapped { program, args, .. } = &launch else {
+                panic!("expected Wrapped variant");
+            };
+            let (program, args) = (program.clone(), args.clone());
+            match launch.with_hotspots() {
+                PreparedLaunch::Wrapped { program: p, args: a, .. } => {
+                    assert_eq!(p, program);
+                    assert_eq!(a, args);
+                }
+                PreparedLaunch::ArgsAugmented { .. } => panic!("expected Wrapped variant"),
+            }
+        }
+        Err(CpuProfileError::MissingBinary { .. }) => {}
+        Err(other) => panic!("expected MissingBinary, got {other}"),
+    }
+}
+
+#[test]
+fn with_hotspots_args_augmented_launch_preserves_args_and_shutdown_signal() {
+    let result = prepare_cpu_profile(
+        CpuProfilerBackend::AsyncProfiler,
+        sample_request(),
+        temp_html_path("hotspots-async-profiler"),
+    );
+
+    match result {
+        Ok(launch) => {
+            let PreparedLaunch::ArgsAugmented { args, shutdown_signal, .. } = &launch else {
+                panic!("expected ArgsAugmented variant");
+            };
+            let (args, shutdown_signal) = (args.clone(), *shutdown_signal);
+            match launch.with_hotspots() {
+                PreparedLaunch::ArgsAugmented { args: a, shutdown_signal: s, .. } => {
+                    assert_eq!(a, args);
+                    assert_eq!(s, shutdown_signal);
+                }
+                PreparedLaunch::Wrapped { .. } => panic!("expected ArgsAugmented variant"),
+            }
+        }
+        Err(CpuProfileError::MissingBinary { .. }) => {}
+        Err(other) => panic!("expected MissingBinary, got {other}"),
+    }
+}

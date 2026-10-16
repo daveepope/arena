@@ -176,3 +176,50 @@ fn top_hotspots_assigns_severity_from_self_pct() {
     assert_eq!(hot.severity, Severity::Critical);
     assert_eq!(cold.severity, Severity::Medium);
 }
+
+#[test]
+fn render_folded_to_html_hotspots_spanning_all_bands_labels_each_severity() {
+    let folded = "main;critical_fn 60\nmain;high_fn 15\nmain;medium_fn 7\nmain;low_fn 3\n";
+    let output_path = temp_html_path("hotspots-all-severities");
+
+    render_folded_to_html(folded.as_bytes(), &output_path, true).unwrap();
+
+    let report = std::fs::read_to_string(&output_path).unwrap();
+    for label in ["Critical", "High", "Medium", "Low"] {
+        assert!(report.contains(label), "missing severity label {label}");
+    }
+    for color in ["#e74c3c", "#b94a3a", "#8d4038", "#5c3530"] {
+        assert!(report.contains(color), "missing badge colour {color}");
+    }
+    for reason in [
+        "20%+ of captured samples",
+        "10-20% of captured samples",
+        "5-10% of captured samples",
+        "Under 5% of captured samples",
+    ] {
+        assert!(report.contains(reason), "missing severity reason {reason}");
+    }
+    let _ = std::fs::remove_file(&output_path);
+}
+
+#[test]
+fn top_hotspots_lines_without_a_count_are_skipped() {
+    let folded = "main;ok 10\nnocountatall\nmain;bad notanumber\n";
+
+    let hotspots = top_hotspots(folded, 10);
+
+    assert_eq!(hotspots.len(), 1);
+    assert_eq!(hotspots[0].function, "ok");
+}
+
+#[test]
+fn top_hotspots_all_counts_zero_returns_zero_percentage() {
+    let folded = "main;idle 0\n";
+
+    let hotspots = top_hotspots(folded, 10);
+
+    assert_eq!(hotspots.len(), 1);
+    assert_eq!(hotspots[0].self_count, 0);
+    assert_eq!(hotspots[0].self_pct, 0.0);
+    assert_eq!(hotspots[0].severity, Severity::Low);
+}

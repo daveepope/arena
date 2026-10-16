@@ -6,11 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.sun.jna.Pointer;
 
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -157,5 +161,37 @@ final class ArenaBindingsUnitTest {
     } finally {
       ArenaBindings.unregisterDispatcherLoggingTarget(token);
     }
+  }
+
+  @ParameterizedTest
+  @NullAndEmptySource
+  void registerDashboardObserver_blankUrl_throwsArenaBindingError(String url) {
+    assertThrows(ArenaBindingError.class, () -> ArenaBindings.registerDashboardObserver(url));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 65536})
+  void dashboardEnsureRunning_portOutOfRange_throwsArenaBindingError(int port) {
+    ArenaBindingError error =
+        assertThrows(
+            ArenaBindingError.class, () -> ArenaBindings.dashboardEnsureRunning(port, null));
+
+    assertTrue(error.getMessage().contains("dashboard port out of range"));
+  }
+
+  @Test
+  void dashboardEnsureRunning_noServerAndMissingSearchDir_throwsArenaBindingError() {
+    Assumptions.assumeTrue(ArenaNativeHolder.LIB != null, "arena shared library not found");
+
+    assertThrows(
+        ArenaBindingError.class,
+        () -> ArenaBindings.dashboardEnsureRunning(1, "/nonexistent-search-dir"));
+  }
+
+  @Test
+  void dashboardSearchDirFromClasspath_resourceAbsent_returnsEmptyOrAnExistingDirectory() {
+    String resolved = ArenaBindings.dashboardSearchDirFromClasspath();
+
+    assertTrue(resolved.isEmpty() || new java.io.File(resolved).isDirectory(), resolved);
   }
 }
