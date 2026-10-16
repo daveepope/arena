@@ -11,40 +11,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `arena-profile`: new crate sampling CPU profiles and rendering them to an HTML flamegraph report via inferno
 - `arena-profile`: `perf`, async-profiler, py-spy and dotnet-trace backends selected from the component's build tool
+- `arena-profile`: flamegraph report gets a filter/search toolbar, a hotspots table ranked by self time, and a resizable side-by-side or stacked layout
 - `arena-executable-component`: `with_cpu_profile`/`with_cpu_profile_auto_open`/`with_hotspots` on `ExecutableComponentBuilder`
 - `arena-ffi`: `cpu_profile_output`/`cpu_profile_auto_open`/`cpu_profile_hotspots` on the executable component config
 - `arena-pytest`, `arena-junit`, `arena-xunit`: `with_cpu_profile`/`with_cpu_profile_auto_open`/`with_hotspots` bindings
 - `arena-junit`, `arena-xunit`: `BuildTool.PYTHON`/`BuildTool.Python`
 - async-profiler and py-spy vendored through Bazel, so no host install is required
-- `arena-dashboard`: a service that ingests `ArenaLifecycleObserver` state over HTTP (`HttpForwardingObserver`) and streams it live to a browser-based dependency-graph viewer
+- `arena-dashboard`: new service ingesting `ArenaLifecycleObserver` state over HTTP (`HttpForwardingObserver`) and streaming it live to a browser dependency-graph viewer
+- `arena-dashboard`: replay a recorded arena lifecycle, scrub it with a timeline slider, and reset or stop the server from the UI
+- `arena-dashboard`: server binary packaged into the release artifacts for linux-x86-64, darwin-aarch64 and darwin-x86-64
 - `arena-pytest`: `ClosedArena.observe(callback)` registers a lifecycle-state observer for the open arena
-- `arena-profile`'s HTML flamegraph report gets a filter/search toolbar and a resizable, togglable side-by-side layout for the flamegraph and hotspots panel
 - `arena-dashboard`: browser test driving the packaged server binary and real arena lifecycle events in Chrome
+- `arena-dashboard`: unit test coverage for the lifecycle-forwarding observer, previously untested
 
 ### Changed
 
-- `rustls` 0.23.43 -> 0.23.45 (RUSTSEC-2026-0285)
+- Arena dependency teardown runs in parallel instead of sequentially
+- `zip` 2.4.2 -> 9.0.3 (RUSTSEC-2026-0367, RUSTSEC-2026-0368, RUSTSEC-2026-0369)
+- `rustls` 0.23.43 -> 0.23.46 (RUSTSEC-2026-0285, RUSTSEC-2026-0346, RUSTSEC-2026-0349)
 - Example apps: `anyio` 4.14.2 (CVE-2026-63374, CVE-2026-64847), `netty-handler` 4.1.137.Final (CVE-2026-75595, CVE-2026-75596)
 - `pyjwt` 2.13.0 -> 2.15.1, `urllib3` 2.7.0 -> 2.8.0 (multiple PyJWT and urllib3 CVEs)
 - `aws-smithy-json` 0.62.5 -> 0.62.7 (GHSA-8ffr-xgwf-xj56, stack overflow via recursive unknown-key skipping)
 - Example Spring Boot app and the Maven bench tool: `jackson-databind`/`jackson-core` pinned to 2.21.7/2.22.3
 - `at.yawk.lz4:lz4-java` 1.11.1 -> 1.11.4 (multiple CVEs, pulled in transitively via `kafka-clients`)
-- `arena-dashboard` web dependencies on latest: React 19, vite 7, vitest 5, `@vitest/coverage-v8` 5, jsdom 30, `@xyflow/react` 12.12, TypeScript 7
-- Bazel Node toolchain pinned to 24.20.0 via `rules_nodejs` 6.7.6, replacing the end-of-life Node 18 default
-- Known-unfixable or false-positive CVEs (py-spy's `mach`/`lru` deps, vitest/tinypool, Spring Framework SSE/XsltView, PyJWT's `decode()` options-reuse bypass, `braces`) documented and suppressed with risk rationale in `osv-scanner.toml` instead of silently ignored
+- CI: 24 duplicated Bazel setup and BuildBuddy blocks replaced with a `.github/actions/bazel-setup` composite action
+- Unit test coverage raised across the dependency crates, `arena-junit`, `arena-xunit` and `arena-pytest`
+- Agent rules forbid asserting on log output to prove behaviour, and require the changelog to record internal as well as external changes
+- Known-unfixable or false-positive CVEs (Spring Framework SSE/XsltView, PyJWT's `decode()` options-reuse bypass, `braces`) documented and suppressed with risk rationale in `osv-scanner.toml` instead of silently ignored
 
 ### Fixed
 
-- Forced teardown finishes an active CPU profile instead of orphaning the profiled process
-- `scripts/repin.py` no longer leaves `MODULE.bazel.lock` stale: `CARGO_BAZEL_REPIN` is scoped to the crate repin step and the lockfile is recorded last
+- macOS release binaries are re-signed ad-hoc after stripping, so the darwin `arena_ffi_shared` no longer ships with an invalidated signature
 - `OpenArena::run_playbook` now records a panicking playbook as a `Fault` instead of letting it unwind out of the arena
-- `arena-ffi`'s executable component config no longer duplicates the `cpu_profile_output` build-tool allow-list; it relies solely on `ExecutableComponentBuilder`'s own validation
 - Executable components no longer mis-resolve a bare command name (e.g. `powershell`, `sh`) against the working directory; PATH-resolved commands are left alone
-- `arena-profile`'s py-spy backend judges success by whether the folded-stacks file was written, not by py-spy's SIGINT exit status
-- Flaky `dotnet-trace` unit and component tests wait on a busy-loop readiness marker instead of a fixed sleep
-- CI installs the .NET profiler and resolves it correctly on the dotnet-trace workflow
-- `requirements_windows.txt` for `examples` and `arena-pytest` regenerated to carry the same `pyjwt`/`urllib3` fixes as the other platform lockfiles
 - `arena-ffi`'s `HttpReadinessCheck` now requires a successful (2xx) status instead of treating any HTTP response, including 404/500, as ready
+- `scripts/repin.py` no longer leaves `MODULE.bazel.lock` stale: `CARGO_BAZEL_REPIN` is scoped to the crate repin step and the lockfile is recorded last
+- `requirements_windows.txt` for `examples` and `arena-pytest` regenerated to carry the same `pyjwt`/`urllib3` fixes as the other platform lockfiles
 
 ## [7.0.1]
 

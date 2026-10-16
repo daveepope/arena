@@ -1,13 +1,6 @@
 
 # cargo-vet imports lock
 
-[[publisher.arbitrary]]
-version = "1.4.2"
-when = "2025-08-14"
-user-id = 696
-user-login = "fitzgen"
-user-name = "Nick Fitzgerald"
-
 [[publisher.bumpalo]]
 version = "3.20.2"
 when = "2026-02-19"
@@ -21,13 +14,6 @@ when = "2022-02-07"
 user-id = 5946
 user-login = "jrmuizel"
 user-name = "Jeff Muizelaar"
-
-[[publisher.derive_arbitrary]]
-version = "1.4.2"
-when = "2025-08-14"
-user-id = 696
-user-login = "fitzgen"
-user-name = "Nick Fitzgerald"
 
 [[publisher.encoding_rs]]
 version = "0.8.35"

@@ -53,6 +53,7 @@ alwaysApply: true
 ## Changelog
 
 - When adding an entry to **`CHANGELOG.md`**, keep it **short and concise**: one line per change, no prose explanations, no restating the diff.
+- **Log everything, internal and external.** The changelog records **both** public API changes and internal work: build and CI changes, test additions and removals, tooling, lockfile and dependency changes, and agent-rule changes. Do not filter an entry out for being "internal"; a changelog that hides internal work makes it invisible at release review. Keep every entry **grouped under the existing headings** for that version (`### Added`, `### Changed`, `### Fixed`) rather than adding new sections.
 
 ## Construction patterns
 
