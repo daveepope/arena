@@ -13,10 +13,8 @@ export interface ArenaEdgeData {
 }
 
 export function ArenaEdge({ id, source, target, data, markerEnd }: EdgeProps) {
-  const { sourceNode, targetNode } = useStore((s) => ({
-    sourceNode: s.nodeLookup.get(source),
-    targetNode: s.nodeLookup.get(target),
-  }));
+  const sourceNode = useStore((s) => s.nodeLookup.get(source));
+  const targetNode = useStore((s) => s.nodeLookup.get(target));
 
   if (!sourceNode || !targetNode) return null;
 

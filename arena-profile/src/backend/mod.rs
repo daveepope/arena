@@ -74,6 +74,12 @@ pub fn map_spawn_error(
     }
 }
 
+pub fn sampled_nothing(profile_path: &std::path::Path) -> bool {
+    std::fs::metadata(profile_path)
+        .map(|metadata| metadata.len() == 0)
+        .unwrap_or(false)
+}
+
 pub fn signal_interrupt(child: &mut Child) -> std::io::Result<()> {
     if child.try_wait()?.is_some() {
         return Ok(());

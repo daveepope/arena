@@ -3,12 +3,16 @@ import dagre from "dagre";
 import type { LayoutEdge, LayoutNode } from "./layout";
 
 const MIN_NODE_WIDTH = 100;
-const MAX_NODE_WIDTH = 220;
+const MAX_NODE_WIDTH = 260;
 const NODE_HEIGHT = 70;
 const CHAR_WIDTH_PX = 7;
+const CHIP_CHAR_WIDTH_PX = 6;
+const CHIP_PADDING_PX = 26;
 
-export function estimateNodeWidth(label: string): number {
-  return Math.min(MAX_NODE_WIDTH, Math.max(MIN_NODE_WIDTH, label.length * CHAR_WIDTH_PX));
+export function estimateNodeWidth(label: string, chipLabel?: string): number {
+  const labelWidth = label.length * CHAR_WIDTH_PX;
+  const chipWidth = chipLabel ? chipLabel.length * CHIP_CHAR_WIDTH_PX + CHIP_PADDING_PX : 0;
+  return Math.min(MAX_NODE_WIDTH, Math.max(MIN_NODE_WIDTH, labelWidth, chipWidth));
 }
 
 // Ported from xyflow's own official "Layouting" example

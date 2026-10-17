@@ -334,23 +334,23 @@ describe("useDashboardStore ingestHistory", () => {
 
 describe("useDashboardStore cpu profiles", () => {
   it("ingested profile state is keyed by component id", () => {
-    useDashboardStore.getState().ingestCpuProfile("svc", "started");
-    useDashboardStore.getState().ingestCpuProfile("worker", "stopped");
+    useDashboardStore.getState().ingestCpuProfile("svc", "started", false);
+    useDashboardStore.getState().ingestCpuProfile("worker", "stopped", true);
 
-    expect(useDashboardStore.getState().cpuProfiles.get("svc")).toBe("started");
-    expect(useDashboardStore.getState().cpuProfiles.get("worker")).toBe("stopped");
+    expect(useDashboardStore.getState().cpuProfiles.get("svc")).toEqual({ state: "started", reportReady: false });
+    expect(useDashboardStore.getState().cpuProfiles.get("worker")).toEqual({ state: "stopped", reportReady: true });
   });
 
   it("later state for the same component replaces the earlier one", () => {
-    useDashboardStore.getState().ingestCpuProfile("svc", "started");
-    useDashboardStore.getState().ingestCpuProfile("svc", "stopped");
+    useDashboardStore.getState().ingestCpuProfile("svc", "started", false);
+    useDashboardStore.getState().ingestCpuProfile("svc", "stopped", true);
 
-    expect(useDashboardStore.getState().cpuProfiles.get("svc")).toBe("stopped");
+    expect(useDashboardStore.getState().cpuProfiles.get("svc")).toEqual({ state: "stopped", reportReady: true });
     expect(useDashboardStore.getState().cpuProfiles.size).toBe(1);
   });
 
   it("clearing arenas discards the profiles and the open view", () => {
-    useDashboardStore.getState().ingestCpuProfile("svc", "stopped");
+    useDashboardStore.getState().ingestCpuProfile("svc", "stopped", true);
     useDashboardStore.getState().openProfileView("svc", { x: 1, y: 2 });
 
     useDashboardStore.getState().clearArenas();
@@ -393,5 +393,54 @@ describe("useDashboardStore profile view", () => {
     useDashboardStore.getState().toggleProfileViewPin();
 
     expect(useDashboardStore.getState().profileView).toBeNull();
+  });
+});
+
+describe("useDashboardStore arena restarts", () => {
+  it("sameArenaStartingAgainReplacesTheFinishedRun", () => {
+    const store = useDashboardStore.getState();
+    store.ingest(arenaState({ id: "arena-1", state: "arena_starting" }));
+    store.ingest(arenaState({ id: "arena-1", state: "arena_open" }));
+    store.ingest(arenaState({ id: "arena-1", state: "arena_closed" }));
+    const afterFirstRun = useDashboardStore.getState().arenas.get("arena-1");
+    expect(afterFirstRun?.history).toHaveLength(3);
+
+    useDashboardStore.getState().ingest(arenaState({ id: "arena-1", state: "arena_starting" }));
+
+    const entry = useDashboardStore.getState().arenas.get("arena-1");
+    expect(entry?.history).toHaveLength(1);
+    expect(entry?.history[0].snapshot.state).toBe("arena_starting");
+    expect(entry?.snapshot.state).toBe("arena_starting");
+  });
+
+  it("arenaStillRunningKeepsItsHistory", () => {
+    const store = useDashboardStore.getState();
+    store.ingest(arenaState({ id: "arena-2", state: "arena_starting" }));
+    store.ingest(arenaState({ id: "arena-2", state: "arena_open" }));
+
+    useDashboardStore.getState().ingest(arenaState({ id: "arena-2", state: "arena_starting" }));
+
+    expect(useDashboardStore.getState().arenas.get("arena-2")?.history).toHaveLength(3);
+  });
+});
+
+describe("useDashboardStore replay", () => {
+  it("replayWalksEveryRecordedStateAndReturnsToLive", () => {
+    vi.useFakeTimers();
+    const store = useDashboardStore.getState();
+    store.ingest(arenaState({ id: "arena-replay", state: "arena_starting" }));
+    store.ingest(arenaState({ id: "arena-replay", state: "arena_open" }));
+    store.ingest(arenaState({ id: "arena-replay", state: "arena_closed" }));
+
+    useDashboardStore.getState().replayArena("arena-replay");
+    expect(useDashboardStore.getState().arenas.get("arena-replay")?.isReplaying).toBe(true);
+
+    vi.advanceTimersByTime(5_000);
+
+    const entry = useDashboardStore.getState().arenas.get("arena-replay");
+    expect(entry?.isReplaying).toBe(false);
+    expect(entry?.replayIndex).toBeNull();
+    expect(entry?.snapshot.state).toBe("arena_closed");
+    vi.useRealTimers();
   });
 });

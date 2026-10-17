@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena-profile`: captured cpu profiles are capped at 8 MiB by default and fault rather than truncate, with the breach reported through `CpuProfileError`
 - `arena-pytest`, `arena-junit`, `arena-xunit`: `with_cpu_profile_limit_bytes(bytes)` on the dashboard builder raises the cpu profile cap
 - `arena-executable-component`: a failed cpu profile capture faults the component's stop instead of only being logged
+- `arena-dashboard`: the lifecycle demo binary reports a cpu profile lifecycle for two of its components, so the profiler node state and flamegraph can be driven without a real profiled process
 - `arena-dashboard`: a profiled component's node shows the profiler's live state and opens its flamegraph in context over the graph, pinnable, with a ranked hotspot table, regex filter, hover linking, layout toggle and a full screen view at `/?profile=<component>`
 
 ### Changed
@@ -59,6 +60,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bazel: the vendored profiler tool binaries are declared on the targets that run them instead of on the `arena-profile` library, keeping the .NET SDK out of the runfiles of every transitive consumer (a dependent Python test's runfiles drop from 6,533 to 2,644 files)
 - Windows CI test jobs pass `--nobuild_python_zip` alongside the `--enable_runfiles` they already set, so Python tests run from the runfiles tree instead of building and self-extracting a zip of it; `//arena-pytest:arena_pytest_unit_test` and `//examples:ephemeral_test_runtime_test` no longer exceed the 60s `small` timeout on that overhead alone
 - macOS CI test jobs no longer pass `--local_test_jobs=6`, which over-subscribed the 3-core and 4-core runners and starved tests; Bazel now sizes local test concurrency from `--jobs`
+- A cpu profile that captured no samples is reported as a stopped profiler with no profile instead of faulting the arena, across the py-spy, perf, async-profiler and dotnet-trace backends; a genuine profiler failure still faults, and py-spy's now names its exit status
+- The five cpu profiling component tests share one busy-loop subject per language under `//tools/profile_subjects`, each burning a known budget across ten named functions with one dominant hotspot, and every test now waits for the subject to complete a pass rather than sleeping for a guessed interval; this is the race that failed on arm64 CI
+- `arena-dashboard`: the lost-connection banner is replaced by a plain `disconnected` notice, shown only while no arenas are held in memory, covered by a browser test that kills the server under an open page
+- `arena-dashboard`: the arena graph refits once its nodes are measured, so subjects that stream in after the page is open are no longer left outside the clipped viewport
+- `arena-dashboard`: the graph no longer swallows the wheel, so the page scrolls past stacked arenas; zoom moves to ctrl+wheel and to zoom in, zoom out and Recenter buttons on the canvas
+- `arena-dashboard`: an arena id starting a fresh run replaces the finished run's history and log instead of appending to it, so a second run no longer reads as the same arena starting and tearing down twice
+- `arena-dashboard`: replay and the no-auto-replay guarantee are now covered by tests, the first coverage that feature has had
+- `arena-dashboard`: a live-joined page draws its graph edges again; react-flow's `remove` changes are no longer applied to nodes and edges that are derived from the arena snapshot
+- `arena-dashboard`: the demo's profiles model a real service under load, around 50 frames deep, with the dominant hotspot a blocking HTTP call made through `futures::executor::block_on` on a tokio worker, a regex compiled per request, and an N+1 query path
+- `arena-dashboard`: the flamegraph's own zoom and search work again; inferno binds its handlers from `onload` on the `<svg>` root, which never fires for inline SVG, so the embedded document now calls its `init` once parsed
+- `arena-dashboard`: the cpu profile panel has a grab bar that drags it, snaps to the nearest viewport corner on release, resizes from all four edges and corners, and uses a pin icon that reflects the pinned state; a profiled node widens to fit its profiler chip rather than clipping it
+- `arena-dashboard`: the lifecycle demo profiles `orders-api` as well, and its faulted arena carries distinct subject ids so it cannot display a profile it never produced
+- `arena-dashboard`: browser tests cover the real profiler workflow end to end (a demo component sampling, then its report opening as a flamegraph with its hotspot), the disconnect notice, and a stopped profiler that sampled nothing offering no report
+- `arena-dashboard`: a profiled component's node shows `cpu profiler <state>` live as the profiler reports it, and only becomes a button once the server confirms a report is held for that component
+- `arena-dashboard`: a profiler run that sampled nothing clears any profile stored for that component, so the dashboard cannot serve a previous run's flamegraph as the current one
+- Agent rules: never let a sleep or timeout carry an assertion, wait on an observable condition bounded by a named deadline
 - Agent rules: bug reports must lead with crate, type and function, then one sentence
 - Agent rules: bound unbounded growth with a modest default cap the caller can raise, faulting when breached, rather than evicting or truncating
 - Agent rules: re-read the AI communication section before every reply, and never write an essay

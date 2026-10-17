@@ -10,6 +10,8 @@ export const CATALOG_ARENA = "arena-catalog";
 export const FAULTED_ARENA = "arena-orders-faulted";
 
 export const PAGE_BACKGROUND = "rgb(14, 19, 48)";
+
+const FAST_STEP_DELAY_MS = 50;
 export const NESTED_DEPENDENCY_EDGE_SUFFIX =
   "dependency:payments-db (postgres)>dependency:fraud-check-service (http)";
 
@@ -58,7 +60,7 @@ export function stopProcess(child: ChildProcessWithoutNullStreams | null): void 
   child.kill("SIGKILL");
 }
 
-async function startDashboardServer(): Promise<{ child: ChildProcessWithoutNullStreams; url: string }> {
+export async function startDashboardServer(): Promise<{ child: ChildProcessWithoutNullStreams; url: string }> {
   const child = spawn(binaryPath("ARENA_DASHBOARD_SERVER_BIN"), ["0"], { stdio: "pipe" });
   try {
     const url = await awaitOutput(child, "dashboard server", (buffered) => {
@@ -72,8 +74,8 @@ async function startDashboardServer(): Promise<{ child: ChildProcessWithoutNullS
   }
 }
 
-async function startDemoLifecycle(dashboardUrl: string): Promise<ChildProcessWithoutNullStreams> {
-  const child = spawn(binaryPath("ARENA_DEMO_LIFECYCLE_BIN"), {
+export async function startDemoLifecycle(dashboardUrl: string): Promise<ChildProcessWithoutNullStreams> {
+  const child = spawn(binaryPath("ARENA_DEMO_LIFECYCLE_BIN"), [FAST_STEP_DELAY_MS.toString()], {
     stdio: "pipe",
     env: { ...process.env, ARENA_DASHBOARD_URL: dashboardUrl },
   });

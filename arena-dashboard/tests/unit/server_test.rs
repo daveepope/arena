@@ -356,3 +356,25 @@ async fn get_cpu_profile_rendered_declares_json_content_type() {
         "application/json"
     );
 }
+
+#[tokio::test]
+async fn get_cpu_profile_laterrunsamplednothing_returnsnotfound() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-restarted", "state": "stopped", "folded": SAMPLE_FOLDED}),
+    )
+    .await;
+
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-restarted", "state": "stopped"}),
+    )
+    .await;
+
+    let response = reqwest::get(format!("{base_url}/profile/cpu/svc-restarted"))
+        .await
+        .expect("get cpu profile");
+
+    assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+}

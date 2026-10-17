@@ -33,27 +33,29 @@ function flamegraphRoot(functions: string[]): HTMLElement {
 
 describe("profilerLabel", () => {
   it.each([
-    ["starting", "profiler attaching"],
-    ["started", "profiler sampling"],
-    ["stopping", "profiler stopping"],
-    ["stopped", "profiler available"],
-    ["faulted", "profiler failed"],
-  ])("%s returns %s", (state, expected) => {
-    expect(profilerLabel(state)).toBe(expected);
+    ["starting", false, "cpu profiler starting"],
+    ["started", false, "cpu profiler started"],
+    ["stopping", false, "cpu profiler stopping"],
+    ["stopped", false, "cpu profiler stopped"],
+    ["stopped", true, "cpu profile report"],
+    ["faulted", false, "cpu profiler faulted"],
+  ])("%s with report %s returns %s", (state, reportReady, expected) => {
+    expect(profilerLabel(state, reportReady)).toBe(expected);
   });
 
   it("unknown state returns the state prefixed", () => {
-    expect(profilerLabel("not_started")).toBe("profiler not_started");
+    expect(profilerLabel("not_started", false)).toBe("cpu profiler not_started");
   });
 });
 
 describe("isProfileAvailable", () => {
   it.each([
-    ["stopped", true],
-    ["started", false],
-    [undefined, false],
-  ])("%s returns %s", (state, expected) => {
-    expect(isProfileAvailable(state)).toBe(expected);
+    ["stopped", true, true],
+    ["stopped", false, false],
+    ["started", true, false],
+    [undefined, true, false],
+  ])("%s with report %s returns %s", (state, reportReady, expected) => {
+    expect(isProfileAvailable(state, reportReady)).toBe(expected);
   });
 });
 

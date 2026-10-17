@@ -148,20 +148,20 @@ describe("ArenaGraph profiler label", () => {
   it("sampling profiler shows its state and cannot be opened", () => {
     act(() => {
       useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
-      useDashboardStore.getState().ingestCpuProfile("svc", "started");
+      useDashboardStore.getState().ingestCpuProfile("svc", "started", false);
     });
 
     render(<ArenaGraph arenaId="arena-1" />);
 
     const label = screen.getByTestId("profiler-label-svc") as HTMLButtonElement;
-    expect(label.textContent).toBe("profiler sampling");
+    expect(label.textContent).toBe("cpu profiler started");
     expect(label.disabled).toBe(true);
   });
 
   it("available profiler opens the profile view for that component", () => {
     act(() => {
       useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
-      useDashboardStore.getState().ingestCpuProfile("svc", "stopped");
+      useDashboardStore.getState().ingestCpuProfile("svc", "stopped", true);
     });
     render(<ArenaGraph arenaId="arena-1" />);
 
@@ -173,12 +173,48 @@ describe("ArenaGraph profiler label", () => {
   it("opening the profile view does not also select the node", () => {
     act(() => {
       useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
-      useDashboardStore.getState().ingestCpuProfile("svc", "stopped");
+      useDashboardStore.getState().ingestCpuProfile("svc", "stopped", true);
     });
     render(<ArenaGraph arenaId="arena-1" />);
 
     fireEvent.click(screen.getByTestId("profiler-label-svc"));
 
     expect(useDashboardStore.getState().selected).toBeNull();
+  });
+
+  it("stoppedProfilerWithoutAReportCannotBeOpened", () => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+      useDashboardStore.getState().ingestCpuProfile("svc", "stopped", false);
+    });
+
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    const label = screen.getByTestId("profiler-label-svc") as HTMLButtonElement;
+    expect(label.textContent).toBe("cpu profiler stopped");
+    expect(label.disabled).toBe(true);
+  });
+
+  it.each([["recenter-graph"], ["zoom-in-graph"], ["zoom-out-graph"]])(
+    "%s controlIsOfferedOnTheCanvas",
+    (testId) => {
+      act(() => {
+        useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+      });
+
+      render(<ArenaGraph arenaId="arena-1" />);
+
+      expect(screen.getByTestId(testId)).toBeDefined();
+    },
+  );
+
+  it("recenterButtonIsOfferedOnTheCanvas", () => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+    });
+
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    expect(screen.getByTestId("recenter-graph")).toBeDefined();
   });
 });

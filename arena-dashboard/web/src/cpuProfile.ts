@@ -7,25 +7,18 @@ const DIMMED_OPACITY = "0.15";
 const FULL_OPACITY = "1";
 const HIGHLIGHT_STROKE = "#f8fafc";
 
-export function profilerLabel(state: string): string {
-  switch (state) {
-    case "starting":
-      return "profiler attaching";
-    case "started":
-      return "profiler sampling";
-    case "stopping":
-      return "profiler stopping";
-    case PROFILE_AVAILABLE_STATE:
-      return "profiler available";
-    case "faulted":
-      return "profiler failed";
-    default:
-      return `profiler ${state}`;
-  }
+export const PROFILE_REPORT_LABEL = "cpu profile report";
+
+export function profilerLabel(state: string, reportReady: boolean): string {
+  if (isProfileAvailable(state, reportReady)) return PROFILE_REPORT_LABEL;
+  return `cpu profiler ${state}`;
 }
 
-export function isProfileAvailable(state: string | undefined): boolean {
-  return state === PROFILE_AVAILABLE_STATE;
+export function isProfileAvailable(
+  state: string | undefined,
+  reportReady: boolean | undefined,
+): boolean {
+  return state === PROFILE_AVAILABLE_STATE && reportReady === true;
 }
 
 export function matchesFilter(text: string, pattern: string): boolean {
@@ -100,5 +93,10 @@ export function visibleHotspots(hotspots: Hotspot[], pattern: string): Hotspot[]
 }
 
 export function flamegraphDocument(svg: string): string {
-  return `<!doctype html><html><head><style>html,body{margin:0;padding:0;background:#1e1e1e}</style></head><body>${svg}</body></html>`;
+  const bindHandlers =
+    "<script>document.addEventListener('DOMContentLoaded',function(){" +
+    "var root=document.querySelector('svg');" +
+    "if(root&&typeof window.init==='function')window.init({target:root});" +
+    "});<\/script>";
+  return `<!doctype html><html><head><style>html,body{margin:0;padding:0;background:#1e1e1e}svg{width:100%;height:auto}</style></head><body>${svg}${bindHandlers}</body></html>`;
 }

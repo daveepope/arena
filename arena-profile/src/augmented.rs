@@ -18,7 +18,11 @@ pub trait ArgAugmentingSampler: Send + Sync {
         request: &LaunchRequest,
     ) -> Result<(Vec<String>, AugmentState), CpuProfileError>;
 
-    fn collect(&self, state: AugmentState, budget: Duration) -> Result<PathBuf, CpuProfileError>;
+    fn collect(
+        &self,
+        state: AugmentState,
+        budget: Duration,
+    ) -> Result<Option<PathBuf>, CpuProfileError>;
 }
 
 pub fn augmenting_sampler_for(backend: CpuProfilerBackend) -> Box<dyn ArgAugmentingSampler> {
@@ -48,10 +52,17 @@ impl ProfileSession for AugmentedProfileSession {
         let collected = crate::backend::wait_bounded(augmented_process, FINISH_TIMEOUT)
             .map_err(|e| CpuProfileError::Finish(format!("profiled process did not exit cleanly: {e}")))
             .and_then(|_status| sampler.collect(state, FINISH_TIMEOUT))
-            .and_then(|folded_path| read_collected(&folded_path, limit_bytes));
+            .and_then(|folded_path| match folded_path {
+                Some(folded_path) => read_collected(&folded_path, limit_bytes).map(Some),
+                None => Ok(None),
+            });
         match collected {
-            Ok(folded) => {
+            Ok(Some(folded)) => {
                 observer::report_complete(&component_id, &folded);
+                Ok(())
+            }
+            Ok(None) => {
+                observer::report(&component_id, RunnableState::Stopped);
                 Ok(())
             }
             Err(e) => {

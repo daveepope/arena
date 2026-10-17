@@ -13,6 +13,7 @@ enum AugmentOutcome {
     AugmentFails,
     CollectFails,
     CollectSucceeds,
+    CollectFindsNoSamples,
 }
 
 struct FakeArgAugmentingSampler {
@@ -29,7 +30,9 @@ impl ArgAugmentingSampler for FakeArgAugmentingSampler {
                 binary: "libasyncProfiler.so",
                 install_hint: "install async-profiler",
             }),
-            AugmentOutcome::CollectFails | AugmentOutcome::CollectSucceeds => {
+            AugmentOutcome::CollectFails
+            | AugmentOutcome::CollectSucceeds
+            | AugmentOutcome::CollectFindsNoSamples => {
                 let mut args = request.args.clone();
                 args.push(request.program.to_string_lossy().into_owned());
                 Ok((
@@ -42,10 +45,17 @@ impl ArgAugmentingSampler for FakeArgAugmentingSampler {
         }
     }
 
-    fn collect(&self, _state: AugmentState, _budget: Duration) -> Result<PathBuf, CpuProfileError> {
+    fn collect(
+        &self,
+        _state: AugmentState,
+        _budget: Duration,
+    ) -> Result<Option<PathBuf>, CpuProfileError> {
         match &self.outcome {
             AugmentOutcome::CollectFails => Err(CpuProfileError::Finish("collect failed".into())),
-            AugmentOutcome::CollectSucceeds => Ok(write_sample_folded_stacks("augmented-collect-succeeds")),
+            AugmentOutcome::CollectSucceeds => {
+                Ok(Some(write_sample_folded_stacks("augmented-collect-succeeds")))
+            }
+            AugmentOutcome::CollectFindsNoSamples => Ok(None),
             AugmentOutcome::AugmentFails => unreachable!("collect() called after augment() failed"),
         }
     }
@@ -170,4 +180,87 @@ fn augmented_finish_collect_succeeds_reports_stopped_with_folded_stacks() {
         .folded_for("finish-success")
         .expect("folded stacks were not reported");
     assert!(folded.contains("compute"), "got: {folded}");
+}
+
+fn async_profiler_output(name: &str, contents: &str) -> PathBuf {
+    let path = std::env::temp_dir().join(format!(
+        "arena-profile-async-profiler-test-{name}-{}.collapsed",
+        std::process::id()
+    ));
+    std::fs::write(&path, contents).expect("write async-profiler output");
+    path
+}
+
+#[test]
+fn async_profiler_collect_empty_output_reports_no_profile() {
+    let folded_path = async_profiler_output("empty", "");
+    let sampler = augmenting_sampler_for(CpuProfilerBackend::AsyncProfiler);
+
+    let result = sampler.collect(
+        AugmentState::AsyncProfiler { folded_path: folded_path.clone() },
+        Duration::from_secs(5),
+    );
+
+    assert_eq!(result.unwrap(), None);
+    let _ = std::fs::remove_file(&folded_path);
+}
+
+#[test]
+fn async_profiler_collect_sampled_output_returns_the_folded_path() {
+    let folded_path = async_profiler_output("sampled", "main;run;compute 7\n");
+    let sampler = augmenting_sampler_for(CpuProfilerBackend::AsyncProfiler);
+
+    let result = sampler.collect(
+        AugmentState::AsyncProfiler { folded_path: folded_path.clone() },
+        Duration::from_secs(5),
+    );
+
+    assert_eq!(result.unwrap(), Some(folded_path.clone()));
+    let _ = std::fs::remove_file(&folded_path);
+}
+
+#[test]
+fn async_profiler_collect_missing_output_returns_finish_error() {
+    let folded_path = std::env::temp_dir().join(format!(
+        "arena-profile-async-profiler-test-absent-{}.collapsed",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_file(&folded_path);
+    let sampler = augmenting_sampler_for(CpuProfilerBackend::AsyncProfiler);
+
+    let result = sampler.collect(
+        AugmentState::AsyncProfiler { folded_path },
+        Duration::from_secs(5),
+    );
+
+    assert!(matches!(result, Err(CpuProfileError::Finish(_))));
+}
+
+#[test]
+fn augmented_finish_no_samples_reports_stopped_without_folded_stacks() {
+    let recording = start_recording();
+    let sampler = FakeArgAugmentingSampler { outcome: AugmentOutcome::CollectFindsNoSamples };
+    let PreparedLaunch::ArgsAugmented { session, .. } = prepare_augmented(
+        Box::new(sampler),
+        &sample_request(),
+        "augmented-no-samples".to_string(),
+        DEFAULT_CPU_PROFILE_LIMIT_BYTES,
+    )
+    .unwrap()
+    else {
+        panic!("expected ArgsAugmented variant");
+    };
+    let mut placeholder_child = std::process::Command::new("true")
+        .spawn()
+        .expect("spawn placeholder child");
+
+    let result = session.finish(&mut placeholder_child);
+    let _ = placeholder_child.wait();
+
+    assert!(result.is_ok());
+    assert_eq!(
+        recording.recorded.states_for("augmented-no-samples"),
+        vec![RunnableState::Stopping, RunnableState::Stopped]
+    );
+    assert_eq!(recording.recorded.folded_for("augmented-no-samples"), None);
 }

@@ -121,7 +121,7 @@ describe("App", () => {
       vi.advanceTimersByTime(1600);
     });
 
-    expect(screen.getByText("disconnected")).toBeDefined();
+    expect(screen.getByTestId("disconnected-notice")).toBeDefined();
     expect(screen.queryByText("Clear server state")).toBeNull();
     expect(screen.queryByText("Stop server")).toBeNull();
 
@@ -137,7 +137,7 @@ describe("App", () => {
       source.onopen?.();
       vi.advanceTimersByTime(1600);
     });
-    expect(screen.getByText("disconnected")).toBeDefined();
+    expect(screen.getByTestId("disconnected-notice")).toBeDefined();
 
     act(() => {
       source.dispatchEvent("heartbeat");
@@ -181,7 +181,7 @@ describe("App", () => {
     expect(screen.getByText("Stop server")).toBeDefined();
   });
 
-  it("shows an error message when the event source errors while open", () => {
+  it("appEventSourceErrorsWhileOpenReportsErrorState", () => {
     render(<App />);
     const source = latestEventSource();
 
@@ -191,22 +191,9 @@ describe("App", () => {
     });
 
     expect(screen.getByText("error")).toBeDefined();
-    expect(screen.getByText(/Lost connection/)).toBeDefined();
   });
 
-  it("appErroredShowsServerStartCommand", () => {
-    render(<App />);
-    const source = latestEventSource();
-
-    act(() => {
-      source.readyState = FakeEventSource.CLOSED;
-      source.onerror?.();
-    });
-
-    expect(screen.getByText("bazel run //arena-dashboard:server")).toBeDefined();
-  });
-
-  it("appDisconnectedShowsServerStartCommand", () => {
+  it("appHeartbeatLapsesReportsDisconnectedState", () => {
     vi.useFakeTimers();
     render(<App />);
     const source = latestEventSource();
@@ -218,21 +205,8 @@ describe("App", () => {
       vi.advanceTimersByTime(1600);
     });
 
-    expect(screen.getByText("disconnected")).toBeDefined();
-    expect(screen.getByRole("alert").textContent).toContain("Lost connection");
-    expect(screen.getByText("bazel run //arena-dashboard:server")).toBeDefined();
+    expect(screen.getByTestId("disconnected-notice")).toBeDefined();
     vi.useRealTimers();
-  });
-
-  it("appConnectedHidesLostConnectionBanner", () => {
-    render(<App />);
-
-    act(() => {
-      latestEventSource().onopen?.();
-    });
-
-    expect(screen.queryByText(/Lost connection/)).toBeNull();
-    expect(screen.queryByText("bazel run //arena-dashboard:server")).toBeNull();
   });
 
   it("renders an arena panel once a state document is ingested", () => {
@@ -826,11 +800,34 @@ describe("App cpu profile events", () => {
 
     act(() => {
       latestEventSource().onmessage?.({
+        data: JSON.stringify({
+          type: "cpu_profile",
+          component: "svc",
+          state: "stopped",
+          report: true,
+        }),
+      });
+    });
+
+    expect(useDashboardStore.getState().cpuProfiles.get("svc")).toEqual({
+      state: "stopped",
+      reportReady: true,
+    });
+  });
+
+  it("appCpuProfileEventWithoutAReportRecordsTheStateOnly", () => {
+    render(<App />);
+
+    act(() => {
+      latestEventSource().onmessage?.({
         data: JSON.stringify({ type: "cpu_profile", component: "svc", state: "stopped" }),
       });
     });
 
-    expect(useDashboardStore.getState().cpuProfiles.get("svc")).toBe("stopped");
+    expect(useDashboardStore.getState().cpuProfiles.get("svc")).toEqual({
+      state: "stopped",
+      reportReady: false,
+    });
   });
 
   it("cpu profile event is not treated as an arena snapshot", () => {
@@ -868,5 +865,23 @@ describe("App full screen profile", () => {
 
     expect(screen.getByText("cpu profile · svc")).toBeDefined();
     expect(screen.queryByText("Arena Topology Dashboard")).toBeNull();
+  });
+
+  it("appDisconnectedWithArenasInMemoryShowsNoNotice", () => {
+    vi.useFakeTimers();
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onopen?.();
+      source.onmessage?.({ data: JSON.stringify(arenaState()) });
+    });
+    act(() => {
+      vi.advanceTimersByTime(1600);
+    });
+
+    expect(screen.getByText("disconnected")).toBeDefined();
+    expect(screen.queryByTestId("disconnected-notice")).toBeNull();
+    vi.useRealTimers();
   });
 });

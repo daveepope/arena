@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
-import type { ArenaState, Subject } from "./types";
+import { isArenaRestart } from "./presentation";
+import type { ArenaState, CpuProfilerState, Subject } from "./types";
 
 export type SubjectKind = "dependency" | "component";
 
@@ -111,14 +112,14 @@ function diffUpTo(history: HistoryEntry[], index: number): DiffState & { snapsho
 interface DashboardStore {
   arenas: Map<string, ArenaEntry>;
   selected: Selected | null;
-  cpuProfiles: Map<string, string>;
+  cpuProfiles: Map<string, CpuProfilerState>;
   profileView: ProfileView | null;
   ingest: (next: ArenaState) => void;
   ingestHistory: (snapshots: ArenaState[]) => void;
   select: (selected: Selected) => void;
   clearSelected: () => void;
   clearArenas: () => void;
-  ingestCpuProfile: (componentId: string, state: string) => void;
+  ingestCpuProfile: (componentId: string, state: string, reportReady: boolean) => void;
   openProfileView: (componentId: string, position: { x: number; y: number }) => void;
   closeProfileView: () => void;
   toggleProfileViewPin: () => void;
@@ -135,8 +136,11 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
 
   ingest: (next) => {
     const { arenas } = get();
-    const prev = arenas.get(next.id);
-    const lastRecorded = prev?.history[prev.history.length - 1]?.snapshot;
+    const prevEntry = arenas.get(next.id);
+    const prevLastRecorded = prevEntry?.history[prevEntry.history.length - 1]?.snapshot;
+    const isRestart = isArenaRestart(prevLastRecorded?.state, next.state);
+    const prev = isRestart ? undefined : prevEntry;
+    const lastRecorded = isRestart ? undefined : prevLastRecorded;
     const isDuplicateOfLastRecorded =
       lastRecorded !== undefined && JSON.stringify(lastRecorded) === JSON.stringify(next);
     const history = isDuplicateOfLastRecorded
@@ -180,8 +184,10 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   clearArenas: () =>
     set({ arenas: new Map(), selected: null, cpuProfiles: new Map(), profileView: null }),
 
-  ingestCpuProfile: (componentId, state) =>
-    set({ cpuProfiles: new Map(get().cpuProfiles).set(componentId, state) }),
+  ingestCpuProfile: (componentId, state, reportReady) =>
+    set({
+      cpuProfiles: new Map(get().cpuProfiles).set(componentId, { state, reportReady }),
+    }),
 
   openProfileView: (componentId, position) =>
     set({ profileView: { componentId, position, isPinned: false } }),

@@ -48,7 +48,11 @@ describe("estimateNodeWidth", () => {
   });
 
   it("long label clamps to the maximum width", () => {
-    expect(estimateNodeWidth("arena-executable-component-example-api-web-app-khr7yx")).toBe(220);
+    expect(estimateNodeWidth("arena-executable-component-example-api-web-app-khr7yx")).toBe(260);
+  });
+
+  it("profilerChipWiderThanTheLabelDrivesTheWidth", () => {
+    expect(estimateNodeWidth("svc", "cpu profile report")).toBe(134);
   });
 
   it("mid-length label scales with its character count", () => {

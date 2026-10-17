@@ -13,6 +13,8 @@ import type { RenderedProfile } from "./types";
 
 const PANEL_WIDTH = 760;
 const PANEL_MAX_HEIGHT = 560;
+const PANEL_MIN_WIDTH = 360;
+const PANEL_MIN_HEIGHT = 260;
 const VIEWPORT_MARGIN = 8;
 const FLAMEGRAPH_MIN_HEIGHT = 240;
 
@@ -233,10 +235,73 @@ export function CpuProfileView({
   );
 }
 
+const SNAP_THRESHOLD_PX = 48;
+
+function PinIcon({ isPinned }: { isPinned: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      className="h-3.5 w-3.5"
+      fill={isPinned ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9.5 1.5 14.5 6.5 12 7l-4 4-1.5-1.5 4-4 .5-2.5Z" />
+      <path d="M6.5 9.5 2 14" />
+    </svg>
+  );
+}
+
+type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+
+const RESIZE_EDGES: { edge: ResizeEdge; className: string }[] = [
+  { edge: "n", className: "left-2 right-2 top-0 h-1.5 cursor-ns-resize" },
+  { edge: "s", className: "bottom-0 left-2 right-2 h-1.5 cursor-ns-resize" },
+  { edge: "w", className: "bottom-2 left-0 top-2 w-1.5 cursor-ew-resize" },
+  { edge: "e", className: "bottom-2 right-0 top-2 w-1.5 cursor-ew-resize" },
+  { edge: "nw", className: "left-0 top-0 h-3 w-3 cursor-nwse-resize" },
+  { edge: "ne", className: "right-0 top-0 h-3 w-3 cursor-nesw-resize" },
+  { edge: "sw", className: "bottom-0 left-0 h-3 w-3 cursor-nesw-resize" },
+  { edge: "se", className: "bottom-0 right-0 h-3 w-3 cursor-nwse-resize" },
+];
+
+export function snapToViewportCorner(
+  rect: { left: number; top: number; width: number; height: number },
+  viewport: { width: number; height: number },
+): { left: number; top: number } {
+  const right = viewport.width - VIEWPORT_MARGIN - rect.width;
+  const bottom = viewport.height - VIEWPORT_MARGIN - rect.height;
+  const left =
+    rect.left <= VIEWPORT_MARGIN + SNAP_THRESHOLD_PX
+      ? VIEWPORT_MARGIN
+      : rect.left >= right - SNAP_THRESHOLD_PX
+        ? Math.max(right, VIEWPORT_MARGIN)
+        : rect.left;
+  const top =
+    rect.top <= VIEWPORT_MARGIN + SNAP_THRESHOLD_PX
+      ? VIEWPORT_MARGIN
+      : rect.top >= bottom - SNAP_THRESHOLD_PX
+        ? Math.max(bottom, VIEWPORT_MARGIN)
+        : rect.top;
+  return { left, top };
+}
+
 export function CpuProfilePopover() {
   const profileView = useDashboardStore((s) => s.profileView);
   const closeProfileView = useDashboardStore((s) => s.closeProfileView);
   const toggleProfileViewPin = useDashboardStore((s) => s.toggleProfileViewPin);
+  const [rect, setRect] = useState<{ left: number; top: number; width: number; height: number } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!profileView) return;
+    const { left, top } = clampPanelPosition(profileView.position.x, profileView.position.y);
+    setRect({ left, top, width: PANEL_WIDTH, height: PANEL_MAX_HEIGHT });
+  }, [profileView?.componentId, profileView?.position.x, profileView?.position.y]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -246,32 +311,101 @@ export function CpuProfilePopover() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [closeProfileView]);
 
-  if (!profileView) return null;
+  const trackPointer = (
+    event: React.PointerEvent,
+    onDelta: (dx: number, dy: number) => void,
+    onFinish?: () => void,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const origin = { x: event.clientX, y: event.clientY };
+    const onMove = (move: PointerEvent) => onDelta(move.clientX - origin.x, move.clientY - origin.y);
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      onFinish?.();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 
-  const { left, top } = clampPanelPosition(profileView.position.x, profileView.position.y);
+  const startDrag = (event: React.PointerEvent) => {
+    if (!rect) return;
+    const start = { ...rect };
+    trackPointer(
+      event,
+      (dx, dy) => setRect({ ...start, left: start.left + dx, top: start.top + dy }),
+      () =>
+        setRect((current) =>
+          current === null
+            ? current
+            : {
+                ...current,
+                ...snapToViewportCorner(current, {
+                  width: window.innerWidth,
+                  height: window.innerHeight,
+                }),
+              },
+        ),
+    );
+  };
+
+  const startResize = (event: React.PointerEvent, edge: ResizeEdge) => {
+    if (!rect) return;
+    const start = { ...rect };
+    trackPointer(event, (dx, dy) => {
+      const next = { ...start };
+      if (edge.includes("e")) next.width = Math.max(PANEL_MIN_WIDTH, start.width + dx);
+      if (edge.includes("s")) next.height = Math.max(PANEL_MIN_HEIGHT, start.height + dy);
+      if (edge.includes("w")) {
+        next.width = Math.max(PANEL_MIN_WIDTH, start.width - dx);
+        next.left = start.left + (start.width - next.width);
+      }
+      if (edge.includes("n")) {
+        next.height = Math.max(PANEL_MIN_HEIGHT, start.height - dy);
+        next.top = start.top + (start.height - next.height);
+      }
+      setRect(next);
+    });
+  };
+
+  if (!profileView || !rect) return null;
 
   return (
     <>
       {!profileView.isPinned && <div className="fixed inset-0 z-40" onClick={closeProfileView} />}
       <div
         data-testid="cpu-profile-panel"
-        style={{ left, top, width: PANEL_WIDTH, maxHeight: PANEL_MAX_HEIGHT }}
-        className="fixed z-50 flex flex-col gap-2 rounded-md border border-slate-700 bg-[#121735] p-3 text-slate-200 shadow-xl"
+        style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
+        className="fixed z-50 flex flex-col gap-2 overflow-hidden rounded-md border border-slate-700 bg-[#121735] p-3 text-slate-200 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-2">
+        <div
+          data-testid="cpu-profile-drag-handle"
+          onPointerDown={startDrag}
+          title="Drag to move, release near an edge to snap"
+          className="-mx-3 -mt-3 flex cursor-grab items-center justify-between gap-2 border-b border-slate-700 bg-[#0b0f28] px-3 py-2 active:cursor-grabbing hover:bg-[#161c44]"
+        >
           <h3 className="truncate text-sm font-semibold">cpu profile · {profileView.componentId}</h3>
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={toggleProfileViewPin}
               aria-pressed={profileView.isPinned}
-              className="cursor-pointer rounded-md border border-slate-600 bg-[#0e1330] px-2 py-1 text-xs uppercase tracking-wide text-slate-300"
+              aria-label={profileView.isPinned ? "Unpin" : "Pin"}
+              title={profileView.isPinned ? "Unpin" : "Pin"}
+              className={`cursor-pointer rounded-md border px-1.5 py-1 ${
+                profileView.isPinned
+                  ? "border-teal-500 bg-teal-950/60 text-teal-300"
+                  : "border-slate-600 bg-[#0e1330] text-slate-300"
+              }`}
             >
-              {profileView.isPinned ? "Unpin" : "Pin"}
+              <PinIcon isPinned={profileView.isPinned} />
             </button>
             <button
               type="button"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={closeProfileView}
               className="cursor-pointer rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-300"
             >
@@ -280,7 +414,16 @@ export function CpuProfilePopover() {
           </div>
         </div>
         <CpuProfileView componentId={profileView.componentId} isFullScreen={false} />
+        {RESIZE_EDGES.map(({ edge, className }) => (
+          <div
+            key={edge}
+            data-testid={`cpu-profile-resize-${edge}`}
+            onPointerDown={(e) => startResize(e, edge)}
+            className={`absolute ${className}`}
+          />
+        ))}
       </div>
     </>
   );
 }
+

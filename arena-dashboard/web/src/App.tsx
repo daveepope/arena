@@ -3,9 +3,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArenaGraph } from "./ArenaGraph";
 import { CpuProfilePopover, CpuProfileView } from "./CpuProfilePanel";
 import { useDashboardStore } from "./store";
+import { TERMINAL_ARENA_STATES } from "./presentation";
 import type { ArenaState } from "./types";
 
 type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
+
+function isDisconnected(status: ConnectionStatus): boolean {
+  return status === "error" || status === "disconnected";
+}
 
 const HEARTBEAT_INTERVAL_MS = 500;
 const HEARTBEAT_TIMEOUT_MS = HEARTBEAT_INTERVAL_MS * 2;
@@ -56,26 +61,6 @@ function useSmoothSliderValue(
   return [display, setImmediate];
 }
 
-const TERMINAL_ARENA_STATES = new Set(["arena_closed", "arena_faulted"]);
-
-const SERVER_START_COMMAND = "bazel run //arena-dashboard:server";
-
-function LostConnectionBanner() {
-  return (
-    <div
-      role="alert"
-      className="mb-4 rounded-md border border-rose-900 bg-rose-950/40 p-4 text-sm text-rose-300"
-    >
-      <div>Lost connection to the dashboard server's /events stream. Is the server still running?</div>
-      <div className="mt-2 text-xs text-rose-200/80">
-        Start it again with{" "}
-        <code className="rounded-sm border border-rose-900 bg-[#0e1330] px-1.5 py-0.5 font-mono text-rose-200">
-          {SERVER_START_COMMAND}
-        </code>
-      </div>
-    </div>
-  );
-}
 
 function ArenaPanel({ arenaId }: { arenaId: string }) {
   const log = useDashboardStore((s) => s.arenas.get(arenaId)?.log ?? EMPTY_LOG);
@@ -370,7 +355,7 @@ export function App() {
           return;
         }
         if (data && data.type === "cpu_profile") {
-          ingestCpuProfile(data.component, data.state);
+          ingestCpuProfile(data.component, data.state, data.report === true);
           return;
         }
         ingest(data as ArenaState);
@@ -438,7 +423,7 @@ export function App() {
             className={`h-2 w-2 rounded-full ${
               status === "connected"
                 ? "bg-emerald-400"
-                : status === "error" || status === "disconnected"
+                : isDisconnected(status)
                   ? "bg-rose-500"
                   : "bg-amber-400"
             }`}
@@ -475,14 +460,23 @@ export function App() {
       </div>
 
       <div className="px-3 pb-4 pt-24">
-        {(status === "error" || status === "disconnected") && <LostConnectionBanner />}
-
-        {status !== "error" && status !== "disconnected" && arenaIds.length === 0 && (
-          <div className="mb-4 rounded-lg border border-dashed border-slate-800 p-10 text-center">
-            <div className="text-sm font-medium text-slate-300">
-              {status === "connected" ? "Connected - no arenas yet" : "Connecting..."}
-            </div>
-            <div className="mt-1 text-xs text-slate-400">Arenas will appear here once one starts</div>
+        {arenaIds.length === 0 && (
+          <div
+            data-testid={isDisconnected(status) ? "disconnected-notice" : "empty-notice"}
+            className="mb-4 rounded-lg border border-dashed border-slate-800 p-10 text-center"
+          >
+            {isDisconnected(status) ? (
+              <div className="text-sm font-medium text-slate-300">disconnected</div>
+            ) : (
+              <>
+                <div className="text-sm font-medium text-slate-300">
+                  {status === "connected" ? "Connected - no arenas yet" : "Connecting..."}
+                </div>
+                <div className="mt-1 text-xs text-slate-400">
+                  Arenas will appear here once one starts
+                </div>
+              </>
+            )}
           </div>
         )}
 

@@ -64,7 +64,7 @@ fn collect_non_zero_exit_status_with_folded_file_present_is_not_treated_as_failu
 
     let result = PySpySampler.collect(state, &mut child, Duration::from_secs(5));
 
-    assert_eq!(result.unwrap(), folded_path);
+    assert_eq!(result.unwrap(), Some(folded_path.clone()));
     let _ = std::fs::remove_file(&folded_path);
 }
 
@@ -80,4 +80,36 @@ fn collect_wrong_wrap_state_panics_unreachable() {
         &mut child,
         Duration::from_secs(5),
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn collect_clean_exit_without_folded_file_reports_no_profile() {
+    let mut child = Command::new("true").spawn().expect("spawn true");
+    let _ = child.wait();
+    let state = WrapState::PySpy {
+        folded_path: PathBuf::from("/tmp/arena-profile-pyspy-test-collect-nothing-sampled.folded"),
+    };
+
+    let result = PySpySampler.collect(state, &mut child, Duration::from_secs(5));
+
+    assert_eq!(result.unwrap(), None);
+}
+
+#[cfg(unix)]
+#[test]
+fn collect_interrupted_exit_with_empty_folded_file_reports_no_profile() {
+    let folded_path = PathBuf::from("/tmp/arena-profile-pyspy-test-collect-empty.folded");
+    std::fs::write(&folded_path, b"").expect("write empty folded stacks file");
+    let mut child = Command::new("sleep").arg("30").spawn().expect("spawn sleep");
+    let _ = Command::new("kill")
+        .args(["-INT", &child.id().to_string()])
+        .status()
+        .expect("interrupt sleep");
+    let state = WrapState::PySpy { folded_path: folded_path.clone() };
+
+    let result = PySpySampler.collect(state, &mut child, Duration::from_secs(5));
+
+    assert_eq!(result.unwrap(), None);
+    let _ = std::fs::remove_file(&folded_path);
 }

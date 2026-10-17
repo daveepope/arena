@@ -1,4 +1,7 @@
-use arena_profile::backend::{binary_on_path, clear_stale_runfiles_manifest_env, map_spawn_error, scratch_path, signal_interrupt};
+use arena_profile::backend::{
+    binary_on_path, clear_stale_runfiles_manifest_env, map_spawn_error, sampled_nothing, scratch_path,
+    signal_interrupt,
+};
 use arena_profile::{wait_bounded, CpuProfileError};
 use std::process::Command;
 use std::sync::Mutex;
@@ -129,4 +132,32 @@ fn signal_interrupt_already_exited_child_returns_ok_without_signaling() {
     let result = signal_interrupt(&mut child);
 
     assert!(result.is_ok());
+}
+
+#[test]
+fn sampled_nothing_empty_file_returns_true() {
+    let path = std::env::temp_dir().join(format!("arena-profile-sampled-nothing-empty-{}", std::process::id()));
+    std::fs::write(&path, b"").expect("write empty profile");
+
+    assert!(sampled_nothing(&path));
+
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn sampled_nothing_populated_file_returns_false() {
+    let path = std::env::temp_dir().join(format!("arena-profile-sampled-nothing-full-{}", std::process::id()));
+    std::fs::write(&path, b"main;run 1\n").expect("write profile");
+
+    assert!(!sampled_nothing(&path));
+
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn sampled_nothing_missing_file_returns_false() {
+    let path = std::env::temp_dir().join(format!("arena-profile-sampled-nothing-absent-{}", std::process::id()));
+    let _ = std::fs::remove_file(&path);
+
+    assert!(!sampled_nothing(&path));
 }

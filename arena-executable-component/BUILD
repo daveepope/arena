@@ -18,6 +18,7 @@ rust_test(
     name = "cpu_profile_component_test",
     srcs = [
         "tests/component/cpu_profile_component_test.rs",
+        "tests/support/profile_subjects.rs",
         "tests/support/recorded_profiles.rs",
     ],
     crate_root = "tests/component/cpu_profile_component_test.rs",
@@ -26,6 +27,8 @@ rust_test(
     tags = ["component_test"],
     data = [
         "//arena-profile:async_profiler_library",
+        "//tools/profile_subjects:BusyLoop.java",
+        "//tools/profile_subjects:busy_loop.py",
         "@profiling_tools//:py-spy__py-spy",
     ],
     target_compatible_with = select({

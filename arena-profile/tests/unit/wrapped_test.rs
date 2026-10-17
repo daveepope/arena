@@ -14,6 +14,7 @@ enum WrapOutcome {
     WrapFails(CpuProfileError),
     CollectFails,
     CollectSucceeds,
+    CollectFindsNoSamples,
 }
 
 struct FakeWrappingSampler {
@@ -28,7 +29,9 @@ impl WrappingSampler for FakeWrappingSampler {
     ) -> Result<(PathBuf, Vec<String>, WrapState), CpuProfileError> {
         match &self.outcome {
             WrapOutcome::WrapFails(e) => Err(clone_error(e)),
-            WrapOutcome::CollectFails | WrapOutcome::CollectSucceeds => {
+            WrapOutcome::CollectFails
+            | WrapOutcome::CollectSucceeds
+            | WrapOutcome::CollectFindsNoSamples => {
                 let mut args = vec!["--".to_string(), request.program.to_string_lossy().into_owned()];
                 args.extend(request.args.iter().cloned());
                 Ok((
@@ -47,10 +50,13 @@ impl WrappingSampler for FakeWrappingSampler {
         _state: WrapState,
         _wrapping_child: &mut Child,
         _budget: Duration,
-    ) -> Result<PathBuf, CpuProfileError> {
+    ) -> Result<Option<PathBuf>, CpuProfileError> {
         match &self.outcome {
             WrapOutcome::CollectFails => Err(CpuProfileError::Finish("collect failed".into())),
-            WrapOutcome::CollectSucceeds => Ok(write_sample_folded_stacks("wrapped-collect-succeeds")),
+            WrapOutcome::CollectSucceeds => {
+                Ok(Some(write_sample_folded_stacks("wrapped-collect-succeeds")))
+            }
+            WrapOutcome::CollectFindsNoSamples => Ok(None),
             WrapOutcome::WrapFails(_) => unreachable!("collect() called after wrap() failed"),
         }
     }
@@ -189,4 +195,37 @@ fn wrapped_sampling_called_reports_started() {
         recording.recorded.states_for("sampling"),
         vec![RunnableState::Started]
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn wrapped_finish_no_samples_reports_stopped_without_folded_stacks() {
+    let recording = start_recording();
+    let sampler = FakeWrappingSampler {
+        outcome: WrapOutcome::CollectFindsNoSamples,
+        wrapped_program: "/usr/bin/perf",
+    };
+    let PreparedLaunch::Wrapped { session, .. } = prepare_wrapped(
+        Box::new(sampler),
+        &sample_request(),
+        "finish-no-samples".to_string(),
+        DEFAULT_CPU_PROFILE_LIMIT_BYTES,
+    )
+    .unwrap()
+    else {
+        panic!("expected Wrapped variant");
+    };
+    let mut placeholder_child = std::process::Command::new("true")
+        .spawn()
+        .expect("spawn placeholder child");
+
+    let result = session.finish(&mut placeholder_child);
+    let _ = placeholder_child.wait();
+
+    assert!(result.is_ok());
+    assert_eq!(
+        recording.recorded.states_for("finish-no-samples"),
+        vec![RunnableState::Stopping, RunnableState::Stopped]
+    );
+    assert_eq!(recording.recorded.folded_for("finish-no-samples"), None);
 }

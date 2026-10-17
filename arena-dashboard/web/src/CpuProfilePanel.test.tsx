@@ -3,7 +3,7 @@ import "./testSetup";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CpuProfilePopover, CpuProfileView } from "./CpuProfilePanel";
+import { CpuProfilePopover, CpuProfileView, snapToViewportCorner } from "./CpuProfilePanel";
 import { useDashboardStore } from "./store";
 import type { RenderedProfile } from "./types";
 
@@ -209,10 +209,10 @@ describe("CpuProfilePopover", () => {
     render(<CpuProfilePopover />);
     await waitFor(() => expect(screen.getByTestId("cpu-profile-panel")).toBeTruthy());
 
-    fireEvent.click(screen.getByText("Pin"));
+    fireEvent.click(screen.getByLabelText("Pin"));
 
     expect(useDashboardStore.getState().profileView?.isPinned).toBe(true);
-    expect(screen.getByText("Unpin")).toBeTruthy();
+    expect(screen.getByLabelText("Unpin")).toBeTruthy();
   });
 
   it("unpinned panel closes when the backdrop is clicked", async () => {
@@ -236,5 +236,41 @@ describe("CpuProfilePopover", () => {
     const panel = screen.getByTestId("cpu-profile-panel") as HTMLElement;
     expect(Number.parseInt(panel.style.left, 10)).toBeLessThan(window.innerWidth);
     expect(Number.parseInt(panel.style.top, 10)).toBeLessThan(window.innerHeight);
+  });
+
+  it("resizeHandlesAreOfferedOnEveryEdgeAndCorner", () => {
+    useDashboardStore.getState().openProfileView("svc", { x: 10, y: 10 });
+    render(<CpuProfilePopover />);
+
+    for (const edge of ["n", "s", "e", "w", "ne", "nw", "se", "sw"]) {
+      expect(screen.getByTestId(`cpu-profile-resize-${edge}`)).toBeTruthy();
+    }
+  });
+
+  it("dragHandleIsOfferedOnTheHeader", () => {
+    useDashboardStore.getState().openProfileView("svc", { x: 10, y: 10 });
+    render(<CpuProfilePopover />);
+
+    expect(screen.getByTestId("cpu-profile-drag-handle")).toBeTruthy();
+  });
+});
+
+describe("snapToViewportCorner", () => {
+  const viewport = { width: 1000, height: 800 };
+
+  it.each([
+    ["top left", { left: 20, top: 20 }, { left: 8, top: 8 }],
+    ["top right", { left: 900, top: 20 }, { left: 892, top: 8 }],
+    ["bottom left", { left: 20, top: 700 }, { left: 8, top: 692 }],
+    ["bottom right", { left: 900, top: 700 }, { left: 892, top: 692 }],
+  ])("%s snaps to the corner", (_name, position, expected) => {
+    expect(snapToViewportCorner({ ...position, width: 100, height: 100 }, viewport)).toEqual(expected);
+  });
+
+  it("centreOfTheViewportIsLeftWhereItIs", () => {
+    expect(snapToViewportCorner({ left: 400, top: 400, width: 100, height: 100 }, viewport)).toEqual({
+      left: 400,
+      top: 400,
+    });
   });
 });

@@ -109,12 +109,12 @@ fn chromium_trace_to_folded_reconstructs_stacks_with_duration_weights() {
 }
 
 #[test]
-fn chromium_trace_to_folded_empty_trace_returns_err() {
+fn chromium_trace_to_folded_empty_trace_returns_no_stacks() {
     let empty = r#"{"traceEvents": [], "stackFrames": {}}"#;
 
     let result = chromium_trace_to_folded(empty);
 
-    assert!(result.is_err());
+    assert_eq!(result.unwrap(), "");
 }
 
 #[test]

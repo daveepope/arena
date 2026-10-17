@@ -1,4 +1,6 @@
-use super::{resolve_binary, scratch_path, signal_interrupt, wait_bounded};
+use super::{
+    resolve_binary, sampled_nothing, scratch_path, signal_interrupt, wait_bounded,
+};
 use crate::profiler::{CpuProfileError, LaunchRequest};
 use crate::wrapped::{WrapState, WrappingSampler};
 use std::path::{Path, PathBuf};
@@ -43,14 +45,14 @@ impl WrappingSampler for PySpySampler {
         state: WrapState,
         wrapping_child: &mut Child,
         budget: Duration,
-    ) -> Result<PathBuf, CpuProfileError> {
+    ) -> Result<Option<PathBuf>, CpuProfileError> {
         let WrapState::PySpy { folded_path } = state else {
             unreachable!("PySpySampler::collect given a non-py-spy WrapState");
         };
 
         signal_interrupt(wrapping_child)
             .map_err(|e| CpuProfileError::Finish(format!("failed to signal py-spy record: {e}")))?;
-        wait_bounded(wrapping_child, budget).map_err(|e| {
+        let status = wait_bounded(wrapping_child, budget).map_err(|e| {
             CpuProfileError::Finish(format!("py-spy record did not exit cleanly: {e}"))
         })?;
 
@@ -59,12 +61,35 @@ impl WrappingSampler for PySpySampler {
         // whether sampling itself succeeded, so success is judged by whether it actually
         // wrote the folded stacks file.
         if !folded_path.exists() {
+            if stopped_before_sampling(status) {
+                return Ok(None);
+            }
             return Err(CpuProfileError::Finish(format!(
-                "py-spy did not write folded stacks at {}",
+                "py-spy did not write folded stacks at {} and exited with {status}",
                 folded_path.display()
             )));
         }
+        if sampled_nothing(&folded_path) {
+            let _ = std::fs::remove_file(&folded_path);
+            return Ok(None);
+        }
 
-        Ok(folded_path)
+        Ok(Some(folded_path))
     }
+}
+
+fn stopped_before_sampling(status: std::process::ExitStatus) -> bool {
+    status.success() || terminated_by_interrupt(status)
+}
+
+#[cfg(unix)]
+fn terminated_by_interrupt(status: std::process::ExitStatus) -> bool {
+    use std::os::unix::process::ExitStatusExt;
+    const SIGINT: i32 = 2;
+    status.signal() == Some(SIGINT)
+}
+
+#[cfg(not(unix))]
+fn terminated_by_interrupt(_status: std::process::ExitStatus) -> bool {
+    false
 }

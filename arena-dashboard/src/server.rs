@@ -202,6 +202,8 @@ fn json_response(status: StatusCode, body: String) -> axum::response::Response {
         .into_response()
 }
 
+const PROFILE_TERMINAL_STATES: [&str; 2] = ["stopped", "faulted"];
+
 async fn cpu_profile_ingest_handler(
     State(state): State<AppState>,
     body: String,
@@ -210,6 +212,7 @@ async fn cpu_profile_ingest_handler(
         return StatusCode::BAD_REQUEST;
     };
 
+    let report_ready;
     {
         let mut profiles = state.cpu_profiles.lock().unwrap_or_else(|e| e.into_inner());
         let record = match profiles.iter_mut().find(|(id, _)| *id == payload.component) {
@@ -219,16 +222,25 @@ async fn cpu_profile_ingest_handler(
                 &mut profiles.last_mut().expect("just pushed").1
             }
         };
-        if let Some(folded) = &payload.folded {
-            record.folded = Some(folded.clone());
-            record.rendered = None;
+        match &payload.folded {
+            Some(folded) => {
+                record.folded = Some(folded.clone());
+                record.rendered = None;
+            }
+            None if PROFILE_TERMINAL_STATES.contains(&payload.state.as_str()) => {
+                record.folded = None;
+                record.rendered = None;
+            }
+            None => {}
         }
+        report_ready = record.folded.is_some();
     }
 
     let announcement = serde_json::json!({
         "type": "cpu_profile",
         "component": payload.component,
         "state": payload.state,
+        "report": report_ready,
     });
     let _ = state.tx.send(announcement.to_string());
     StatusCode::ACCEPTED

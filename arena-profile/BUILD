@@ -1,6 +1,5 @@
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@crates//:defs.bzl", "all_crate_deps")
-load("@rules_dotnet//dotnet:defs.bzl", "csharp_binary")
 
 config_setting(
     name = "linux_x86_64",
@@ -174,23 +173,18 @@ rust_test(
     ],
 )
 
-csharp_binary(
-    name = "dotnet_busy_loop",
-    target_frameworks = ["net8.0"],
-    srcs = ["tests/component/dotnet_busy_loop/Program.cs"],
-    visibility = ["//visibility:private"],
-)
-
 rust_test(
     name = "perf_component_test",
     srcs = [
         "tests/component/perf_component_test.rs",
+        "tests/support/profile_subjects.rs",
         "tests/support/recorded_profiles.rs",
     ],
     crate_root = "tests/component/perf_component_test.rs",
     size = "small",
     edition = "2021",
     tags = ["component_test"],
+    data = ["//tools/profile_subjects:busy_loop_native"],
     target_compatible_with = select({
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -208,13 +202,17 @@ rust_test(
     name = "async_profiler_component_test",
     srcs = [
         "tests/component/async_profiler_component_test.rs",
+        "tests/support/profile_subjects.rs",
         "tests/support/recorded_profiles.rs",
     ],
     crate_root = "tests/component/async_profiler_component_test.rs",
     size = "small",
     edition = "2021",
     tags = ["component_test"],
-    data = [":async_profiler_library"],
+    data = [
+        ":async_profiler_library",
+        "//tools/profile_subjects:BusyLoop.java",
+    ],
     target_compatible_with = select({
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -232,13 +230,17 @@ rust_test(
     name = "pyspy_component_test",
     srcs = [
         "tests/component/pyspy_component_test.rs",
+        "tests/support/profile_subjects.rs",
         "tests/support/recorded_profiles.rs",
     ],
     crate_root = "tests/component/pyspy_component_test.rs",
     size = "small",
     edition = "2021",
     tags = ["component_test"],
-    data = ["@profiling_tools//:py-spy__py-spy"],
+    data = [
+        "//tools/profile_subjects:busy_loop.py",
+        "@profiling_tools//:py-spy__py-spy",
+    ],
     target_compatible_with = select({
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -256,6 +258,7 @@ rust_test(
     name = "dotnet_trace_component_test",
     srcs = [
         "tests/component/dotnet_trace_component_test.rs",
+        "tests/support/profile_subjects.rs",
         "tests/support/recorded_profiles.rs",
     ],
     crate_root = "tests/component/dotnet_trace_component_test.rs",
@@ -263,8 +266,8 @@ rust_test(
     edition = "2021",
     tags = ["component_test"],
     data = [
-        ":dotnet_busy_loop",
         "//tools/dotnet_trace:dotnet_trace_tool",
+        "//tools/profile_subjects:busy_loop_dotnet",
     ],
     target_compatible_with = select({
         "@platforms//os:linux": [],

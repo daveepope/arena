@@ -36,3 +36,8 @@ export interface RenderedProfile {
   svg: string;
   hotspots: Hotspot[];
 }
+
+export interface CpuProfilerState {
+  state: string;
+  reportReady: boolean;
+}

@@ -34,9 +34,13 @@ function flamegraphFrames(page: Page) {
   return page.frameLocator('[data-testid="cpu-flamegraph"]').locator("#frames g");
 }
 
+function flamegraphControl(page: Page, id: string) {
+  return page.frameLocator('[data-testid="cpu-flamegraph"]').locator(`#${id}`);
+}
+
 async function openProfilePanel(page: Page): Promise<void> {
   await postProfileState(page, "stopped", SAMPLE_FOLDED);
-  await expect(profilerLabel(page)).toHaveText("profiler available");
+  await expect(profilerLabel(page)).toHaveText("cpu profile report");
   await profilerLabel(page).click();
   await expect(page.getByTestId("cpu-profile-panel")).toBeVisible();
 }
@@ -49,7 +53,14 @@ test.beforeEach(async ({ page }) => {
 test("samplingProfilerShowsADisabledLabelOnItsNode", async ({ page }) => {
   await postProfileState(page, "started");
 
-  await expect(profilerLabel(page)).toHaveText("profiler sampling");
+  await expect(profilerLabel(page)).toHaveText("cpu profiler started");
+  await expect(profilerLabel(page)).toBeDisabled();
+});
+
+test("stoppedProfilerThatSampledNothingOffersNoReport", async ({ page }) => {
+  await postProfileState(page, "stopped");
+
+  await expect(profilerLabel(page)).toHaveText("cpu profiler stopped");
   await expect(profilerLabel(page)).toBeDisabled();
 });
 
@@ -143,4 +154,23 @@ test("openInNewTabLandsOnTheFullScreenProfileView", async ({ page, context }) =>
   ).toBeVisible();
   await expect(opened.getByTestId("cpu-hotspot-compute")).toBeVisible();
   await expect(opened.getByRole("link", { name: "Open in new tab" })).toBeHidden();
+});
+
+test("clickingAFrameZoomsTheFlamegraphAndOffersReset", async ({ page }) => {
+  await openProfilePanel(page);
+  await expect(flamegraphControl(page, "unzoom")).toBeHidden();
+
+  await flamegraphFrames(page).filter({ hasText: "compute" }).first().click();
+
+  await expect(flamegraphControl(page, "unzoom")).toBeVisible();
+});
+
+test("resetZoomRestoresTheWholeFlamegraph", async ({ page }) => {
+  await openProfilePanel(page);
+  await flamegraphFrames(page).filter({ hasText: "compute" }).first().click();
+  await expect(flamegraphControl(page, "unzoom")).toBeVisible();
+
+  await flamegraphControl(page, "unzoom").click();
+
+  await expect(flamegraphControl(page, "unzoom")).toBeHidden();
 });

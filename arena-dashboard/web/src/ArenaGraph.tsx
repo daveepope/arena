@@ -8,7 +8,9 @@ import {
   Position,
   ReactFlow,
   useEdgesState,
+  useNodesInitialized,
   useNodesState,
+  useReactFlow,
   type Edge,
   type Node,
   type NodeProps,
@@ -20,6 +22,7 @@ import { computeLayout, type LayoutNode } from "./layout";
 import { isProfileAvailable, profilerLabel } from "./cpuProfile";
 import { arenaClasses, formatDetail, isActiveState, nodeClasses } from "./presentation";
 import { useDashboardStore } from "./store";
+import type { CpuProfilerState } from "./types";
 
 const edgeTypes = { arena: ArenaEdge };
 
@@ -40,9 +43,15 @@ function pulseStyle(isPulsing: boolean, isStrongPulse: boolean): Record<string, 
   return { animationDelay: syncedAnimationDelay(isStrongPulse ? PULSE_DURATION_MS : PULSE_SOFT_DURATION_MS) };
 }
 
-function ProfilerLabel({ componentId, state }: { componentId: string; state: string }) {
+function ProfilerLabel({
+  componentId,
+  profiler,
+}: {
+  componentId: string;
+  profiler: CpuProfilerState;
+}) {
   const openProfileView = useDashboardStore((s) => s.openProfileView);
-  const isAvailable = isProfileAvailable(state);
+  const isAvailable = isProfileAvailable(profiler.state, profiler.reportReady);
 
   return (
     <button
@@ -53,13 +62,13 @@ function ProfilerLabel({ componentId, state }: { componentId: string; state: str
         e.stopPropagation();
         openProfileView(componentId, { x: e.clientX, y: e.clientY });
       }}
-      className={`mt-0.5 rounded-sm border px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${
+      className={`mt-0.5 whitespace-nowrap rounded-sm border px-1 py-0 text-[8px] uppercase leading-[1.5] tracking-tight ${
         isAvailable
           ? "cursor-pointer border-teal-500 bg-teal-950/60 text-teal-300"
           : "cursor-default border-slate-600 bg-slate-900/60 text-slate-400"
       }`}
     >
-      {profilerLabel(state)}
+      {profilerLabel(profiler.state, profiler.reportReady)}
     </button>
   );
 }
@@ -67,13 +76,19 @@ function ProfilerLabel({ componentId, state }: { componentId: string; state: str
 function ArenaNode({ data }: NodeProps) {
   const node = data as unknown as LayoutNode;
   const select = useDashboardStore((s) => s.select);
-  const profilerState = useDashboardStore((s) => s.cpuProfiles.get(node.label));
+  const profiler = useDashboardStore((s) => s.cpuProfiles.get(node.label));
   const hasFaults = node.faults.length > 0;
   const isPulsing = hasFaults || isActiveState(node.state);
 
   return (
     <div
-      style={{ width: estimateNodeWidth(node.label), ...pulseStyle(isPulsing, hasFaults) }}
+      style={{
+        width: estimateNodeWidth(
+          node.label,
+          profiler ? profilerLabel(profiler.state, profiler.reportReady) : undefined,
+        ),
+        ...pulseStyle(isPulsing, hasFaults),
+      }}
       className={`flex min-h-[70px] cursor-pointer flex-col items-center justify-center gap-0.5 break-words border-2 px-3 py-2 text-center text-[11px] transition-all duration-300 ${
         node.visible ? "scale-100 opacity-100" : "pointer-events-none scale-[0.3] opacity-0"
       } ${nodeClasses(node.kind, node.state, hasFaults)}`}
@@ -90,14 +105,62 @@ function ArenaNode({ data }: NodeProps) {
       <span>{node.label}</span>
       <span className="text-[9px] uppercase tracking-wide opacity-70">{node.kind}</span>
       <span className="text-[9px] uppercase tracking-wide opacity-60">{node.state}</span>
-      {profilerState !== undefined && (
-        <ProfilerLabel componentId={node.label} state={profilerState} />
-      )}
+      {profiler !== undefined && <ProfilerLabel componentId={node.label} profiler={profiler} />}
     </div>
   );
 }
 
 const nodeTypes = { arena: ArenaNode };
+
+const GRAPH_CONTROL_CLASSES =
+  "cursor-pointer rounded-md border border-slate-600 bg-[#0e1330] px-2 py-1.5 text-xs uppercase tracking-wide text-slate-300 transition-colors hover:bg-slate-700/60";
+
+function GraphControls() {
+  const { fitView, zoomIn, zoomOut } = useReactFlow();
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        data-testid="zoom-out-graph"
+        aria-label="Zoom out"
+        onClick={() => void zoomOut()}
+        className={GRAPH_CONTROL_CLASSES}
+      >
+        -
+      </button>
+      <button
+        type="button"
+        data-testid="zoom-in-graph"
+        aria-label="Zoom in"
+        onClick={() => void zoomIn()}
+        className={GRAPH_CONTROL_CLASSES}
+      >
+        +
+      </button>
+      <button
+        type="button"
+        data-testid="recenter-graph"
+        onClick={() => void fitView()}
+        className={GRAPH_CONTROL_CLASSES}
+      >
+        Recenter
+      </button>
+    </div>
+  );
+}
+
+function FitViewOnNodeSetChange({ nodeIds }: { nodeIds: string }) {
+  const { fitView } = useReactFlow();
+  const nodesInitialized = useNodesInitialized();
+
+  useEffect(() => {
+    if (!nodesInitialized) return;
+    void fitView();
+  }, [fitView, nodeIds, nodesInitialized]);
+
+  return null;
+}
 
 export function ArenaGraph({ arenaId }: { arenaId: string }) {
   const snapshot = useDashboardStore((s) => s.arenas.get(arenaId)?.snapshot ?? null);
@@ -105,6 +168,11 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
+  const applyNodeChanges = (changes: Parameters<typeof onNodesChange>[0]) =>
+    onNodesChange(changes.filter((change) => change.type !== "remove"));
+  const applyEdgeChanges = (changes: Parameters<typeof onEdgesChange>[0]) =>
+    onEdgesChange(changes.filter((change) => change.type !== "remove"));
 
   useEffect(() => {
     if (!snapshot) return;
@@ -115,10 +183,11 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
       const existing = new Map(current.map((n) => [n.id, n]));
       return layout.nodes.map((n) => {
         const prev = existing.get(n.id);
+        if (prev) return { ...prev, data: n as unknown as Record<string, unknown> };
         return {
           id: n.id,
           type: "arena",
-          position: prev?.position ?? positions.get(n.id) ?? { x: 0, y: 0 },
+          position: positions.get(n.id) ?? { x: 0, y: 0 },
           data: n as unknown as Record<string, unknown>,
         };
       });
@@ -141,13 +210,20 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        onNodesChange={applyNodeChanges}
+        onEdgesChange={applyEdgeChanges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
+        zoomOnScroll={false}
+        preventScrolling={false}
+        zoomActivationKeyCode="Control"
         proOptions={{ hideAttribution: true }}
       >
+        <FitViewOnNodeSetChange nodeIds={nodes.map((n) => n.id).join("|")} />
+        <Panel position="top-right">
+          <GraphControls />
+        </Panel>
         <Background
           variant={BackgroundVariant.Lines}
           color={GRID_LINE_COLOR}

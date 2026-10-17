@@ -1,4 +1,6 @@
-use super::{map_spawn_error, resolve_binary, scratch_path, signal_interrupt, wait_bounded};
+use super::{
+    map_spawn_error, resolve_binary, sampled_nothing, scratch_path, signal_interrupt, wait_bounded,
+};
 use crate::profiler::{CpuProfileError, LaunchRequest};
 use crate::wrapped::{WrapState, WrappingSampler};
 use std::collections::HashMap;
@@ -42,7 +44,7 @@ impl WrappingSampler for DotnetTraceSampler {
         state: WrapState,
         wrapping_child: &mut Child,
         budget: Duration,
-    ) -> Result<PathBuf, CpuProfileError> {
+    ) -> Result<Option<PathBuf>, CpuProfileError> {
         let WrapState::DotnetTrace { nettrace_path } = state else {
             unreachable!("DotnetTraceSampler::collect given a non-dotnet-trace WrapState");
         };
@@ -61,7 +63,13 @@ impl WrappingSampler for DotnetTraceSampler {
             )));
         }
 
-        convert_nettrace_to_folded(&nettrace_path)
+        let folded_path = convert_nettrace_to_folded(&nettrace_path)?;
+        if sampled_nothing(&folded_path) {
+            let _ = std::fs::remove_file(&folded_path);
+            return Ok(None);
+        }
+
+        Ok(Some(folded_path))
     }
 }
 
@@ -181,6 +189,9 @@ pub fn chromium_trace_to_folded(json: &str) -> Result<String, String> {
     }
 
     if weights.is_empty() {
+        if trace.trace_events.is_empty() {
+            return Ok(String::new());
+        }
         return Err("no stack samples found in dotnet-trace chromium output".to_string());
     }
 

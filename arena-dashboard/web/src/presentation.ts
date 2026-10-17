@@ -73,3 +73,14 @@ export function formatDetail(id: string, kind: string, state: string, faults: Fa
     "\n"
   );
 }
+
+export const TERMINAL_ARENA_STATES = new Set(["arena_closed", "arena_faulted"]);
+export const INITIAL_ARENA_STATE = "arena_starting";
+
+export function isArenaRestart(previousState: string | undefined, nextState: string): boolean {
+  return (
+    previousState !== undefined &&
+    TERMINAL_ARENA_STATES.has(previousState) &&
+    nextState === INITIAL_ARENA_STATE
+  );
+}

@@ -1,4 +1,4 @@
-use super::{resolve_binary, scratch_path};
+use super::{resolve_binary, sampled_nothing, scratch_path};
 use crate::profiler::{CpuProfileError, LaunchRequest};
 use crate::augmented::{ArgAugmentingSampler, AugmentState};
 use std::path::PathBuf;
@@ -38,7 +38,11 @@ impl ArgAugmentingSampler for AsyncProfilerSampler {
         Ok((args, AugmentState::AsyncProfiler { folded_path }))
     }
 
-    fn collect(&self, state: AugmentState, _budget: Duration) -> Result<PathBuf, CpuProfileError> {
+    fn collect(
+        &self,
+        state: AugmentState,
+        _budget: Duration,
+    ) -> Result<Option<PathBuf>, CpuProfileError> {
         let AugmentState::AsyncProfiler { folded_path } = state;
         if !folded_path.exists() {
             return Err(CpuProfileError::Finish(format!(
@@ -47,6 +51,11 @@ impl ArgAugmentingSampler for AsyncProfilerSampler {
                 folded_path.display()
             )));
         }
-        Ok(folded_path)
+        if sampled_nothing(&folded_path) {
+            let _ = std::fs::remove_file(&folded_path);
+            return Ok(None);
+        }
+
+        Ok(Some(folded_path))
     }
 }

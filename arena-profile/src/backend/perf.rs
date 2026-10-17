@@ -1,4 +1,6 @@
-use super::{map_spawn_error, resolve_binary, scratch_path, signal_interrupt, wait_bounded};
+use super::{
+    map_spawn_error, resolve_binary, sampled_nothing, scratch_path, signal_interrupt, wait_bounded,
+};
 use crate::profiler::{CpuProfileError, LaunchRequest};
 use crate::wrapped::{WrapState, WrappingSampler};
 use inferno::collapse::perf::Folder;
@@ -45,7 +47,7 @@ impl WrappingSampler for PerfSampler {
         state: WrapState,
         wrapping_child: &mut Child,
         budget: Duration,
-    ) -> Result<PathBuf, CpuProfileError> {
+    ) -> Result<Option<PathBuf>, CpuProfileError> {
         let WrapState::Perf { data_path } = state else {
             unreachable!("PerfSampler::collect given a non-perf WrapState");
         };
@@ -97,6 +99,11 @@ impl WrappingSampler for PerfSampler {
             .flush()
             .map_err(|e| CpuProfileError::Finish(format!("failed to flush folded stacks file: {e}")))?;
 
-        Ok(folded_path)
+        if sampled_nothing(&folded_path) {
+            let _ = std::fs::remove_file(&folded_path);
+            return Ok(None);
+        }
+
+        Ok(Some(folded_path))
     }
 }
