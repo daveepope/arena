@@ -1,10 +1,16 @@
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Once;
+use std::sync::mpsc::channel;
+use std::sync::{LazyLock, Once};
+use std::thread;
 use std::time::{Duration, Instant};
 
 pub const DEFAULT_PORT: u16 = 4873;
+
+const PROBE_TIMEOUT: Duration = Duration::from_millis(500);
+
+const CLIENT_BUILD_TIMEOUT: Duration = Duration::from_secs(5);
 
 const EXECUTABLE_NAMES: [&str; 3] = [
     "arena-dashboard-server-linux",
@@ -24,6 +30,7 @@ pub enum LaunchError {
     ExecutableNotFound,
     Spawn(io::Error),
     Timeout { url: String, waited: Duration },
+    ReadinessUnavailable,
 }
 
 impl std::fmt::Display for LaunchError {
@@ -37,6 +44,9 @@ impl std::fmt::Display for LaunchError {
                 f,
                 "arena-dashboard server at {url} did not become ready within {waited:?}"
             ),
+            LaunchError::ReadinessUnavailable => {
+                write!(f, "arena-dashboard readiness probe is unavailable")
+            }
         }
     }
 }
@@ -51,11 +61,41 @@ fn is_arena_dashboard_response(response: &reqwest::blocking::Response) -> bool {
             .is_some_and(|value| value == "no-store")
 }
 
+static READINESS_CLIENT: LazyLock<Option<reqwest::blocking::Client>> =
+    LazyLock::new(build_readiness_client);
+
+fn build_readiness_client() -> Option<reqwest::blocking::Client> {
+    let (sender, receiver) = channel();
+    thread::spawn(move || {
+        let built = reqwest::blocking::Client::builder()
+            .connect_timeout(PROBE_TIMEOUT)
+            .timeout(PROBE_TIMEOUT)
+            .build();
+        let _ = sender.send(built);
+    });
+    match receiver.recv_timeout(CLIENT_BUILD_TIMEOUT) {
+        Ok(Ok(client)) => Some(client),
+        Ok(Err(e)) => {
+            tracing::warn!(error = %e, "arena-dashboard readiness probe could not be built");
+            None
+        }
+        Err(_) => {
+            tracing::warn!(
+                waited = ?CLIENT_BUILD_TIMEOUT,
+                "arena-dashboard readiness probe did not start"
+            );
+            None
+        }
+    }
+}
+
 pub fn poll_ready(url: &str, timeout: Duration) -> bool {
-    let client = reqwest::blocking::Client::new();
+    let Some(client) = READINESS_CLIENT.as_ref() else {
+        return false;
+    };
     let deadline = Instant::now() + timeout;
     loop {
-        if let Ok(response) = client.get(url).timeout(Duration::from_millis(500)).send() {
+        if let Ok(response) = client.get(url).send() {
             if is_arena_dashboard_response(&response) {
                 return true;
             }
@@ -63,7 +103,7 @@ pub fn poll_ready(url: &str, timeout: Duration) -> bool {
         if Instant::now() >= deadline {
             return false;
         }
-        std::thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(100));
     }
 }
 
@@ -117,6 +157,9 @@ pub fn resolve_port(port: u16) -> u16 {
 }
 
 pub fn ensure_running(port: u16, search_dir: Option<&Path>) -> Result<String, LaunchError> {
+    if READINESS_CLIENT.is_none() {
+        return Err(LaunchError::ReadinessUnavailable);
+    }
     let port = resolve_port(port);
     let url = format!("http://127.0.0.1:{port}");
 

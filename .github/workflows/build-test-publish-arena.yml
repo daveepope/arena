@@ -785,7 +785,7 @@ jobs:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Build and test
-        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
 
   test_macos_arm64:
     name: Test unit macOS ARM64
@@ -828,7 +828,7 @@ jobs:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Build and test
-        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
 
   test_unit_windows:
     name: Test unit Windows
@@ -867,7 +867,7 @@ jobs:
       - name: Set up Bazel and remote cache
         uses: ./.github/actions/bazel-setup
         with:
-          disk-cache: build-test-publish-arena-unit-windows
+          disk-cache: false
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Build and test
@@ -912,7 +912,7 @@ jobs:
       - name: Set up Bazel and remote cache
         uses: ./.github/actions/bazel-setup
         with:
-          disk-cache: build-test-publish-arena-component-windows
+          disk-cache: false
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Setup WSL2 Docker
@@ -961,7 +961,7 @@ jobs:
       - name: Set up Bazel and remote cache
         uses: ./.github/actions/bazel-setup
         with:
-          disk-cache: build-test-publish-arena-windows-examples
+          disk-cache: false
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Setup WSL2 Docker
@@ -989,7 +989,7 @@ jobs:
       - name: Set up Bazel and remote cache
         uses: ./.github/actions/bazel-setup
         with:
-          disk-cache: build-test-publish-arena-windows
+          disk-cache: false
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
 
       - name: Regenerate Windows pip lock files
@@ -1150,7 +1150,7 @@ jobs:
             staged-lib-name: libarena_ffi_shared.dylib
           - runner: windows-latest
             artifact: arena-ffi-windows-x86-64
-            disk-cache: build-test-publish-arena-windows
+            disk-cache: false
             built-lib-name: arena_ffi.dll
             staged-lib-name: arena_ffi_shared.dll
     steps:
@@ -1219,7 +1219,7 @@ jobs:
             staged-bin-name: arena-dashboard-server
           - runner: windows-latest
             artifact: arena-dashboard-server-windows-x86-64
-            disk-cache: build-test-publish-arena-windows
+            disk-cache: false
             built-bin-name: server.exe
             staged-bin-name: arena-dashboard-server.exe
     steps:
@@ -1296,7 +1296,7 @@ jobs:
             dashboard-server-prebuilt-dir: darwin-x86-64
           - runner: windows-latest
             artifact: arena-pytest-wheel-windows-x86-64
-            disk-cache: build-test-publish-arena-windows
+            disk-cache: false
             arena-ffi-artifact: arena-ffi-windows-x86-64
             arena-ffi-prebuilt-dir: windows-x86-64
             dashboard-server-artifact: arena-dashboard-server-windows-x86-64
