@@ -12,6 +12,6 @@ pub use observer::{
 };
 pub use profiler::{
     prepare_cpu_profile, CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch,
-    ProfileSession, ShutdownSignal, FINISH_TIMEOUT,
+    ProfileSession, ShutdownSignal, DEFAULT_CPU_PROFILE_LIMIT_BYTES, FINISH_TIMEOUT,
 };
 pub use render::{render_folded, Hotspot, RenderError, RenderedProfile, Severity};

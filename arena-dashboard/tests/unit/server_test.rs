@@ -138,3 +138,221 @@ async fn app_assetrequests_serveembeddedcontentwithtype() {
         assert!(!body.is_empty(), "{path} was served empty");
     }
 }
+
+async fn serve_dashboard() -> (String, AppState) {
+    let state = AppState::new();
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind ephemeral port");
+    let addr = listener.local_addr().expect("local addr");
+    let served = state.clone();
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, app(served)).await;
+    });
+    (format!("http://{addr}"), state)
+}
+
+const SAMPLE_FOLDED: &str = "main;handler;compute 42\nmain;handler;idle 8\n";
+
+async fn post_cpu_profile(base_url: &str, body: serde_json::Value) -> reqwest::StatusCode {
+    reqwest::Client::new()
+        .post(format!("{base_url}/profile/cpu"))
+        .json(&body)
+        .send()
+        .await
+        .expect("post cpu profile")
+        .status()
+}
+
+#[tokio::test]
+async fn post_cpu_profile_statewithoutfolded_isaccepted() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc", "state": "started"}),
+    )
+    .await;
+
+    assert_eq!(status, reqwest::StatusCode::ACCEPTED);
+}
+
+#[tokio::test]
+async fn post_cpu_profile_malformedbody_isrejected() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = reqwest::Client::new()
+        .post(format!("{base_url}/profile/cpu"))
+        .body("not json at all")
+        .send()
+        .await
+        .expect("post cpu profile")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn get_cpu_profile_unknowncomponent_returnsnotfound() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let response = reqwest::get(format!("{base_url}/profile/cpu/never-profiled"))
+        .await
+        .expect("get cpu profile");
+
+    assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn get_cpu_profile_statereportedbutnosamples_returnsnotfound() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-pending", "state": "started"}),
+    )
+    .await;
+
+    let response = reqwest::get(format!("{base_url}/profile/cpu/svc-pending"))
+        .await
+        .expect("get cpu profile");
+
+    assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn get_cpu_profile_foldedstacksposted_returnssvgandhotspots() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-done", "state": "stopped", "folded": SAMPLE_FOLDED}),
+    )
+    .await;
+
+    let body: serde_json::Value = reqwest::get(format!("{base_url}/profile/cpu/svc-done"))
+        .await
+        .expect("get cpu profile")
+        .json()
+        .await
+        .expect("json body");
+
+    assert!(body["svg"].as_str().expect("svg string").contains("<svg"));
+    let hotspots = body["hotspots"].as_array().expect("hotspots array");
+    assert_eq!(hotspots.len(), 2);
+    assert_eq!(hotspots[0]["function"], "compute");
+    assert_eq!(hotspots[0]["severity"], "critical");
+}
+
+#[tokio::test]
+async fn get_cpu_profile_unrenderablestacks_returnsunprocessable() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-empty", "state": "stopped", "folded": ""}),
+    )
+    .await;
+
+    let response = reqwest::get(format!("{base_url}/profile/cpu/svc-empty"))
+        .await
+        .expect("get cpu profile");
+
+    assert_eq!(response.status(), reqwest::StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn post_cpu_profile_samecomponenttwice_replacestheearliersamples() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-twice", "state": "stopped", "folded": "main;first 10\n"}),
+    )
+    .await;
+    let first: serde_json::Value = reqwest::get(format!("{base_url}/profile/cpu/svc-twice"))
+        .await
+        .expect("get first")
+        .json()
+        .await
+        .expect("json");
+    assert_eq!(first["hotspots"][0]["function"], "first");
+
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-twice", "state": "stopped", "folded": "main;second 10\n"}),
+    )
+    .await;
+
+    let second: serde_json::Value = reqwest::get(format!("{base_url}/profile/cpu/svc-twice"))
+        .await
+        .expect("get second")
+        .json()
+        .await
+        .expect("json");
+    assert_eq!(second["hotspots"][0]["function"], "second");
+}
+
+#[tokio::test]
+async fn post_cpu_profile_anytransition_broadcastsatypedcpuprofileevent() {
+    let (base_url, state) = serve_dashboard().await;
+    let mut subscriber = state.subscribe();
+
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-broadcast", "state": "started"}),
+    )
+    .await;
+
+    let message = tokio::time::timeout(std::time::Duration::from_secs(5), subscriber.recv())
+        .await
+        .expect("broadcast arrives")
+        .expect("broadcast message");
+    let event: serde_json::Value = serde_json::from_str(&message).expect("json event");
+    assert_eq!(event["type"], "cpu_profile");
+    assert_eq!(event["component"], "svc-broadcast");
+    assert_eq!(event["state"], "started");
+}
+
+#[tokio::test]
+async fn clear_stored_cpu_profile_discards_it() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-cleared", "state": "stopped", "folded": SAMPLE_FOLDED}),
+    )
+    .await;
+
+    let cleared = reqwest::Client::new()
+        .post(format!("{base_url}/clear"))
+        .send()
+        .await
+        .expect("post clear")
+        .status();
+    let response = reqwest::get(format!("{base_url}/profile/cpu/svc-cleared"))
+        .await
+        .expect("get cpu profile");
+
+    assert_eq!(cleared, reqwest::StatusCode::NO_CONTENT);
+    assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn get_cpu_profile_rendered_declares_json_content_type() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-typed", "state": "stopped", "folded": SAMPLE_FOLDED}),
+    )
+    .await;
+
+    let rendered = reqwest::get(format!("{base_url}/profile/cpu/svc-typed"))
+        .await
+        .expect("get cpu profile");
+    let rendered_type = rendered.headers()[reqwest::header::CONTENT_TYPE].clone();
+    let cached = reqwest::get(format!("{base_url}/profile/cpu/svc-typed"))
+        .await
+        .expect("get cached cpu profile");
+
+    assert_eq!(rendered_type, "application/json");
+    assert_eq!(
+        cached.headers()[reqwest::header::CONTENT_TYPE],
+        "application/json"
+    );
+}

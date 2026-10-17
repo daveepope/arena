@@ -39,6 +39,26 @@ def _normalize_optional_id_seq(
     return tuple(str(x).strip() for x in seq if str(x).strip())
 
 
+class LifecycleDashboardBuilder:
+    def __init__(self, closed: "ClosedArena") -> None:
+        self._closed = closed
+
+    def with_cpu_profiler(self, component_id: str) -> "LifecycleDashboardBuilder":
+        self._closed._cpu_profiled_components.append(component_id)
+        return self
+
+    def with_cpu_profile_limit_bytes(self, limit_bytes: int) -> "LifecycleDashboardBuilder":
+        self._closed._cpu_profile_limit_bytes = limit_bytes
+        return self
+
+    def done(self) -> "ClosedArena":
+        return self._closed
+
+    async def open(self) -> OpenArena:
+        __tracebackhide__ = True
+        return await self._closed.open()
+
+
 class ClosedArena:
     def __init__(
         self,
@@ -63,6 +83,8 @@ class ClosedArena:
         self._dashboard_port: int = _DEFAULT_DASHBOARD_PORT
         self._dashboard_search_dir: Optional[str] = None
         self._lifecycle_dashboard = False
+        self._cpu_profiled_components: List[str] = []
+        self._cpu_profile_limit_bytes: Optional[int] = None
 
     def observe(self, callback: Callable[[str], None]) -> "ClosedArena":
         self._observers.append(callback)
@@ -74,12 +96,12 @@ class ClosedArena:
         *,
         port: int = _DEFAULT_DASHBOARD_PORT,
         search_dir: Optional[str] = None,
-    ) -> "ClosedArena":
+    ) -> "LifecycleDashboardBuilder":
         self._lifecycle_dashboard = True
         self._dashboard_url = url
         self._dashboard_port = port
         self._dashboard_search_dir = search_dir
-        return self
+        return LifecycleDashboardBuilder(self)
 
     async def _register_dashboard(self, ffi) -> Optional[int]:
         if not self._lifecycle_dashboard:
@@ -114,6 +136,12 @@ class ClosedArena:
             return "{}"
         a_match = self._matches[0]
         config = a_match._for_ffi() if hasattr(a_match, "_for_ffi") else a_match
+        if self._cpu_profiled_components or self._cpu_profile_limit_bytes is not None:
+            config = dict(config)
+        if self._cpu_profiled_components:
+            config["cpu_profiled_components"] = list(self._cpu_profiled_components)
+        if self._cpu_profile_limit_bytes is not None:
+            config["cpu_profile_limit_bytes"] = self._cpu_profile_limit_bytes
         return json.dumps(config)
 
     async def open(self) -> OpenArena:

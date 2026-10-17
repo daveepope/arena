@@ -3,6 +3,7 @@ mod recorded_profiles;
 
 use arena::lifecycle::RunnableState;
 use arena_profile::profiler::read_collected;
+use arena_profile::DEFAULT_CPU_PROFILE_LIMIT_BYTES;
 use arena_profile::{prepare_cpu_profile, CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch};
 use recorded_profiles::start_recording;
 use std::path::PathBuf;
@@ -64,6 +65,7 @@ fn prepare_cpu_profile_perf_backend_returns_wrapped_variant() {
         CpuProfilerBackend::Perf,
         sample_request(),
         "dispatch-perf",
+        DEFAULT_CPU_PROFILE_LIMIT_BYTES,
     );
 
     match result {
@@ -80,6 +82,7 @@ fn prepare_cpu_profile_async_profiler_backend_returns_args_augmented_variant() {
         CpuProfilerBackend::AsyncProfiler,
         sample_request(),
         "dispatch-async-profiler",
+        DEFAULT_CPU_PROFILE_LIMIT_BYTES,
     );
 
     match result {
@@ -97,7 +100,7 @@ fn read_collected_missing_folded_path_returns_finish_error() {
         std::process::id()
     ));
 
-    let result = read_collected(&missing);
+    let result = read_collected(&missing, DEFAULT_CPU_PROFILE_LIMIT_BYTES);
 
     assert!(matches!(result, Err(CpuProfileError::Finish(_))));
 }
@@ -106,7 +109,7 @@ fn read_collected_missing_folded_path_returns_finish_error() {
 fn read_collected_valid_folded_path_returns_stacks_and_removes_the_file() {
     let folded_path = write_sample_folded_stacks("read-collected-cleanup");
 
-    let result = read_collected(&folded_path);
+    let result = read_collected(&folded_path, DEFAULT_CPU_PROFILE_LIMIT_BYTES);
 
     assert_eq!(result.unwrap(), "main;handler;compute 42\n");
     assert!(!folded_path.exists());
@@ -116,7 +119,7 @@ fn read_collected_valid_folded_path_returns_stacks_and_removes_the_file() {
 fn prepare_cpu_profile_any_backend_reports_the_attaching_transition() {
     let recording = start_recording();
 
-    let _ = prepare_cpu_profile(CpuProfilerBackend::Perf, sample_request(), "attaching");
+    let _ = prepare_cpu_profile(CpuProfilerBackend::Perf, sample_request(), "attaching", DEFAULT_CPU_PROFILE_LIMIT_BYTES);
 
     assert_eq!(
         recording.recorded.states_for("attaching").first(),
@@ -128,7 +131,7 @@ fn prepare_cpu_profile_any_backend_reports_the_attaching_transition() {
 fn prepare_cpu_profile_missing_backend_binary_reports_faulted_after_attaching() {
     let recording = start_recording();
 
-    let result = prepare_cpu_profile(CpuProfilerBackend::Perf, sample_request(), "attach-fault");
+    let result = prepare_cpu_profile(CpuProfilerBackend::Perf, sample_request(), "attach-fault", DEFAULT_CPU_PROFILE_LIMIT_BYTES);
 
     if matches!(result, Err(CpuProfileError::MissingBinary { .. })) {
         assert_eq!(
@@ -141,4 +144,44 @@ fn prepare_cpu_profile_missing_backend_binary_reports_faulted_after_attaching() 
             vec![RunnableState::Starting]
         );
     }
+}
+
+#[test]
+fn read_collected_stacks_over_the_limit_returns_profile_too_large() {
+    let folded_path = write_sample_folded_stacks("read-collected-over-limit");
+    let expected_bytes = std::fs::metadata(&folded_path).expect("metadata").len();
+
+    let result = read_collected(&folded_path, 4);
+
+    match result {
+        Err(CpuProfileError::ProfileTooLarge { bytes, limit }) => {
+            assert_eq!(bytes, expected_bytes);
+            assert_eq!(limit, 4);
+        }
+        other => panic!("expected ProfileTooLarge, got {other:?}"),
+    }
+    assert!(!folded_path.exists());
+}
+
+#[test]
+fn read_collected_stacks_exactly_at_the_limit_returns_the_stacks() {
+    let folded_path = write_sample_folded_stacks("read-collected-at-limit");
+    let limit = std::fs::metadata(&folded_path).expect("metadata").len() as usize;
+
+    let result = read_collected(&folded_path, limit);
+
+    assert_eq!(result.unwrap(), "main;handler;compute 42\n");
+}
+
+#[test]
+fn profile_too_large_display_names_the_limit_and_how_to_raise_it() {
+    let message = CpuProfileError::ProfileTooLarge {
+        bytes: 99,
+        limit: 8,
+    }
+    .to_string();
+
+    assert!(message.contains("99 bytes"), "got: {message}");
+    assert!(message.contains("8 byte limit"), "got: {message}");
+    assert!(message.contains("lifecycle dashboard builder"), "got: {message}");
 }

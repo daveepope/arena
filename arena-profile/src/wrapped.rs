@@ -43,6 +43,7 @@ pub(crate) struct WrappedProfileSession {
     sampler: Box<dyn WrappingSampler>,
     state: WrapState,
     component_id: String,
+    limit_bytes: usize,
 }
 
 impl ProfileSession for WrappedProfileSession {
@@ -51,11 +52,11 @@ impl ProfileSession for WrappedProfileSession {
     }
 
     fn finish(self: Box<Self>, wrapping_child: &mut Child) -> Result<(), CpuProfileError> {
-        let WrappedProfileSession { sampler, state, component_id } = *self;
+        let WrappedProfileSession { sampler, state, component_id, limit_bytes } = *self;
         observer::report(&component_id, RunnableState::Stopping);
         let collected = sampler
             .collect(state, wrapping_child, FINISH_TIMEOUT)
-            .and_then(|folded_path| read_collected(&folded_path));
+            .and_then(|folded_path| read_collected(&folded_path, limit_bytes));
         match collected {
             Ok(folded) => {
                 observer::report_complete(&component_id, &folded);
@@ -73,6 +74,7 @@ pub fn prepare_wrapped(
     sampler: Box<dyn WrappingSampler>,
     request: &LaunchRequest,
     component_id: String,
+    limit_bytes: usize,
 ) -> Result<PreparedLaunch, CpuProfileError> {
     let (program, args, state) = sampler.wrap(request)?;
     Ok(PreparedLaunch::Wrapped {
@@ -82,6 +84,7 @@ pub fn prepare_wrapped(
             sampler,
             state,
             component_id,
+            limit_bytes,
         }),
     })
 }

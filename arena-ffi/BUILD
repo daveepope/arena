@@ -5,6 +5,7 @@ _ARENA_FFI_DEPS = all_crate_deps(normal = True) + [
     "//arena",
     "//arena-containerized-component:arena_containerized_component",
     "//arena-dashboard:arena_dashboard",
+        "//arena-profile:arena_profile",
     "//arena-executable-component:arena_executable_component",
     "//arena-host:arena_host",
     "//arena-http:arena_http",
@@ -122,6 +123,7 @@ rust_test(
         normal = True,
         normal_dev = True,
     ) + [
+        "//arena",
         ":arena_ffi",
     ],
     proc_macro_deps = all_crate_deps(
@@ -662,6 +664,8 @@ rust_test(
         normal = True,
         normal_dev = True,
     ) + [
+        "//arena",
+        "//arena-profile:arena_profile",
         ":arena_ffi",
     ],
     proc_macro_deps = all_crate_deps(
@@ -725,6 +729,7 @@ rust_test(
     ) + [
         ":arena_ffi",
         "//arena-dashboard:arena_dashboard",
+        "//arena-profile:arena_profile",
     ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,

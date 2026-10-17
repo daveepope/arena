@@ -156,7 +156,7 @@ public abstract class ArenaCollectionFixture : IDisposable
     private static ClosedArena ApplyVisualize(Type fixtureType, ClosedArena closed)
     {
         return fixtureType.GetCustomAttribute<ArenaVisualizeAttribute>() != null
-            ? closed.WithLifecycleDashboard()
+            ? closed.WithLifecycleDashboard().Done()
             : closed;
     }
 

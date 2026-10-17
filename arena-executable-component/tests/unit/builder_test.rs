@@ -116,7 +116,7 @@ fn attach_cpu_profiler_supported_build_tool_returns_ok() {
             .build()
             .expect("build executable component");
 
-        assert!(component.attach_cpu_profiler().is_ok());
+        assert!(component.attach_cpu_profiler(None).is_ok());
     }
 }
 
@@ -140,7 +140,7 @@ fn attach_cpu_profiler_unsupported_build_tool_returns_fault_naming_the_tool() {
             .expect("build executable component");
 
         let fault = component
-            .attach_cpu_profiler()
+            .attach_cpu_profiler(None)
             .err()
             .expect("unsupported build tool must fault");
 
@@ -158,7 +158,7 @@ fn attach_cpu_profiler_without_build_tool_returns_fault() {
         .expect("build executable component");
 
     let fault = component
-        .attach_cpu_profiler()
+        .attach_cpu_profiler(None)
         .err()
         .expect("missing build tool must fault");
 

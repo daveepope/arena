@@ -17,6 +17,7 @@
 
 ## AI communication
 
+- **Re-read this AI communication section before every single reply**, not once per session. If the reply runs past two sentences, cut it before sending. **Never write an essay**: not for status, not for wrap-ups, not for review findings.
 - **VERY SHORT ANSWERS.** Default to one or two sentences, or a bare command. No essays, no summaries of what you just did, no restating the question. Expand only when the developer explicitly asks for detail.
 - **After a coding task, keep the wrap-up to one or two sentences:** what changed and the verification result (e.g. which `bazel build`/`test` passed). Do not list every edit, walk through each finding, or explain the reasoning unless the developer asks. Still report new or changed third-party dependencies in that one line, since other rules require it.
 - **No unsolicited tables, headings, or bullet lists** in chat replies. Prose only, and as little of it as possible.
@@ -65,6 +66,7 @@
 - Prefer **performance, speed, and efficiency** in lifecycle and orchestration code.
 - Keep behavior **testable**, follow **simple SOLID** shaping (single responsibility, small interfaces), and **avoid over-abstraction**.
 - **Follow the established module/crate layout**; do not invent parallel structures without a clear reason.
+- **Bound anything that can grow with a cap the caller can raise, not with eviction.** When proposing a solution for unbounded growth (memory, stored payloads, queues, retries), do **not** evict, truncate, or silently discard: a partial result is worse than a clear failure. Default to a **modest hard cap**, let the caller **raise it through a builder method**, and **fault through the existing error contract** when it is breached. The error must name the limit and say how to raise it.
 - **The Arena owns teardown.** Any dependency or component the Arena has started must be stopped by the Arena, including after a fault and including when the Arena is dropped. **Never leave dangling containers, networks, or processes.** Teardown is aggressive and runs in **two passes**: a graceful stop, then an **unconditional forced stop** over every subject regardless of the state it reports, because a subject claiming to be stopped may still be running. The forced stop must be **idempotent**, **infallible**, and **panic-free**. Neither pass may short-circuit: a failure is recorded and the sweep continues to every remaining subject. A fault path that returns before the forced sweep has run is a **defect**, not a tradeoff. If any dependency or component ends faulted, the Arena is faulted: **no exit path may report success while a subject may still be running.**
 
 ## Tests (unit and component)

@@ -1,8 +1,9 @@
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use arena::lifecycle::{ArenaLifecycleObserver, ArenaLifecycleState, ArenaState};
+use arena::lifecycle::{ArenaLifecycleObserver, ArenaLifecycleState, ArenaState, RunnableState};
 use arena_dashboard::HttpForwardingObserver;
+use arena_profile::{CpuProfileEvent, CpuProfileObserver};
 use axum::extract::State;
 use axum::routing::post;
 use axum::Router;
@@ -134,4 +135,87 @@ async fn drop_stalling_dashboard_stops_forwarding_at_the_drain_budget() {
         elapsed < Duration::from_secs(10),
         "teardown took {elapsed:?}, ten stalled posts without a budget would take twenty seconds"
     );
+}
+
+async fn start_profile_capture_server(bodies: CapturedBodies) -> String {
+    let router = Router::new()
+        .route(
+            "/profile/cpu",
+            post(|State(captured): State<CapturedBodies>, body: String| async move {
+                captured.lock().expect("capture lock").push(body);
+            }),
+        )
+        .with_state(bodies);
+
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind ephemeral port");
+    let port = listener.local_addr().expect("local addr").port();
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, router).await;
+    });
+    format!("http://127.0.0.1:{port}")
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn on_cpu_profile_statetransition_postsitwithoutsamples() {
+    let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
+    let url = start_profile_capture_server(Arc::clone(&bodies)).await;
+
+    let observer = HttpForwardingObserver::new(url);
+    observer.on_cpu_profile(&CpuProfileEvent::new("svc", RunnableState::Started));
+    drop(observer);
+
+    let captured = bodies.lock().expect("capture lock").clone();
+    assert_eq!(captured.len(), 1);
+    let payload: serde_json::Value = serde_json::from_str(&captured[0]).expect("json payload");
+    assert_eq!(payload["component"], "svc");
+    assert_eq!(payload["state"], "started");
+    assert!(payload.get("folded").is_none());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn on_cpu_profile_completedprofile_poststhefoldedstacks() {
+    let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
+    let url = start_profile_capture_server(Arc::clone(&bodies)).await;
+
+    let observer = HttpForwardingObserver::new(url);
+    observer.on_cpu_profile(
+        &CpuProfileEvent::new("svc", RunnableState::Stopped).with_folded("main;compute 42\n"),
+    );
+    drop(observer);
+
+    let captured = bodies.lock().expect("capture lock").clone();
+    assert_eq!(captured.len(), 1);
+    let payload: serde_json::Value = serde_json::from_str(&captured[0]).expect("json payload");
+    assert_eq!(payload["state"], "stopped");
+    assert_eq!(payload["folded"], "main;compute 42\n");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn on_cpu_profile_everytransition_isforwardedinorder() {
+    let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
+    let url = start_profile_capture_server(Arc::clone(&bodies)).await;
+
+    let observer = HttpForwardingObserver::new(url);
+    for state in [
+        RunnableState::Starting,
+        RunnableState::Started,
+        RunnableState::Stopping,
+    ] {
+        observer.on_cpu_profile(&CpuProfileEvent::new("svc", state));
+    }
+    drop(observer);
+
+    let captured = bodies.lock().expect("capture lock").clone();
+    let states: Vec<String> = captured
+        .iter()
+        .map(|body| {
+            serde_json::from_str::<serde_json::Value>(body).expect("json")["state"]
+                .as_str()
+                .expect("state string")
+                .to_string()
+        })
+        .collect();
+    assert_eq!(states, vec!["starting", "started", "stopping"]);
 }

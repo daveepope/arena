@@ -17,7 +17,7 @@ rust_library(
         "--check-cfg=cfg(arena_embedded_web_assets)",
     ],
     edition = "2021",
-    deps = all_crate_deps(normal = True) + ["//arena"],
+    deps = all_crate_deps(normal = True) + ["//arena", "//arena-profile:arena_profile"],
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
 )
@@ -29,6 +29,7 @@ rust_binary(
     deps = all_crate_deps(normal = True) + [
         ":arena_dashboard",
         "//arena",
+        "//arena-profile:arena_profile",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
@@ -42,6 +43,7 @@ rust_binary(
     deps = all_crate_deps(normal = True) + [
         ":arena_dashboard",
         "//arena",
+        "//arena-profile:arena_profile",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
     visibility = ["//visibility:public"],
@@ -57,6 +59,7 @@ rust_test(
         normal_dev = True,
     ) + [
         "//arena",
+        "//arena-profile:arena_profile",
         ":arena_dashboard",
     ],
     proc_macro_deps = all_crate_deps(

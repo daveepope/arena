@@ -19,18 +19,6 @@ id = "RUSTSEC-2026-0099"
 reason = "rustls-webpki 0.101.7 CRL-parsing bug, pulled in via tiberius 0.12.3 (arena-mssql). Same tiberius chain as RUSTSEC-2026-0098; no fixed release exists upstream."
 
 [[IgnoredVulns]]
-id = "GHSA-82fw-gwwq-j7x9"
-reason = "@vitest/mocker path traversal / arbitrary file read via an unauthenticated redirect-mock registered over Vite's dev-server HMR WebSocket. Fixed only in vitest 4.1.11+/5.0.0+; the 2.1.x/3.x lines are not maintained and will not receive a backport. Arena's dashboard tests run via `vitest run` (one-shot, no persistent dev server, never network-exposed) and do not use Vitest's module-mocking feature at all, so the vulnerable interceptor path is never registered."
-
-[[IgnoredVulns]]
-id = "GHSA-5gmw-xhrv-c9v3"
-reason = "tinypool prototype-pollution gadget in worker options leading to RCE. tinypool is pinned by vitest's own dependency range (^1.1.1); vitest 3.x (current latest supporting our vite/plugin-react versions) has not bumped it to the fixed 2.1.1+ line. The worker options tinypool receives come only from vitest's own trusted internal config in our `vitest run` invocation, never from external or attacker-controlled input."
-
-[[IgnoredVulns]]
-id = "GHSA-85c8-ppgw-ccpr"
-reason = "Same tinypool prototype-pollution class as GHSA-5gmw-xhrv-c9v3 (fixed in 2.1.2+), same vitest-imposed ^1.1.1 constraint and same no-untrusted-input reasoning."
-
-[[IgnoredVulns]]
 id = "RUSTSEC-2026-0346"
 reason = "rustls 0.21.12 `Debug` impls on client session values expose the TLS 1.2 master secret / TLS 1.3 resumption PSK. Fixed in 0.23.46, which the workspace already uses directly; the 0.21.12 copy is the tiberius 0.12.3 chain (arena-mssql) and cannot reach 0.23.x. tiberius 0.13.0 drops the chain but forces rustls's aws-lc-rs provider and a cmake/C build on every platform, so that bump is deferred. Arena implements no ClientSessionStore and never debug-formats session values."
 

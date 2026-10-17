@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 
 import pytest
@@ -53,3 +54,66 @@ def test_open_logger_factory_configured_asks_the_factory_for_a_logger():
     _open_and_close(closed)
 
     assert requested
+
+
+class _StubMatch:
+    def _for_ffi(self):
+        return {"match_name": "m", "dependencies": [], "components": []}
+
+
+def test_config_no_cpu_profiler_omits_the_cpu_profiled_components_key():
+    closed = ClosedArena("arena", [_StubMatch()])
+
+    assert "cpu_profiled_components" not in json.loads(closed._config())
+
+
+def test_with_cpu_profiler_single_component_serializes_that_id():
+    closed = (
+        ClosedArena("arena", [_StubMatch()])
+        .with_lifecycle_dashboard("http://127.0.0.1:65535")
+        .with_cpu_profiler("svc")
+        .done()
+    )
+
+    assert json.loads(closed._config())["cpu_profiled_components"] == ["svc"]
+
+
+def test_with_cpu_profiler_several_components_preserve_declaration_order():
+    closed = (
+        ClosedArena("arena", [_StubMatch()])
+        .with_lifecycle_dashboard("http://127.0.0.1:65535")
+        .with_cpu_profiler("svc")
+        .with_cpu_profiler("worker")
+        .done()
+    )
+
+    assert json.loads(closed._config())["cpu_profiled_components"] == ["svc", "worker"]
+
+
+def test_done_after_with_cpu_profiler_returns_the_originating_closed_arena():
+    closed = ClosedArena("arena", [_StubMatch()])
+
+    assert closed.with_lifecycle_dashboard().with_cpu_profiler("svc").done() is closed
+
+
+def test_with_cpu_profile_limit_bytes_set_serializes_the_limit():
+    closed = (
+        ClosedArena("arena", [_StubMatch()])
+        .with_lifecycle_dashboard("http://127.0.0.1:65535")
+        .with_cpu_profiler("svc")
+        .with_cpu_profile_limit_bytes(1024)
+        .done()
+    )
+
+    assert json.loads(closed._config())["cpu_profile_limit_bytes"] == 1024
+
+
+def test_config_no_cpu_profile_limit_omits_the_cpu_profile_limit_key():
+    closed = (
+        ClosedArena("arena", [_StubMatch()])
+        .with_lifecycle_dashboard("http://127.0.0.1:65535")
+        .with_cpu_profiler("svc")
+        .done()
+    )
+
+    assert "cpu_profile_limit_bytes" not in json.loads(closed._config())

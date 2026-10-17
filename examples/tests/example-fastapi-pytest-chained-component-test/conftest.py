@@ -379,7 +379,7 @@ def closed_arena() -> ClosedArena:
         ),
     )
     if os.environ.get("ARENA_VISUALIZE") == "1":
-        closed = closed.with_lifecycle_dashboard()
+        closed = closed.with_lifecycle_dashboard().done()
     return closed
 
 

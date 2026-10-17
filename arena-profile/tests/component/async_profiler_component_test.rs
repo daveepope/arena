@@ -1,6 +1,7 @@
 #[path = "../support/recorded_profiles.rs"]
 mod recorded_profiles;
 
+use arena_profile::DEFAULT_CPU_PROFILE_LIMIT_BYTES;
 use arena_profile::{prepare_cpu_profile, CpuProfilerBackend, LaunchRequest, PreparedLaunch, ShutdownSignal};
 use arena::lifecycle::RunnableState;
 use recorded_profiles::start_recording;
@@ -50,7 +51,7 @@ fn prepare_cpu_profile_real_async_profiler_agent_flag_against_jvm_busy_loop_repo
         ],
     };
 
-    let prepared = prepare_cpu_profile(CpuProfilerBackend::AsyncProfiler, request, component_id)
+    let prepared = prepare_cpu_profile(CpuProfilerBackend::AsyncProfiler, request, component_id, DEFAULT_CPU_PROFILE_LIMIT_BYTES)
         .expect("prepare async-profiler profile");
     let PreparedLaunch::ArgsAugmented { args, shutdown_signal, session } = prepared else {
         panic!("expected ArgsAugmented variant for AsyncProfiler backend");

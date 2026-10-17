@@ -227,7 +227,7 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
   }
 
   private static ClosedArena applyVisualize(Class<?> root, ClosedArena closedArena) {
-    return root.isAnnotationPresent(ArenaVisualize.class) ? closedArena.withLifecycleDashboard() : closedArena;
+    return root.isAnnotationPresent(ArenaVisualize.class) ? closedArena.withLifecycleDashboard().done() : closedArena;
   }
 
   private static ClosedArena closedArenaFor(Class<?> root, Match match, LogIdentifiers logIdentifiers) {

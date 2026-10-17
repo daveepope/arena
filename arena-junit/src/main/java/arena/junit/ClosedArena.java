@@ -27,6 +27,8 @@ public final class ClosedArena {
   private final String dashboardUrl;
   private final int dashboardPort;
   private final String dashboardSearchDir;
+  private final List<String> cpuProfiledComponents;
+  private final Long cpuProfileLimitBytes;
 
   public ClosedArena(String name, List<Match> matches) {
     this(name, matches, ArenaLogLevel.INFO, null, List.of(), List.of());
@@ -77,6 +79,8 @@ public final class ClosedArena {
         false,
         null,
         DEFAULT_DASHBOARD_PORT,
+        null,
+        List.of(),
         null);
   }
 
@@ -91,7 +95,9 @@ public final class ClosedArena {
       boolean lifecycleDashboard,
       String dashboardUrl,
       int dashboardPort,
-      String dashboardSearchDir) {
+      String dashboardSearchDir,
+      List<String> cpuProfiledComponents,
+      Long cpuProfileLimitBytes) {
     this.name = name;
     this.matches = List.copyOf(matches);
     this.logLevel = logLevel;
@@ -109,18 +115,22 @@ public final class ClosedArena {
     this.dashboardUrl = dashboardUrl;
     this.dashboardPort = dashboardPort;
     this.dashboardSearchDir = dashboardSearchDir;
+    this.cpuProfiledComponents = List.copyOf(cpuProfiledComponents);
+    this.cpuProfileLimitBytes = cpuProfileLimitBytes;
   }
 
-  public ClosedArena withLifecycleDashboard() {
-    return withLifecycleDashboardInternal(null, DEFAULT_DASHBOARD_PORT, null);
+  public LifecycleDashboardBuilder withLifecycleDashboard() {
+    return new LifecycleDashboardBuilder(
+        withLifecycleDashboardInternal(null, DEFAULT_DASHBOARD_PORT, null));
   }
 
-  public ClosedArena withLifecycleDashboard(String url) {
-    return withLifecycleDashboardInternal(url, DEFAULT_DASHBOARD_PORT, null);
+  public LifecycleDashboardBuilder withLifecycleDashboard(String url) {
+    return new LifecycleDashboardBuilder(
+        withLifecycleDashboardInternal(url, DEFAULT_DASHBOARD_PORT, null));
   }
 
-  public ClosedArena withLifecycleDashboard(int port, String searchDir) {
-    return withLifecycleDashboardInternal(null, port, searchDir);
+  public LifecycleDashboardBuilder withLifecycleDashboard(int port, String searchDir) {
+    return new LifecycleDashboardBuilder(withLifecycleDashboardInternal(null, port, searchDir));
   }
 
   private ClosedArena withLifecycleDashboardInternal(String url, int port, String searchDir) {
@@ -135,7 +145,58 @@ public final class ClosedArena {
         true,
         url,
         port,
-        searchDir);
+        searchDir,
+        cpuProfiledComponents,
+        cpuProfileLimitBytes);
+  }
+
+  ClosedArena withCpuProfiledComponent(String componentId) {
+    List<String> next = new java.util.ArrayList<>(cpuProfiledComponents);
+    next.add(componentId);
+    return new ClosedArena(
+        name,
+        matches,
+        logLevel,
+        slf4jLogger,
+        slf4jLoggerFactory,
+        logDependencyIds,
+        logComponentIds,
+        lifecycleDashboard,
+        dashboardUrl,
+        dashboardPort,
+        dashboardSearchDir,
+        next,
+        cpuProfileLimitBytes);
+  }
+
+  ClosedArena withCpuProfileLimitBytes(long limitBytes) {
+    return new ClosedArena(
+        name,
+        matches,
+        logLevel,
+        slf4jLogger,
+        slf4jLoggerFactory,
+        logDependencyIds,
+        logComponentIds,
+        lifecycleDashboard,
+        dashboardUrl,
+        dashboardPort,
+        dashboardSearchDir,
+        cpuProfiledComponents,
+        limitBytes);
+  }
+
+  com.fasterxml.jackson.databind.node.ObjectNode matchConfigForFfi() {
+    com.fasterxml.jackson.databind.node.ObjectNode config = matches.get(0).forFfi().deepCopy();
+    if (!cpuProfiledComponents.isEmpty()) {
+      com.fasterxml.jackson.databind.node.ArrayNode ids =
+          config.putArray("cpu_profiled_components");
+      cpuProfiledComponents.forEach(ids::add);
+    }
+    if (cpuProfileLimitBytes != null) {
+      config.put("cpu_profile_limit_bytes", cpuProfileLimitBytes.longValue());
+    }
+    return config;
   }
 
   private long registerLoggingTarget() {
@@ -173,7 +234,7 @@ public final class ClosedArena {
     if (matches.isEmpty()) {
       throw new ArenaBindingError("closed arena has no matches");
     }
-    String json = ArenaJson.MAPPER.writeValueAsString(matches.get(0).forFfi());
+    String json = ArenaJson.MAPPER.writeValueAsString(matchConfigForFfi());
     ArenaBindings.setDispatcherDependencyAllowJson(
         logDependencyIds.isEmpty() ? null : ArenaJson.MAPPER.writeValueAsString(logDependencyIds));
     ArenaBindings.setDispatcherComponentAllowJson(

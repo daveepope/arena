@@ -36,3 +36,11 @@ pub struct IngestArenaState {
 pub fn parse(body: &str) -> Result<IngestArenaState, serde_json::Error> {
     serde_json::from_str(body)
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CpuProfilePayload {
+    pub component: String,
+    pub state: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub folded: Option<String>,
+}

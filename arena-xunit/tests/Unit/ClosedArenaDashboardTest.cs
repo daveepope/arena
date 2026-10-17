@@ -14,7 +14,7 @@ public class ClosedArenaDashboardTest
     {
         var closed = WithoutDashboard("xunit-dashboard-default");
 
-        Assert.NotSame(closed, closed.WithLifecycleDashboard());
+        Assert.NotSame(closed, closed.WithLifecycleDashboard().Done());
     }
 
     [Fact]
@@ -22,7 +22,7 @@ public class ClosedArenaDashboardTest
     {
         var closed = WithoutDashboard("xunit-dashboard-url");
 
-        Assert.NotSame(closed, closed.WithLifecycleDashboard("http://127.0.0.1:65535"));
+        Assert.NotSame(closed, closed.WithLifecycleDashboard("http://127.0.0.1:65535").Done());
     }
 
     [Fact]
@@ -30,7 +30,7 @@ public class ClosedArenaDashboardTest
     {
         var closed = WithoutDashboard("xunit-dashboard-port");
 
-        Assert.NotSame(closed, closed.WithLifecycleDashboard(1, "/nonexistent-search-dir"));
+        Assert.NotSame(closed, closed.WithLifecycleDashboard(1, "/nonexistent-search-dir").Done());
     }
 
     [Fact]

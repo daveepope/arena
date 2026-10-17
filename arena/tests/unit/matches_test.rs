@@ -979,3 +979,174 @@ async fn stop_faulting_dependency_logs_error_naming_the_cause() {
         event.fields
     );
 }
+
+#[tokio::test]
+async fn start_cpu_profiler_named_component_attaches_that_component() {
+    let component = probe_component("arena-executable-component-svc-ab12cd");
+    let counts = component.counts();
+    let mut a_match = Match::new("profiled", Vec::new(), vec![component.into_component()])
+        .with_cpu_profiled_components(vec!["svc".to_string()]);
+
+    a_match.start(&context().0).await.expect("match should start");
+
+    assert_eq!(counts.cpu_profiler_attaches(), 1);
+    assert_eq!(counts.starts(), 1);
+}
+
+#[tokio::test]
+async fn start_cpu_profiler_exact_identifier_attaches_that_component() {
+    let component = probe_component("arena-executable-component-svc-ab12cd");
+    let counts = component.counts();
+    let mut a_match = Match::new("profiled", Vec::new(), vec![component.into_component()])
+        .with_cpu_profiled_components(vec![
+            "arena-executable-component-svc-ab12cd".to_string()
+        ]);
+
+    a_match.start(&context().0).await.expect("match should start");
+
+    assert_eq!(counts.cpu_profiler_attaches(), 1);
+}
+
+#[tokio::test]
+async fn start_cpu_profiler_nested_child_attaches_the_child_not_the_parent() {
+    let child = probe_component("arena-executable-component-worker-ef34gh");
+    let child_counts = child.counts();
+    let parent = probe_component("arena-executable-component-svc-ab12cd")
+        .with_child(child.into_component());
+    let parent_counts = parent.counts();
+    let mut a_match = Match::new("profiled", Vec::new(), vec![parent.into_component()])
+        .with_cpu_profiled_components(vec!["worker".to_string()]);
+
+    a_match.start(&context().0).await.expect("match should start");
+
+    assert_eq!(child_counts.cpu_profiler_attaches(), 1);
+    assert_eq!(parent_counts.cpu_profiler_attaches(), 0);
+}
+
+#[tokio::test]
+async fn start_cpu_profiler_several_components_attaches_each_one() {
+    let first = probe_component("arena-executable-component-svc-ab12cd");
+    let second = probe_component("arena-executable-component-worker-ef34gh");
+    let first_counts = first.counts();
+    let second_counts = second.counts();
+    let mut a_match = Match::new(
+        "profiled",
+        Vec::new(),
+        vec![first.into_component(), second.into_component()],
+    )
+    .with_cpu_profiled_components(vec!["svc".to_string(), "worker".to_string()]);
+
+    a_match.start(&context().0).await.expect("match should start");
+
+    assert_eq!(first_counts.cpu_profiler_attaches(), 1);
+    assert_eq!(second_counts.cpu_profiler_attaches(), 1);
+}
+
+#[tokio::test]
+async fn start_cpu_profiler_unknown_component_faults_without_starting_components() {
+    let component = probe_component("arena-executable-component-svc-ab12cd");
+    let counts = component.counts();
+    let mut a_match = Match::new("profiled", Vec::new(), vec![component.into_component()])
+        .with_cpu_profiled_components(vec!["does-not-exist".to_string()]);
+
+    let faults = a_match
+        .start(&context().0)
+        .await
+        .err()
+        .expect("unknown component must fault");
+
+    assert_eq!(faults.len(), 1);
+    assert!(faults[0].message.contains("does-not-exist"), "got: {}", faults[0].message);
+    assert!(
+        faults[0].message.contains("not a component of this arena"),
+        "got: {}",
+        faults[0].message
+    );
+    assert_eq!(counts.starts(), 0);
+}
+
+#[tokio::test]
+async fn start_cpu_profiler_ambiguous_name_faults_naming_every_match() {
+    let mut a_match = Match::new(
+        "profiled",
+        Vec::new(),
+        vec![
+            probe_component("arena-executable-component-svc-ab12cd").into_component(),
+            probe_component("arena-executable-component-svc-ef34gh").into_component(),
+        ],
+    )
+    .with_cpu_profiled_components(vec!["svc".to_string()]);
+
+    let faults = a_match
+        .start(&context().0)
+        .await
+        .err()
+        .expect("ambiguous name must fault");
+
+    let message = faults[0].message.clone();
+    assert!(message.contains("matches 2 components"), "got: {message}");
+    assert!(message.contains("arena-executable-component-svc-ab12cd"), "got: {message}");
+    assert!(message.contains("arena-executable-component-svc-ef34gh"), "got: {message}");
+}
+
+#[tokio::test]
+async fn start_cpu_profiler_component_refuses_attachment_faults_the_match() {
+    let mut a_match = Match::new(
+        "profiled",
+        Vec::new(),
+        vec![probe_component("arena-executable-component-svc-ab12cd")
+            .behaving(Behaviour::RefuseCpuProfiler)
+            .into_component()],
+    )
+    .with_cpu_profiled_components(vec!["svc".to_string()]);
+
+    let faults = a_match
+        .start(&context().0)
+        .await
+        .err()
+        .expect("refused attachment must fault");
+
+    assert!(
+        faults[0].message.contains("BuildTool::Make"),
+        "got: {}",
+        faults[0].message
+    );
+}
+
+#[tokio::test]
+async fn start_no_cpu_profilers_requested_attaches_nothing() {
+    let component = probe_component("arena-executable-component-svc-ab12cd");
+    let counts = component.counts();
+    let mut a_match = Match::new("plain", Vec::new(), vec![component.into_component()]);
+
+    a_match.start(&context().0).await.expect("match should start");
+
+    assert_eq!(counts.cpu_profiler_attaches(), 0);
+    assert_eq!(counts.starts(), 1);
+}
+
+#[tokio::test]
+async fn start_cpu_profile_limit_set_reaches_the_component() {
+    let component = probe_component("arena-executable-component-svc-ab12cd");
+    let counts = component.counts();
+    let mut a_match = Match::new("profiled", Vec::new(), vec![component.into_component()])
+        .with_cpu_profiled_components(vec!["svc".to_string()])
+        .with_cpu_profile_limit_bytes(1024);
+
+    a_match.start(&context().0).await.expect("match should start");
+
+    assert_eq!(counts.cpu_profile_limit_bytes(), 1024);
+}
+
+#[tokio::test]
+async fn start_cpu_profile_limit_unset_passes_no_limit_to_the_component() {
+    let component = probe_component("arena-executable-component-svc-ab12cd");
+    let counts = component.counts();
+    let mut a_match = Match::new("profiled", Vec::new(), vec![component.into_component()])
+        .with_cpu_profiled_components(vec!["svc".to_string()]);
+
+    a_match.start(&context().0).await.expect("match should start");
+
+    assert_eq!(counts.cpu_profiler_attaches(), 1);
+    assert_eq!(counts.cpu_profile_limit_bytes(), 0);
+}

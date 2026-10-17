@@ -3,6 +3,7 @@ mod recorded_profiles;
 
 use arena::lifecycle::RunnableState;
 use arena_profile::wrapped::{prepare_wrapped, wrapping_sampler_for, WrapState, WrappingSampler};
+use arena_profile::DEFAULT_CPU_PROFILE_LIMIT_BYTES;
 use arena_profile::{CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch};
 use recorded_profiles::start_recording;
 use std::path::PathBuf;
@@ -104,7 +105,7 @@ fn prepare_wrapped_sampler_wrap_fails_propagates_missing_binary_before_any_spawn
         wrapped_program: "/usr/bin/perf",
     };
 
-    let result = prepare_wrapped(Box::new(sampler), &sample_request(), "wrap-missing".to_string());
+    let result = prepare_wrapped(Box::new(sampler), &sample_request(), "wrap-missing".to_string(), DEFAULT_CPU_PROFILE_LIMIT_BYTES);
 
     assert!(matches!(result, Err(CpuProfileError::MissingBinary { binary: "perf", .. })));
 }
@@ -118,7 +119,7 @@ fn wrapped_finish_collect_fails_returns_finish_error_and_reports_faulted() {
         wrapped_program: "/usr/bin/perf",
     };
     let PreparedLaunch::Wrapped { session, .. } =
-        prepare_wrapped(Box::new(sampler), &sample_request(), "finish-fail".to_string()).unwrap()
+        prepare_wrapped(Box::new(sampler), &sample_request(), "finish-fail".to_string(), DEFAULT_CPU_PROFILE_LIMIT_BYTES).unwrap()
     else {
         panic!("expected Wrapped variant");
     };
@@ -145,7 +146,7 @@ fn wrapped_finish_collect_succeeds_reports_stopped_with_folded_stacks() {
         wrapped_program: "/usr/bin/perf",
     };
     let PreparedLaunch::Wrapped { session, .. } =
-        prepare_wrapped(Box::new(sampler), &sample_request(), "finish-success".to_string()).unwrap()
+        prepare_wrapped(Box::new(sampler), &sample_request(), "finish-success".to_string(), DEFAULT_CPU_PROFILE_LIMIT_BYTES).unwrap()
     else {
         panic!("expected Wrapped variant");
     };
@@ -177,7 +178,7 @@ fn wrapped_sampling_called_reports_started() {
         wrapped_program: "/usr/bin/perf",
     };
     let PreparedLaunch::Wrapped { session, .. } =
-        prepare_wrapped(Box::new(sampler), &sample_request(), "sampling".to_string()).unwrap()
+        prepare_wrapped(Box::new(sampler), &sample_request(), "sampling".to_string(), DEFAULT_CPU_PROFILE_LIMIT_BYTES).unwrap()
     else {
         panic!("expected Wrapped variant");
     };

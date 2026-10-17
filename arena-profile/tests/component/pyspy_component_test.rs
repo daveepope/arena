@@ -1,6 +1,7 @@
 #[path = "../support/recorded_profiles.rs"]
 mod recorded_profiles;
 
+use arena_profile::DEFAULT_CPU_PROFILE_LIMIT_BYTES;
 use arena_profile::{prepare_cpu_profile, CpuProfilerBackend, LaunchRequest, PreparedLaunch};
 use arena::lifecycle::RunnableState;
 use recorded_profiles::start_recording;
@@ -17,7 +18,7 @@ fn prepare_cpu_profile_real_pyspy_wrapping_python_busy_loop_reports_folded_stack
         args: vec!["-c".to_string(), "while True:\n    pass\n".to_string()],
     };
 
-    let prepared = prepare_cpu_profile(CpuProfilerBackend::PySpy, request, component_id)
+    let prepared = prepare_cpu_profile(CpuProfilerBackend::PySpy, request, component_id, DEFAULT_CPU_PROFILE_LIMIT_BYTES)
         .expect("prepare py-spy profile");
     let PreparedLaunch::Wrapped { program, args, session } = prepared else {
         panic!("expected Wrapped variant for PySpy backend");

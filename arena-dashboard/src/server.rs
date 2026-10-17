@@ -66,7 +66,14 @@ pub struct AppState {
     tx: broadcast::Sender<String>,
     last_state: Arc<Mutex<Vec<(String, String)>>>,
     history: Arc<Mutex<Vec<(String, Vec<String>)>>>,
+    cpu_profiles: Arc<Mutex<Vec<(String, CpuProfileRecord)>>>,
     shutdown: Arc<ServerShutdown>,
+}
+
+#[derive(Clone, Default)]
+struct CpuProfileRecord {
+    folded: Option<String>,
+    rendered: Option<String>,
 }
 
 impl Default for AppState {
@@ -76,6 +83,7 @@ impl Default for AppState {
             tx,
             last_state: Arc::new(Mutex::new(Vec::new())),
             history: Arc::new(Mutex::new(Vec::new())),
+            cpu_profiles: Arc::new(Mutex::new(Vec::new())),
             shutdown: Arc::new(ServerShutdown::default()),
         }
     }
@@ -84,6 +92,10 @@ impl Default for AppState {
 impl AppState {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn subscribe(&self) -> broadcast::Receiver<String> {
+        self.tx.subscribe()
     }
 
     pub fn shutdown_handle(&self) -> Arc<ServerShutdown> {
@@ -98,6 +110,8 @@ pub fn app(state: AppState) -> Router {
         .route("/clear", post(clear_handler))
         .route("/history", get(history_handler))
         .route("/shutdown", post(shutdown_handler))
+        .route("/profile/cpu", post(cpu_profile_ingest_handler))
+        .route("/profile/cpu/{component}", get(cpu_profile_handler))
         .with_state(state);
 
     let router = router
@@ -144,6 +158,7 @@ async fn history_handler(State(state): State<AppState>) -> impl IntoResponse {
 async fn clear_handler(State(state): State<AppState>) -> impl IntoResponse {
     state.last_state.lock().unwrap_or_else(|e| e.into_inner()).clear();
     state.history.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    state.cpu_profiles.lock().unwrap_or_else(|e| e.into_inner()).clear();
     let _ = state.tx.send(r#"{"type":"clear"}"#.to_string());
     StatusCode::NO_CONTENT
 }
@@ -172,6 +187,97 @@ async fn ingest_handler(State(state): State<AppState>, body: String) -> impl Int
             StatusCode::ACCEPTED
         }
         Err(_) => StatusCode::BAD_REQUEST,
+    }
+}
+
+fn json_response(status: StatusCode, body: String) -> axum::response::Response {
+    (
+        status,
+        [(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        )],
+        body,
+    )
+        .into_response()
+}
+
+async fn cpu_profile_ingest_handler(
+    State(state): State<AppState>,
+    body: String,
+) -> impl IntoResponse {
+    let Ok(payload) = serde_json::from_str::<ingest::CpuProfilePayload>(&body) else {
+        return StatusCode::BAD_REQUEST;
+    };
+
+    {
+        let mut profiles = state.cpu_profiles.lock().unwrap_or_else(|e| e.into_inner());
+        let record = match profiles.iter_mut().find(|(id, _)| *id == payload.component) {
+            Some(entry) => &mut entry.1,
+            None => {
+                profiles.push((payload.component.clone(), CpuProfileRecord::default()));
+                &mut profiles.last_mut().expect("just pushed").1
+            }
+        };
+        if let Some(folded) = &payload.folded {
+            record.folded = Some(folded.clone());
+            record.rendered = None;
+        }
+    }
+
+    let announcement = serde_json::json!({
+        "type": "cpu_profile",
+        "component": payload.component,
+        "state": payload.state,
+    });
+    let _ = state.tx.send(announcement.to_string());
+    StatusCode::ACCEPTED
+}
+
+async fn cpu_profile_handler(
+    State(state): State<AppState>,
+    axum::extract::Path(component): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    let cached = {
+        let profiles = state.cpu_profiles.lock().unwrap_or_else(|e| e.into_inner());
+        profiles
+            .iter()
+            .find(|(id, _)| *id == component)
+            .map(|(_, record)| record.clone())
+    };
+
+    let Some(record) = cached else {
+        return (StatusCode::NOT_FOUND, axum::Json(serde_json::Value::Null)).into_response();
+    };
+    if let Some(rendered) = record.rendered {
+        return json_response(StatusCode::OK, rendered);
+    }
+    let Some(folded) = record.folded else {
+        return (StatusCode::NOT_FOUND, axum::Json(serde_json::Value::Null)).into_response();
+    };
+
+    match arena_profile::render_folded(&folded) {
+        Ok(profile) => {
+            let body = serde_json::json!({
+                "svg": profile.svg,
+                "hotspots": profile.hotspots,
+            })
+            .to_string();
+            let mut profiles = state.cpu_profiles.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(entry) = profiles.iter_mut().find(|(id, _)| *id == component) {
+                entry.1.rendered = Some(body.clone());
+            }
+            drop(profiles);
+            json_response(StatusCode::OK, body)
+        }
+        Err(e) => {
+            tracing::warn!(component = %component, error = %e, "failed to render cpu profile");
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                axum::Json(serde_json::Value::Null),
+            )
+                .into_response()
+        }
     }
 }
 

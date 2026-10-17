@@ -11,6 +11,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(arena_embedded_web_assets)
 
 [dependencies]
 arena = { workspace = true }
+arena-profile = { workspace = true }
 async-trait = { workspace = true }
 axum = { workspace = true, features = ["macros", "json"] }
 futures = { workspace = true }

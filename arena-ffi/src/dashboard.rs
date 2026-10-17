@@ -58,8 +58,17 @@ pub extern "C" fn arena_register_dashboard_observer(dashboard_url_utf8: *const c
         return 0;
     };
     call_across_boundary(move || {
-        let recipient: Arc<dyn ArenaLifecycleObserver> = Arc::new(HttpForwardingObserver::new(url));
-        crate::lifecycle_observer::register_observer(recipient)
+        let forwarder = Arc::new(HttpForwardingObserver::new(url));
+        let recipient: Arc<dyn ArenaLifecycleObserver> = forwarder.clone();
+        let token = crate::lifecycle_observer::register_observer(recipient);
+        if token == 0 {
+            return 0;
+        }
+        let profile_token = arena_profile::register_observer(
+            forwarder as Arc<dyn arena_profile::CpuProfileObserver>,
+        );
+        crate::lifecycle_observer::pair_cpu_profile_observer(token, profile_token);
+        token
     })
     .unwrap_or(0)
 }

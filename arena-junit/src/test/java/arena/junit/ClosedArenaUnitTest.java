@@ -1,11 +1,14 @@
 package arena.junit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import arena.junit.ffi.ArenaBindingError;
 import arena.junit.ffi.ArenaLogLevel;
 import arena.junit.match.Match;
+import arena.junit.match.MatchBuilder;
 import java.util.List;
 import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
@@ -61,11 +64,73 @@ final class ClosedArenaUnitTest {
     assertThrows(ArenaBindingError.class, closedArena::open);
   }
 
+  @Test
+  void matchConfigForFfi_noCpuProfiler_omitsTheCpuProfiledComponentsField() {
+    Match match = new MatchBuilder("junit-profiled-match").build();
+    ClosedArena closedArena = new ClosedArena("junit-profiled-arena", List.of(match));
+
+    assertFalse(closedArena.matchConfigForFfi().has("cpu_profiled_components"));
+  }
+
+  @Test
+  void withCpuProfiler_singleComponent_serializesThatId() {
+    Match match = new MatchBuilder("junit-profiled-match").build();
+    ClosedArena closedArena =
+        new ClosedArena("junit-profiled-arena", List.of(match))
+            .withLifecycleDashboard("http://127.0.0.1:65535")
+            .withCpuProfiler("svc")
+            .done();
+
+    assertEquals(
+        "[\"svc\"]", closedArena.matchConfigForFfi().get("cpu_profiled_components").toString());
+  }
+
+  @Test
+  void withCpuProfiler_severalComponents_preserveDeclarationOrder() {
+    Match match = new MatchBuilder("junit-profiled-match").build();
+    ClosedArena closedArena =
+        new ClosedArena("junit-profiled-arena", List.of(match))
+            .withLifecycleDashboard("http://127.0.0.1:65535")
+            .withCpuProfiler("svc")
+            .withCpuProfiler("worker")
+            .done();
+
+    assertEquals(
+        "[\"svc\",\"worker\"]",
+        closedArena.matchConfigForFfi().get("cpu_profiled_components").toString());
+  }
+
+  @Test
+  void withCpuProfileLimitBytes_set_serializesTheLimit() {
+    Match match = new MatchBuilder("junit-profiled-match").build();
+    ClosedArena closedArena =
+        new ClosedArena("junit-profiled-arena", List.of(match))
+            .withLifecycleDashboard("http://127.0.0.1:65535")
+            .withCpuProfiler("svc")
+            .withCpuProfileLimitBytes(1024)
+            .done();
+
+    assertEquals(
+        1024L, closedArena.matchConfigForFfi().get("cpu_profile_limit_bytes").asLong());
+  }
+
+  @Test
+  void matchConfigForFfi_noCpuProfileLimit_omitsTheCpuProfileLimitField() {
+    Match match = new MatchBuilder("junit-profiled-match").build();
+    ClosedArena closedArena =
+        new ClosedArena("junit-profiled-arena", List.of(match))
+            .withLifecycleDashboard("http://127.0.0.1:65535")
+            .withCpuProfiler("svc")
+            .done();
+
+    assertFalse(closedArena.matchConfigForFfi().has("cpu_profile_limit_bytes"));
+  }
+
   private static Stream<UnaryOperator<ClosedArena>> dashboardConfigurations() {
     return Stream.of(
-        ClosedArena::withLifecycleDashboard,
-        arena -> arena.withLifecycleDashboard("http://127.0.0.1:65535"),
-        arena -> arena.withLifecycleDashboard(1, "/nonexistent-search-dir"));
+        arena -> arena.withLifecycleDashboard().done(),
+        arena -> arena.withLifecycleDashboard("http://127.0.0.1:65535").done(),
+        arena -> arena.withLifecycleDashboard(1, "/nonexistent-search-dir").done());
   }
 
   @ParameterizedTest

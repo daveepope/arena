@@ -24,6 +24,8 @@ public sealed class ClosedArena
     private readonly string? _dashboardUrl;
     private readonly int _dashboardPort;
     private readonly string? _dashboardSearchDir;
+    private readonly List<string> _cpuProfiledComponents;
+    private readonly long? _cpuProfileLimitBytes;
 
     public ClosedArena(string name, Match match)
         : this(name, match, ArenaLogLevel.Info, null, null, null)
@@ -54,13 +56,14 @@ public sealed class ClosedArena
     public ClosedArena(string name, Match match, ArenaLogLevel logLevel, ILogger? logger,
         ILoggerFactory? loggerFactory, List<string>? logDependencyIds, List<string>? logComponentIds)
         : this(name, match, logLevel, logger, loggerFactory, logDependencyIds, logComponentIds,
-            false, null, DefaultDashboardPort, null)
+            false, null, DefaultDashboardPort, null, null, null)
     {
     }
 
     private ClosedArena(string name, Match match, ArenaLogLevel logLevel, ILogger? logger,
         ILoggerFactory? loggerFactory, List<string>? logDependencyIds, List<string>? logComponentIds,
-        bool lifecycleDashboard, string? dashboardUrl, int dashboardPort, string? dashboardSearchDir)
+        bool lifecycleDashboard, string? dashboardUrl, int dashboardPort, string? dashboardSearchDir,
+        List<string>? cpuProfiledComponents, long? cpuProfileLimitBytes)
     {
         _name = name;
         _match = match;
@@ -73,20 +76,48 @@ public sealed class ClosedArena
         _dashboardUrl = dashboardUrl;
         _dashboardPort = dashboardPort;
         _dashboardSearchDir = dashboardSearchDir;
+        _cpuProfiledComponents = cpuProfiledComponents ?? new List<string>();
+        _cpuProfileLimitBytes = cpuProfileLimitBytes;
     }
 
-    public ClosedArena WithLifecycleDashboard() =>
-        WithLifecycleDashboardInternal(null, DefaultDashboardPort, null);
+    public LifecycleDashboardBuilder WithLifecycleDashboard() =>
+        new(WithLifecycleDashboardInternal(null, DefaultDashboardPort, null));
 
-    public ClosedArena WithLifecycleDashboard(string url) =>
-        WithLifecycleDashboardInternal(url, DefaultDashboardPort, null);
+    public LifecycleDashboardBuilder WithLifecycleDashboard(string url) =>
+        new(WithLifecycleDashboardInternal(url, DefaultDashboardPort, null));
 
-    public ClosedArena WithLifecycleDashboard(int port, string? searchDir) =>
-        WithLifecycleDashboardInternal(null, port, searchDir);
+    public LifecycleDashboardBuilder WithLifecycleDashboard(int port, string? searchDir) =>
+        new(WithLifecycleDashboardInternal(null, port, searchDir));
 
     private ClosedArena WithLifecycleDashboardInternal(string? url, int port, string? searchDir) =>
         new(_name, _match, _logLevel, _logger, _loggerFactory, _logDependencyIds, _logComponentIds,
-            true, url, port, searchDir);
+            true, url, port, searchDir, _cpuProfiledComponents, _cpuProfileLimitBytes);
+
+    internal ClosedArena WithCpuProfiledComponent(string componentId)
+    {
+        var next = new List<string>(_cpuProfiledComponents) { componentId };
+        return new ClosedArena(_name, _match, _logLevel, _logger, _loggerFactory,
+            _logDependencyIds, _logComponentIds, _lifecycleDashboard, _dashboardUrl,
+            _dashboardPort, _dashboardSearchDir, next, _cpuProfileLimitBytes);
+    }
+
+    internal ClosedArena WithCpuProfileLimitBytes(long limitBytes) =>
+        new(_name, _match, _logLevel, _logger, _loggerFactory, _logDependencyIds, _logComponentIds,
+            _lifecycleDashboard, _dashboardUrl, _dashboardPort, _dashboardSearchDir,
+            _cpuProfiledComponents, limitBytes);
+
+    internal string MatchConfigForFfi()
+    {
+        if (_cpuProfiledComponents.Count == 0 && _cpuProfileLimitBytes == null)
+            return _match.ForFfi();
+        var config = Newtonsoft.Json.Linq.JObject.Parse(_match.ForFfi());
+        if (_cpuProfiledComponents.Count > 0)
+            config["cpu_profiled_components"] =
+                new Newtonsoft.Json.Linq.JArray(_cpuProfiledComponents);
+        if (_cpuProfileLimitBytes != null)
+            config["cpu_profile_limit_bytes"] = _cpuProfileLimitBytes.Value;
+        return config.ToString(Newtonsoft.Json.Formatting.None);
+    }
 
     private ulong RegisterDashboard(ArenaLogRouting routing)
     {
@@ -108,7 +139,7 @@ public sealed class ClosedArena
 
     public System.Threading.Tasks.Task<OpenArena> OpenAsync()
     {
-        var json = _match.ForFfi();
+        var json = MatchConfigForFfi();
         ArenaBindings.SetDispatcherDependencyAllowJson(
             _logDependencyIds != null && _logDependencyIds.Count > 0
                 ? ArenaJson.Serialize(_logDependencyIds) : null);

@@ -1,5 +1,5 @@
 {
-  "checksum": "3bc5ecf7028daad712a70eea3a7c61999d25f932d5698ac29ecc5b3134c55e78",
+  "checksum": "e3ba66c3b1d4bae57cf88f2a0212b431711f30ad0232568e011d72da6fca21bc",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -2154,10 +2154,6 @@
         ],
         "deps": {
           "common": [
-            {
-              "id": "base64 0.22.1",
-              "target": "base64"
-            },
             {
               "id": "inferno 0.12.8",
               "target": "inferno"

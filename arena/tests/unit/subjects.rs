@@ -26,6 +26,7 @@ pub enum Behaviour {
     ResistTeardown,
     FaultSilently,
     ReportStoppedWithoutStopping,
+    RefuseCpuProfiler,
 }
 
 #[derive(Default)]
@@ -34,6 +35,8 @@ pub struct CallCounts {
     stop: AtomicUsize,
     force_stop: AtomicUsize,
     release: AtomicUsize,
+    cpu_profiler_attach: AtomicUsize,
+    cpu_profile_limit_bytes: AtomicUsize,
 }
 
 impl CallCounts {
@@ -51,6 +54,14 @@ impl CallCounts {
 
     pub fn releases(&self) -> usize {
         self.release.load(Ordering::SeqCst)
+    }
+
+    pub fn cpu_profiler_attaches(&self) -> usize {
+        self.cpu_profiler_attach.load(Ordering::SeqCst)
+    }
+
+    pub fn cpu_profile_limit_bytes(&self) -> usize {
+        self.cpu_profile_limit_bytes.load(Ordering::SeqCst)
     }
 }
 
@@ -315,6 +326,20 @@ impl ProbeComponent {
 
 #[async_trait]
 impl RunnableComponent for ProbeComponent {
+    fn attach_cpu_profiler(&mut self, limit_bytes: Option<usize>) -> Result<(), Fault> {
+        self.counts.cpu_profiler_attach.fetch_add(1, Ordering::SeqCst);
+        self.counts
+            .cpu_profile_limit_bytes
+            .store(limit_bytes.unwrap_or(0), Ordering::SeqCst);
+        if self.behaviour == Behaviour::RefuseCpuProfiler {
+            return Err(Fault::component(
+                self.identifier.clone(),
+                "cpu profiling is not supported for BuildTool::Make",
+            ));
+        }
+        Ok(())
+    }
+
     fn identifier(&self) -> &str {
         &self.identifier
     }

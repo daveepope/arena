@@ -150,6 +150,7 @@ path = "tests/unit/dependency/smtp/smtp_dependency_test.rs"
 arc-swap = { workspace = true }
 arena = { workspace = true }
 arena-dashboard = { workspace = true }
+arena-profile = { workspace = true }
 arena-http = { workspace = true }
 async-trait = { workspace = true }
 arena-containerized-component = { workspace = true }

@@ -34,6 +34,7 @@ pub(crate) struct AugmentedProfileSession {
     sampler: Box<dyn ArgAugmentingSampler>,
     state: AugmentState,
     component_id: String,
+    limit_bytes: usize,
 }
 
 impl ProfileSession for AugmentedProfileSession {
@@ -42,12 +43,12 @@ impl ProfileSession for AugmentedProfileSession {
     }
 
     fn finish(self: Box<Self>, augmented_process: &mut Child) -> Result<(), CpuProfileError> {
-        let AugmentedProfileSession { sampler, state, component_id } = *self;
+        let AugmentedProfileSession { sampler, state, component_id, limit_bytes } = *self;
         observer::report(&component_id, RunnableState::Stopping);
         let collected = crate::backend::wait_bounded(augmented_process, FINISH_TIMEOUT)
             .map_err(|e| CpuProfileError::Finish(format!("profiled process did not exit cleanly: {e}")))
             .and_then(|_status| sampler.collect(state, FINISH_TIMEOUT))
-            .and_then(|folded_path| read_collected(&folded_path));
+            .and_then(|folded_path| read_collected(&folded_path, limit_bytes));
         match collected {
             Ok(folded) => {
                 observer::report_complete(&component_id, &folded);
@@ -65,6 +66,7 @@ pub fn prepare_augmented(
     sampler: Box<dyn ArgAugmentingSampler>,
     request: &LaunchRequest,
     component_id: String,
+    limit_bytes: usize,
 ) -> Result<PreparedLaunch, CpuProfileError> {
     let (args, state) = sampler.augment(request)?;
     Ok(PreparedLaunch::ArgsAugmented {
@@ -74,6 +76,7 @@ pub fn prepare_augmented(
             sampler,
             state,
             component_id,
+            limit_bytes,
         }),
     })
 }

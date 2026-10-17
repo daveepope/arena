@@ -176,6 +176,7 @@ name = "arena-dashboard"
 version = "7.1.0"
 dependencies = [
  "arena",
+ "arena-profile",
  "async-trait",
  "axum",
  "futures",
@@ -252,6 +253,7 @@ dependencies = [
  "arena-oauth",
  "arena-oracledb",
  "arena-postgres",
+ "arena-profile",
  "arena-smtp",
  "arena-temporal",
  "async-trait",

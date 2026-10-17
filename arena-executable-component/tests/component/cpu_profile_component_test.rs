@@ -37,7 +37,7 @@ async fn stop_pyspy_wrapped_profile_attached_reports_folded_stacks() {
         .build()
         .expect("build executable component");
     component
-        .attach_cpu_profiler()
+        .attach_cpu_profiler(None)
         .expect("attach cpu profiler");
     let component_id = component.identifier().to_string();
 
@@ -64,7 +64,7 @@ async fn stop_pyspy_wrapped_profile_attached_reports_the_full_transition_sequenc
         .build()
         .expect("build executable component");
     component
-        .attach_cpu_profiler()
+        .attach_cpu_profiler(None)
         .expect("attach cpu profiler");
     let component_id = component.identifier().to_string();
 
@@ -107,7 +107,7 @@ async fn stop_async_profiler_arg_augmented_profile_attached_reports_folded_stack
         .build()
         .expect("build executable component");
     component
-        .attach_cpu_profiler()
+        .attach_cpu_profiler(None)
         .expect("attach cpu profiler");
     let component_id = component.identifier().to_string();
 

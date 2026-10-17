@@ -1,6 +1,7 @@
 #[path = "../support/recorded_profiles.rs"]
 mod recorded_profiles;
 
+use arena_profile::DEFAULT_CPU_PROFILE_LIMIT_BYTES;
 use arena_profile::{prepare_cpu_profile, CpuProfilerBackend, LaunchRequest, PreparedLaunch};
 use arena::lifecycle::RunnableState;
 use recorded_profiles::start_recording;
@@ -46,7 +47,7 @@ fn prepare_cpu_profile_real_dotnet_trace_wrapping_busy_loop_reports_folded_stack
         args: vec![marker_path.to_string_lossy().into_owned()],
     };
 
-    let prepared = prepare_cpu_profile(CpuProfilerBackend::DotnetTrace, request, component_id)
+    let prepared = prepare_cpu_profile(CpuProfilerBackend::DotnetTrace, request, component_id, DEFAULT_CPU_PROFILE_LIMIT_BYTES)
         .expect("prepare dotnet-trace profile");
     let PreparedLaunch::Wrapped { program, args, session } = prepared else {
         panic!("expected Wrapped variant for DotnetTrace backend");

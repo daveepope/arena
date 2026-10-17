@@ -229,12 +229,49 @@ pub trait MatchTrait: Send + Sync {
     }
 }
 
+pub(crate) fn matching_component_ids(components: &[Component], requested: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    collect_matching_component_ids(components, requested, &mut found);
+    found
+}
+
+fn collect_matching_component_ids(
+    components: &[Component],
+    requested: &str,
+    found: &mut Vec<String>,
+) {
+    let infix = format!("-{requested}-");
+    for component in components {
+        let identifier = component.identifier();
+        if identifier == requested || identifier.contains(&infix) {
+            found.push(identifier.to_string());
+        }
+        collect_matching_component_ids(component.children(), requested, found);
+    }
+}
+
+fn find_component_mut<'a>(components: &'a mut [Component], identifier: &str) -> Option<&'a mut Component> {
+    for index in 0..components.len() {
+        if components[index].identifier() == identifier {
+            return Some(&mut components[index]);
+        }
+    }
+    for component in components.iter_mut() {
+        if let Some(found) = find_component_mut(component.children_mut(), identifier) {
+            return Some(found);
+        }
+    }
+    None
+}
+
 pub struct Match {
     pub name: String,
     dependencies: Vec<Dependency>,
     components: Vec<Component>,
     playbooks: Vec<(Box<dyn Playbook>, bool)>,
     active_playbooks: Vec<Box<dyn ActivePlaybook>>,
+    cpu_profiled_component_ids: Vec<String>,
+    cpu_profile_limit_bytes: Option<usize>,
     started: bool,
 }
 
@@ -246,8 +283,20 @@ impl Match {
             components,
             playbooks: Vec::new(),
             active_playbooks: Vec::new(),
+            cpu_profiled_component_ids: Vec::new(),
+            cpu_profile_limit_bytes: None,
             started: false,
         }
+    }
+
+    pub fn with_cpu_profiled_components(mut self, component_ids: Vec<String>) -> Self {
+        self.cpu_profiled_component_ids = component_ids;
+        self
+    }
+
+    pub fn with_cpu_profile_limit_bytes(mut self, limit_bytes: usize) -> Self {
+        self.cpu_profile_limit_bytes = Some(limit_bytes);
+        self
     }
 
     pub fn register_playbook(
@@ -464,7 +513,77 @@ impl Match {
         faults
     }
 
+    fn attach_cpu_profilers(&mut self) -> Vec<Fault> {
+        let requested = std::mem::take(&mut self.cpu_profiled_component_ids);
+        let mut faults = Vec::new();
+        for name in requested {
+            let matches = matching_component_ids(&self.components, &name);
+            let resolved = match matches.as_slice() {
+                [single] => single.clone(),
+                [] => {
+                    tracing::error!(
+                        match_name = %self.name,
+                        component = %name,
+                        phase = "cpu_profiler_component_not_found",
+                        "cpu profiler requested for a component that is not in this arena"
+                    );
+                    faults.push(Fault::component(
+                        name.clone(),
+                        format!("cpu profiler requested for '{name}', which is not a component of this arena"),
+                    ));
+                    continue;
+                }
+                several => {
+                    tracing::error!(
+                        match_name = %self.name,
+                        component = %name,
+                        phase = "cpu_profiler_component_ambiguous",
+                        "cpu profiler request matched more than one component"
+                    );
+                    faults.push(Fault::component(
+                        name.clone(),
+                        format!(
+                            "cpu profiler requested for '{name}', which matches {} components: {}",
+                            several.len(),
+                            several.join(", ")
+                        ),
+                    ));
+                    continue;
+                }
+            };
+
+            let Some(component) = find_component_mut(&mut self.components, &resolved) else {
+                tracing::error!(
+                    match_name = %self.name,
+                    component = %resolved,
+                    phase = "cpu_profiler_component_unreachable",
+                    "cpu profiler could not reach a component that resolution had just found"
+                );
+                faults.push(Fault::component(
+                    resolved.clone(),
+                    format!("cpu profiler could not attach to '{resolved}'"),
+                ));
+                continue;
+            };
+            if let Err(fault) = component.attach_cpu_profiler(self.cpu_profile_limit_bytes) {
+                tracing::error!(
+                    match_name = %self.name,
+                    component = %resolved,
+                    reason = %fault_reason(&fault),
+                    phase = "cpu_profiler_attach_faulted",
+                    "cpu profiler could not be attached"
+                );
+                faults.push(fault);
+            }
+        }
+        faults
+    }
+
     async fn start_components(&mut self, ctx: &LifecycleContext) -> Vec<Fault> {
+        let attach_faults = self.attach_cpu_profilers();
+        if !attach_faults.is_empty() {
+            return attach_faults;
+        }
         let comp_count = self.components.len();
         if comp_count > 0 {
             tracing::debug!(

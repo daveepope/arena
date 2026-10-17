@@ -15,6 +15,13 @@ pub trait RunnableComponent: Send + Sync {
     fn add_child(&mut self, child: Box<dyn RunnableComponent>);
     fn children(&self) -> &[Component];
     fn children_mut(&mut self) -> &mut [Component];
+
+    fn attach_cpu_profiler(&mut self, _limit_bytes: Option<usize>) -> Result<(), Fault> {
+        Err(Fault::component(
+            self.identifier().to_string(),
+            "this component type does not support cpu profiling",
+        ))
+    }
 }
 
 pub type Component = Box<dyn RunnableComponent>;

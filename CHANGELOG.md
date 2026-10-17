@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena-profile`: `perf`, async-profiler, py-spy and dotnet-trace backends selected from the component's build tool
 - `arena-profile`: `CpuProfileObserver` reports the profiler lifecycle as `RunnableState`, carrying the folded stacks on the `Stopped` transition
 - `arena-profile`: `render_folded` returns the inferno SVG plus hotspots ranked by self time with severity bands
-- `arena-executable-component`: `ExecutableComponent::attach_cpu_profiler` resolves a backend from the build tool and faults when the tool cannot be profiled
+- `arena`: `RunnableComponent::attach_cpu_profiler` switches a component's profiler on, defaulting to a fault for component types that cannot be profiled
+- `arena-executable-component`: implements `attach_cpu_profiler`, resolving a backend from the build tool and faulting when the tool cannot be profiled
 - `arena-junit`, `arena-xunit`: `BuildTool.PYTHON`/`BuildTool.Python`
 - async-profiler and py-spy vendored through Bazel, so no host install is required
 - `arena-dashboard`: new service ingesting `ArenaLifecycleObserver` state over HTTP (`HttpForwardingObserver`) and streaming it live to a browser dependency-graph viewer
@@ -22,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena-pytest`: `ClosedArena.observe(callback)` registers a lifecycle-state observer for the open arena
 - `arena-dashboard`: browser test driving the packaged server binary and real arena lifecycle events in Chrome
 - `arena-dashboard`: unit test coverage for the lifecycle-forwarding observer, previously untested
+- `arena-pytest`, `arena-junit`, `arena-xunit`: `with_lifecycle_dashboard()` returns a dashboard builder carrying `with_cpu_profiler(component_id)`, repeatable per component, with `done()` back to the arena
+- `arena`: `Match` resolves the requested profiler component ids at open, faulting on an unknown or ambiguous id
+- `arena-dashboard`: `POST /profile/cpu` ingests profiler state and folded stacks, `GET /profile/cpu/{component}` returns the rendered SVG with hotspots, and profiler state reaches the browser on the existing event stream
+- `arena-ffi`: `arena_register_dashboard_observer` also subscribes the dashboard to profiler events, removed again with the lifecycle observer token
+- `arena-profile`: captured cpu profiles are capped at 8 MiB by default and fault rather than truncate, with the breach reported through `CpuProfileError`
+- `arena-pytest`, `arena-junit`, `arena-xunit`: `with_cpu_profile_limit_bytes(bytes)` on the dashboard builder raises the cpu profile cap
+- `arena-executable-component`: a failed cpu profile capture faults the component's stop instead of only being logged
 
 ### Changed
 
@@ -49,6 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows CI jobs no longer use a Bazel disk cache, working around upstream Bazel 7.4.1 bug bazelbuild/bazel#28408 where a concurrent rename into the disk cache CAS fails with "Permission denied"; the BuildBuddy remote cache still applies
 - macOS CI test jobs no longer pass `--local_test_jobs=6`, which over-subscribed the 3-core and 4-core runners and starved tests; Bazel now sizes local test concurrency from `--jobs`
 - Agent rules: bug reports must lead with crate, type and function, then one sentence
+- Agent rules: bound unbounded growth with a modest default cap the caller can raise, faulting when breached, rather than evicting or truncating
+- Agent rules: re-read the AI communication section before every reply, and never write an essay
+- Dropped three stale `osv-scanner.toml` ignores (one `@vitest/mocker`, two tinypool) now that vitest is 5.0.4 and tinypool has left the dependency tree
 
 ## [7.0.1]
 

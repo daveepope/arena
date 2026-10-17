@@ -19,6 +19,7 @@ enum ActiveCpuProfile {
 
 pub(crate) struct CpuProfileConfig {
     pub(crate) backend: arena_profile::CpuProfilerBackend,
+    pub(crate) limit_bytes: usize,
 }
 
 pub struct ExecutableComponent {
@@ -54,13 +55,6 @@ impl ExecutableComponent {
             state: RunnableState::NotStarted,
             faults: Vec::new(),
         }
-    }
-
-    pub fn attach_cpu_profiler(&mut self) -> Result<(), Fault> {
-        let backend =
-            crate::builder::cpu_profiler_backend(&self.identifier, self.build_tool.as_ref())?;
-        self.cpu_profile = Some(CpuProfileConfig { backend });
-        Ok(())
     }
 
     pub fn builder(identifier: impl Into<String>) -> ExecutableComponentBuilder {
@@ -102,9 +96,9 @@ impl ExecutableComponent {
         fault
     }
 
-    fn terminate_process(&mut self) {
+    fn terminate_process(&mut self) -> Option<Fault> {
         let Some(mut child) = self.process_handle.take() else {
-            return;
+            return None;
         };
         match self.active_cpu_profile.take() {
             Some(ActiveCpuProfile::Wrapped(session)) => {
@@ -114,8 +108,9 @@ impl ExecutableComponent {
                     "finishing cpu profile",
                 );
                 let result = session.finish(&mut child);
-                self.on_cpu_profile_finished(result);
+                let fault = self.on_cpu_profile_finished(result);
                 let _ = child.wait();
+                fault
             }
             Some(ActiveCpuProfile::ArgAugmented(session, shutdown_signal)) => {
                 tracing::debug!(
@@ -132,8 +127,9 @@ impl ExecutableComponent {
                     "finishing cpu profile",
                 );
                 let result = session.finish(&mut child);
-                self.on_cpu_profile_finished(result);
+                let fault = self.on_cpu_profile_finished(result);
                 let _ = child.wait();
+                fault
             }
             None => {
                 tracing::debug!(
@@ -144,6 +140,7 @@ impl ExecutableComponent {
                 );
                 let _ = child.kill();
                 let _ = child.wait();
+                None
             }
         }
     }
@@ -190,7 +187,10 @@ impl ExecutableComponent {
         Ok(())
     }
 
-    fn on_cpu_profile_finished(&self, result: Result<(), arena_profile::CpuProfileError>) {
+    fn on_cpu_profile_finished(
+        &mut self,
+        result: Result<(), arena_profile::CpuProfileError>,
+    ) -> Option<Fault> {
         match result {
             Ok(()) => {
                 tracing::debug!(
@@ -198,13 +198,20 @@ impl ExecutableComponent {
                     phase = "cpu_profile_finish_done",
                     "cpu profile samples captured",
                 );
+                None
             }
-            Err(e) => tracing::error!(
-                component = %self.identifier,
-                error = %e,
-                phase = "cpu_profile_finish_failed",
-                "cpu profile finish failed",
-            ),
+            Err(e) => {
+                tracing::error!(
+                    component = %self.identifier,
+                    error = %e,
+                    phase = "cpu_profile_finish_failed",
+                    "cpu profile finish failed",
+                );
+                Some(Fault::component(
+                    &self.identifier,
+                    message::cpu_profile_capture_failed(&e.to_string()),
+                ))
+            }
         }
     }
 
@@ -241,7 +248,12 @@ impl ExecutableComponent {
                 program: executable_path.clone(),
                 args: base_args,
             };
-            let prepared = arena_profile::prepare_cpu_profile(cfg.backend, request, self.identifier.clone())
+            let prepared = arena_profile::prepare_cpu_profile(
+                cfg.backend,
+                request,
+                self.identifier.clone(),
+                cfg.limit_bytes,
+            )
                 .map_err(|e| format!("cpu profiler preparation failed: {}", e))?;
             match prepared {
                 PreparedLaunch::Wrapped { program, args, session } => {
@@ -309,6 +321,16 @@ impl ExecutableComponent {
 
 #[async_trait]
 impl RunnableComponent for ExecutableComponent {
+    fn attach_cpu_profiler(&mut self, limit_bytes: Option<usize>) -> Result<(), Fault> {
+        let backend =
+            crate::builder::cpu_profiler_backend(&self.identifier, self.build_tool.as_ref())?;
+        self.cpu_profile = Some(CpuProfileConfig {
+            backend,
+            limit_bytes: limit_bytes.unwrap_or(arena_profile::DEFAULT_CPU_PROFILE_LIMIT_BYTES),
+        });
+        Ok(())
+    }
+
     fn identifier(&self) -> &str {
         &self.identifier
     }
@@ -372,7 +394,7 @@ impl RunnableComponent for ExecutableComponent {
             "stopping",
         );
 
-        self.terminate_process();
+        let profile_fault = self.terminate_process();
 
         tracing::debug!(
             component = %self.identifier,
@@ -381,6 +403,7 @@ impl RunnableComponent for ExecutableComponent {
         );
 
         let mut causes = Vec::new();
+        causes.extend(profile_fault);
         for child in self.children.iter_mut().flatten().rev() {
             if let Err(fault) = arena::component::stop_child(child).await {
                 causes.push(fault);
@@ -402,7 +425,9 @@ impl RunnableComponent for ExecutableComponent {
     }
 
     fn release(&mut self) {
-        self.terminate_process();
+        if let Some(fault) = self.terminate_process() {
+            self.faults.push(fault);
+        }
         self.stopped = true;
         for child in self.children.iter_mut().flatten().rev() {
             arena::component::release_child(child);
@@ -411,7 +436,9 @@ impl RunnableComponent for ExecutableComponent {
     }
 
     async fn force_stop(&mut self) {
-        self.terminate_process();
+        if let Some(fault) = self.terminate_process() {
+            self.faults.push(fault);
+        }
         self.stopped = true;
 
         for child in self.children.iter_mut().flatten().rev() {

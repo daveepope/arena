@@ -1,7 +1,7 @@
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, LazyLock};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use arc_swap::ArcSwap;
 use arena::lifecycle::{ArenaLifecycleObserver, ArenaState};
@@ -43,6 +43,26 @@ static REGISTERED_OBSERVERS: LazyLock<ArcSwap<Vec<RegisteredObserver>>> =
     LazyLock::new(|| ArcSwap::from_pointee(Vec::new()));
 
 static NEXT_OBSERVER_TOKEN: AtomicU64 = AtomicU64::new(1);
+
+static PAIRED_CPU_PROFILE_OBSERVERS: LazyLock<Mutex<Vec<(u64, u64)>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
+
+pub(crate) fn pair_cpu_profile_observer(lifecycle_token: u64, profile_token: u64) {
+    PAIRED_CPU_PROFILE_OBSERVERS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .push((lifecycle_token, profile_token));
+}
+
+fn take_paired_cpu_profile_observer(lifecycle_token: u64) -> Option<u64> {
+    let mut paired = PAIRED_CPU_PROFILE_OBSERVERS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let index = paired
+        .iter()
+        .position(|(lifecycle, _)| *lifecycle == lifecycle_token)?;
+    Some(paired.swap_remove(index).1)
+}
 
 fn observer_is_registered(token: u64) -> bool {
     REGISTERED_OBSERVERS
@@ -104,6 +124,9 @@ pub extern "C" fn arena_remove_lifecycle_observer(token: u64) {
         return;
     }
     let _ = call_across_boundary(move || {
+        if let Some(profile_token) = take_paired_cpu_profile_observer(token) {
+            arena_profile::unregister_observer(profile_token);
+        }
         REGISTERED_OBSERVERS.rcu(|current| {
             let next: Vec<RegisteredObserver> = (**current)
                 .iter()

@@ -1,14 +1,14 @@
 use arena_executable_component::platform::{resolve_configured_executable_path, resolve_executable_extension};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static NEXT_TEMP_DIR_ID: AtomicU64 = AtomicU64::new(0);
 
 fn unique_temp_dir() -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "arena-executable-component-test-{}-{}",
         std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
+        NEXT_TEMP_DIR_ID.fetch_add(1, Ordering::Relaxed)
     ));
     std::fs::create_dir_all(&dir).expect("create temp dir");
     dir
