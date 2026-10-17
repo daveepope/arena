@@ -28,9 +28,6 @@ def test_identifier_built_component_matches_serialized_identifier():
         (lambda b: b.with_executable_path("/bin/true"), "executable_path", "/bin/true"),
         (lambda b: b.with_source_path("/src/api"), "source_path", "/src/api"),
         (lambda b: b.with_build_tool(BuildTool.PYTHON), "build_tool", "python"),
-        (lambda b: b.with_cpu_profile("/tmp/profile.html"), "cpu_profile_output", "/tmp/profile.html"),
-        (lambda b: b.with_cpu_profile_auto_open(), "cpu_profile_auto_open", True),
-        (lambda b: b.with_hotspots(), "cpu_profile_hotspots", True),
     ],
 )
 def test_builder_single_option_sets_its_own_config_key(configure, key, expected):
@@ -106,9 +103,6 @@ def test_builder_every_option_chained_returns_the_same_builder():
         .with_build_tool(BuildTool.MAKE)
         .with_env_var("KEY", "value")
         .with_runtime_arg("flag", "-v")
-        .with_cpu_profile("/tmp/p.html")
-        .with_cpu_profile_auto_open()
-        .with_hotspots()
         .with_child_components([])
     )
 

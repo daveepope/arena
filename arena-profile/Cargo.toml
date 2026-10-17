@@ -3,14 +3,14 @@ name = "arena-profile"
 version.workspace = true
 edition = "2021"
 authors = ["David Pope"]
-description = "CPU profiling for Arena-managed processes: attaches a per-runtime external sampler and renders results to an HTML flamegraph report via inferno."
+description = "CPU profiling for Arena-managed processes: attaches a per-runtime external sampler and reports captured samples through the Arena lifecycle."
 license = "todo"
 
 [lib]
 path = "src/lib.rs"
 
 [dependencies]
-base64 = { workspace = true }
+arena = { workspace = true }
 inferno = { workspace = true }
 runfiles = { workspace = true }
 serde = { workspace = true }

@@ -19,9 +19,6 @@ enum ActiveCpuProfile {
 
 pub(crate) struct CpuProfileConfig {
     pub(crate) backend: arena_profile::CpuProfilerBackend,
-    pub(crate) output_path: PathBuf,
-    pub(crate) auto_open: bool,
-    pub(crate) include_hotspots: bool,
 }
 
 pub struct ExecutableComponent {
@@ -33,6 +30,7 @@ pub struct ExecutableComponent {
     pub(crate) process_handle: Option<Child>,
     pub(crate) stopped: bool,
     pub(crate) readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
+    pub(crate) build_tool: Option<crate::builder::BuildTool>,
     pub(crate) cpu_profile: Option<CpuProfileConfig>,
     active_cpu_profile: Option<ActiveCpuProfile>,
     pub(crate) state: RunnableState,
@@ -50,11 +48,19 @@ impl ExecutableComponent {
             process_handle: None,
             stopped: false,
             readiness_checks: Vec::new(),
+            build_tool: None,
             cpu_profile: None,
             active_cpu_profile: None,
             state: RunnableState::NotStarted,
             faults: Vec::new(),
         }
+    }
+
+    pub fn attach_cpu_profiler(&mut self) -> Result<(), Fault> {
+        let backend =
+            crate::builder::cpu_profiler_backend(&self.identifier, self.build_tool.as_ref())?;
+        self.cpu_profile = Some(CpuProfileConfig { backend });
+        Ok(())
     }
 
     pub fn builder(identifier: impl Into<String>) -> ExecutableComponentBuilder {
@@ -190,19 +196,8 @@ impl ExecutableComponent {
                 tracing::debug!(
                     component = %self.identifier,
                     phase = "cpu_profile_finish_done",
-                    "cpu profile rendered",
+                    "cpu profile samples captured",
                 );
-                if let Some(cfg) = self.cpu_profile.as_ref() {
-                    if cfg.auto_open {
-                        if let Err(e) = arena_profile::open_report(&cfg.output_path) {
-                            tracing::warn!(
-                                component = %self.identifier,
-                                error = %e,
-                                "failed to open cpu profile report",
-                            );
-                        }
-                    }
-                }
             }
             Err(e) => tracing::error!(
                 component = %self.identifier,
@@ -246,11 +241,8 @@ impl ExecutableComponent {
                 program: executable_path.clone(),
                 args: base_args,
             };
-            let mut prepared = arena_profile::prepare_cpu_profile(cfg.backend, request, cfg.output_path.clone())
+            let prepared = arena_profile::prepare_cpu_profile(cfg.backend, request, self.identifier.clone())
                 .map_err(|e| format!("cpu profiler preparation failed: {}", e))?;
-            if cfg.include_hotspots {
-                prepared = prepared.with_hotspots();
-            }
             match prepared {
                 PreparedLaunch::Wrapped { program, args, session } => {
                     (program, args, Some(ActiveCpuProfile::Wrapped(session)))
@@ -293,6 +285,12 @@ impl ExecutableComponent {
             "child process spawned",
         );
 
+        if let Some(active) = active_profile.as_ref() {
+            match active {
+                ActiveCpuProfile::Wrapped(session) => session.sampling(),
+                ActiveCpuProfile::ArgAugmented(session, _) => session.sampling(),
+            }
+        }
         self.active_cpu_profile = active_profile;
 
         if let Some(stdout) = child.stdout.take() {

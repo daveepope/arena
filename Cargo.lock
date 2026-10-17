@@ -417,7 +417,7 @@ dependencies = [
 name = "arena-profile"
 version = "7.1.0"
 dependencies = [
- "base64 0.22.1",
+ "arena",
  "inferno",
  "runfiles",
  "serde",

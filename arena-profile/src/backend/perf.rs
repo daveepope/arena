@@ -32,7 +32,6 @@ impl WrappingSampler for PerfSampler {
     fn wrap(
         &self,
         request: &LaunchRequest,
-        _output_path: &Path,
     ) -> Result<(PathBuf, Vec<String>, WrapState), CpuProfileError> {
         let perf = resolve_binary(PERF_RLOCATIONS, PERF_BINARY, PERF_BINARY, INSTALL_HINT)?;
         let data_path = scratch_path("arena-profile-perf", "data");

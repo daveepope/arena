@@ -1,7 +1,7 @@
 use super::{resolve_binary, scratch_path};
 use crate::profiler::{CpuProfileError, LaunchRequest};
 use crate::augmented::{ArgAugmentingSampler, AugmentState};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Duration;
 
 const LIBASYNC_PROFILER_RLOCATIONS: &[&str] = &[
@@ -17,7 +17,6 @@ impl ArgAugmentingSampler for AsyncProfilerSampler {
     fn augment(
         &self,
         request: &LaunchRequest,
-        _output_path: &Path,
     ) -> Result<(Vec<String>, AugmentState), CpuProfileError> {
         let libasync_profiler = resolve_binary(
             LIBASYNC_PROFILER_RLOCATIONS,

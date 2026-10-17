@@ -1,5 +1,10 @@
+#[path = "../support/recorded_profiles.rs"]
+mod recorded_profiles;
+
+use arena::lifecycle::RunnableState;
 use arena_profile::wrapped::{prepare_wrapped, wrapping_sampler_for, WrapState, WrappingSampler};
 use arena_profile::{CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch};
+use recorded_profiles::start_recording;
 use std::path::PathBuf;
 use std::process::Child;
 use std::time::Duration;
@@ -19,7 +24,6 @@ impl WrappingSampler for FakeWrappingSampler {
     fn wrap(
         &self,
         request: &LaunchRequest,
-        _output_path: &std::path::Path,
     ) -> Result<(PathBuf, Vec<String>, WrapState), CpuProfileError> {
         match &self.outcome {
             WrapOutcome::WrapFails(e) => Err(clone_error(e)),
@@ -71,10 +75,6 @@ fn clone_error(e: &CpuProfileError) -> CpuProfileError {
     }
 }
 
-fn temp_html_path(name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("arena-profile-wrapped-test-{name}-{}.html", std::process::id()))
-}
-
 fn sample_request() -> LaunchRequest {
     LaunchRequest {
         program: PathBuf::from("/bin/target"),
@@ -104,21 +104,21 @@ fn prepare_wrapped_sampler_wrap_fails_propagates_missing_binary_before_any_spawn
         wrapped_program: "/usr/bin/perf",
     };
 
-    let result = prepare_wrapped(Box::new(sampler), &sample_request(), temp_html_path("wrap-missing"));
+    let result = prepare_wrapped(Box::new(sampler), &sample_request(), "wrap-missing".to_string());
 
     assert!(matches!(result, Err(CpuProfileError::MissingBinary { binary: "perf", .. })));
 }
 
 #[cfg(unix)]
 #[test]
-fn wrapped_finish_collect_fails_returns_finish_error() {
-    let output_path = temp_html_path("wrapped-finish-fail");
+fn wrapped_finish_collect_fails_returns_finish_error_and_reports_faulted() {
+    let recording = start_recording();
     let sampler = FakeWrappingSampler {
         outcome: WrapOutcome::CollectFails,
         wrapped_program: "/usr/bin/perf",
     };
     let PreparedLaunch::Wrapped { session, .. } =
-        prepare_wrapped(Box::new(sampler), &sample_request(), output_path).unwrap()
+        prepare_wrapped(Box::new(sampler), &sample_request(), "finish-fail".to_string()).unwrap()
     else {
         panic!("expected Wrapped variant");
     };
@@ -130,18 +130,22 @@ fn wrapped_finish_collect_fails_returns_finish_error() {
     let _ = placeholder_child.wait();
 
     assert!(matches!(result, Err(CpuProfileError::Finish(_))));
+    assert_eq!(
+        recording.recorded.states_for("finish-fail"),
+        vec![RunnableState::Stopping, RunnableState::Faulted]
+    );
 }
 
 #[cfg(unix)]
 #[test]
-fn wrapped_finish_collect_succeeds_renders_html_report() {
-    let output_path = temp_html_path("wrapped-finish-success");
+fn wrapped_finish_collect_succeeds_reports_stopped_with_folded_stacks() {
+    let recording = start_recording();
     let sampler = FakeWrappingSampler {
         outcome: WrapOutcome::CollectSucceeds,
         wrapped_program: "/usr/bin/perf",
     };
     let PreparedLaunch::Wrapped { session, .. } =
-        prepare_wrapped(Box::new(sampler), &sample_request(), output_path.clone()).unwrap()
+        prepare_wrapped(Box::new(sampler), &sample_request(), "finish-success".to_string()).unwrap()
     else {
         panic!("expected Wrapped variant");
     };
@@ -153,34 +157,35 @@ fn wrapped_finish_collect_succeeds_renders_html_report() {
     let _ = placeholder_child.wait();
 
     assert!(result.is_ok());
-    let report = std::fs::read_to_string(&output_path).expect("read rendered report");
-    assert!(report.contains("<svg"));
-    let _ = std::fs::remove_file(&output_path);
+    assert_eq!(
+        recording.recorded.states_for("finish-success"),
+        vec![RunnableState::Stopping, RunnableState::Stopped]
+    );
+    let folded = recording
+        .recorded
+        .folded_for("finish-success")
+        .expect("folded stacks were not reported");
+    assert!(folded.contains("compute"), "got: {folded}");
 }
 
 #[cfg(unix)]
 #[test]
-fn wrapped_finish_with_hotspots_enabled_renders_hotspots_table() {
-    let output_path = temp_html_path("wrapped-finish-hotspots");
+fn wrapped_sampling_called_reports_started() {
+    let recording = start_recording();
     let sampler = FakeWrappingSampler {
         outcome: WrapOutcome::CollectSucceeds,
         wrapped_program: "/usr/bin/perf",
     };
     let PreparedLaunch::Wrapped { session, .. } =
-        prepare_wrapped(Box::new(sampler), &sample_request(), output_path.clone()).unwrap()
+        prepare_wrapped(Box::new(sampler), &sample_request(), "sampling".to_string()).unwrap()
     else {
         panic!("expected Wrapped variant");
     };
-    let mut placeholder_child = std::process::Command::new("true")
-        .spawn()
-        .expect("spawn placeholder child");
 
-    let result = session.with_hotspots().finish(&mut placeholder_child);
-    let _ = placeholder_child.wait();
+    session.sampling();
 
-    assert!(result.is_ok());
-    let report = std::fs::read_to_string(&output_path).expect("read rendered report");
-    assert!(report.contains("arena-profile-hotspots"));
-    assert!(report.contains("compute"));
-    let _ = std::fs::remove_file(&output_path);
+    assert_eq!(
+        recording.recorded.states_for("sampling"),
+        vec![RunnableState::Started]
+    );
 }

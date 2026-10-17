@@ -28,7 +28,6 @@ impl WrappingSampler for DotnetTraceSampler {
     fn wrap(
         &self,
         request: &LaunchRequest,
-        _output_path: &Path,
     ) -> Result<(PathBuf, Vec<String>, WrapState), CpuProfileError> {
         let dotnet_trace =
             resolve_binary(DOTNET_TRACE_RLOCATIONS, DOTNET_TRACE_PATH_FALLBACK, DOTNET_TRACE_PATH_FALLBACK, INSTALL_HINT)?;

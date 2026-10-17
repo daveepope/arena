@@ -9,12 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `arena-profile`: new crate sampling CPU profiles and rendering them to an HTML flamegraph report via inferno
+- `arena-profile`: new crate sampling CPU profiles and reporting the captured folded stacks through its own observer
 - `arena-profile`: `perf`, async-profiler, py-spy and dotnet-trace backends selected from the component's build tool
-- `arena-profile`: flamegraph report gets a filter/search toolbar, a hotspots table ranked by self time, and a resizable side-by-side or stacked layout
-- `arena-executable-component`: `with_cpu_profile`/`with_cpu_profile_auto_open`/`with_hotspots` on `ExecutableComponentBuilder`
-- `arena-ffi`: `cpu_profile_output`/`cpu_profile_auto_open`/`cpu_profile_hotspots` on the executable component config
-- `arena-pytest`, `arena-junit`, `arena-xunit`: `with_cpu_profile`/`with_cpu_profile_auto_open`/`with_hotspots` bindings
+- `arena-profile`: `CpuProfileObserver` reports the profiler lifecycle as `RunnableState`, carrying the folded stacks on the `Stopped` transition
+- `arena-profile`: `render_folded` returns the inferno SVG plus hotspots ranked by self time with severity bands
+- `arena-executable-component`: `ExecutableComponent::attach_cpu_profiler` resolves a backend from the build tool and faults when the tool cannot be profiled
 - `arena-junit`, `arena-xunit`: `BuildTool.PYTHON`/`BuildTool.Python`
 - async-profiler and py-spy vendored through Bazel, so no host install is required
 - `arena-dashboard`: new service ingesting `ArenaLifecycleObserver` state over HTTP (`HttpForwardingObserver`) and streaming it live to a browser dependency-graph viewer

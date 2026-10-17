@@ -16,7 +16,11 @@ rust_library(
 
 rust_test(
     name = "cpu_profile_component_test",
-    srcs = ["tests/component/cpu_profile_component_test.rs"],
+    srcs = [
+        "tests/component/cpu_profile_component_test.rs",
+        "tests/support/recorded_profiles.rs",
+    ],
+    crate_root = "tests/component/cpu_profile_component_test.rs",
     size = "small",
     edition = "2021",
     tags = ["component_test"],

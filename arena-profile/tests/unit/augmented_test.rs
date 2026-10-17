@@ -1,5 +1,10 @@
+#[path = "../support/recorded_profiles.rs"]
+mod recorded_profiles;
+
+use arena::lifecycle::RunnableState;
 use arena_profile::augmented::{augmenting_sampler_for, prepare_augmented, ArgAugmentingSampler, AugmentState};
 use arena_profile::{CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch, ShutdownSignal};
+use recorded_profiles::start_recording;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -17,7 +22,6 @@ impl ArgAugmentingSampler for FakeArgAugmentingSampler {
     fn augment(
         &self,
         request: &LaunchRequest,
-        _output_path: &std::path::Path,
     ) -> Result<(Vec<String>, AugmentState), CpuProfileError> {
         match &self.outcome {
             AugmentOutcome::AugmentFails => Err(CpuProfileError::MissingBinary {
@@ -57,10 +61,6 @@ fn write_sample_folded_stacks(name: &str) -> PathBuf {
     path
 }
 
-fn temp_html_path(name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("arena-profile-augmented-test-{name}-{}.html", std::process::id()))
-}
-
 fn sample_request() -> LaunchRequest {
     LaunchRequest {
         program: PathBuf::from("/bin/target"),
@@ -91,7 +91,7 @@ fn prepare_augmented_sampler_augment_fails_propagates_missing_binary() {
         outcome: AugmentOutcome::AugmentFails,
     };
 
-    let result = prepare_augmented(Box::new(sampler), &sample_request(), temp_html_path("augment-missing"));
+    let result = prepare_augmented(Box::new(sampler), &sample_request(), "augment-missing".to_string());
 
     assert!(matches!(
         result,
@@ -106,7 +106,7 @@ fn prepare_augmented_sampler_augment_succeeds_defaults_shutdown_signal_to_termin
     };
 
     let PreparedLaunch::ArgsAugmented { shutdown_signal, .. } =
-        prepare_augmented(Box::new(sampler), &sample_request(), temp_html_path("augment-signal")).unwrap()
+        prepare_augmented(Box::new(sampler), &sample_request(), "augment-signal".to_string()).unwrap()
     else {
         panic!("expected ArgsAugmented variant");
     };
@@ -116,13 +116,13 @@ fn prepare_augmented_sampler_augment_succeeds_defaults_shutdown_signal_to_termin
 
 #[cfg(unix)]
 #[test]
-fn augmented_finish_collect_fails_returns_finish_error() {
-    let output_path = temp_html_path("augmented-finish-fail");
+fn augmented_finish_collect_fails_returns_finish_error_and_reports_faulted() {
+    let recording = start_recording();
     let sampler = FakeArgAugmentingSampler {
         outcome: AugmentOutcome::CollectFails,
     };
     let PreparedLaunch::ArgsAugmented { session, .. } =
-        prepare_augmented(Box::new(sampler), &sample_request(), output_path).unwrap()
+        prepare_augmented(Box::new(sampler), &sample_request(), "finish-fail".to_string()).unwrap()
     else {
         panic!("expected ArgsAugmented variant");
     };
@@ -134,17 +134,21 @@ fn augmented_finish_collect_fails_returns_finish_error() {
     let _ = placeholder_process.wait();
 
     assert!(matches!(result, Err(CpuProfileError::Finish(_))));
+    assert_eq!(
+        recording.recorded.states_for("finish-fail"),
+        vec![RunnableState::Stopping, RunnableState::Faulted]
+    );
 }
 
 #[cfg(unix)]
 #[test]
-fn augmented_finish_collect_succeeds_renders_html_report() {
-    let output_path = temp_html_path("augmented-finish-success");
+fn augmented_finish_collect_succeeds_reports_stopped_with_folded_stacks() {
+    let recording = start_recording();
     let sampler = FakeArgAugmentingSampler {
         outcome: AugmentOutcome::CollectSucceeds,
     };
     let PreparedLaunch::ArgsAugmented { session, .. } =
-        prepare_augmented(Box::new(sampler), &sample_request(), output_path.clone()).unwrap()
+        prepare_augmented(Box::new(sampler), &sample_request(), "finish-success".to_string()).unwrap()
     else {
         panic!("expected ArgsAugmented variant");
     };
@@ -156,7 +160,13 @@ fn augmented_finish_collect_succeeds_renders_html_report() {
     let _ = placeholder_process.wait();
 
     assert!(result.is_ok());
-    let report = std::fs::read_to_string(&output_path).expect("read rendered report");
-    assert!(report.contains("<svg"));
-    let _ = std::fs::remove_file(&output_path);
+    assert_eq!(
+        recording.recorded.states_for("finish-success"),
+        vec![RunnableState::Stopping, RunnableState::Stopped]
+    );
+    let folded = recording
+        .recorded
+        .folded_for("finish-success")
+        .expect("folded stacks were not reported");
+    assert!(folded.contains("compute"), "got: {folded}");
 }

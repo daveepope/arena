@@ -1,7 +1,10 @@
-use crate::render::RenderError;
 use std::path::PathBuf;
 use std::process::Child;
 use std::time::Duration;
+
+use arena::lifecycle::RunnableState;
+
+use crate::observer;
 
 pub const FINISH_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -28,7 +31,6 @@ pub enum CpuProfileError {
     Spawn(std::io::Error),
     Launch(String),
     Finish(String),
-    Render(RenderError),
 }
 
 impl std::fmt::Display for CpuProfileError {
@@ -40,18 +42,11 @@ impl std::fmt::Display for CpuProfileError {
             CpuProfileError::Spawn(e) => write!(f, "failed to spawn profiler process: {e}"),
             CpuProfileError::Launch(msg) => write!(f, "failed to prepare profiled launch: {msg}"),
             CpuProfileError::Finish(msg) => write!(f, "failed to finish profiling session: {msg}"),
-            CpuProfileError::Render(e) => write!(f, "failed to render flamegraph report: {e}"),
         }
     }
 }
 
 impl std::error::Error for CpuProfileError {}
-
-impl From<RenderError> for CpuProfileError {
-    fn from(e: RenderError) -> Self {
-        CpuProfileError::Render(e)
-    }
-}
 
 pub struct LaunchRequest {
     pub program: PathBuf,
@@ -59,7 +54,7 @@ pub struct LaunchRequest {
 }
 
 pub trait ProfileSession: Send + Sync {
-    fn with_hotspots(self: Box<Self>) -> Box<dyn ProfileSession>;
+    fn sampling(&self);
     fn finish(self: Box<Self>, child: &mut Child) -> Result<(), CpuProfileError>;
 }
 
@@ -76,59 +71,44 @@ pub enum PreparedLaunch {
     },
 }
 
-impl PreparedLaunch {
-    pub fn with_hotspots(self) -> Self {
-        match self {
-            PreparedLaunch::Wrapped { program, args, session } => PreparedLaunch::Wrapped {
-                program,
-                args,
-                session: session.with_hotspots(),
-            },
-            PreparedLaunch::ArgsAugmented { args, shutdown_signal, session } => PreparedLaunch::ArgsAugmented {
-                args,
-                shutdown_signal,
-                session: session.with_hotspots(),
-            },
-        }
-    }
-}
-
 pub fn prepare_cpu_profile(
     backend: CpuProfilerBackend,
     request: LaunchRequest,
-    output_path: impl Into<PathBuf>,
+    component_id: impl Into<String>,
 ) -> Result<PreparedLaunch, CpuProfileError> {
-    let output_path = output_path.into();
-    tracing::info!(backend = ?backend, output = %output_path.display(), "starting cpu profile capture");
-    match backend {
-        CpuProfilerBackend::Perf | CpuProfilerBackend::PySpy | CpuProfilerBackend::DotnetTrace => crate::wrapped::prepare_wrapped(
-            crate::wrapped::wrapping_sampler_for(backend),
-            &request,
-            output_path,
-        ),
+    let component_id = component_id.into();
+    tracing::info!(backend = ?backend, component = %component_id, "attaching cpu profiler");
+    observer::report(&component_id, RunnableState::Starting);
+
+    let prepared = match backend {
+        CpuProfilerBackend::Perf | CpuProfilerBackend::PySpy | CpuProfilerBackend::DotnetTrace => {
+            crate::wrapped::prepare_wrapped(
+                crate::wrapped::wrapping_sampler_for(backend),
+                &request,
+                component_id.clone(),
+            )
+        }
         CpuProfilerBackend::AsyncProfiler => crate::augmented::prepare_augmented(
             crate::augmented::augmenting_sampler_for(backend),
             &request,
-            output_path,
+            component_id.clone(),
         ),
+    };
+
+    if prepared.is_err() {
+        observer::report(&component_id, RunnableState::Faulted);
     }
+    prepared
 }
 
-pub fn render_collected(
-    folded_path: &std::path::Path,
-    output_path: &std::path::Path,
-    include_hotspots: bool,
-) -> Result<(), CpuProfileError> {
+pub fn read_collected(folded_path: &std::path::Path) -> Result<String, CpuProfileError> {
     tracing::debug!(folded = %folded_path.display(), "reading collected profile samples");
-    let folded_file = std::fs::File::open(folded_path).map_err(|e| {
+    let folded = std::fs::read_to_string(folded_path).map_err(|e| {
         CpuProfileError::Finish(format!(
             "failed to read folded stacks at {}: {e}",
             folded_path.display()
         ))
-    })?;
-    let render_result = crate::render::render_folded_to_html(folded_file, output_path, include_hotspots);
+    });
     let _ = std::fs::remove_file(folded_path);
-    render_result?;
-    tracing::info!(output = %output_path.display(), "cpu profile report rendered");
-    Ok(())
+    folded
 }

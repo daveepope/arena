@@ -31,12 +31,6 @@ pub struct ExecutableComponentConfig {
     pub readiness_checks: Option<Vec<ReadinessCheckConfig>>,
     #[serde(default)]
     pub readiness_check_url: Option<String>,
-    #[serde(default)]
-    pub cpu_profile_output: Option<String>,
-    #[serde(default)]
-    pub cpu_profile_auto_open: bool,
-    #[serde(default)]
-    pub cpu_profile_hotspots: bool,
 }
 
 pub fn build(config: &ExecutableComponentConfig) -> Result<Component, String> {
@@ -58,15 +52,6 @@ pub fn build(config: &ExecutableComponentConfig) -> Result<Component, String> {
     if let Some(runtime_args) = &config.runtime_args {
         for arg in runtime_args {
             builder = builder.with_runtime_arg(&arg.name, &arg.value);
-        }
-    }
-    if let Some(output_path) = &config.cpu_profile_output {
-        builder = builder.with_cpu_profile(output_path);
-        if config.cpu_profile_auto_open {
-            builder = builder.with_cpu_profile_auto_open();
-        }
-        if config.cpu_profile_hotspots {
-            builder = builder.with_hotspots();
         }
     }
     builder = apply_readiness_checks(builder, &readiness_checks_for(config));

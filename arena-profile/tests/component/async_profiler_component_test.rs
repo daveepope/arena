@@ -1,4 +1,9 @@
+#[path = "../support/recorded_profiles.rs"]
+mod recorded_profiles;
+
 use arena_profile::{prepare_cpu_profile, CpuProfilerBackend, LaunchRequest, PreparedLaunch, ShutdownSignal};
+use arena::lifecycle::RunnableState;
+use recorded_profiles::start_recording;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
@@ -21,17 +26,15 @@ fn await_jvm_running(marker_path: &std::path::Path, jvm: &mut std::process::Chil
 }
 
 #[test]
-fn prepare_cpu_profile_real_async_profiler_agent_flag_against_jvm_busy_loop_produces_html_report() {
+fn prepare_cpu_profile_real_async_profiler_agent_flag_against_jvm_busy_loop_reports_folded_stacks() {
     let fixture_path = std::env::temp_dir().join(format!(
         "arena-profile-asprof-fixture-{}.java",
         std::process::id()
     ));
     std::fs::write(&fixture_path, BUSY_LOOP_JAVA).expect("write java fixture");
 
-    let output_path = std::env::temp_dir().join(format!(
-        "arena-profile-asprof-component-test-{}.html",
-        std::process::id()
-    ));
+    let component_id = "async_profiler-component-test";
+    let recording = start_recording();
 
     let marker_path = std::env::temp_dir().join(format!(
         "arena-profile-asprof-running-{}",
@@ -47,7 +50,7 @@ fn prepare_cpu_profile_real_async_profiler_agent_flag_against_jvm_busy_loop_prod
         ],
     };
 
-    let prepared = prepare_cpu_profile(CpuProfilerBackend::AsyncProfiler, request, &output_path)
+    let prepared = prepare_cpu_profile(CpuProfilerBackend::AsyncProfiler, request, component_id)
         .expect("prepare async-profiler profile");
     let PreparedLaunch::ArgsAugmented { args, shutdown_signal, session } = prepared else {
         panic!("expected ArgsAugmented variant for AsyncProfiler backend");
@@ -73,8 +76,14 @@ fn prepare_cpu_profile_real_async_profiler_agent_flag_against_jvm_busy_loop_prod
     session.finish(&mut jvm).expect("finish async-profiler profile");
     let _ = std::fs::remove_file(&fixture_path);
 
-    let report = std::fs::read_to_string(&output_path).expect("read html report");
-    assert!(report.contains("<svg"));
-    let _ = std::fs::remove_file(&output_path);
+    let folded = recording
+        .recorded
+        .folded_for(component_id)
+        .expect("folded stacks were not reported");
+    assert!(!folded.trim().is_empty(), "folded stacks were empty");
+    assert!(recording
+        .recorded
+        .states_for(component_id)
+        .contains(&RunnableState::Stopped));
     let _ = std::fs::remove_file(&marker_path);
 }

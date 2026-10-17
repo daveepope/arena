@@ -30,7 +30,6 @@ impl WrappingSampler for PySpySampler {
     fn wrap(
         &self,
         request: &LaunchRequest,
-        _output_path: &Path,
     ) -> Result<(PathBuf, Vec<String>, WrapState), CpuProfileError> {
         let py_spy = resolve_binary(PYSPY_RLOCATIONS, PYSPY_PATH_FALLBACK, PYSPY_PATH_FALLBACK, INSTALL_HINT)?;
         let folded_path = scratch_path("arena-profile-pyspy", "folded");

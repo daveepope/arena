@@ -1,8 +1,10 @@
+use crate::observer;
 use crate::profiler::{
-    render_collected, CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch, ProfileSession,
+    read_collected, CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch, ProfileSession,
     FINISH_TIMEOUT,
 };
-use std::path::{Path, PathBuf};
+use arena::lifecycle::RunnableState;
+use std::path::PathBuf;
 use std::process::Child;
 use std::time::Duration;
 
@@ -16,7 +18,6 @@ pub trait WrappingSampler: Send + Sync {
     fn wrap(
         &self,
         request: &LaunchRequest,
-        output_path: &Path,
     ) -> Result<(PathBuf, Vec<String>, WrapState), CpuProfileError>;
 
     fn collect(
@@ -41,37 +42,46 @@ pub fn wrapping_sampler_for(backend: CpuProfilerBackend) -> Box<dyn WrappingSamp
 pub(crate) struct WrappedProfileSession {
     sampler: Box<dyn WrappingSampler>,
     state: WrapState,
-    output_path: PathBuf,
-    include_hotspots: bool,
+    component_id: String,
 }
 
 impl ProfileSession for WrappedProfileSession {
-    fn with_hotspots(self: Box<Self>) -> Box<dyn ProfileSession> {
-        Box::new(WrappedProfileSession { include_hotspots: true, ..*self })
+    fn sampling(&self) {
+        observer::report(&self.component_id, RunnableState::Started);
     }
 
     fn finish(self: Box<Self>, wrapping_child: &mut Child) -> Result<(), CpuProfileError> {
-        let folded_path = self
-            .sampler
-            .collect(self.state, wrapping_child, FINISH_TIMEOUT)?;
-        render_collected(&folded_path, &self.output_path, self.include_hotspots)
+        let WrappedProfileSession { sampler, state, component_id } = *self;
+        observer::report(&component_id, RunnableState::Stopping);
+        let collected = sampler
+            .collect(state, wrapping_child, FINISH_TIMEOUT)
+            .and_then(|folded_path| read_collected(&folded_path));
+        match collected {
+            Ok(folded) => {
+                observer::report_complete(&component_id, &folded);
+                Ok(())
+            }
+            Err(e) => {
+                observer::report(&component_id, RunnableState::Faulted);
+                Err(e)
+            }
+        }
     }
 }
 
 pub fn prepare_wrapped(
     sampler: Box<dyn WrappingSampler>,
     request: &LaunchRequest,
-    output_path: PathBuf,
+    component_id: String,
 ) -> Result<PreparedLaunch, CpuProfileError> {
-    let (program, args, state) = sampler.wrap(request, &output_path)?;
+    let (program, args, state) = sampler.wrap(request)?;
     Ok(PreparedLaunch::Wrapped {
         program,
         args,
         session: Box::new(WrappedProfileSession {
             sampler,
             state,
-            output_path,
-            include_hotspots: false,
+            component_id,
         }),
     })
 }
