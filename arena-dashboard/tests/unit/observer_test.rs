@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use arena::lifecycle::{ArenaLifecycleObserver, ArenaLifecycleState, ArenaState};
 use arena_dashboard::HttpForwardingObserver;
@@ -97,4 +98,40 @@ async fn drop_unreachable_dashboard_completes_without_blocking_teardown() {
         .await
         .expect("drop must not block teardown")
         .expect("join drop task");
+}
+
+async fn start_stalling_listener() -> (String, tokio::task::JoinHandle<()>) {
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind ephemeral port");
+    let port = listener.local_addr().expect("local addr").port();
+    let accepting = tokio::spawn(async move {
+        let mut accepted = Vec::new();
+        while let Ok((stream, _)) = listener.accept().await {
+            accepted.push(stream);
+        }
+    });
+    (format!("http://127.0.0.1:{port}"), accepting)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn drop_stalling_dashboard_stops_forwarding_at_the_drain_budget() {
+    let (url, accepting) = start_stalling_listener().await;
+
+    let observer = HttpForwardingObserver::new(url);
+    for index in 0..10 {
+        observer.on_state(&arena_state(&format!("stalled-arena-{index}")));
+    }
+
+    let started = Instant::now();
+    tokio::task::spawn_blocking(move || drop(observer))
+        .await
+        .expect("join drop task");
+    let elapsed = started.elapsed();
+    accepting.abort();
+
+    assert!(
+        elapsed < Duration::from_secs(10),
+        "teardown took {elapsed:?}, ten stalled posts without a budget would take twenty seconds"
+    );
 }

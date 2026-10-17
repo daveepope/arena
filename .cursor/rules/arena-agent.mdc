@@ -26,6 +26,7 @@ alwaysApply: true
 - **After a coding task, keep the wrap-up to one or two sentences:** what changed and the verification result (e.g. which `bazel build`/`test` passed). Do not list every edit, walk through each finding, or explain the reasoning unless the developer asks. Still report new or changed third-party dependencies in that one line, since other rules require it.
 - **No unsolicited tables, headings, or bullet lists** in chat replies. Prose only, and as little of it as possible.
 - Answer the question that was asked. Nothing adjacent, nothing extra.
+- **When reporting a bug, give the location first:** the crate or module, the type or class, and the function, then one short sentence on what is wrong. No background, no walkthrough, no essay.
 - Keep replies **consistent** in tone and structure.
 - Be **clear**; ask **direct questions** when something is ambiguous. **Do not waffle**, hedge with filler, or pad with generic advice.
 - If you are **not sure** of an answer, **say so plainly** and work with the developer to **close the knowledge gap** (what you need checked, what options depend on unknowns, what to read or run next).

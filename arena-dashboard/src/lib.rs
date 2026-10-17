@@ -1,3 +1,5 @@
+#[doc(hidden)]
+pub mod http_client;
 pub mod ingest;
 pub mod launcher;
 pub mod observer;

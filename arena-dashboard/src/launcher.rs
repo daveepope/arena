@@ -1,16 +1,15 @@
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::mpsc::channel;
 use std::sync::{LazyLock, Once};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use crate::http_client::build_client;
+
 pub const DEFAULT_PORT: u16 = 4873;
 
 const PROBE_TIMEOUT: Duration = Duration::from_millis(500);
-
-const CLIENT_BUILD_TIMEOUT: Duration = Duration::from_secs(5);
 
 const EXECUTABLE_NAMES: [&str; 3] = [
     "arena-dashboard-server-linux",
@@ -62,32 +61,7 @@ fn is_arena_dashboard_response(response: &reqwest::blocking::Response) -> bool {
 }
 
 static READINESS_CLIENT: LazyLock<Option<reqwest::blocking::Client>> =
-    LazyLock::new(build_readiness_client);
-
-fn build_readiness_client() -> Option<reqwest::blocking::Client> {
-    let (sender, receiver) = channel();
-    thread::spawn(move || {
-        let built = reqwest::blocking::Client::builder()
-            .connect_timeout(PROBE_TIMEOUT)
-            .timeout(PROBE_TIMEOUT)
-            .build();
-        let _ = sender.send(built);
-    });
-    match receiver.recv_timeout(CLIENT_BUILD_TIMEOUT) {
-        Ok(Ok(client)) => Some(client),
-        Ok(Err(e)) => {
-            tracing::warn!(error = %e, "arena-dashboard readiness probe could not be built");
-            None
-        }
-        Err(_) => {
-            tracing::warn!(
-                waited = ?CLIENT_BUILD_TIMEOUT,
-                "arena-dashboard readiness probe did not start"
-            );
-            None
-        }
-    }
-}
+    LazyLock::new(|| build_client(PROBE_TIMEOUT));
 
 pub fn poll_ready(url: &str, timeout: Duration) -> bool {
     let Some(client) = READINESS_CLIENT.as_ref() else {

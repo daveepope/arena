@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `requirements_windows.txt` for `examples` and `arena-pytest` regenerated to carry the same `pyjwt`/`urllib3` fixes as the other platform lockfiles
 - Windows CI jobs no longer use a Bazel disk cache, working around upstream Bazel 7.4.1 bug bazelbuild/bazel#28408 where a concurrent rename into the disk cache CAS fails with "Permission denied"; the BuildBuddy remote cache still applies
 - macOS CI test jobs no longer pass `--local_test_jobs=6`, which over-subscribed the 3-core and 4-core runners and starved tests; Bazel now sizes local test concurrency from `--jobs`
+- Agent rules: bug reports must lead with crate, type and function, then one sentence
 
 ## [7.0.1]
 
