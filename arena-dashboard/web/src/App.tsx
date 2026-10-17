@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ArenaGraph } from "./ArenaGraph";
+import { CpuProfilePopover, CpuProfileView } from "./CpuProfilePanel";
 import { useDashboardStore } from "./store";
 import type { ArenaState } from "./types";
 
@@ -315,8 +316,14 @@ function StopServerConfirmation({
   );
 }
 
+export function fullScreenProfileComponentId(search: string): string | null {
+  const value = new URLSearchParams(search).get("profile");
+  return value !== null && value !== "" ? value : null;
+}
+
 export function App() {
   const ingest = useDashboardStore((s) => s.ingest);
+  const ingestCpuProfile = useDashboardStore((s) => s.ingestCpuProfile);
   const ingestHistory = useDashboardStore((s) => s.ingestHistory);
   const arenas = useDashboardStore((s) => s.arenas);
   const arenaIds = useMemo(() => Array.from(arenas.keys()), [arenas]);
@@ -362,6 +369,10 @@ export function App() {
           clearArenas();
           return;
         }
+        if (data && data.type === "cpu_profile") {
+          ingestCpuProfile(data.component, data.state);
+          return;
+        }
         ingest(data as ArenaState);
       } catch {}
     };
@@ -377,8 +388,9 @@ export function App() {
       clearInterval(heartbeatCheck);
       source.close();
     };
-  }, [ingest, clearArenas]);
+  }, [ingest, clearArenas, ingestCpuProfile]);
 
+  const fullScreenProfile = useMemo(() => fullScreenProfileComponentId(window.location.search), []);
   const [actionFeedback, setActionFeedback] = useState<{ text: string; isError: boolean } | null>(null);
   const [isStopConfirmOpen, setIsStopConfirmOpen] = useState(false);
 
@@ -407,6 +419,15 @@ export function App() {
       showActionFeedback("Server stopped", false);
     }
   };
+
+  if (fullScreenProfile !== null) {
+    return (
+      <div className="flex h-screen w-full flex-col gap-2 bg-[#0e1330] p-3 text-slate-200">
+        <h1 className="text-base font-semibold">cpu profile · {fullScreenProfile}</h1>
+        <CpuProfileView componentId={fullScreenProfile} isFullScreen />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full bg-[#0e1330] text-slate-200">
@@ -480,6 +501,7 @@ export function App() {
       )}
 
       {selected && <SelectedDetailPopover selected={selected} onClose={clearSelected} />}
+      <CpuProfilePopover />
     </div>
   );
 }

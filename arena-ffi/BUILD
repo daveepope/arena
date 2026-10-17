@@ -5,7 +5,7 @@ _ARENA_FFI_DEPS = all_crate_deps(normal = True) + [
     "//arena",
     "//arena-containerized-component:arena_containerized_component",
     "//arena-dashboard:arena_dashboard",
-        "//arena-profile:arena_profile",
+    "//arena-profile:arena_profile",
     "//arena-executable-component:arena_executable_component",
     "//arena-host:arena_host",
     "//arena-http:arena_http",

@@ -18,7 +18,12 @@ function arenaState(overrides: Partial<ArenaState> = {}): ArenaState {
 }
 
 beforeEach(() => {
-  useDashboardStore.setState({ arenas: new Map(), selected: null });
+  useDashboardStore.setState({
+    arenas: new Map(),
+    selected: null,
+    cpuProfiles: new Map(),
+    profileView: null,
+  });
 });
 
 describe("useDashboardStore ingest", () => {
@@ -324,5 +329,69 @@ describe("useDashboardStore ingestHistory", () => {
     expect(entry?.history.length).toBe(3);
     expect(entry?.replayIndex).toBe(0);
     expect(entry?.snapshot.state).toBe("arena_starting");
+  });
+});
+
+describe("useDashboardStore cpu profiles", () => {
+  it("ingested profile state is keyed by component id", () => {
+    useDashboardStore.getState().ingestCpuProfile("svc", "started");
+    useDashboardStore.getState().ingestCpuProfile("worker", "stopped");
+
+    expect(useDashboardStore.getState().cpuProfiles.get("svc")).toBe("started");
+    expect(useDashboardStore.getState().cpuProfiles.get("worker")).toBe("stopped");
+  });
+
+  it("later state for the same component replaces the earlier one", () => {
+    useDashboardStore.getState().ingestCpuProfile("svc", "started");
+    useDashboardStore.getState().ingestCpuProfile("svc", "stopped");
+
+    expect(useDashboardStore.getState().cpuProfiles.get("svc")).toBe("stopped");
+    expect(useDashboardStore.getState().cpuProfiles.size).toBe(1);
+  });
+
+  it("clearing arenas discards the profiles and the open view", () => {
+    useDashboardStore.getState().ingestCpuProfile("svc", "stopped");
+    useDashboardStore.getState().openProfileView("svc", { x: 1, y: 2 });
+
+    useDashboardStore.getState().clearArenas();
+
+    expect(useDashboardStore.getState().cpuProfiles.size).toBe(0);
+    expect(useDashboardStore.getState().profileView).toBeNull();
+  });
+});
+
+describe("useDashboardStore profile view", () => {
+  it("opening a view records the component and position unpinned", () => {
+    useDashboardStore.getState().openProfileView("svc", { x: 4, y: 8 });
+
+    expect(useDashboardStore.getState().profileView).toEqual({
+      componentId: "svc",
+      position: { x: 4, y: 8 },
+      isPinned: false,
+    });
+  });
+
+  it("closing a view clears it", () => {
+    useDashboardStore.getState().openProfileView("svc", { x: 4, y: 8 });
+
+    useDashboardStore.getState().closeProfileView();
+
+    expect(useDashboardStore.getState().profileView).toBeNull();
+  });
+
+  it("toggling the pin flips it both ways", () => {
+    useDashboardStore.getState().openProfileView("svc", { x: 4, y: 8 });
+
+    useDashboardStore.getState().toggleProfileViewPin();
+    expect(useDashboardStore.getState().profileView?.isPinned).toBe(true);
+
+    useDashboardStore.getState().toggleProfileViewPin();
+    expect(useDashboardStore.getState().profileView?.isPinned).toBe(false);
+  });
+
+  it("toggling the pin with no view open does nothing", () => {
+    useDashboardStore.getState().toggleProfileViewPin();
+
+    expect(useDashboardStore.getState().profileView).toBeNull();
   });
 });

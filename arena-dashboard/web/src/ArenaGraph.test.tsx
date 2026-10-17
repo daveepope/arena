@@ -20,8 +20,17 @@ function arenaState(overrides: Partial<ArenaState> = {}): ArenaState {
 }
 
 beforeEach(() => {
-  useDashboardStore.setState({ arenas: new Map(), selected: null });
+  useDashboardStore.setState({
+    arenas: new Map(),
+    selected: null,
+    cpuProfiles: new Map(),
+    profileView: null,
+  });
 });
+
+function componentSubject(id: string) {
+  return { id, state: "stopped", faults: [], children: [] };
+}
 
 describe("ArenaGraph", () => {
   it("canvas renders a thin line grid behind the topology", () => {
@@ -122,5 +131,54 @@ describe("ArenaGraph", () => {
 
     const node = screen.getByText("oracle").closest(".pointer-events-none");
     expect(node).not.toBeNull();
+  });
+});
+
+describe("ArenaGraph profiler label", () => {
+  it("component without a profiler shows no label", () => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+    });
+
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    expect(screen.queryByTestId("profiler-label-svc")).toBeNull();
+  });
+
+  it("sampling profiler shows its state and cannot be opened", () => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+      useDashboardStore.getState().ingestCpuProfile("svc", "started");
+    });
+
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    const label = screen.getByTestId("profiler-label-svc") as HTMLButtonElement;
+    expect(label.textContent).toBe("profiler sampling");
+    expect(label.disabled).toBe(true);
+  });
+
+  it("available profiler opens the profile view for that component", () => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+      useDashboardStore.getState().ingestCpuProfile("svc", "stopped");
+    });
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    fireEvent.click(screen.getByTestId("profiler-label-svc"));
+
+    expect(useDashboardStore.getState().profileView?.componentId).toBe("svc");
+  });
+
+  it("opening the profile view does not also select the node", () => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+      useDashboardStore.getState().ingestCpuProfile("svc", "stopped");
+    });
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    fireEvent.click(screen.getByTestId("profiler-label-svc"));
+
+    expect(useDashboardStore.getState().selected).toBeNull();
   });
 });

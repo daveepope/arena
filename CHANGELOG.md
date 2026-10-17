@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena-profile`: captured cpu profiles are capped at 8 MiB by default and fault rather than truncate, with the breach reported through `CpuProfileError`
 - `arena-pytest`, `arena-junit`, `arena-xunit`: `with_cpu_profile_limit_bytes(bytes)` on the dashboard builder raises the cpu profile cap
 - `arena-executable-component`: a failed cpu profile capture faults the component's stop instead of only being logged
+- `arena-dashboard`: a profiled component's node shows the profiler's live state and opens its flamegraph in context over the graph, pinnable, with a ranked hotspot table, regex filter, hover linking, layout toggle and a full screen view at `/?profile=<component>`
 
 ### Changed
 
@@ -55,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scripts/repin.py` no longer leaves `MODULE.bazel.lock` stale: `CARGO_BAZEL_REPIN` is scoped to the crate repin step and the lockfile is recorded last
 - `requirements_windows.txt` for `examples` and `arena-pytest` regenerated to carry the same `pyjwt`/`urllib3` fixes as the other platform lockfiles
 - Windows CI jobs no longer use a Bazel disk cache, working around upstream Bazel 7.4.1 bug bazelbuild/bazel#28408 where a concurrent rename into the disk cache CAS fails with "Permission denied"; the BuildBuddy remote cache still applies
+- Bazel: the vendored profiler tool binaries are declared on the targets that run them instead of on the `arena-profile` library, keeping the .NET SDK out of the runfiles of every transitive consumer (a dependent Python test's runfiles drop from 6,533 to 2,644 files)
+- Windows CI test jobs pass `--nobuild_python_zip` alongside the `--enable_runfiles` they already set, so Python tests run from the runfiles tree instead of building and self-extracting a zip of it; `//arena-pytest:arena_pytest_unit_test` and `//examples:ephemeral_test_runtime_test` no longer exceed the 60s `small` timeout on that overhead alone
 - macOS CI test jobs no longer pass `--local_test_jobs=6`, which over-subscribed the 3-core and 4-core runners and starved tests; Bazel now sizes local test concurrency from `--jobs`
 - Agent rules: bug reports must lead with crate, type and function, then one sentence
 - Agent rules: bound unbounded growth with a modest default cap the caller can raise, faulting when breached, rather than evicting or truncating

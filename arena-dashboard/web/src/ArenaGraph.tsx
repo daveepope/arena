@@ -17,6 +17,7 @@ import {
 import { ArenaEdge, type ArenaEdgeData } from "./ArenaEdge";
 import { dagreLayout, estimateNodeWidth } from "./dagreLayout";
 import { computeLayout, type LayoutNode } from "./layout";
+import { isProfileAvailable, profilerLabel } from "./cpuProfile";
 import { arenaClasses, formatDetail, isActiveState, nodeClasses } from "./presentation";
 import { useDashboardStore } from "./store";
 
@@ -39,9 +40,34 @@ function pulseStyle(isPulsing: boolean, isStrongPulse: boolean): Record<string, 
   return { animationDelay: syncedAnimationDelay(isStrongPulse ? PULSE_DURATION_MS : PULSE_SOFT_DURATION_MS) };
 }
 
+function ProfilerLabel({ componentId, state }: { componentId: string; state: string }) {
+  const openProfileView = useDashboardStore((s) => s.openProfileView);
+  const isAvailable = isProfileAvailable(state);
+
+  return (
+    <button
+      type="button"
+      data-testid={`profiler-label-${componentId}`}
+      disabled={!isAvailable}
+      onClick={(e) => {
+        e.stopPropagation();
+        openProfileView(componentId, { x: e.clientX, y: e.clientY });
+      }}
+      className={`mt-0.5 rounded-sm border px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${
+        isAvailable
+          ? "cursor-pointer border-teal-500 bg-teal-950/60 text-teal-300"
+          : "cursor-default border-slate-600 bg-slate-900/60 text-slate-400"
+      }`}
+    >
+      {profilerLabel(state)}
+    </button>
+  );
+}
+
 function ArenaNode({ data }: NodeProps) {
   const node = data as unknown as LayoutNode;
   const select = useDashboardStore((s) => s.select);
+  const profilerState = useDashboardStore((s) => s.cpuProfiles.get(node.label));
   const hasFaults = node.faults.length > 0;
   const isPulsing = hasFaults || isActiveState(node.state);
 
@@ -64,6 +90,9 @@ function ArenaNode({ data }: NodeProps) {
       <span>{node.label}</span>
       <span className="text-[9px] uppercase tracking-wide opacity-70">{node.kind}</span>
       <span className="text-[9px] uppercase tracking-wide opacity-60">{node.state}</span>
+      {profilerState !== undefined && (
+        <ProfilerLabel componentId={node.label} state={profilerState} />
+      )}
     </div>
   );
 }

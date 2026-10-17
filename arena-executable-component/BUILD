@@ -24,6 +24,10 @@ rust_test(
     size = "small",
     edition = "2021",
     tags = ["component_test"],
+    data = [
+        "//arena-profile:async_profiler_library",
+        "@profiling_tools//:py-spy__py-spy",
+    ],
     target_compatible_with = select({
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],

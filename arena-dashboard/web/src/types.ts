@@ -22,3 +22,17 @@ export interface ArenaState {
   components: Subject[];
   faults: Fault[];
 }
+
+export type Severity = "low" | "medium" | "high" | "critical";
+
+export interface Hotspot {
+  function: string;
+  self_count: number;
+  self_pct: number;
+  severity: Severity;
+}
+
+export interface RenderedProfile {
+  svg: string;
+  hotspots: Hotspot[];
+}

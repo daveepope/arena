@@ -3,7 +3,7 @@ import "./testSetup";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { App } from "./App";
+import { App, fullScreenProfileComponentId } from "./App";
 import { useDashboardStore } from "./store";
 import type { ArenaState } from "./types";
 
@@ -65,7 +65,13 @@ function arenaState(overrides: Partial<ArenaState> = {}): ArenaState {
 beforeEach(() => {
   FakeEventSource.instances = [];
   (globalThis as unknown as { EventSource: typeof FakeEventSource }).EventSource = FakeEventSource;
-  useDashboardStore.setState({ arenas: new Map(), selected: null });
+  useDashboardStore.setState({
+    arenas: new Map(),
+    selected: null,
+    cpuProfiles: new Map(),
+    profileView: null,
+  });
+  window.history.replaceState(null, "", "/");
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
 });
 
@@ -799,5 +805,68 @@ describe("App", () => {
     });
 
     expect(screen.getByText("Failed to clear")).toBeDefined();
+  });
+});
+
+describe("fullScreenProfileComponentId", () => {
+  it.each([
+    ["?profile=svc", "svc"],
+    ["?profile=svc%20one", "svc one"],
+    ["?profile=", null],
+    ["", null],
+    ["?other=svc", null],
+  ])("%s resolves to %s", (search, expected) => {
+    expect(fullScreenProfileComponentId(search)).toBe(expected);
+  });
+});
+
+describe("App cpu profile events", () => {
+  it("cpu profile event records the profiler state for that component", () => {
+    render(<App />);
+
+    act(() => {
+      latestEventSource().onmessage?.({
+        data: JSON.stringify({ type: "cpu_profile", component: "svc", state: "stopped" }),
+      });
+    });
+
+    expect(useDashboardStore.getState().cpuProfiles.get("svc")).toBe("stopped");
+  });
+
+  it("cpu profile event is not treated as an arena snapshot", () => {
+    render(<App />);
+
+    act(() => {
+      latestEventSource().onmessage?.({
+        data: JSON.stringify({ type: "cpu_profile", component: "svc", state: "started" }),
+      });
+    });
+
+    expect(useDashboardStore.getState().arenas.size).toBe(0);
+  });
+
+  it("clear event discards recorded profiler state", () => {
+    render(<App />);
+
+    act(() => {
+      latestEventSource().onmessage?.({
+        data: JSON.stringify({ type: "cpu_profile", component: "svc", state: "stopped" }),
+      });
+      latestEventSource().onmessage?.({ data: JSON.stringify({ type: "clear" }) });
+    });
+
+    expect(useDashboardStore.getState().cpuProfiles.size).toBe(0);
+  });
+});
+
+describe("App full screen profile", () => {
+  it("profile query parameter renders only the profile view", () => {
+    window.history.replaceState(null, "", "/?profile=svc");
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise(() => {})));
+
+    render(<App />);
+
+    expect(screen.getByText("cpu profile · svc")).toBeDefined();
+    expect(screen.queryByText("Arena Topology Dashboard")).toBeNull();
   });
 });

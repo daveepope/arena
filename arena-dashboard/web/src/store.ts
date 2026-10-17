@@ -22,6 +22,12 @@ interface SubjectSnapshot {
   state: string;
 }
 
+export interface ProfileView {
+  componentId: string;
+  position: { x: number; y: number };
+  isPinned: boolean;
+}
+
 export interface HistoryEntry {
   at: number;
   snapshot: ArenaState;
@@ -105,11 +111,17 @@ function diffUpTo(history: HistoryEntry[], index: number): DiffState & { snapsho
 interface DashboardStore {
   arenas: Map<string, ArenaEntry>;
   selected: Selected | null;
+  cpuProfiles: Map<string, string>;
+  profileView: ProfileView | null;
   ingest: (next: ArenaState) => void;
   ingestHistory: (snapshots: ArenaState[]) => void;
   select: (selected: Selected) => void;
   clearSelected: () => void;
   clearArenas: () => void;
+  ingestCpuProfile: (componentId: string, state: string) => void;
+  openProfileView: (componentId: string, position: { x: number; y: number }) => void;
+  closeProfileView: () => void;
+  toggleProfileViewPin: () => void;
   replayArena: (arenaId: string) => void;
   stopReplay: (arenaId: string) => void;
   scrubArena: (arenaId: string, index: number) => void;
@@ -118,6 +130,8 @@ interface DashboardStore {
 export const useDashboardStore = create<DashboardStore>((set, get) => ({
   arenas: new Map(),
   selected: null,
+  cpuProfiles: new Map(),
+  profileView: null,
 
   ingest: (next) => {
     const { arenas } = get();
@@ -163,7 +177,22 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
 
   select: (selected) => set({ selected }),
   clearSelected: () => set({ selected: null }),
-  clearArenas: () => set({ arenas: new Map(), selected: null }),
+  clearArenas: () =>
+    set({ arenas: new Map(), selected: null, cpuProfiles: new Map(), profileView: null }),
+
+  ingestCpuProfile: (componentId, state) =>
+    set({ cpuProfiles: new Map(get().cpuProfiles).set(componentId, state) }),
+
+  openProfileView: (componentId, position) =>
+    set({ profileView: { componentId, position, isPinned: false } }),
+
+  closeProfileView: () => set({ profileView: null }),
+
+  toggleProfileViewPin: () => {
+    const { profileView } = get();
+    if (!profileView) return;
+    set({ profileView: { ...profileView, isPinned: !profileView.isPinned } });
+  },
 
   replayArena: (arenaId) => {
     const entry = get().arenas.get(arenaId);

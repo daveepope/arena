@@ -18,18 +18,20 @@ config_setting(
     ],
 )
 
+filegroup(
+    name = "async_profiler_library",
+    srcs = select({
+        ":linux_x86_64": ["@async_profiler_linux_x64//:lib/libasyncProfiler.so"],
+        ":linux_aarch64": ["@async_profiler_linux_arm64//:lib/libasyncProfiler.so"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+)
+
 rust_library(
     name = "arena_profile",
     srcs = glob(["src/**/*.rs"]),
     edition = "2021",
-    data = select({
-        ":linux_x86_64": ["@async_profiler_linux_x64//:lib/libasyncProfiler.so"],
-        ":linux_aarch64": ["@async_profiler_linux_arm64//:lib/libasyncProfiler.so"],
-        "//conditions:default": [],
-    }) + [
-        "@profiling_tools//:py-spy__py-spy",
-        "//tools/dotnet_trace:dotnet_trace_tool",
-    ],
     deps = all_crate_deps(normal = True) + ["//arena"],
     visibility = ["//visibility:public"],
 )
@@ -212,6 +214,7 @@ rust_test(
     size = "small",
     edition = "2021",
     tags = ["component_test"],
+    data = [":async_profiler_library"],
     target_compatible_with = select({
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -235,6 +238,7 @@ rust_test(
     size = "small",
     edition = "2021",
     tags = ["component_test"],
+    data = ["@profiling_tools//:py-spy__py-spy"],
     target_compatible_with = select({
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -258,7 +262,10 @@ rust_test(
     size = "small",
     edition = "2021",
     tags = ["component_test"],
-    data = [":dotnet_busy_loop"],
+    data = [
+        ":dotnet_busy_loop",
+        "//tools/dotnet_trace:dotnet_trace_tool",
+    ],
     target_compatible_with = select({
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],
