@@ -1,7 +1,11 @@
+use arena::lifecycle::RunnableState;
+use arena::playbook::ScopedPlaybookLifecycle;
+use std::sync::Arc;
 use crate::blocking::run_blocking;
 use crate::postgres_dependency::PostgresDependency;
 
 pub struct Playbook {
+    lifecycle: Option<Arc<ScopedPlaybookLifecycle>>,
     connection_string: String,
     identifier: String,
     managed_tables: Vec<(String, String)>,
@@ -14,6 +18,7 @@ impl Playbook {
             .expect("PostgresDependency must be started before configuring a Playbook")
             .to_string();
         Self {
+            lifecycle: None,
             connection_string,
             identifier: format!("postgres-playbook:{}", dependency.identifier),
             managed_tables: dependency.managed_tables().to_vec(),
@@ -22,6 +27,11 @@ impl Playbook {
 
     pub fn with_identifier(mut self, identifier: impl Into<String>) -> Self {
         self.identifier = identifier.into();
+        self
+    }
+
+    pub fn with_lifecycle(mut self, lifecycle: Arc<ScopedPlaybookLifecycle>) -> Self {
+        self.lifecycle = Some(lifecycle);
         self
     }
 
@@ -53,6 +63,10 @@ impl Playbook {
         );
 
         ActivePlaybook {
+            lifecycle: self
+                .lifecycle
+                .clone()
+                .unwrap_or_else(|| ScopedPlaybookLifecycle::new(self.identifier.clone())),
             connection_string: self.connection_string,
             identifier: self.identifier,
             managed_tables: tables,
@@ -83,6 +97,7 @@ fn reset_on_drop(identifier: String, connection_string: String, managed_tables: 
 }
 
 pub struct ActivePlaybook {
+    lifecycle: Arc<ScopedPlaybookLifecycle>,
     connection_string: String,
     identifier: String,
     managed_tables: Vec<(String, String)>,
@@ -91,6 +106,10 @@ pub struct ActivePlaybook {
 impl arena::ActivePlaybook for ActivePlaybook {
     fn identifier(&self) -> &str {
         &self.identifier
+    }
+
+    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+        &self.lifecycle
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -148,8 +167,8 @@ impl ActivePlaybook {
     }
 }
 
-impl Drop for ActivePlaybook {
-    fn drop(&mut self) {
+impl ActivePlaybook {
+    fn teardown(&mut self) {
         let identifier = std::mem::take(&mut self.identifier);
         let connection_string = std::mem::take(&mut self.connection_string);
         let managed_tables = std::mem::take(&mut self.managed_tables);
@@ -159,6 +178,15 @@ impl Drop for ActivePlaybook {
         }
 
         reset_on_drop(identifier, connection_string, managed_tables);
+    
+    }
+}
+
+impl Drop for ActivePlaybook {
+    fn drop(&mut self) {
+        self.lifecycle.report(RunnableState::Stopping);
+        self.teardown();
+        self.lifecycle.report(RunnableState::Stopped);
     }
 }
 

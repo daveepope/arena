@@ -65,6 +65,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena-dashboard`: the lost-connection banner is replaced by a plain `disconnected` notice, shown only while no arenas are held in memory, covered by a browser test that kills the server under an open page
 - `arena-dashboard`: the arena graph refits once its nodes are measured, so subjects that stream in after the page is open are no longer left outside the clipped viewport
 - `arena-dashboard`: the graph no longer swallows the wheel, so the page scrolls past stacked arenas; zoom moves to ctrl+wheel and to zoom in, zoom out and Recenter buttons on the canvas
+- `arena`: publishing and observing are split into `Publisher<E>`, `Observer<E>` and an `EventBus<E>` that owns the routing, with symmetrical register, unregister and bounded flush on both sides; the arena lifecycle and cpu profile channels now share that one mechanism instead of hand-rolling it twice
+- `arena`: `LifecycleRule` validates state transitions, `Monotonic` for the arena phase and `RunnableRule` for any restartable subject, so an illegal transition is logged as a defect rather than published
+- `arena`: scoped playbooks report their own `RunnableState` on their own channel, `Starting` and `Started` from the playbook and `Stopping` and `Stopped` from the handle's drop, so a playbook that runs and stops repeatedly is observable; events carry the arena id, and a failing playbook's fault lands on its own row
+- `arena`: `LifecycleContext` is renamed `ArenaLifecyclePublisher` and moved to `lifecycle/publisher.rs`, since it only ever publishes
 - `arena-dashboard`: an arena id starting a fresh run replaces the finished run's history and log instead of appending to it, so a second run no longer reads as the same arena starting and tearing down twice
 - `arena-dashboard`: replay and the no-auto-replay guarantee are now covered by tests, the first coverage that feature has had
 - `arena-dashboard`: a live-joined page draws its graph edges again; react-flow's `remove` changes are no longer applied to nodes and edges that are derived from the arena snapshot

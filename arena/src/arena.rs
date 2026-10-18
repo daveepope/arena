@@ -1,8 +1,10 @@
 use crate::lifecycle::message;
+use crate::lifecycle::bus::{EventBus, Observer, Publisher};
 use crate::lifecycle::{
     panic_message, ArenaLifecycleState, ArenaLifecycleObserver, ArenaState, ComponentState,
-    DependencyState, Fault, LifecycleContext, RunnableState, Subject,
+    DependencyState, Fault, ArenaLifecyclePublisher, RunnableState, Subject,
 };
+use crate::playbook::lifecycle::{ScopedPlaybookEvent, CHANNEL as SCOPED_PLAYBOOK_CHANNEL};
 use crate::matches::MatchTrait;
 use futures::future::join_all;
 use futures::FutureExt;
@@ -10,6 +12,8 @@ use tracing::Instrument;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 use std::time::Instant;
+
+const EVENT_FLUSH_BUDGET: std::time::Duration = std::time::Duration::from_secs(2);
 
 #[derive(Clone, Copy)]
 enum ResetKind {
@@ -19,11 +23,13 @@ enum ResetKind {
 
 type Matches = Vec<Box<dyn MatchTrait>>;
 type Observers = Vec<Arc<dyn ArenaLifecycleObserver>>;
+type ScopedPlaybookObservers = Vec<Arc<dyn Observer<ScopedPlaybookEvent>>>;
 
 pub struct ClosedArena {
     pub id: String,
     pub matches: Matches,
     observers: Observers,
+    scoped_playbook_observers: ScopedPlaybookObservers,
     closed_state: Option<ArenaState>,
 }
 
@@ -31,7 +37,9 @@ pub struct OpenArena {
     id: String,
     matches: Matches,
     observers: Observers,
-    context: Arc<LifecycleContext>,
+    scoped_playbook_observers: ScopedPlaybookObservers,
+    scoped_playbooks: Arc<EventBus<ScopedPlaybookEvent>>,
+    context: Arc<ArenaLifecyclePublisher>,
     closed: bool,
 }
 
@@ -46,7 +54,7 @@ fn collect_states(matches: &[Box<dyn MatchTrait>]) -> (Vec<DependencyState>, Vec
 }
 
 fn emit(
-    context: &LifecycleContext,
+    context: &ArenaLifecyclePublisher,
     state: ArenaLifecycleState,
     matches: &[Box<dyn MatchTrait>],
 ) -> ArenaState {
@@ -54,12 +62,12 @@ fn emit(
     context.transition(state, dependencies, components)
 }
 
-fn finish(context: &LifecycleContext, matches: &[Box<dyn MatchTrait>]) -> ArenaState {
+fn finish(context: &ArenaLifecyclePublisher, matches: &[Box<dyn MatchTrait>]) -> ArenaState {
     let (dependencies, components) = collect_states(matches);
     context.finish(dependencies, components)
 }
 
-async fn forced_teardown(context: &LifecycleContext, matches: &mut Matches) {
+async fn forced_teardown(context: &ArenaLifecyclePublisher, matches: &mut Matches) {
     let _ = catch_unwind(AssertUnwindSafe(|| {
         emit(context, ArenaLifecycleState::ArenaTeardown, matches)
     }));
@@ -123,7 +131,7 @@ impl<'a> From<&'a ComponentState> for Unexplained<'a> {
     }
 }
 
-fn record_unexplained(context: &LifecycleContext, node: Unexplained<'_>) {
+fn record_unexplained(context: &ArenaLifecyclePublisher, node: Unexplained<'_>) {
     if !node.state.is_inactive() && !node.explained {
         context.record(Fault::arena(
             context.arena_id(),
@@ -160,12 +168,21 @@ impl ClosedArena {
             id,
             matches,
             observers: Vec::new(),
+            scoped_playbook_observers: Vec::new(),
             closed_state: None,
         }
     }
 
     pub fn observe(mut self, observer: Arc<dyn ArenaLifecycleObserver>) -> Self {
         self.observers.push(observer);
+        self
+    }
+
+    pub fn observe_scoped_playbooks(
+        mut self,
+        observer: Arc<dyn Observer<ScopedPlaybookEvent>>,
+    ) -> Self {
+        self.scoped_playbook_observers.push(observer);
         self
     }
 
@@ -192,11 +209,22 @@ impl ClosedArena {
         tracing::debug!(arena = %self.id, phase = "open_begin", "opening");
         let sw = Instant::now();
 
-        let context = Arc::new(LifecycleContext::new(
+        let context = Arc::new(ArenaLifecyclePublisher::new(
             self.id.clone(),
             self.observers.clone(),
         ));
+        let scoped_playbooks: Arc<EventBus<ScopedPlaybookEvent>> =
+            Arc::new(EventBus::new(SCOPED_PLAYBOOK_CHANNEL));
+        for observer in &self.scoped_playbook_observers {
+            scoped_playbooks.register_observer(Arc::clone(observer));
+        }
+
         let mut matches = std::mem::take(&mut self.matches);
+        let scoped_playbook_publisher: Arc<dyn Publisher<ScopedPlaybookEvent>> =
+            Arc::clone(&scoped_playbooks) as Arc<dyn Publisher<ScopedPlaybookEvent>>;
+        for a_match in matches.iter() {
+            a_match.attach_scoped_playbook_publisher(&self.id, Arc::clone(&scoped_playbook_publisher));
+        }
         emit(&context, ArenaLifecycleState::ArenaStarting, &matches);
 
         let arena_id = self.id.clone();
@@ -264,6 +292,8 @@ impl ClosedArena {
             id: self.id,
             matches,
             observers: self.observers,
+            scoped_playbook_observers: self.scoped_playbook_observers,
+            scoped_playbooks,
             context,
             closed: false,
         })
@@ -382,6 +412,7 @@ impl OpenArena {
         let id = std::mem::take(&mut self.id);
         let matches = std::mem::take(&mut self.matches);
         let observers = std::mem::take(&mut self.observers);
+        let scoped_playbook_observers = std::mem::take(&mut self.scoped_playbook_observers);
 
         if state.state == ArenaLifecycleState::ArenaFaulted {
             return Err(state);
@@ -391,6 +422,7 @@ impl OpenArena {
             id,
             matches,
             observers,
+            scoped_playbook_observers,
             closed_state: Some(state),
         })
     }
@@ -438,6 +470,8 @@ impl OpenArena {
         let state = finish(&context, &self.matches);
         self.closed = true;
 
+        self.drain_event_buses();
+
         tracing::debug!(
             arena = %self.id,
             elapsed = ?sw.elapsed(),
@@ -447,6 +481,13 @@ impl OpenArena {
         );
 
         state
+    }
+
+    fn drain_event_buses(&self) {
+        self.scoped_playbooks.flush(EVENT_FLUSH_BUDGET);
+        self.context.flush(EVENT_FLUSH_BUDGET);
+        self.scoped_playbooks.unregister_all_observers();
+        self.context.unregister_all();
     }
 }
 
@@ -463,6 +504,7 @@ impl Drop for OpenArena {
             phase = "drop_without_close",
             "arena dropped without close; releasing subjects without a graceful stop"
         );
+        let _ = catch_unwind(AssertUnwindSafe(|| self.drain_event_buses()));
         for a_match in self.matches.iter_mut() {
             let outcome = catch_unwind(AssertUnwindSafe(|| a_match.release_all()));
             if let Err(payload) = outcome {

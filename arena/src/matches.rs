@@ -1,10 +1,13 @@
 use super::component::{component_state, Component};
 use super::dependency::{dependency_state, Dependency};
 use super::dependency::RunnableDependency;
+use super::playbook::lifecycle::ScopedPlaybookEvent;
 use super::playbook::{ActivePlaybook, Playbook};
+use crate::lifecycle::bus::Publisher;
+use std::sync::Arc;
 use crate::lifecycle::message;
 use crate::lifecycle::{
-    panic_message, ArenaLifecycleState, ComponentState, DependencyState, Fault, LifecycleContext,
+    panic_message, ArenaLifecycleState, ComponentState, DependencyState, Fault, ArenaLifecyclePublisher,
     RunnableState, Subject,
 };
 use async_trait::async_trait;
@@ -199,8 +202,8 @@ async fn force_stop_component(comp: &mut Component) -> Option<Fault> {
 
 #[async_trait]
 pub trait MatchTrait: Send + Sync {
-    async fn start(&mut self, ctx: &LifecycleContext) -> Result<(), Vec<Fault>>;
-    async fn stop(&mut self, ctx: &LifecycleContext) -> Result<(), Vec<Fault>>;
+    async fn start(&mut self, ctx: &ArenaLifecyclePublisher) -> Result<(), Vec<Fault>>;
+    async fn stop(&mut self, ctx: &ArenaLifecyclePublisher) -> Result<(), Vec<Fault>>;
 
     async fn force_stop_all(&mut self) -> Vec<Fault> {
         Vec::new()
@@ -226,6 +229,13 @@ pub trait MatchTrait: Send + Sync {
 
     async fn run_playbook(&self, _identifier: &str) -> Option<Result<Box<dyn ActivePlaybook>, Fault>> {
         None
+    }
+
+    fn attach_scoped_playbook_publisher(
+        &self,
+        _arena_id: &str,
+        _publisher: Arc<dyn Publisher<ScopedPlaybookEvent>>,
+    ) {
     }
 }
 
@@ -312,12 +322,12 @@ impl Match {
         (self.dependency_states(), self.component_states())
     }
 
-    fn transition(&self, ctx: &LifecycleContext, state: ArenaLifecycleState) {
+    fn transition(&self, ctx: &ArenaLifecyclePublisher, state: ArenaLifecycleState) {
         let (dependencies, components) = self.snapshot();
         ctx.transition(state, dependencies, components);
     }
 
-    async fn start_dependencies(&mut self, ctx: &LifecycleContext) -> Vec<Fault> {
+    async fn start_dependencies(&mut self, ctx: &ArenaLifecyclePublisher) -> Vec<Fault> {
         let dep_count = self.dependencies.len();
         if dep_count > 0 {
             tracing::debug!(
@@ -421,6 +431,16 @@ impl Match {
         faults
     }
 
+    fn report_playbook_fault(&self, identifier: &str, fault: Fault) {
+        if let Some((playbook, _)) = self
+            .playbooks
+            .iter()
+            .find(|(p, _)| p.identifier() == identifier)
+        {
+            playbook.lifecycle().report_fault(fault);
+        }
+    }
+
     async fn run_startup_playbooks(&mut self) -> Vec<Fault> {
         let startup: Vec<&dyn Playbook> = self
             .playbooks
@@ -489,14 +509,17 @@ impl Match {
                     );
                     actives.push(active);
                 }
-                Ok(Err(fault)) => faults.push(fault),
-                Err(payload) => faults.push(
-                    Fault::playbook(&id, message::playbook_failed()).caused_by(Fault::from_panic(
-                        &id,
-                        Subject::Playbook,
-                        payload.as_ref(),
-                    )),
-                ),
+                Ok(Err(fault)) => {
+                    self.report_playbook_fault(&id, fault.clone());
+                    faults.push(fault)
+                }
+                Err(payload) => {
+                    let fault = Fault::playbook(&id, message::playbook_failed()).caused_by(
+                        Fault::from_panic(&id, Subject::Playbook, payload.as_ref()),
+                    );
+                    self.report_playbook_fault(&id, fault.clone());
+                    faults.push(fault)
+                }
             }
         }
 
@@ -579,7 +602,7 @@ impl Match {
         faults
     }
 
-    async fn start_components(&mut self, ctx: &LifecycleContext) -> Vec<Fault> {
+    async fn start_components(&mut self, ctx: &ArenaLifecyclePublisher) -> Vec<Fault> {
         let attach_faults = self.attach_cpu_profilers();
         if !attach_faults.is_empty() {
             return attach_faults;
@@ -687,7 +710,7 @@ impl Match {
         faults
     }
 
-    async fn graceful_teardown(&mut self, ctx: &LifecycleContext) -> Vec<Fault> {
+    async fn graceful_teardown(&mut self, ctx: &ArenaLifecyclePublisher) -> Vec<Fault> {
         let mut faults = Vec::new();
         self.transition(ctx, ArenaLifecycleState::ComponentsStopping);
         tracing::debug!(
@@ -794,7 +817,7 @@ impl Match {
 
 #[async_trait]
 impl MatchTrait for Match {
-    async fn start(&mut self, ctx: &LifecycleContext) -> Result<(), Vec<Fault>> {
+    async fn start(&mut self, ctx: &ArenaLifecyclePublisher) -> Result<(), Vec<Fault>> {
         if self.started {
             return Ok(());
         }
@@ -836,7 +859,7 @@ impl MatchTrait for Match {
         Ok(())
     }
 
-    async fn stop(&mut self, ctx: &LifecycleContext) -> Result<(), Vec<Fault>> {
+    async fn stop(&mut self, ctx: &ArenaLifecyclePublisher) -> Result<(), Vec<Fault>> {
         tracing::debug!(match_name = %self.name, phase = "stop_begin", "stopping");
         let sw = Instant::now();
 
@@ -877,6 +900,12 @@ impl MatchTrait for Match {
             let _ = catch_unwind(AssertUnwindSafe(|| comp.release()));
         }
         let _ = catch_unwind(AssertUnwindSafe(|| self.active_playbooks.clear()));
+        for (playbook, _) in &self.playbooks {
+            if playbook.state() == RunnableState::Started {
+                playbook.lifecycle().report(RunnableState::Stopping);
+                playbook.lifecycle().report(RunnableState::Stopped);
+            }
+        }
         for dep in self.dependencies.iter_mut().rev() {
             let _ = catch_unwind(AssertUnwindSafe(|| dep.release()));
         }
@@ -904,12 +933,28 @@ impl MatchTrait for Match {
         find_dependency_mut(&mut self.dependencies, identifier)
     }
 
+    fn attach_scoped_playbook_publisher(
+        &self,
+        arena_id: &str,
+        publisher: Arc<dyn Publisher<ScopedPlaybookEvent>>,
+    ) {
+        for (playbook, _) in &self.playbooks {
+            playbook
+                .lifecycle()
+                .attach(arena_id, Arc::clone(&publisher));
+        }
+    }
+
     async fn run_playbook(&self, identifier: &str) -> Option<Result<Box<dyn ActivePlaybook>, Fault>> {
         let pb = self
             .playbooks
             .iter()
             .find(|(p, _)| p.identifier() == identifier)?;
         let span = playbook_span(identifier);
-        Some(pb.0.run(&self.dependencies).instrument(span).await)
+        let outcome = pb.0.run(&self.dependencies).instrument(span).await;
+        if let Err(fault) = &outcome {
+            self.report_playbook_fault(identifier, fault.clone());
+        }
+        Some(outcome)
     }
 }

@@ -2,14 +2,14 @@
 mod subjects;
 
 use arena::lifecycle::{
-    ArenaLifecycleState, ComponentState, DependencyState, Fault, LifecycleContext, RunnableState,
+    ArenaLifecycleState, ComponentState, DependencyState, Fault, ArenaLifecyclePublisher, RunnableState,
 };
 use std::sync::Arc;
 use subjects::StateRecorder;
 
-fn context_with_recorder() -> (LifecycleContext, Arc<StateRecorder>) {
+fn context_with_recorder() -> (ArenaLifecyclePublisher, Arc<StateRecorder>) {
     let recorder = Arc::new(StateRecorder::default());
-    let context = LifecycleContext::new("test-arena", vec![recorder.clone()]);
+    let context = ArenaLifecyclePublisher::new("test-arena", vec![recorder.clone()]);
     (context, recorder)
 }
 

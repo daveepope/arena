@@ -1,3 +1,4 @@
+use arena::lifecycle::RunnableState;
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::lifecycle::Subject;
 use arena::playbook::Playbook as PlaybookTrait;
@@ -114,4 +115,22 @@ fn into_box_produces_trait_object() {
     let playbook = ManagedHttpPlaybook::new("boxed", "http-dep", |p| Ok(p));
     let boxed: Box<dyn PlaybookTrait> = playbook.into_box();
     assert_eq!(boxed.identifier(), "boxed");
+}
+
+#[test]
+fn state_newly_built_playbook_is_not_started() {
+    let playbook = ManagedHttpPlaybook::new("lifecycle-probe", "does-not-exist", Ok);
+
+    assert_eq!(playbook.state(), RunnableState::NotStarted);
+    assert_eq!(playbook.faults(), Vec::new());
+}
+
+#[tokio::test]
+async fn run_missing_dependency_leaves_the_playbook_starting_until_the_arena_reports() {
+    let playbook = ManagedHttpPlaybook::new("lifecycle-probe", "does-not-exist", Ok);
+    let deps: Vec<Dependency> = Vec::new();
+
+    let _ = playbook.run(&deps).await;
+
+    assert_eq!(playbook.state(), RunnableState::Starting);
 }

@@ -12,7 +12,7 @@ pub use crate::dependency::{Dependency, RunnableDependency};
 pub use crate::healthcheck::ReadinessCheck;
 pub use crate::lifecycle::{
     ArenaLifecycleObserver, ArenaLifecycleState, ArenaState, ComponentState, DependencyState, Fault,
-    LifecycleContext, RunnableState, Subject,
+    ArenaLifecyclePublisher, RunnableState, Subject,
 };
 pub use crate::matches::{Match, MatchTrait};
 pub use crate::playbook::{ActivePlaybook, Playbook};

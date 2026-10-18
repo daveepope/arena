@@ -5,7 +5,7 @@ use arena::dependency::{Dependency, RunnableDependency};
 use arena::lifecycle::{
     ArenaLifecycleObserver, ArenaLifecycleState, ArenaState, Fault, RunnableState,
 };
-use arena::playbook::{ActivePlaybook, Playbook};
+use arena::playbook::{ActivePlaybook, Playbook, ScopedPlaybookLifecycle};
 use async_trait::async_trait;
 use std::any::Any;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -444,6 +444,7 @@ impl RunnableComponent for ProbeComponent {
 
 pub struct ProbeActivePlaybook {
     identifier: String,
+    lifecycle: Arc<ScopedPlaybookLifecycle>,
 }
 
 impl ActivePlaybook for ProbeActivePlaybook {
@@ -454,17 +455,30 @@ impl ActivePlaybook for ProbeActivePlaybook {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+        &self.lifecycle
+    }
+}
+
+impl Drop for ProbeActivePlaybook {
+    fn drop(&mut self) {
+        self.lifecycle.report(RunnableState::Stopping);
+        self.lifecycle.report(RunnableState::Stopped);
+    }
 }
 
 pub struct ProbePlaybook {
     identifier: String,
     behaviour: Behaviour,
+    lifecycle: Arc<ScopedPlaybookLifecycle>,
 }
 
 pub fn probe_playbook(identifier: &str) -> ProbePlaybook {
     ProbePlaybook {
         identifier: identifier.to_string(),
         behaviour: Behaviour::Healthy,
+        lifecycle: ScopedPlaybookLifecycle::new(identifier),
     }
 }
 
@@ -485,13 +499,22 @@ impl Playbook for ProbePlaybook {
         &self.identifier
     }
 
+    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+        &self.lifecycle
+    }
+
     async fn run(&self, _dependencies: &[Dependency]) -> Result<Box<dyn ActivePlaybook>, Fault> {
+        self.lifecycle.report(RunnableState::Starting);
         match self.behaviour {
             Behaviour::PanicStart => panic!("playbook '{}' run failed", self.identifier),
             Behaviour::FailStart => Err(Fault::playbook(&self.identifier, "seed data rejected")),
-            _ => Ok(Box::new(ProbeActivePlaybook {
-                identifier: self.identifier.clone(),
-            })),
+            _ => {
+                self.lifecycle.report(RunnableState::Started);
+                Ok(Box::new(ProbeActivePlaybook {
+                    identifier: self.identifier.clone(),
+                    lifecycle: Arc::clone(&self.lifecycle),
+                }))
+            }
         }
     }
 }

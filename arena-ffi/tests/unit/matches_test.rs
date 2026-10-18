@@ -179,7 +179,7 @@ async fn build_match_async_cpu_profiled_component_not_in_the_arena_faults_on_sta
     let config = exec_component_config_with_cpu_profilers(r#""does-not-exist""#);
 
     let mut a_match = build_match_async(&config).await.expect("match builds");
-    let ctx = arena::lifecycle::LifecycleContext::new("ffi-profiled", Vec::new());
+    let ctx = arena::lifecycle::ArenaLifecyclePublisher::new("ffi-profiled", Vec::new());
     let faults = a_match
         .start(&ctx)
         .await

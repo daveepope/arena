@@ -1,8 +1,11 @@
+use arena::lifecycle::RunnableState;
+use arena::playbook::ScopedPlaybookLifecycle;
+use std::sync::Arc;
 use crate::oracle_dependency::oracle_container_impl::{self, OracleImpl};
 use crate::oracle_dependency::OracleDependency;
-use std::sync::Arc;
 
 pub struct Playbook {
+    lifecycle: Option<Arc<ScopedPlaybookLifecycle>>,
     oracle_impl: Arc<dyn OracleImpl>,
     username: String,
     password: String,
@@ -17,6 +20,7 @@ impl Playbook {
             .expect("OracleDependency must be started before configuring a Playbook");
 
         Self {
+            lifecycle: None,
             oracle_impl: dependency.oracle_impl(),
             username: dependency.database_username().to_string(),
             password: dependency.database_password().to_string(),
@@ -27,6 +31,11 @@ impl Playbook {
 
     pub fn with_identifier(mut self, identifier: impl Into<String>) -> Self {
         self.identifier = identifier.into();
+        self
+    }
+
+    pub fn with_lifecycle(mut self, lifecycle: Arc<ScopedPlaybookLifecycle>) -> Self {
+        self.lifecycle = Some(lifecycle);
         self
     }
 
@@ -56,6 +65,10 @@ impl Playbook {
         );
 
         ActivePlaybook {
+            lifecycle: self
+                .lifecycle
+                .clone()
+                .unwrap_or_else(|| ScopedPlaybookLifecycle::new(self.identifier.clone())),
             oracle_impl: self.oracle_impl,
             username: self.username,
             password: self.password,
@@ -115,6 +128,7 @@ fn reset_on_drop(
 }
 
 pub struct ActivePlaybook {
+    lifecycle: Arc<ScopedPlaybookLifecycle>,
     oracle_impl: Arc<dyn OracleImpl>,
     username: String,
     password: String,
@@ -125,6 +139,10 @@ pub struct ActivePlaybook {
 impl arena::ActivePlaybook for ActivePlaybook {
     fn identifier(&self) -> &str {
         &self.identifier
+    }
+
+    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+        &self.lifecycle
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -149,8 +167,8 @@ impl ActivePlaybook {
     }
 }
 
-impl Drop for ActivePlaybook {
-    fn drop(&mut self) {
+impl ActivePlaybook {
+    fn teardown(&mut self) {
         let identifier = std::mem::take(&mut self.identifier);
         let username = std::mem::take(&mut self.username);
         let password = std::mem::take(&mut self.password);
@@ -167,6 +185,15 @@ impl Drop for ActivePlaybook {
             password,
             managed_tables,
         );
+    
+    }
+}
+
+impl Drop for ActivePlaybook {
+    fn drop(&mut self) {
+        self.lifecycle.report(RunnableState::Stopping);
+        self.teardown();
+        self.lifecycle.report(RunnableState::Stopped);
     }
 }
 

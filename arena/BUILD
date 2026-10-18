@@ -53,6 +53,65 @@ rust_test(
 )
 
 rust_test(
+    name = "playbook_lifecycle_test",
+    srcs = [
+        "tests/unit/playbook/lifecycle_test.rs",
+        "tests/unit/subjects.rs",
+    ],
+    crate_root = "tests/unit/playbook/lifecycle_test.rs",
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "lifecycle_bus_test",
+    srcs = [
+        "tests/unit/lifecycle/bus_test.rs",
+    ],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "lifecycle_rule_test",
+    srcs = [
+        "tests/unit/lifecycle/rule_test.rs",
+    ],
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
     name = "lifecycle_state_test",
     srcs = [
         "tests/unit/lifecycle/state_test.rs",
@@ -129,12 +188,12 @@ rust_test(
 )
 
 rust_test(
-    name = "lifecycle_observer_test",
+    name = "lifecycle_publisher_test",
     srcs = [
-        "tests/unit/lifecycle/observer_test.rs",
+        "tests/unit/lifecycle/publisher_test.rs",
         "tests/unit/subjects.rs",
     ],
-    crate_root = "tests/unit/lifecycle/observer_test.rs",
+    crate_root = "tests/unit/lifecycle/publisher_test.rs",
     size = "small",
     edition = "2021",
     deps = all_crate_deps(

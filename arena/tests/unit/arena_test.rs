@@ -581,7 +581,7 @@ fn bare_match() -> BareMatch {
 impl MatchTrait for BareMatch {
     async fn start(
         &mut self,
-        _ctx: &arena::lifecycle::LifecycleContext,
+        _ctx: &arena::lifecycle::ArenaLifecyclePublisher,
     ) -> Result<(), Vec<arena::lifecycle::Fault>> {
         if self.panic_on_start {
             panic!("match start failed");
@@ -595,7 +595,7 @@ impl MatchTrait for BareMatch {
 
     async fn stop(
         &mut self,
-        _ctx: &arena::lifecycle::LifecycleContext,
+        _ctx: &arena::lifecycle::ArenaLifecyclePublisher,
     ) -> Result<(), Vec<arena::lifecycle::Fault>> {
         Ok(())
     }
@@ -721,14 +721,14 @@ async fn close_match_stop_faults_are_recorded_on_the_arena() {
     impl MatchTrait for StopFaultingMatch {
         async fn start(
             &mut self,
-            _ctx: &arena::lifecycle::LifecycleContext,
+            _ctx: &arena::lifecycle::ArenaLifecyclePublisher,
         ) -> Result<(), Vec<arena::lifecycle::Fault>> {
             Ok(())
         }
 
         async fn stop(
             &mut self,
-            _ctx: &arena::lifecycle::LifecycleContext,
+            _ctx: &arena::lifecycle::ArenaLifecyclePublisher,
         ) -> Result<(), Vec<arena::lifecycle::Fault>> {
             Err(vec![arena::lifecycle::Fault::dependency(
                 "dep-1",
@@ -754,14 +754,14 @@ async fn close_match_stop_panics_is_recorded_on_the_arena() {
     impl MatchTrait for PanickingStopMatch {
         async fn start(
             &mut self,
-            _ctx: &arena::lifecycle::LifecycleContext,
+            _ctx: &arena::lifecycle::ArenaLifecyclePublisher,
         ) -> Result<(), Vec<arena::lifecycle::Fault>> {
             Ok(())
         }
 
         async fn stop(
             &mut self,
-            _ctx: &arena::lifecycle::LifecycleContext,
+            _ctx: &arena::lifecycle::ArenaLifecyclePublisher,
         ) -> Result<(), Vec<arena::lifecycle::Fault>> {
             panic!("match stop failed");
         }

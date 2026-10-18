@@ -1,19 +1,23 @@
 use arena::dependency::{find_dependency, Dependency};
-use arena::lifecycle::Fault;
-use arena::playbook::{ActivePlaybook, Playbook as PlaybookTrait};
+use arena::lifecycle::{Fault, RunnableState};
+use arena::playbook::{ActivePlaybook, Playbook as PlaybookTrait, ScopedPlaybookLifecycle};
+use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::mssql_dependency::MssqlDependency;
 
 pub struct ManagedMssqlPlaybook {
+    lifecycle: Arc<ScopedPlaybookLifecycle>,
     identifier: String,
     dependency_identifier: String,
 }
 
 impl ManagedMssqlPlaybook {
     pub fn new(identifier: impl Into<String>, dependency_identifier: impl Into<String>) -> Self {
+        let identifier = identifier.into();
         Self {
-            identifier: identifier.into(),
+            lifecycle: ScopedPlaybookLifecycle::new(identifier.clone()),
+            identifier,
             dependency_identifier: dependency_identifier.into(),
         }
     }
@@ -29,7 +33,27 @@ impl PlaybookTrait for ManagedMssqlPlaybook {
         &self.identifier
     }
 
+    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+        &self.lifecycle
+    }
+
     async fn run(&self, dependencies: &[Dependency]) -> Result<Box<dyn ActivePlaybook>, Fault> {
+        self.lifecycle.report(RunnableState::Starting);
+        match self.run_inner(dependencies).await {
+            Ok(active) => {
+                self.lifecycle.report(RunnableState::Started);
+                Ok(active)
+            }
+            Err(fault) => Err(fault),
+        }
+    }
+}
+
+impl ManagedMssqlPlaybook {
+    async fn run_inner(
+        &self,
+        dependencies: &[Dependency],
+    ) -> Result<Box<dyn ActivePlaybook>, Fault> {
         let mssql = find_dependency(dependencies, &self.dependency_identifier)
             .and_then(|d| d.as_any().downcast_ref::<MssqlDependency>())
             .ok_or_else(|| {
@@ -52,7 +76,10 @@ impl PlaybookTrait for ManagedMssqlPlaybook {
             ));
         }
 
-        let playbook = mssql.playbook().with_identifier(&self.identifier);
-        Ok(Box::new(playbook.run().await))
+        let playbook = mssql.playbook().with_identifier(&self.identifier)
+            .with_lifecycle(Arc::clone(&self.lifecycle));
+        let active = playbook.run().await;
+        self.lifecycle.report(RunnableState::Started);
+        Ok(Box::new(active))
     }
 }

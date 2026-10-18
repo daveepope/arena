@@ -103,3 +103,21 @@ async fn run_postgres_not_started_returns_fault() {
     assert_eq!(fault.subject, Subject::Playbook);
     assert_eq!(fault.id, playbook.identifier());
 }
+
+#[test]
+fn state_newly_built_playbook_is_not_started() {
+    let playbook = ManagedPostgresPlaybook::new("lifecycle-probe", "does-not-exist");
+
+    assert_eq!(playbook.state(), RunnableState::NotStarted);
+    assert_eq!(playbook.faults(), Vec::new());
+}
+
+#[tokio::test]
+async fn run_missing_dependency_leaves_the_playbook_starting_until_the_arena_reports() {
+    let playbook = ManagedPostgresPlaybook::new("lifecycle-probe", "does-not-exist");
+    let deps: Vec<Dependency> = Vec::new();
+
+    let _ = playbook.run(&deps).await;
+
+    assert_eq!(playbook.state(), RunnableState::Starting);
+}

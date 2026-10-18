@@ -1,14 +1,14 @@
 #[path = "subjects.rs"]
 mod subjects;
 
-use arena::lifecycle::{ArenaLifecycleState, LifecycleContext, RunnableState};
+use arena::lifecycle::{ArenaLifecycleState, ArenaLifecyclePublisher, RunnableState};
 use arena::matches::{Match, MatchTrait};
 use std::sync::{Arc, Mutex};
 use subjects::{probe_component, probe_dependency, probe_playbook, Behaviour, StateRecorder};
 
-fn context() -> (LifecycleContext, Arc<StateRecorder>) {
+fn context() -> (ArenaLifecyclePublisher, Arc<StateRecorder>) {
     let recorder = Arc::new(StateRecorder::default());
-    let context = LifecycleContext::new("test-arena", vec![recorder.clone()]);
+    let context = ArenaLifecyclePublisher::new("test-arena", vec![recorder.clone()]);
     (context, recorder)
 }
 
