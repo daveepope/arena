@@ -1,23 +1,54 @@
+use chrono::{DateTime, Utc};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::lifecycle::bus::Publisher;
-use crate::lifecycle::fault::Fault;
+use crate::lifecycle::fault::{serialize_timestamp, Fault};
 use crate::lifecycle::rule::{LifecycleRule, RunnableRule};
 use crate::lifecycle::state::RunnableState;
 
 pub const CHANNEL: &str = "scoped-playbook";
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlaybookKind {
+    Startup,
+    Scoped,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct ScopedPlaybookEvent {
     pub arena_id: String,
     pub playbook_id: String,
+    pub kind: PlaybookKind,
     pub state: RunnableState,
     pub faults: Vec<Fault>,
+    #[serde(serialize_with = "serialize_timestamp")]
+    pub at: DateTime<Utc>,
+}
+
+impl ScopedPlaybookEvent {
+    pub fn new(
+        arena_id: impl Into<String>,
+        playbook_id: impl Into<String>,
+        kind: PlaybookKind,
+        state: RunnableState,
+        faults: Vec<Fault>,
+    ) -> Self {
+        Self {
+            arena_id: arena_id.into(),
+            playbook_id: playbook_id.into(),
+            kind,
+            state,
+            faults,
+            at: Utc::now(),
+        }
+    }
 }
 
 struct Attachment {
     arena_id: String,
+    kind: PlaybookKind,
     publisher: Arc<dyn Publisher<ScopedPlaybookEvent>>,
 }
 
@@ -43,12 +74,15 @@ impl ScopedPlaybookLifecycle {
     pub fn attach(
         &self,
         arena_id: impl Into<String>,
+        kind: PlaybookKind,
         publisher: Arc<dyn Publisher<ScopedPlaybookEvent>>,
     ) {
         *self.attachment.lock().unwrap_or_else(|e| e.into_inner()) = Some(Attachment {
             arena_id: arena_id.into(),
+            kind,
             publisher,
         });
+        self.publish(self.state());
     }
 
     pub fn playbook_id(&self) -> &str {
@@ -104,6 +138,7 @@ impl ScopedPlaybookLifecycle {
         if self.state() == RunnableState::Started {
             return;
         }
+        self.faults.lock().unwrap_or_else(|e| e.into_inner()).clear();
         self.report(RunnableState::Starting);
     }
 
@@ -126,18 +161,23 @@ impl ScopedPlaybookLifecycle {
     fn publish(&self, state: RunnableState) {
         let attached = {
             let attachment = self.attachment.lock().unwrap_or_else(|e| e.into_inner());
-            attachment
-                .as_ref()
-                .map(|attachment| (attachment.arena_id.clone(), Arc::clone(&attachment.publisher)))
+            attachment.as_ref().map(|attachment| {
+                (
+                    attachment.arena_id.clone(),
+                    attachment.kind,
+                    Arc::clone(&attachment.publisher),
+                )
+            })
         };
-        let Some((arena_id, publisher)) = attached else {
+        let Some((arena_id, kind, publisher)) = attached else {
             return;
         };
-        publisher.publish(&ScopedPlaybookEvent {
+        publisher.publish(&ScopedPlaybookEvent::new(
             arena_id,
-            playbook_id: self.playbook_id.clone(),
+            self.playbook_id.clone(),
+            kind,
             state,
-            faults: self.faults(),
-        });
+            self.faults(),
+        ));
     }
 }

@@ -22,6 +22,7 @@ alwaysApply: true
 
 ## AI communication
 
+- **Hard cap: three sentences per reply.** This is not a default to be weighed against other goals, it is a limit. It applies to every reply, including explanations, status, reviews, design discussion and answers to "talk to me about X". Going over it is a rule violation, not a judgement call. The only exception is when the developer explicitly asks for detail, a list, or a full contract.
 - **Re-read this AI communication section before every single reply**, not once per session. If the reply runs past two sentences, cut it before sending. **Never write an essay**: not for status, not for wrap-ups, not for review findings.
 - **VERY SHORT ANSWERS.** Default to one or two sentences, or a bare command. No essays, no summaries of what you just did, no restating the question. Expand only when the developer explicitly asks for detail.
 - **After a coding task, keep the wrap-up to one or two sentences:** what changed and the verification result (e.g. which `bazel build`/`test` passed). Do not list every edit, walk through each finding, or explain the reasoning unless the developer asks. Still report new or changed third-party dependencies in that one line, since other rules require it.

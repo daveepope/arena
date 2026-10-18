@@ -7,7 +7,7 @@ use crate::lifecycle::{Fault, RunnableState};
 
 pub mod lifecycle;
 
-pub use lifecycle::{ScopedPlaybookEvent, ScopedPlaybookLifecycle};
+pub use lifecycle::{PlaybookKind, ScopedPlaybookEvent, ScopedPlaybookLifecycle};
 
 #[async_trait]
 pub trait Playbook: Send + Sync {

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ArenaGraph } from "./ArenaGraph";
+import { ScopedPlaybookPanel } from "./ScopedPlaybookPanel";
 import { CpuProfilePopover, CpuProfileView } from "./CpuProfilePanel";
-import { useDashboardStore } from "./store";
+import { lastRecordedSnapshot, useDashboardStore } from "./store";
 import { TERMINAL_ARENA_STATES } from "./presentation";
-import type { ArenaState } from "./types";
+import type { ArenaState, Fault, ScopedPlaybookEntry } from "./types";
 
 type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
@@ -62,13 +63,30 @@ function useSmoothSliderValue(
 }
 
 
-function ArenaPanel({ arenaId }: { arenaId: string }) {
+interface RecordedPlaybook {
+  playbook: string;
+  state: string;
+  kind: string;
+  at: string;
+  faults?: Fault[];
+}
+
+function recordedPlaybookEntry(recorded: RecordedPlaybook): ScopedPlaybookEntry {
+  return {
+    at: Date.parse(recorded.at),
+    playbookId: recorded.playbook,
+    state: recorded.state,
+    kind: recorded.kind,
+    faults: recorded.faults ?? [],
+  };
+}
+
+function ArenaPanel({ arenaId, isStale }: { arenaId: string; isStale: boolean }) {
   const log = useDashboardStore((s) => s.arenas.get(arenaId)?.log ?? EMPTY_LOG);
   const historyLength = useDashboardStore((s) => s.arenas.get(arenaId)?.history.length ?? 0);
-  const latestArenaState = useDashboardStore((s) => {
-    const history = s.arenas.get(arenaId)?.history;
-    return history && history.length > 0 ? history[history.length - 1].snapshot.state : null;
-  });
+  const latestArenaState = useDashboardStore(
+    (s) => lastRecordedSnapshot(s.arenas.get(arenaId)?.history)?.state ?? null,
+  );
   const replayIndex = useDashboardStore((s) => s.arenas.get(arenaId)?.replayIndex ?? null);
   const isReplaying = useDashboardStore((s) => s.arenas.get(arenaId)?.isReplaying ?? false);
   const replayArena = useDashboardStore((s) => s.replayArena);
@@ -83,6 +101,7 @@ function ArenaPanel({ arenaId }: { arenaId: string }) {
   }, [log]);
 
   const isTerminal = latestArenaState !== null && TERMINAL_ARENA_STATES.has(latestArenaState);
+  const showTimeline = isTerminal || isStale;
   const sliderMax = Math.max(historyLength - 1, 0);
   const sliderValue = replayIndex ?? sliderMax;
   const [isScrubbing, setIsScrubbing] = useState(false);
@@ -104,7 +123,7 @@ function ArenaPanel({ arenaId }: { arenaId: string }) {
           </span>
           {arenaId}
         </h2>
-        {isTerminal && (
+        {showTimeline && (
           <>
             <div className="flex flex-1 items-center gap-2">
               <span className="whitespace-nowrap text-xs uppercase tracking-wide text-slate-500">Timeline</span>
@@ -143,7 +162,20 @@ function ArenaPanel({ arenaId }: { arenaId: string }) {
           </>
         )}
       </div>
-      <ArenaGraph arenaId={arenaId} />
+      {isStale && (
+        <div
+          data-testid={`stale-notice-${arenaId}`}
+          className="mb-2 rounded-md border border-amber-700/60 bg-amber-950/30 px-2 py-1 text-[11px] text-amber-300"
+        >
+          disconnected from server, this is the last known state and may not be accurate
+        </div>
+      )}
+      <div className="flex gap-3">
+        <ScopedPlaybookPanel arenaId={arenaId} />
+        <div className="min-w-0 flex-1">
+          <ArenaGraph arenaId={arenaId} />
+        </div>
+      </div>
       <div
         ref={logRef}
         data-testid={`event-log-${arenaId}`}
@@ -309,6 +341,7 @@ export function fullScreenProfileComponentId(search: string): string | null {
 export function App() {
   const ingest = useDashboardStore((s) => s.ingest);
   const ingestCpuProfile = useDashboardStore((s) => s.ingestCpuProfile);
+  const ingestScopedPlaybook = useDashboardStore((s) => s.ingestScopedPlaybook);
   const ingestHistory = useDashboardStore((s) => s.ingestHistory);
   const arenas = useDashboardStore((s) => s.arenas);
   const arenaIds = useMemo(() => Array.from(arenas.keys()), [arenas]);
@@ -322,9 +355,11 @@ export function App() {
     let abandoned = false;
     fetch("/history")
       .then((response) => (response.ok ? response.json() : []))
-      .then((arenas: { id: string; states: ArenaState[] }[]) => {
+      .then((arenas: { id: string; states: ArenaState[]; playbooks?: RecordedPlaybook[] }[]) => {
         if (abandoned || !Array.isArray(arenas)) return;
-        arenas.forEach((arena) => ingestHistory(arena.states));
+        arenas.forEach((arena) =>
+          ingestHistory(arena.states, (arena.playbooks ?? []).map(recordedPlaybookEntry)),
+        );
       })
       .catch(() => {});
     return () => {
@@ -358,6 +393,16 @@ export function App() {
           ingestCpuProfile(data.component, data.state, data.report === true);
           return;
         }
+        if (data && data.type === "scoped_playbook") {
+          ingestScopedPlaybook(data.arena, {
+            at: Date.parse(data.at),
+            playbookId: data.playbook,
+            state: data.state,
+            kind: data.kind,
+            faults: Array.isArray(data.faults) ? data.faults : [],
+          });
+          return;
+        }
         if (data && typeof data.type === "string") {
           return;
         }
@@ -376,7 +421,7 @@ export function App() {
       clearInterval(heartbeatCheck);
       source.close();
     };
-  }, [ingest, clearArenas, ingestCpuProfile]);
+  }, [ingest, clearArenas, ingestCpuProfile, ingestScopedPlaybook]);
 
   const fullScreenProfile = useMemo(() => fullScreenProfileComponentId(window.location.search), []);
   const [actionFeedback, setActionFeedback] = useState<{ text: string; isError: boolean } | null>(null);
@@ -485,7 +530,7 @@ export function App() {
 
         <div className="flex w-full flex-col gap-4">
           {arenaIds.map((id) => (
-            <ArenaPanel key={id} arenaId={id} />
+            <ArenaPanel key={id} arenaId={id} isStale={isDisconnected(status)} />
           ))}
         </div>
       </div>

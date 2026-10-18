@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { ORDERS_ARENA, startArenaStack, stopArenaStack, type ArenaStack } from "./arenaStack";
 
-const PROFILED_COMPONENT = "orders-api";
+const PROFILED_COMPONENT = "cheshire-api";
 const SAMPLE_FOLDED = "main;handler;compute 42\nmain;handler;idle 8\n";
 const DIMMED_OPACITY = "0.15";
 

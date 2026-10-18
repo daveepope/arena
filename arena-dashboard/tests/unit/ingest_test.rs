@@ -57,19 +57,21 @@ fn parse_missingrequiredfield_returnserror() {
 
 #[test]
 fn parse_scoped_playbook_fullpayload_isparsed() {
-    let body = r#"{"arena_id":"arena-orders","playbook_id":"reset-orders","state":"started","faults":[]}"#;
+    let body = r#"{"arena_id":"arena-orders","playbook_id":"reset-orders","kind":"scoped","state":"started","at":"2026-10-18T00:00:00.000Z","faults":[]}"#;
 
     let parsed = arena_dashboard::ingest::parse_scoped_playbook(body).expect("payload should parse");
 
     assert_eq!(parsed.arena_id, "arena-orders");
     assert_eq!(parsed.playbook_id, "reset-orders");
+    assert_eq!(parsed.kind, "scoped");
     assert_eq!(parsed.state, "started");
+    assert_eq!(parsed.at, "2026-10-18T00:00:00.000Z");
     assert!(parsed.faults.is_empty());
 }
 
 #[test]
 fn parse_scoped_playbook_withoutfaults_defaultstoempty() {
-    let body = r#"{"arena_id":"arena-orders","playbook_id":"reset-orders","state":"stopped"}"#;
+    let body = r#"{"arena_id":"arena-orders","playbook_id":"reset-orders","kind":"startup","state":"stopped","at":"2026-10-18T00:00:00.000Z"}"#;
 
     let parsed = arena_dashboard::ingest::parse_scoped_playbook(body).expect("payload should parse");
 
@@ -79,6 +81,13 @@ fn parse_scoped_playbook_withoutfaults_defaultstoempty() {
 #[test]
 fn parse_scoped_playbook_missingplaybookid_isrejected() {
     let body = r#"{"arena_id":"arena-orders","state":"started"}"#;
+
+    assert!(arena_dashboard::ingest::parse_scoped_playbook(body).is_err());
+}
+
+#[test]
+fn parse_scoped_playbook_missingkind_isrejected() {
+    let body = r#"{"arena_id":"arena-orders","playbook_id":"reset-orders","state":"started","at":"2026-10-18T00:00:00.000Z"}"#;
 
     assert!(arena_dashboard::ingest::parse_scoped_playbook(body).is_err());
 }

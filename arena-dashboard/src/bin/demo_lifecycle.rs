@@ -4,7 +4,8 @@ use std::time::Duration;
 use arena::component::{Component, RunnableComponent};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::{ClosedArena, Fault, Match, MatchTrait, RunnableState};
-use arena_dashboard::HttpForwardingObserver;
+use arena_dashboard::{HttpForwardingObserver, ScopedPlaybookForwarder};
+use arena::playbook::{ActivePlaybook, Playbook, ScopedPlaybookLifecycle};
 use arena_profile::observer::{register_observer, report, report_complete, unregister_observer};
 use rand::Rng;
 
@@ -256,115 +257,206 @@ impl RunnableComponent for ProbeComponent {
     }
 }
 
+
+struct ProbePlaybook {
+    identifier: String,
+    lifecycle: Arc<ScopedPlaybookLifecycle>,
+    fails: bool,
+}
+
+impl ProbePlaybook {
+    fn new(identifier: &str) -> Self {
+        Self {
+            identifier: identifier.to_string(),
+            lifecycle: ScopedPlaybookLifecycle::new(identifier),
+            fails: false,
+        }
+    }
+
+    fn failing(mut self) -> Self {
+        self.fails = true;
+        self
+    }
+
+    fn into_playbook(self) -> Box<dyn Playbook> {
+        Box::new(self)
+    }
+}
+
+#[async_trait::async_trait]
+impl Playbook for ProbePlaybook {
+    fn identifier(&self) -> &str {
+        &self.identifier
+    }
+
+    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+        &self.lifecycle
+    }
+
+    async fn run(&self, _dependencies: &[Dependency]) -> Result<Box<dyn ActivePlaybook>, Fault> {
+        self.lifecycle.report_starting();
+        tokio::time::sleep(random_step_delay()).await;
+        if self.fails {
+            return Err(Fault::playbook(&self.identifier, "seed data rejected"));
+        }
+        self.lifecycle.report_started();
+        Ok(Box::new(ProbeActivePlaybook {
+            identifier: self.identifier.clone(),
+            lifecycle: Arc::clone(&self.lifecycle),
+        }))
+    }
+}
+
+struct ProbeActivePlaybook {
+    identifier: String,
+    lifecycle: Arc<ScopedPlaybookLifecycle>,
+}
+
+impl ActivePlaybook for ProbeActivePlaybook {
+    fn identifier(&self) -> &str {
+        &self.identifier
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+        &self.lifecycle
+    }
+}
+
+impl Drop for ProbeActivePlaybook {
+    fn drop(&mut self) {
+        self.lifecycle.exit();
+    }
+}
+
 fn topology_a() -> (Vec<Dependency>, Vec<Component>) {
     let dependencies = vec![
-        ProbeDependency::new("orders-db (postgres)")
-            .with_component_id("orders-api")
+        ProbeDependency::new("duchess-db (postgres)")
+            .with_component_id("cheshire-api")
             .into_dependency(),
-        ProbeDependency::new("pricing-service (http)")
-            .with_component_id("orders-api")
+        ProbeDependency::new("tweedledee-service (http)")
+            .with_component_id("cheshire-api")
             .into_dependency(),
-        ProbeDependency::new("orders-events (kafka)")
-            .with_component_id("payments-worker")
+        ProbeDependency::new("rabbit-hole-events (kafka)")
+            .with_component_id("dormouse-worker")
             .into_dependency(),
-        ProbeDependency::new("payments-db (postgres)")
-            .with_component_id("payments-worker")
-            .with_child(ProbeDependency::new("fraud-check-service (http)").into_dependency())
+        ProbeDependency::new("queen-of-hearts-db (postgres)")
+            .with_component_id("dormouse-worker")
+            .with_child(ProbeDependency::new("mad-hatter-service (http)").into_dependency())
             .into_dependency(),
-        ProbeDependency::new("refunds-queue (rabbitmq)")
-            .with_component_id("payments-worker")
+        ProbeDependency::new("white-rabbit-queue (rabbitmq)")
+            .with_component_id("dormouse-worker")
             .into_dependency(),
     ];
-    let components = vec![ProbeComponent::new("orders-api")
+    let components = vec![ProbeComponent::new("cheshire-api")
         .with_cpu_profile()
-        .with_child(ProbeComponent::new("payments-worker").into_component())
+        .with_child(ProbeComponent::new("dormouse-worker").into_component())
         .into_component()];
+    (dependencies, components)
+}
+
+fn topology_d() -> (Vec<Dependency>, Vec<Component>) {
+    let dependencies = vec![ProbeDependency::new("croquet-db (postgres)")
+        .with_component_id("flamingo-service")
+        .into_dependency()];
+    let components = vec![ProbeComponent::new("flamingo-service").into_component()];
     (dependencies, components)
 }
 
 fn topology_c() -> (Vec<Dependency>, Vec<Component>) {
     let dependencies = vec![
-        ProbeDependency::new("orders-db-canary (postgres)")
-            .with_component_id("orders-api-canary")
+        ProbeDependency::new("looking-glass-db (postgres)")
+            .with_component_id("jabberwock-api")
             .into_dependency(),
-        ProbeDependency::new("pricing-service-canary (http)")
-            .with_component_id("orders-api-canary")
+        ProbeDependency::new("tweedledum-service (http)")
+            .with_component_id("jabberwock-api")
             .into_dependency(),
-        ProbeDependency::new("orders-events-canary (kafka)")
-            .with_component_id("payments-worker-canary")
+        ProbeDependency::new("bandersnatch-events (kafka)")
+            .with_component_id("bread-and-butterfly-worker")
             .into_dependency(),
-        ProbeDependency::new("payments-db-canary (postgres)")
-            .with_component_id("payments-worker-canary")
-            .with_child(ProbeDependency::new("fraud-check-service-canary (http)").into_dependency())
+        ProbeDependency::new("red-queen-db (postgres)")
+            .with_component_id("bread-and-butterfly-worker")
+            .with_child(ProbeDependency::new("walrus-service (http)").into_dependency())
             .into_dependency(),
-        ProbeDependency::new("refunds-queue-canary (rabbitmq)")
-            .with_component_id("payments-worker-canary")
+        ProbeDependency::new("oyster-queue (rabbitmq)")
+            .with_component_id("bread-and-butterfly-worker")
             .failing_to_start()
             .into_dependency(),
     ];
-    let components = vec![ProbeComponent::new("orders-api-canary")
-        .with_child(ProbeComponent::new("payments-worker-canary").into_component())
+    let components = vec![ProbeComponent::new("jabberwock-api")
+        .with_child(ProbeComponent::new("bread-and-butterfly-worker").into_component())
         .into_component()];
     (dependencies, components)
 }
 
 fn topology_b() -> (Vec<Dependency>, Vec<Component>) {
-    let dependencies = vec![ProbeDependency::new("catalog-db (postgres)")
-        .with_component_id("catalog-service")
-        .with_component_id("search-service")
-        .with_component_id("inventory-service")
+    let dependencies = vec![ProbeDependency::new("wonderland-db (postgres)")
+        .with_component_id("caterpillar-service")
+        .with_component_id("gryphon-service")
+        .with_component_id("dodo-service")
         .into_dependency()];
     let components = vec![
-        ProbeComponent::new("catalog-service")
+        ProbeComponent::new("caterpillar-service")
             .with_cpu_profile()
             .into_component(),
-        ProbeComponent::new("search-service")
+        ProbeComponent::new("gryphon-service")
             .with_cpu_profile()
             .into_component(),
-        ProbeComponent::new("inventory-service").into_component(),
+        ProbeComponent::new("dodo-service").into_component(),
     ];
     (dependencies, components)
 }
 
-const ORDERS_API_PROFILE: &str = "\
-orders-api;main;tokio::runtime::Runtime::block_on;hyper::server::conn::serve;axum::routing::Router::call;middleware::trace;middleware::authenticate;jsonwebtoken::decode;ring::hmac::verify 18
-orders-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::create_order;orders::service::place_order;orders::pricing::recalculate_totals;futures::executor::block_on;orders::pricing::fetch_fx_rate;reqwest::blocking::Client::execute;std::net::TcpStream::read 420
-orders-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::create_order;orders::service::place_order;orders::pricing::recalculate_totals;futures::executor::block_on;orders::pricing::fetch_fx_rate;reqwest::blocking::Client::execute;rustls::client::handshake 96
-orders-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::create_order;orders::service::place_order;orders::validation::validate_line_items;regex::Regex::new;regex_syntax::parse 168
-orders-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::create_order;orders::service::place_order;orders::validation::validate_line_items;regex::Regex::is_match 24
-orders-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::create_order;orders::service::place_order;orders::repository::insert_order;sqlx::query::execute;sqlx::postgres::protocol::flush;std::io::Write::write_all 54
-orders-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::list_orders;orders::repository::load_orders;orders::repository::load_customer_for_each;sqlx::query::fetch_one;sqlx::postgres::protocol::flush 132
-orders-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::list_orders;orders::repository::load_orders;serde_json::ser::to_writer;serde::ser::Serialize::serialize 61
-orders-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::list_orders;orders::repository::load_orders;sqlx::pool::acquire;parking_lot::Mutex::lock 37
-orders-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::get_order;orders::repository::load_order;sqlx::query::fetch_optional 22
-orders-api;main;tokio::runtime::worker;hyper::server::conn::serve;hyper::proto::h1::Conn::read_head;bytes::BytesMut::reserve 16
-orders-api;main;tokio::runtime::worker;tokio::net::TcpListener::accept 11
-orders-api;main;tokio::runtime::blocking::pool::worker;orders::audit::write_audit_log;std::fs::File::write_all 29
-orders-api;main;metrics::exporter::prometheus::scrape;metrics::registry::snapshot 14
-orders-api;main;tokio::time::driver::park 9
+const CHESHIRE_API_PROFILE: &str = "\
+cheshire-api;main;tokio::runtime::Runtime::block_on;hyper::server::conn::serve;axum::routing::Router::call;middleware::trace;middleware::authenticate;jsonwebtoken::decode;ring::hmac::verify 18
+cheshire-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::create_order;orders::service::place_order;orders::pricing::recalculate_totals;futures::executor::block_on;orders::pricing::fetch_fx_rate;reqwest::blocking::Client::execute;std::net::TcpStream::read 420
+cheshire-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::create_order;orders::service::place_order;orders::pricing::recalculate_totals;futures::executor::block_on;orders::pricing::fetch_fx_rate;reqwest::blocking::Client::execute;rustls::client::handshake 96
+cheshire-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::create_order;orders::service::place_order;orders::validation::validate_line_items;regex::Regex::new;regex_syntax::parse 168
+cheshire-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::create_order;orders::service::place_order;orders::validation::validate_line_items;regex::Regex::is_match 24
+cheshire-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::create_order;orders::service::place_order;orders::repository::insert_order;sqlx::query::execute;sqlx::postgres::protocol::flush;std::io::Write::write_all 54
+cheshire-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::list_orders;orders::repository::load_orders;orders::repository::load_customer_for_each;sqlx::query::fetch_one;sqlx::postgres::protocol::flush 132
+cheshire-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::list_orders;orders::repository::load_orders;serde_json::ser::to_writer;serde::ser::Serialize::serialize 61
+cheshire-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::list_orders;orders::repository::load_orders;sqlx::pool::acquire;parking_lot::Mutex::lock 37
+cheshire-api;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::get_order;orders::repository::load_order;sqlx::query::fetch_optional 22
+cheshire-api;main;tokio::runtime::worker;hyper::server::conn::serve;hyper::proto::h1::Conn::read_head;bytes::BytesMut::reserve 16
+cheshire-api;main;tokio::runtime::worker;tokio::net::TcpListener::accept 11
+cheshire-api;main;tokio::runtime::blocking::pool::worker;orders::audit::write_audit_log;std::fs::File::write_all 29
+cheshire-api;main;metrics::exporter::prometheus::scrape;metrics::registry::snapshot 14
+cheshire-api;main;tokio::time::driver::park 9
 ";
 
-const CATALOG_SERVICE_PROFILE: &str = "\
-catalog-service;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::search;catalog::search::execute_query;catalog::search::rank_results;catalog::search::score_document;catalog::text::normalize;regex::Regex::captures 212
-catalog-service;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::search;catalog::search::execute_query;catalog::search::rank_results;catalog::search::dedupe_by_title;alloc::vec::Vec::contains 164
-catalog-service;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::search;catalog::search::execute_query;tantivy::query::BooleanQuery::scorer;tantivy::postings::SegmentPostings::decode 118
-catalog-service;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::search;catalog::search::execute_query;catalog::cache::get_or_insert;std::collections::HashMap::insert 26
-catalog-service;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::facets;catalog::facets::aggregate;catalog::facets::bucket_by_attribute;std::collections::BTreeMap::entry 74
-catalog-service;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::facets;catalog::facets::aggregate;serde_json::ser::to_writer 31
-catalog-service;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::suggest;catalog::suggest::prefix_scan;fst::Map::range 44
-catalog-service;main;tokio::runtime::blocking::pool::worker;catalog::index::refresh_segments;std::fs::read;std::io::Read::read_to_end 58
-catalog-service;main;tokio::runtime::blocking::pool::worker;catalog::index::refresh_segments;tantivy::directory::MmapDirectory::open_read 19
-catalog-service;main;tokio::runtime::worker;hyper::proto::h1::Conn::read_head;bytes::BytesMut::reserve 13
-catalog-service;main;tokio::runtime::worker;tokio::net::TcpListener::accept 9
-catalog-service;main;metrics::exporter::prometheus::scrape 7
+const CATERPILLAR_SERVICE_PROFILE: &str = "\
+caterpillar-service;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::search;catalog::search::execute_query;catalog::search::rank_results;catalog::search::score_document;catalog::text::normalize;regex::Regex::captures 212
+caterpillar-service;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::search;catalog::search::execute_query;catalog::search::rank_results;catalog::search::dedupe_by_title;alloc::vec::Vec::contains 164
+caterpillar-service;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::search;catalog::search::execute_query;tantivy::query::BooleanQuery::scorer;tantivy::postings::SegmentPostings::decode 118
+caterpillar-service;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::search;catalog::search::execute_query;catalog::cache::get_or_insert;std::collections::HashMap::insert 26
+caterpillar-service;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::facets;catalog::facets::aggregate;catalog::facets::bucket_by_attribute;std::collections::BTreeMap::entry 74
+caterpillar-service;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::facets;catalog::facets::aggregate;serde_json::ser::to_writer 31
+caterpillar-service;main;tokio::runtime::worker;hyper::server::conn::serve;axum::routing::Router::call;handlers::suggest;catalog::suggest::prefix_scan;fst::Map::range 44
+caterpillar-service;main;tokio::runtime::blocking::pool::worker;catalog::index::refresh_segments;std::fs::read;std::io::Read::read_to_end 58
+caterpillar-service;main;tokio::runtime::blocking::pool::worker;catalog::index::refresh_segments;tantivy::directory::MmapDirectory::open_read 19
+caterpillar-service;main;tokio::runtime::worker;hyper::proto::h1::Conn::read_head;bytes::BytesMut::reserve 13
+caterpillar-service;main;tokio::runtime::worker;tokio::net::TcpListener::accept 9
+caterpillar-service;main;metrics::exporter::prometheus::scrape 7
 ";
 
 fn folded_profile_for(component_id: &str) -> String {
     match component_id {
-        "orders-api" => ORDERS_API_PROFILE.to_string(),
-        "search-service" => ORDERS_API_PROFILE.to_string(),
-        "catalog-service" => CATALOG_SERVICE_PROFILE.to_string(),
+        "cheshire-api" => CHESHIRE_API_PROFILE.to_string(),
+        "gryphon-service" => CATERPILLAR_SERVICE_PROFILE.to_string(),
+        "caterpillar-service" => CATERPILLAR_SERVICE_PROFILE.to_string(),
         _ => format!("{component_id};main 1\n"),
+    }
+}
+
+fn scoped_playbooks_for(arena_id: &str) -> Vec<&'static str> {
+    match arena_id {
+        "arena-tea-party" => vec!["reset-tea-party-db", "hatter-gateway-outage"],
+        "arena-rabbit-hole" => vec!["reset-rabbit-hole-db", "caterpillar-cache-purge"],
+        _ => vec!["reset-looking-glass-db"],
     }
 }
 
@@ -373,10 +465,35 @@ fn closed_arena_for(
     observer: Arc<HttpForwardingObserver>,
     dependencies: Vec<Dependency>,
     components: Vec<Component>,
+    faulting_playbook: bool,
 ) -> ClosedArena {
-    let matches: Vec<Box<dyn MatchTrait>> =
-        vec![Box::new(Match::new(arena_id, dependencies, components))];
-    ClosedArena::new(arena_id.to_string(), matches).observe(observer)
+    let mut a_match = Match::new(arena_id, dependencies, components)
+        .register_playbook(ProbePlaybook::new("apply-schema-migrations").into_playbook(), true)
+        .register_playbook(ProbePlaybook::new("seed-reference-data").into_playbook(), true);
+    for scoped in scoped_playbooks_for(arena_id) {
+        a_match = a_match.register_playbook(ProbePlaybook::new(scoped).into_playbook(), false);
+    }
+    if faulting_playbook {
+        a_match = a_match
+            .register_playbook(ProbePlaybook::new("seed-croquet-data").failing().into_playbook(), true);
+    }
+    let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new(a_match)];
+    ClosedArena::new(arena_id.to_string(), matches)
+        .observe(observer.clone())
+        .observe_scoped_playbooks(ScopedPlaybookForwarder::new(observer))
+}
+
+async fn cycle_scoped_playbooks(arena: &arena::OpenArena, arena_id: &str) {
+    for scoped in scoped_playbooks_for(arena_id) {
+        let Some(outcome) = arena.run_playbook(scoped).await else {
+            continue;
+        };
+        if let Ok(active) = outcome {
+            tokio::time::sleep(random_step_delay()).await;
+            drop(active);
+        }
+        tokio::time::sleep(random_step_delay()).await;
+    }
 }
 
 #[tokio::main]
@@ -390,20 +507,29 @@ async fn main() {
     let (deps_a, comps_a) = topology_a();
     let (deps_b, comps_b) = topology_b();
     let (deps_c, comps_c) = topology_c();
+    let (deps_d, comps_d) = topology_d();
     let observer = Arc::new(HttpForwardingObserver::new(&dashboard_url));
     let profile_token = register_observer(observer.clone());
-    let closed_a = closed_arena_for("arena-orders", observer.clone(), deps_a, comps_a);
-    let closed_b = closed_arena_for("arena-catalog", observer.clone(), deps_b, comps_b);
-    let closed_c = closed_arena_for("arena-orders-faulted", observer.clone(), deps_c, comps_c);
+    let closed_a = closed_arena_for("arena-tea-party", observer.clone(), deps_a, comps_a, false);
+    let closed_b = closed_arena_for("arena-rabbit-hole", observer.clone(), deps_b, comps_b, false);
+    let closed_c = closed_arena_for("arena-looking-glass", observer.clone(), deps_c, comps_c, false);
+    let closed_d = closed_arena_for("arena-croquet-ground", observer.clone(), deps_d, comps_d, true);
 
-    println!("posting demo lifecycle events for 3 arenas to {dashboard_url}");
+    println!("posting demo lifecycle events for 4 arenas to {dashboard_url}");
 
-    let open_a = closed_a.open().await.expect("arena-orders should open");
-    let open_b = closed_b.open().await.expect("arena-catalog should open");
+    let open_a = closed_a.open().await.expect("arena-tea-party should open");
+    let open_b = closed_b.open().await.expect("arena-rabbit-hole should open");
     match closed_c.open().await {
-        Ok(_) => panic!("arena-orders-faulted was expected to fault on start"),
-        Err(state) => println!("arena-orders-faulted faulted as expected: {state}"),
+        Ok(_) => panic!("arena-looking-glass was expected to fault on start"),
+        Err(state) => println!("arena-looking-glass faulted as expected: {state}"),
     }
+    match closed_d.open().await {
+        Ok(_) => panic!("arena-croquet-ground was expected to fault on its playbook"),
+        Err(state) => println!("arena-croquet-ground faulted as expected: {state}"),
+    }
+
+    cycle_scoped_playbooks(&open_a, "arena-tea-party").await;
+    cycle_scoped_playbooks(&open_b, "arena-rabbit-hole").await;
 
     println!("\nAll arenas open. Press enter to tear down...");
     let _ = tokio::task::spawn_blocking(|| {
@@ -413,10 +539,10 @@ async fn main() {
     .await;
 
     if let Err(state) = open_a.close().await {
-        eprintln!("arena-orders closed with faults: {state}");
+        eprintln!("arena-tea-party closed with faults: {state}");
     }
     if let Err(state) = open_b.close().await {
-        eprintln!("arena-catalog closed with faults: {state}");
+        eprintln!("arena-rabbit-hole closed with faults: {state}");
     }
 
     unregister_observer(profile_token);

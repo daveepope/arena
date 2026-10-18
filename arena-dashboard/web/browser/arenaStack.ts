@@ -5,15 +5,15 @@ const LISTENING_PATTERN = /listening on (http:\/\/127\.0\.0\.1:\d+)/;
 const ARENAS_OPEN_LINE = "All arenas open";
 const PROCESS_READY_TIMEOUT_MS = 10_000;
 
-export const ORDERS_ARENA = "arena-orders";
-export const CATALOG_ARENA = "arena-catalog";
-export const FAULTED_ARENA = "arena-orders-faulted";
+export const ORDERS_ARENA = "arena-tea-party";
+export const CATALOG_ARENA = "arena-rabbit-hole";
+export const FAULTED_ARENA = "arena-looking-glass";
 
 export const PAGE_BACKGROUND = "rgb(14, 19, 48)";
 
 const FAST_STEP_DELAY_MS = 50;
 export const NESTED_DEPENDENCY_EDGE_SUFFIX =
-  "dependency:payments-db (postgres)>dependency:fraud-check-service (http)";
+  "dependency:queen-of-hearts-db (postgres)>dependency:mad-hatter-service (http)";
 
 function binaryPath(variable: string): string {
   const relative = process.env[variable];

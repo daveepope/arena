@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import { isArenaRestart } from "./presentation";
-import type { ArenaState, CpuProfilerState, Subject } from "./types";
+import type { ArenaState, CpuProfilerState, ScopedPlaybookEntry, ScopedPlaybookState, Subject } from "./types";
 
 export type SubjectKind = "dependency" | "component";
 
@@ -31,7 +31,8 @@ export interface ProfileView {
 
 export interface HistoryEntry {
   at: number;
-  snapshot: ArenaState;
+  snapshot?: ArenaState;
+  playbook?: ScopedPlaybookEntry;
 }
 
 interface DiffState {
@@ -39,6 +40,7 @@ interface DiffState {
   lastArenaState: string | null;
   lastSubjectStates: Map<string, SubjectSnapshot>;
   nextLogId: number;
+  playbooks: Map<string, ScopedPlaybookState>;
 }
 
 interface ArenaEntry extends DiffState {
@@ -51,6 +53,15 @@ interface ArenaEntry extends DiffState {
 const MAX_HISTORY = 1000;
 const REPLAY_MIN_DELAY_MS = 150;
 const REPLAY_MAX_DELAY_MS = 1500;
+
+export function lastRecordedSnapshot(history: HistoryEntry[] | undefined): ArenaState | undefined {
+  if (history === undefined) return undefined;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const snapshot = history[i].snapshot;
+    if (snapshot !== undefined) return snapshot;
+  }
+  return undefined;
+}
 
 function flatten(list: Subject[], kind: SubjectKind, out: Map<string, SubjectSnapshot>): void {
   list.forEach((s) => {
@@ -96,17 +107,50 @@ function diffEntry(prev: DiffState | undefined, next: ArenaState): DiffState & {
     lastSubjectStates: subjectStates,
     log: [...(prev?.log ?? []), ...entries],
     nextLogId: id,
+    playbooks: prev?.playbooks ?? new Map(),
   };
 }
 
-function diffUpTo(history: HistoryEntry[], index: number): DiffState & { snapshot: ArenaState } {
-  let acc: DiffState | undefined;
-  let result: (DiffState & { snapshot: ArenaState }) | undefined;
-  for (let i = 0; i <= index; i++) {
-    result = diffEntry(acc, history[i].snapshot);
-    acc = result;
+function withPlaybook(
+  playbooks: Map<string, ScopedPlaybookState>,
+  reported: ScopedPlaybookEntry,
+): Map<string, ScopedPlaybookState> {
+  return new Map(playbooks).set(reported.playbookId, {
+    state: reported.state,
+    kind: reported.kind,
+    faults: reported.faults,
+  });
+}
+
+export function foldUpTo(
+  history: HistoryEntry[],
+  index: number,
+): DiffState & { snapshot?: ArenaState } {
+  let acc: (DiffState & { snapshot?: ArenaState }) | undefined;
+  for (let i = 0; i <= index && i < history.length; i++) {
+    const entry = history[i];
+    if (entry.snapshot !== undefined) {
+      acc = diffEntry(acc, entry.snapshot);
+    } else if (entry.playbook !== undefined) {
+      acc = {
+        log: acc?.log ?? [],
+        lastArenaState: acc?.lastArenaState ?? null,
+        lastSubjectStates: acc?.lastSubjectStates ?? new Map(),
+        nextLogId: acc?.nextLogId ?? 0,
+        snapshot: acc?.snapshot,
+        playbooks: withPlaybook(acc?.playbooks ?? new Map(), entry.playbook),
+      };
+    }
   }
-  return result as DiffState & { snapshot: ArenaState };
+  return (
+    acc ?? {
+      log: [],
+      lastArenaState: null,
+      lastSubjectStates: new Map(),
+      nextLogId: 0,
+      playbooks: new Map(),
+    }
+  );
 }
 
 interface DashboardStore {
@@ -115,11 +159,12 @@ interface DashboardStore {
   cpuProfiles: Map<string, CpuProfilerState>;
   profileView: ProfileView | null;
   ingest: (next: ArenaState) => void;
-  ingestHistory: (snapshots: ArenaState[]) => void;
+  ingestHistory: (snapshots: ArenaState[], playbooks?: ScopedPlaybookEntry[]) => void;
   select: (selected: Selected) => void;
   clearSelected: () => void;
   clearArenas: () => void;
   ingestCpuProfile: (componentId: string, state: string, reportReady: boolean) => void;
+  ingestScopedPlaybook: (arenaId: string, reported: ScopedPlaybookEntry) => void;
   openProfileView: (componentId: string, position: { x: number; y: number }) => void;
   closeProfileView: () => void;
   toggleProfileViewPin: () => void;
@@ -137,7 +182,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   ingest: (next) => {
     const { arenas } = get();
     const prevEntry = arenas.get(next.id);
-    const prevLastRecorded = prevEntry?.history[prevEntry.history.length - 1]?.snapshot;
+    const prevLastRecorded = lastRecordedSnapshot(prevEntry?.history);
     const isRestart = isArenaRestart(prevLastRecorded?.state, next.state);
     const prev = isRestart ? undefined : prevEntry;
     const lastRecorded = isRestart ? undefined : prevLastRecorded;
@@ -145,7 +190,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       lastRecorded !== undefined && JSON.stringify(lastRecorded) === JSON.stringify(next);
     const history = isDuplicateOfLastRecorded
       ? prev?.history ?? []
-      : [...(prev?.history ?? []), { at: Date.now(), snapshot: next }].slice(-MAX_HISTORY);
+      : [...(prev?.history ?? []), { at: Date.parse(next.at), snapshot: next }].slice(-MAX_HISTORY);
     const updated = new Map(arenas);
     if (prev && prev.replayIndex !== null) {
       updated.set(next.id, { ...prev, history });
@@ -155,22 +200,28 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ arenas: updated });
   },
 
-  ingestHistory: (snapshots) => {
+  ingestHistory: (snapshots, playbooks = []) => {
     if (snapshots.length === 0) return;
     const arenaId = snapshots[0].id;
     const { arenas } = get();
     const prev = arenas.get(arenaId);
-    const history = snapshots.map((snapshot) => ({ at: Date.parse(snapshot.at), snapshot }));
-    const newerLocally = (prev?.history ?? []).filter((entry) => entry.snapshot.at > snapshots[snapshots.length - 1].at);
-    const merged = [...history, ...newerLocally].slice(-MAX_HISTORY);
+    const recorded: HistoryEntry[] = [
+      ...snapshots.map((snapshot) => ({ at: Date.parse(snapshot.at), snapshot })),
+      ...playbooks.map((playbook) => ({ at: playbook.at, playbook })),
+    ].sort((left, right) => left.at - right.at);
+    const lastRecordedAt = recorded[recorded.length - 1].at;
+    const newerLocally = (prev?.history ?? []).filter((entry) => entry.at > lastRecordedAt);
+    const merged = [...recorded, ...newerLocally].slice(-MAX_HISTORY);
     if (prev && prev.history.length >= merged.length) return;
 
+    const folded = foldUpTo(merged, merged.length - 1);
     const updated = new Map(arenas);
     if (prev && (prev.isReplaying || prev.replayIndex !== null)) {
       updated.set(arenaId, { ...prev, history: merged });
-    } else {
+    } else if (folded.snapshot !== undefined) {
       updated.set(arenaId, {
-        ...diffUpTo(merged, merged.length - 1),
+        ...folded,
+        snapshot: folded.snapshot,
         history: merged,
         isReplaying: false,
         replayIndex: null,
@@ -182,7 +233,36 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
   select: (selected) => set({ selected }),
   clearSelected: () => set({ selected: null }),
   clearArenas: () =>
-    set({ arenas: new Map(), selected: null, cpuProfiles: new Map(), profileView: null }),
+    set({
+      arenas: new Map(),
+      selected: null,
+      cpuProfiles: new Map(),
+      profileView: null,
+    }),
+
+  ingestScopedPlaybook: (arenaId, reported) => {
+    const { arenas } = get();
+    const prev = arenas.get(arenaId);
+    if (prev === undefined) return;
+    const alreadyRecorded = prev.history.some(
+      (entry) =>
+        entry.playbook !== undefined &&
+        entry.playbook.playbookId === reported.playbookId &&
+        entry.playbook.state === reported.state &&
+        entry.at === reported.at,
+    );
+    const history = alreadyRecorded
+      ? prev.history
+      : [...prev.history, { at: reported.at, playbook: reported }].slice(-MAX_HISTORY);
+    const updated = new Map(arenas);
+    updated.set(arenaId, {
+      ...prev,
+      history,
+      playbooks:
+        prev.replayIndex === null ? withPlaybook(prev.playbooks, reported) : prev.playbooks,
+    });
+    set({ arenas: updated });
+  },
 
   ingestCpuProfile: (componentId, state, reportReady) =>
     set({
@@ -210,9 +290,11 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       if (!current || !current.isReplaying) return;
 
       const isLast = index >= history.length - 1;
+      const folded = foldUpTo(history, index);
       const arenas = new Map(get().arenas);
       arenas.set(arenaId, {
-        ...diffUpTo(history, index),
+        ...folded,
+        snapshot: folded.snapshot ?? current.snapshot,
         history: current.history,
         isReplaying: !isLast,
         replayIndex: isLast ? null : index,
@@ -236,6 +318,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
       lastArenaState: null,
       lastSubjectStates: new Map(),
       nextLogId: 0,
+      playbooks: new Map(),
     };
     set({ arenas: new Map(get().arenas).set(arenaId, resetBase) });
     setTimeout(() => playStep(0), REPLAY_MIN_DELAY_MS);
@@ -257,9 +340,11 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
 
     const clamped = Math.max(0, Math.min(index, entry.history.length - 1));
     const atEnd = clamped === entry.history.length - 1;
+    const folded = foldUpTo(entry.history, clamped);
     const updated = new Map(arenas);
     updated.set(arenaId, {
-      ...diffUpTo(entry.history, clamped),
+      ...folded,
+      snapshot: folded.snapshot ?? entry.snapshot,
       history: entry.history,
       isReplaying: false,
       replayIndex: atEnd ? null : clamped,

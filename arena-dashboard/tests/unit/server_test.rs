@@ -405,6 +405,8 @@ async fn post_scoped_playbook_validpayload_isaccepted() {
         serde_json::json!({
             "arena_id": "arena-orders",
             "playbook_id": "reset-orders",
+            "kind": "scoped",
+            "at": "2026-10-18T00:00:00.000Z",
             "state": "started",
             "faults": []
         }),
@@ -436,6 +438,8 @@ async fn post_scoped_playbook_twoarenassameplaybookid_arekeptapart() {
         serde_json::json!({
             "arena_id": arena,
             "playbook_id": "reset-orders",
+            "kind": "scoped",
+            "at": "2026-10-18T00:00:00.000Z",
             "state": "started",
             "faults": []
         })
@@ -458,6 +462,8 @@ async fn post_scoped_playbook_pathdisagreeingwithbody_isrejected() {
         serde_json::json!({
             "arena_id": "arena-catalog",
             "playbook_id": "reset-orders",
+            "kind": "scoped",
+            "at": "2026-10-18T00:00:00.000Z",
             "state": "started",
             "faults": []
         }),
@@ -479,6 +485,8 @@ async fn post_scoped_playbook_faults_reachthebrowserinfull() {
         serde_json::json!({
             "arena_id": "arena-orders",
             "playbook_id": "reset-orders",
+            "kind": "scoped",
+            "at": "2026-10-18T00:00:00.000Z",
             "state": "faulted",
             "faults": [{
                 "id": "reset-orders",
@@ -504,6 +512,8 @@ async fn clear_scopedplaybooksheld_areforgotten() {
         serde_json::json!({
             "arena_id": "arena-orders",
             "playbook_id": "reset-orders",
+            "kind": "scoped",
+            "at": "2026-10-18T00:00:00.000Z",
             "state": "started",
             "faults": []
         }),
@@ -532,6 +542,8 @@ async fn post_scoped_playbook_beyondthelimit_isrefusedratherthangrowing() {
             serde_json::json!({
                 "arena_id": "arena-orders",
                 "playbook_id": playbook,
+                "kind": "scoped",
+                "at": "2026-10-18T00:00:00.000Z",
                 "state": "started",
                 "faults": []
             }),
@@ -546,6 +558,8 @@ async fn post_scoped_playbook_beyondthelimit_isrefusedratherthangrowing() {
         serde_json::json!({
             "arena_id": "arena-orders",
             "playbook_id": "one-too-many",
+            "kind": "scoped",
+            "at": "2026-10-18T00:00:00.000Z",
             "state": "started",
             "faults": []
         }),
@@ -557,5 +571,284 @@ async fn post_scoped_playbook_beyondthelimit_isrefusedratherthangrowing() {
         state.scoped_playbook_count(),
         arena_dashboard::server::SCOPED_PLAYBOOK_LIMIT
     );
+}
+
+
+fn arena_snapshot_body(arena_id: &str, state: &str) -> String {
+    serde_json::json!({
+        "id": arena_id,
+        "state": state,
+        "at": "2026-10-18T00:00:00.000Z",
+        "dependencies": [],
+        "components": [],
+        "faults": []
+    })
+    .to_string()
+}
+
+async fn post_ingest(base_url: &str, body: String) -> reqwest::StatusCode {
+    reqwest::Client::new()
+        .post(format!("{base_url}/ingest"))
+        .body(body)
+        .send()
+        .await
+        .expect("post ingest")
+        .status()
+}
+
+#[tokio::test]
+async fn post_ingest_arenasnapshot_isstoredandreturnedbyhistory() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+
+    assert_eq!(status, reqwest::StatusCode::ACCEPTED);
+    let history: serde_json::Value = reqwest::get(format!("{base_url}/history"))
+        .await
+        .expect("get history")
+        .json()
+        .await
+        .expect("json body");
+    assert_eq!(history[0]["id"], "arena-tea-party");
+    assert_eq!(history[0]["states"][0]["state"], "arena_open");
+}
+
+#[tokio::test]
+async fn post_ingest_malformedbody_isrejectedandnothingisstored() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = post_ingest(&base_url, "not json".to_string()).await;
+
+    assert_eq!(status, reqwest::StatusCode::BAD_REQUEST);
+    let history: serde_json::Value = reqwest::get(format!("{base_url}/history"))
+        .await
+        .expect("get history")
+        .json()
+        .await
+        .expect("json body");
+    assert_eq!(history, serde_json::json!([]));
+}
+
+#[tokio::test]
+async fn post_ingest_everysnapshotforanarena_isrecordedinorder() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_starting")).await;
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+
+    let history: serde_json::Value = reqwest::get(format!("{base_url}/history"))
+        .await
+        .expect("get history")
+        .json()
+        .await
+        .expect("json body");
+    assert_eq!(history[0]["states"][0]["state"], "arena_starting");
+    assert_eq!(history[0]["states"][1]["state"], "arena_open");
+}
+
+#[tokio::test]
+async fn get_history_separatearenas_arereportedseparately() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+    post_ingest(&base_url, arena_snapshot_body("arena-rabbit-hole", "arena_open")).await;
+
+    let history: serde_json::Value = reqwest::get(format!("{base_url}/history"))
+        .await
+        .expect("get history")
+        .json()
+        .await
+        .expect("json body");
+    let ids: Vec<&str> = history
+        .as_array()
+        .expect("array")
+        .iter()
+        .map(|arena| arena["id"].as_str().expect("id"))
+        .collect();
+    assert_eq!(ids, vec!["arena-tea-party", "arena-rabbit-hole"]);
+}
+
+#[tokio::test]
+async fn get_events_alreadyingestedsnapshot_isreplayedtoanewsubscriber() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+
+    let mut stream = reqwest::get(format!("{base_url}/events"))
+        .await
+        .expect("get events")
+        .bytes_stream();
+
+    let mut seen = String::new();
+    while let Some(chunk) = futures::StreamExt::next(&mut stream).await {
+        seen.push_str(&String::from_utf8_lossy(&chunk.expect("chunk")));
+        if seen.contains("arena-tea-party") {
+            break;
+        }
+    }
+    assert!(seen.contains("arena-tea-party"), "got: {seen}");
+}
+
+#[tokio::test]
+async fn post_shutdown_isaccepted_andthehandlestopswaiting() {
+    let (base_url, state) = serve_dashboard().await;
+    let shutdown = state.shutdown_handle();
+
+    let status = reqwest::Client::new()
+        .post(format!("{base_url}/shutdown"))
+        .send()
+        .await
+        .expect("post shutdown")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::ACCEPTED);
+    shutdown.wait().await;
+}
+
+#[tokio::test]
+async fn wait_alreadytriggered_returnsimmediately() {
+    let (_base_url, state) = serve_dashboard().await;
+    let shutdown = state.shutdown_handle();
+    shutdown.trigger();
+
+    shutdown.wait().await;
+    shutdown.wait().await;
+}
+
+fn playbook_body(arena: &str, playbook: &str, kind: &str, state: &str, at: &str) -> serde_json::Value {
+    serde_json::json!({
+        "arena_id": arena,
+        "playbook_id": playbook,
+        "kind": kind,
+        "at": at,
+        "state": state,
+        "faults": []
+    })
+}
+
+async fn history_for(base_url: &str, arena: &str) -> serde_json::Value {
+    let history: serde_json::Value = reqwest::get(format!("{base_url}/history"))
+        .await
+        .expect("get history")
+        .json()
+        .await
+        .expect("json body");
+    history
+        .as_array()
+        .expect("array")
+        .iter()
+        .find(|entry| entry["id"] == arena)
+        .cloned()
+        .unwrap_or(serde_json::Value::Null)
+}
+
+#[tokio::test]
+async fn get_history_everyplaybookreport_isreplayableinorder() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+    for state in ["starting", "started", "stopped"] {
+        post_scoped_playbook(
+            &base_url,
+            "arena-tea-party",
+            "reset-tea-party-db",
+            playbook_body(
+                "arena-tea-party",
+                "reset-tea-party-db",
+                "scoped",
+                state,
+                "2026-10-18T00:00:00.000Z",
+            ),
+        )
+        .await;
+    }
+
+    let arena = history_for(&base_url, "arena-tea-party").await;
+
+    let states: Vec<&str> = arena["playbooks"]
+        .as_array()
+        .expect("playbooks array")
+        .iter()
+        .map(|entry| entry["state"].as_str().expect("state"))
+        .collect();
+    assert_eq!(states, vec!["starting", "started", "stopped"]);
+}
+
+#[tokio::test]
+async fn get_history_playbookreport_carriesitskindandmoment() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+    post_scoped_playbook(
+        &base_url,
+        "arena-tea-party",
+        "apply-schema",
+        playbook_body(
+            "arena-tea-party",
+            "apply-schema",
+            "startup",
+            "started",
+            "2026-10-18T12:00:00.000Z",
+        ),
+    )
+    .await;
+
+    let arena = history_for(&base_url, "arena-tea-party").await;
+
+    assert_eq!(arena["playbooks"][0]["kind"], "startup");
+    assert_eq!(arena["playbooks"][0]["at"], "2026-10-18T12:00:00.000Z");
+    assert_eq!(arena["playbooks"][0]["playbook"], "apply-schema");
+}
+
+#[tokio::test]
+async fn get_history_anotherarenasplaybooks_arenotincluded() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+    post_ingest(&base_url, arena_snapshot_body("arena-rabbit-hole", "arena_open")).await;
+    post_scoped_playbook(
+        &base_url,
+        "arena-rabbit-hole",
+        "reset-rabbit-hole",
+        playbook_body(
+            "arena-rabbit-hole",
+            "reset-rabbit-hole",
+            "scoped",
+            "started",
+            "2026-10-18T00:00:00.000Z",
+        ),
+    )
+    .await;
+
+    let tea_party = history_for(&base_url, "arena-tea-party").await;
+    let rabbit_hole = history_for(&base_url, "arena-rabbit-hole").await;
+
+    assert_eq!(tea_party["playbooks"], serde_json::json!([]));
+    assert_eq!(rabbit_hole["playbooks"].as_array().expect("array").len(), 1);
+}
+
+#[tokio::test]
+async fn clear_recordedplaybooks_areforgotten() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+    post_scoped_playbook(
+        &base_url,
+        "arena-tea-party",
+        "reset-tea-party-db",
+        playbook_body(
+            "arena-tea-party",
+            "reset-tea-party-db",
+            "scoped",
+            "started",
+            "2026-10-18T00:00:00.000Z",
+        ),
+    )
+    .await;
+
+    reqwest::Client::new()
+        .post(format!("{base_url}/clear"))
+        .send()
+        .await
+        .expect("clear");
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+
+    let arena = history_for(&base_url, "arena-tea-party").await;
+    assert_eq!(arena["playbooks"], serde_json::json!([]));
 }
 

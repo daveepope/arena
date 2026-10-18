@@ -14,7 +14,7 @@ export function isActiveState(state: string): boolean {
   return state === "starting" || state === "readiness_check" || state === "started" || state === "stopping";
 }
 
-function fillClasses(state: string): string {
+export function fillClasses(state: string): string {
   switch (state) {
     case "starting":
     case "readiness_check":

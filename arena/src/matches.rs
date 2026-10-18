@@ -1,7 +1,7 @@
 use super::component::{component_state, Component};
 use super::dependency::{dependency_state, Dependency};
 use super::dependency::RunnableDependency;
-use super::playbook::lifecycle::ScopedPlaybookEvent;
+use super::playbook::lifecycle::{PlaybookKind, ScopedPlaybookEvent};
 use super::playbook::{ActivePlaybook, Playbook};
 use crate::lifecycle::bus::Publisher;
 use std::sync::Arc;
@@ -932,10 +932,15 @@ impl MatchTrait for Match {
         arena_id: &str,
         publisher: Arc<dyn Publisher<ScopedPlaybookEvent>>,
     ) {
-        for (playbook, _) in &self.playbooks {
+        for (playbook, exec_on_dependency_start) in &self.playbooks {
+            let kind = if *exec_on_dependency_start {
+                PlaybookKind::Startup
+            } else {
+                PlaybookKind::Scoped
+            };
             playbook
                 .lifecycle()
-                .attach(arena_id, Arc::clone(&publisher));
+                .attach(arena_id, kind, Arc::clone(&publisher));
         }
     }
 

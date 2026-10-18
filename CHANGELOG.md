@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `arena`: playbook events name their kind, `startup` or `scoped`, and carry the moment they happened; every registered playbook is announced once the arena has announced itself, so a playbook that has not run yet is still visible
+- `arena-dashboard`: playbook reports join the arena's own timeline, recorded per arena and served from `GET /history`, so the graph and the playbook panel replay and scrub off one history keyed by the arena's own timestamps
+- `arena-dashboard`: a canvas whose server connection is lost says so, keeps showing the last known state, and offers replay for as far as it got
+- `arena-dashboard`: the playbook panel stays on screen when an arena has no playbooks and says so
+- `arena-dashboard`: each arena's canvas carries a scrollable playbook panel on its left, one row per playbook with its live state, faulted rows marked, and a row click opening the same detail dialog the graph nodes use
+- `arena-dashboard`: the lifecycle demo registers startup playbooks (`apply-schema-migrations`, `seed-reference-data`) and per-arena scoped ones, cycles the scoped ones while the arenas are open, renames its subjects onto an Alice in Wonderland theme, and gains a fourth arena whose startup playbook faults
 - `arena`: publishing and observing are split into `Publisher<E>`, `Observer<E>` and an `EventBus<E>` that owns the routing, with symmetrical register, unregister and bounded flush on both sides; the arena lifecycle and cpu profile channels now share that one mechanism instead of hand-rolling it twice
 - `arena`: `LifecycleRule` validates state transitions, `Monotonic` for the arena phase and `RunnableRule` for any restartable subject, so an illegal transition is logged as a defect rather than published
 - `arena`: scoped playbooks report their own `RunnableState` on their own channel, `Starting` and `Started` from the playbook and `Stopping` and `Stopped` from the handle's drop, so a playbook that runs and stops repeatedly is observable; events carry the arena id, and a failing playbook's fault lands on its own row
@@ -54,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `arena-ffi`: the dashboard observer tests no longer race each other through the process-wide observer registry; one test now covers register, forward and remove, and asserts on cpu profile posts rather than on any request reaching the listener
+- `arena-dashboard`: `ServerShutdown::trigger` set the shutdown flag only while something was already subscribed, so a `POST /shutdown` arriving before the server subscribed was lost and the later wait never returned
 - macOS release binaries are re-signed ad-hoc after stripping, so the darwin `arena_ffi_shared` no longer ships with an invalidated signature
 - `OpenArena::run_playbook` now records a panicking playbook as a `Fault` instead of letting it unwind out of the arena
 - Executable components no longer mis-resolve a bare command name (e.g. `powershell`, `sh`) against the working directory; PATH-resolved commands are left alone

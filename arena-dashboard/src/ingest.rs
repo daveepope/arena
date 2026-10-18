@@ -49,7 +49,9 @@ pub struct CpuProfilePayload {
 pub struct ScopedPlaybookPayload {
     pub arena_id: String,
     pub playbook_id: String,
+    pub kind: String,
     pub state: String,
+    pub at: String,
     #[serde(default)]
     pub faults: Vec<IngestFault>,
 }

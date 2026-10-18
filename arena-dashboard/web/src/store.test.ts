@@ -3,7 +3,7 @@ import "./testSetup";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useDashboardStore } from "./store";
-import type { ArenaState } from "./types";
+import type { ArenaState, ScopedPlaybookEntry } from "./types";
 
 function arenaState(overrides: Partial<ArenaState> = {}): ArenaState {
   return {
@@ -134,8 +134,8 @@ describe("useDashboardStore replay", () => {
 
     const history = useDashboardStore.getState().arenas.get("arena-1")?.history;
     expect(history?.length).toBe(2);
-    expect(history?.[0].snapshot.state).toBe("arena_starting");
-    expect(history?.[1].snapshot.state).toBe("arena_open");
+    expect(history?.[0].snapshot?.state).toBe("arena_starting");
+    expect(history?.[1].snapshot?.state).toBe("arena_open");
     expect(typeof history?.[0].at).toBe("number");
   });
 
@@ -147,7 +147,7 @@ describe("useDashboardStore replay", () => {
 
     const history = useDashboardStore.getState().arenas.get("arena-1")?.history;
     expect(history?.length).toBe(2);
-    expect(history?.map((h) => h.snapshot.state)).toEqual(["arena_starting", "arena_open"]);
+    expect(history?.map((h) => h.snapshot?.state)).toEqual(["arena_starting", "arena_open"]);
   });
 
   it("replayArena replays recorded snapshots back through the same log, ending not replaying", () => {
@@ -277,7 +277,7 @@ describe("useDashboardStore ingestHistory", () => {
 
     const entry = useDashboardStore.getState().arenas.get("arena-1");
     expect(entry?.history.length).toBe(3);
-    expect(entry?.history[2].snapshot.state).toBe("arena_closed");
+    expect(entry?.history[2].snapshot?.state).toBe("arena_closed");
   });
 
   it("history no longer than what is already recorded is ignored", () => {
@@ -409,7 +409,7 @@ describe("useDashboardStore arena restarts", () => {
 
     const entry = useDashboardStore.getState().arenas.get("arena-1");
     expect(entry?.history).toHaveLength(1);
-    expect(entry?.history[0].snapshot.state).toBe("arena_starting");
+    expect(entry?.history[0].snapshot?.state).toBe("arena_starting");
     expect(entry?.snapshot.state).toBe("arena_starting");
   });
 
@@ -444,3 +444,160 @@ describe("useDashboardStore replay", () => {
     vi.useRealTimers();
   });
 });
+
+function playbookEntry(
+  playbookId: string,
+  state: string,
+  at = 1,
+  kind = "scoped",
+): ScopedPlaybookEntry {
+  return { at, playbookId, state, kind, faults: [] };
+}
+
+describe("useDashboardStore playbooks", () => {
+  function openArena(arenaId: string, at = "2026-10-18T00:00:00.000Z") {
+    useDashboardStore
+      .getState()
+      .ingest(arenaState({ id: arenaId, state: "arena_open", at }));
+  }
+
+  function playbooksOf(arenaId: string) {
+    return useDashboardStore.getState().arenas.get(arenaId)?.playbooks;
+  }
+
+  it("reportedPlaybooksAreHeldAgainstTheirOwnArena", () => {
+    openArena("arena-a");
+    openArena("arena-b");
+
+    useDashboardStore.getState().ingestScopedPlaybook("arena-a", playbookEntry("reset", "started"));
+    useDashboardStore.getState().ingestScopedPlaybook("arena-b", playbookEntry("reset", "stopped"));
+
+    expect(playbooksOf("arena-a")?.get("reset")?.state).toBe("started");
+    expect(playbooksOf("arena-b")?.get("reset")?.state).toBe("stopped");
+  });
+
+  it("reportForAnArenaThatIsNotOnScreenIsDropped", () => {
+    useDashboardStore.getState().ingestScopedPlaybook("arena-unknown", playbookEntry("reset", "started"));
+
+    expect(useDashboardStore.getState().arenas.get("arena-unknown")).toBeUndefined();
+  });
+
+  it("restartingAnArenaForgetsItsPreviousPlaybooks", () => {
+    const store = useDashboardStore.getState();
+    store.ingest(arenaState({ id: "arena-restart", state: "arena_starting" }));
+    store.ingest(arenaState({ id: "arena-restart", state: "arena_closed" }));
+    store.ingestScopedPlaybook("arena-restart", playbookEntry("reset", "faulted"));
+
+    useDashboardStore.getState().ingest(arenaState({ id: "arena-restart", state: "arena_starting" }));
+
+    expect(playbooksOf("arena-restart")?.size).toBe(0);
+  });
+
+  it("clearingArenasForgetsEveryPlaybook", () => {
+    openArena("arena-a");
+    useDashboardStore.getState().ingestScopedPlaybook("arena-a", playbookEntry("reset", "started"));
+
+    useDashboardStore.getState().clearArenas();
+
+    expect(useDashboardStore.getState().arenas.size).toBe(0);
+  });
+
+  it("everyReportedStateJoinsTheSameTimelineAsTheSnapshots", () => {
+    openArena("arena-a", "2026-10-18T00:00:00.000Z");
+    const store = useDashboardStore.getState();
+    store.ingestScopedPlaybook("arena-a", playbookEntry("reset", "starting", 10));
+    store.ingestScopedPlaybook("arena-a", playbookEntry("reset", "started", 20));
+    store.ingestScopedPlaybook("arena-a", playbookEntry("reset", "stopped", 30));
+
+    const history = useDashboardStore.getState().arenas.get("arena-a")?.history ?? [];
+    expect(history.map((entry) => entry.playbook?.state ?? entry.snapshot?.state)).toEqual([
+      "arena_open",
+      "starting",
+      "started",
+      "stopped",
+    ]);
+  });
+
+  it("sameReportArrivingTwiceIsRecordedOnce", () => {
+    openArena("arena-a");
+    const store = useDashboardStore.getState();
+    store.ingestScopedPlaybook("arena-a", playbookEntry("reset", "started", 20));
+
+    store.ingestScopedPlaybook("arena-a", playbookEntry("reset", "started", 20));
+
+    expect(useDashboardStore.getState().arenas.get("arena-a")?.history).toHaveLength(2);
+  });
+
+  it("loadedHistoryRebuildsBothTheSnapshotAndThePlaybooks", () => {
+    useDashboardStore.getState().ingestHistory(
+      [
+        arenaState({ id: "arena-a", state: "arena_starting", at: "2026-10-18T00:00:01.000Z" }),
+        arenaState({ id: "arena-a", state: "arena_open", at: "2026-10-18T00:00:03.000Z" }),
+      ],
+      [
+        playbookEntry("reset", "started", Date.parse("2026-10-18T00:00:02.000Z")),
+        playbookEntry("reset", "starting", Date.parse("2026-10-18T00:00:01.500Z")),
+      ],
+    );
+
+    const entry = useDashboardStore.getState().arenas.get("arena-a");
+    expect(entry?.snapshot.state).toBe("arena_open");
+    expect(entry?.playbooks.get("reset")?.state).toBe("started");
+    expect(entry?.history).toHaveLength(4);
+  });
+
+  it("scrubbingBackBeforeAPlaybookReportDropsThatRow", () => {
+    useDashboardStore.getState().ingestHistory(
+      [
+        arenaState({ id: "arena-a", state: "arena_starting", at: "2026-10-18T00:00:01.000Z" }),
+        arenaState({ id: "arena-a", state: "arena_open", at: "2026-10-18T00:00:04.000Z" }),
+      ],
+      [
+        playbookEntry("reset", "starting", Date.parse("2026-10-18T00:00:02.000Z")),
+        playbookEntry("seed", "started", Date.parse("2026-10-18T00:00:03.000Z")),
+      ],
+    );
+
+    useDashboardStore.getState().scrubArena("arena-a", 1);
+
+    const entry = useDashboardStore.getState().arenas.get("arena-a");
+    expect(entry?.playbooks.get("reset")?.state).toBe("starting");
+    expect(entry?.playbooks.get("seed")).toBeUndefined();
+    expect(entry?.snapshot.state).toBe("arena_starting");
+  });
+
+  it("scrubbingBackToTheStartShowsNoPlaybooks", () => {
+    useDashboardStore.getState().ingestHistory(
+      [
+        arenaState({ id: "arena-a", state: "arena_starting", at: "2026-10-18T00:00:01.000Z" }),
+        arenaState({ id: "arena-a", state: "arena_open", at: "2026-10-18T00:00:03.000Z" }),
+      ],
+      [playbookEntry("reset", "starting", Date.parse("2026-10-18T00:00:02.000Z"))],
+    );
+
+    useDashboardStore.getState().scrubArena("arena-a", 0);
+
+    expect(useDashboardStore.getState().arenas.get("arena-a")?.playbooks.size).toBe(0);
+  });
+
+  it("aReportArrivingDuringAReplayIsRecordedWithoutDisturbingTheReplayedRows", () => {
+    useDashboardStore.getState().ingestHistory(
+      [
+        arenaState({ id: "arena-a", state: "arena_starting", at: "2026-10-18T00:00:01.000Z" }),
+        arenaState({ id: "arena-a", state: "arena_open", at: "2026-10-18T00:00:03.000Z" }),
+      ],
+      [playbookEntry("reset", "starting", Date.parse("2026-10-18T00:00:02.000Z"))],
+    );
+    useDashboardStore.getState().scrubArena("arena-a", 0);
+
+    useDashboardStore
+      .getState()
+      .ingestScopedPlaybook("arena-a", playbookEntry("seed", "started", Date.parse("2026-10-18T00:00:04.000Z")));
+
+    const entry = useDashboardStore.getState().arenas.get("arena-a");
+    expect(entry?.playbooks.size).toBe(0);
+    expect(entry?.history).toHaveLength(4);
+  });
+});
+
+

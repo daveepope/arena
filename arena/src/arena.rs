@@ -222,10 +222,10 @@ impl ClosedArena {
         let mut matches = std::mem::take(&mut self.matches);
         let scoped_playbook_publisher: Arc<dyn Publisher<ScopedPlaybookEvent>> =
             Arc::clone(&scoped_playbooks) as Arc<dyn Publisher<ScopedPlaybookEvent>>;
+        emit(&context, ArenaLifecycleState::ArenaStarting, &matches);
         for a_match in matches.iter() {
             a_match.attach_scoped_playbook_publisher(&self.id, Arc::clone(&scoped_playbook_publisher));
         }
-        emit(&context, ArenaLifecycleState::ArenaStarting, &matches);
 
         let arena_id = self.id.clone();
         let outcomes = join_all(matches.into_iter().enumerate().map(|(i, mut m)| {

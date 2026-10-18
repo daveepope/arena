@@ -50,7 +50,7 @@ impl Default for ServerShutdown {
 
 impl ServerShutdown {
     pub fn trigger(&self) {
-        let _ = self.tx.send(true);
+        self.tx.send_replace(true);
     }
 
     pub async fn wait(&self) {
@@ -68,7 +68,8 @@ pub struct AppState {
     last_state: Arc<Mutex<Vec<(String, String)>>>,
     history: Arc<Mutex<Vec<(String, Vec<String>)>>>,
     cpu_profiles: Arc<Mutex<Vec<(String, CpuProfileRecord)>>>,
-    scoped_playbooks: Arc<Mutex<Vec<((String, String), String)>>>,
+    scoped_playbooks: Arc<Mutex<Vec<(String, String)>>>,
+    playbook_history: Arc<Mutex<Vec<(String, Vec<String>)>>>,
     shutdown: Arc<ServerShutdown>,
 }
 
@@ -87,6 +88,7 @@ impl Default for AppState {
             history: Arc::new(Mutex::new(Vec::new())),
             cpu_profiles: Arc::new(Mutex::new(Vec::new())),
             scoped_playbooks: Arc::new(Mutex::new(Vec::new())),
+            playbook_history: Arc::new(Mutex::new(Vec::new())),
             shutdown: Arc::new(ServerShutdown::default()),
         }
     }
@@ -155,6 +157,11 @@ async fn styles_handler() -> impl IntoResponse {
 }
 
 async fn history_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let playbook_history = state
+        .playbook_history
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
     let history = state.history.lock().unwrap_or_else(|e| e.into_inner());
     let arenas: Vec<serde_json::Value> = history
         .iter()
@@ -163,10 +170,30 @@ async fn history_handler(State(state): State<AppState>) -> impl IntoResponse {
                 .iter()
                 .filter_map(|body| serde_json::from_str(body).ok())
                 .collect();
-            serde_json::json!({ "id": id, "states": states })
+            serde_json::json!({
+                "id": id,
+                "states": states,
+                "playbooks": recorded_playbooks(&playbook_history, id),
+            })
         })
         .collect();
     axum::Json(arenas)
+}
+
+fn recorded_playbooks(
+    playbook_history: &[(String, Vec<String>)],
+    arena_id: &str,
+) -> Vec<serde_json::Value> {
+    playbook_history
+        .iter()
+        .find(|(id, _)| id == arena_id)
+        .map(|(_, bodies)| {
+            bodies
+                .iter()
+                .filter_map(|body| serde_json::from_str(body).ok())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 async fn clear_handler(State(state): State<AppState>) -> impl IntoResponse {
@@ -175,6 +202,11 @@ async fn clear_handler(State(state): State<AppState>) -> impl IntoResponse {
     state.cpu_profiles.lock().unwrap_or_else(|e| e.into_inner()).clear();
     state
         .scoped_playbooks
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clear();
+    state
+        .playbook_history
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .clear();
@@ -242,37 +274,48 @@ async fn scoped_playbook_ingest_handler(
         return StatusCode::BAD_REQUEST;
     }
 
+    let record = serde_json::json!({
+        "arena": arena,
+        "playbook": playbook,
+        "kind": payload.kind,
+        "state": payload.state,
+        "at": payload.at,
+        "faults": payload.faults,
+    });
+    let recorded = record.to_string();
+    let mut announced = record;
+    announced["type"] = serde_json::Value::String("scoped_playbook".to_string());
+    let announcement = announced.to_string();
+
     {
         let mut playbooks = state
             .scoped_playbooks
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         let key = (arena.clone(), playbook.clone());
-        match playbooks.iter_mut().find(|(stored, _)| *stored == key) {
-            Some(entry) => entry.1 = payload.state.clone(),
-            None => {
-                if playbooks.len() >= SCOPED_PLAYBOOK_LIMIT {
-                    tracing::error!(
-                        limit = SCOPED_PLAYBOOK_LIMIT,
-                        arena = %arena,
-                        playbook = %playbook,
-                        "arena-dashboard is holding its limit of scoped playbooks; raise SCOPED_PLAYBOOK_LIMIT to hold more"
-                    );
-                    return StatusCode::INSUFFICIENT_STORAGE;
-                }
-                playbooks.push((key, payload.state.clone()))
+        if !playbooks.contains(&key) {
+            if playbooks.len() >= SCOPED_PLAYBOOK_LIMIT {
+                tracing::error!(
+                    limit = SCOPED_PLAYBOOK_LIMIT,
+                    arena = %arena,
+                    playbook = %playbook,
+                    "arena-dashboard is holding its limit of scoped playbooks; raise SCOPED_PLAYBOOK_LIMIT to hold more"
+                );
+                return StatusCode::INSUFFICIENT_STORAGE;
             }
+            playbooks.push(key);
         }
     }
 
-    let announcement = serde_json::json!({
-        "type": "scoped_playbook",
-        "arena": arena,
-        "playbook": playbook,
-        "state": payload.state,
-        "faults": payload.faults,
-    });
-    let _ = state.tx.send(announcement.to_string());
+    {
+        let mut playbook_history = state
+            .playbook_history
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        record_history(&mut playbook_history, &arena, recorded);
+    }
+
+    let _ = state.tx.send(announcement);
     StatusCode::ACCEPTED
 }
 

@@ -11,18 +11,18 @@ import {
   stopProcess,
 } from "./arenaStack";
 
-const PROFILED_COMPONENT = "catalog-service";
+const PROFILED_COMPONENT = "caterpillar-service";
 const HOTSPOT_FUNCTION = "regex::Regex::captures";
 
 const ORDERS_SUBJECTS = [
-  "orders-db (postgres)",
-  "pricing-service (http)",
-  "orders-events (kafka)",
-  "payments-db (postgres)",
-  "fraud-check-service (http)",
-  "refunds-queue (rabbitmq)",
-  "orders-api",
-  "payments-worker",
+  "duchess-db (postgres)",
+  "tweedledee-service (http)",
+  "rabbit-hole-events (kafka)",
+  "queen-of-hearts-db (postgres)",
+  "mad-hatter-service (http)",
+  "white-rabbit-queue (rabbitmq)",
+  "cheshire-api",
+  "dormouse-worker",
 ];
 
 let server: ChildProcessWithoutNullStreams | null = null;
@@ -75,13 +75,20 @@ test("arenaLifecycleStreamsToTheDashboardAndAProfiledComponentReportsItsFlamegra
     await expect(page.getByRole("heading", { name: `arena ${arenaId}`, exact: true })).toBeVisible();
   }
 
-  await expect(page.getByTestId(`event-log-${ORDERS_ARENA}`)).toContainText("orders-db (postgres)");
+  await expect(page.getByTestId(`event-log-${ORDERS_ARENA}`)).toContainText("duchess-db (postgres)");
+
+  const playbooks = page.getByTestId(`scoped-playbooks-${ORDERS_ARENA}`);
+  await expect(playbooks.getByTestId("scoped-playbook-apply-schema-migrations")).toBeVisible();
+  await expect(playbooks.getByTestId("scoped-playbook-reset-tea-party-db")).toBeVisible();
+  await playbooks.getByTestId("scoped-playbook-apply-schema-migrations").click();
+  await expect(page.getByText("kind: playbook")).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
 
   await expect(profilerLabel(page)).toHaveText("cpu profiler started");
   await expect(profilerLabel(page)).toBeDisabled();
 
-  await orders.locator(".react-flow__node").filter({ hasText: "orders-db (postgres)" }).first().click();
-  await expect(page.getByRole("heading", { name: "orders-db (postgres)" })).toBeVisible();
+  await orders.locator(".react-flow__node").filter({ hasText: "duchess-db (postgres)" }).first().click();
+  await expect(page.getByRole("heading", { name: "duchess-db (postgres)" })).toBeVisible();
   await expect(page.getByText("kind: dependency")).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
   await expect(page.getByText("kind: dependency")).toBeHidden();

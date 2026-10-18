@@ -41,3 +41,17 @@ export interface CpuProfilerState {
   state: string;
   reportReady: boolean;
 }
+
+export interface ScopedPlaybookState {
+  state: string;
+  kind: string;
+  faults: Fault[];
+}
+
+export interface ScopedPlaybookEntry {
+  at: number;
+  playbookId: string;
+  state: string;
+  kind: string;
+  faults: Fault[];
+}

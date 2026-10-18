@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 
 use arena::lifecycle::{ArenaLifecycleObserver, ArenaLifecycleState, ArenaState, RunnableState};
 use arena::lifecycle::bus::Observer;
-use arena::playbook::ScopedPlaybookEvent;
+use arena::playbook::{PlaybookKind, ScopedPlaybookEvent};
 use arena_dashboard::{HttpForwardingObserver, ScopedPlaybookForwarder};
 use arena_profile::{CpuProfileEvent, CpuProfileObserver};
 use axum::extract::State;
@@ -229,12 +229,13 @@ async fn on_cpu_profile_everytransition_isforwardedinorder() {
 }
 
 fn scoped_playbook_event(playbook_id: &str) -> ScopedPlaybookEvent {
-    ScopedPlaybookEvent {
-        arena_id: "arena-under-test".to_string(),
-        playbook_id: playbook_id.to_string(),
-        state: RunnableState::Started,
-        faults: Vec::new(),
-    }
+    ScopedPlaybookEvent::new(
+        "arena-under-test",
+        playbook_id,
+        PlaybookKind::Scoped,
+        RunnableState::Started,
+        Vec::new(),
+    )
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -289,3 +290,78 @@ async fn on_event_every_channel_shares_one_forwarding_thread() {
     assert!(captured[0].contains("shared-arena"));
     assert!(captured[1].contains("reset-orders"));
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn flush_queued_updates_are_posted_before_it_returns() {
+    let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
+    let url = start_capture_server(Arc::clone(&bodies)).await;
+    let forwarder = HttpForwardingObserver::new(url);
+
+    for index in 0..25 {
+        forwarder.on_state(&arena_state(&format!("arena-{index}")));
+    }
+    forwarder.flush_within(Duration::from_secs(5));
+
+    assert_eq!(bodies.lock().expect("capture lock").len(), 25);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn flush_nothing_queued_returns_without_waiting() {
+    let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
+    let url = start_capture_server(Arc::clone(&bodies)).await;
+    let forwarder = HttpForwardingObserver::new(url);
+
+    let started = Instant::now();
+    forwarder.flush_within(Duration::from_secs(5));
+
+    assert!(started.elapsed() < Duration::from_secs(1));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn flush_called_twice_still_posts_everything_once() {
+    let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
+    let url = start_capture_server(Arc::clone(&bodies)).await;
+    let forwarder = HttpForwardingObserver::new(url);
+
+    forwarder.on_state(&arena_state("arena-once"));
+    forwarder.flush_within(Duration::from_secs(5));
+    forwarder.flush_within(Duration::from_secs(5));
+
+    assert_eq!(bodies.lock().expect("capture lock").len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn flush_keeps_forwarding_afterwards() {
+    let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
+    let url = start_capture_server(Arc::clone(&bodies)).await;
+    let forwarder = HttpForwardingObserver::new(url);
+
+    forwarder.on_state(&arena_state("arena-before-flush"));
+    forwarder.flush_within(Duration::from_secs(5));
+    forwarder.on_state(&arena_state("arena-after-flush"));
+    forwarder.flush_within(Duration::from_secs(5));
+
+    let captured = bodies.lock().expect("capture lock").clone();
+    assert_eq!(captured.len(), 2);
+    assert!(captured[1].contains("arena-after-flush"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn flush_exhausted_budget_returns_rather_than_waiting_for_an_unreachable_dashboard() {
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind ephemeral port");
+    let port = listener.local_addr().expect("local addr").port();
+    tokio::spawn(async move {
+        let _accepted = listener.accept().await;
+        std::future::pending::<()>().await;
+    });
+    let forwarder = HttpForwardingObserver::new(format!("http://127.0.0.1:{port}"));
+    forwarder.on_state(&arena_state("arena-stalled"));
+
+    let started = Instant::now();
+    forwarder.flush_within(Duration::from_millis(200));
+
+    assert!(started.elapsed() < Duration::from_secs(2), "flush overran its budget");
+}
+

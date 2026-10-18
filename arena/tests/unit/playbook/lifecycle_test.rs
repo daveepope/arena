@@ -3,7 +3,9 @@ mod subjects;
 
 use arena::lifecycle::bus::{EventBus, Observer, Publisher};
 use arena::lifecycle::{Fault, RunnableState};
-use arena::playbook::lifecycle::{ScopedPlaybookEvent, ScopedPlaybookLifecycle, CHANNEL};
+use arena::playbook::lifecycle::{
+    PlaybookKind, ScopedPlaybookEvent, ScopedPlaybookLifecycle, CHANNEL,
+};
 use arena::{Match, MatchTrait};
 use std::sync::{Arc, Mutex};
 use subjects::{probe_playbook, Behaviour};
@@ -38,6 +40,26 @@ impl RecordingObserver {
             .iter()
             .filter(|event| event.playbook_id == playbook_id)
             .flat_map(|event| event.faults.clone())
+            .collect()
+    }
+
+    fn kinds_for(&self, playbook_id: &str) -> Vec<PlaybookKind> {
+        self.events
+            .lock()
+            .expect("events lock")
+            .iter()
+            .filter(|event| event.playbook_id == playbook_id)
+            .map(|event| event.kind)
+            .collect()
+    }
+
+    fn timestamps_for(&self, playbook_id: &str) -> Vec<chrono::DateTime<chrono::Utc>> {
+        self.events
+            .lock()
+            .expect("events lock")
+            .iter()
+            .filter(|event| event.playbook_id == playbook_id)
+            .map(|event| event.at)
             .collect()
     }
 
@@ -108,7 +130,11 @@ async fn run_playbook_scoped_run_reports_started_then_stopped_on_drop() {
         .expect("playbook should run");
     assert_eq!(
         observer.states_for("reset-orders"),
-        vec![RunnableState::Starting, RunnableState::Started]
+        vec![
+            RunnableState::NotStarted,
+            RunnableState::Starting,
+            RunnableState::Started
+        ]
     );
 
     drop(active);
@@ -116,6 +142,7 @@ async fn run_playbook_scoped_run_reports_started_then_stopped_on_drop() {
     assert_eq!(
         observer.states_for("reset-orders"),
         vec![
+            RunnableState::NotStarted,
             RunnableState::Starting,
             RunnableState::Started,
             RunnableState::Stopping,
@@ -145,6 +172,7 @@ async fn run_playbook_run_twice_reports_two_cycles() {
     assert_eq!(
         observer.states_for("reset-orders"),
         vec![
+            RunnableState::NotStarted,
             RunnableState::Starting,
             RunnableState::Started,
             RunnableState::Stopping,
@@ -178,7 +206,11 @@ async fn run_playbook_failing_run_reports_faulted_with_its_fault() {
     assert!(outcome.is_err());
     assert_eq!(
         observer.states_for("seed"),
-        vec![RunnableState::Starting, RunnableState::Faulted]
+        vec![
+            RunnableState::NotStarted,
+            RunnableState::Starting,
+            RunnableState::Faulted
+        ]
     );
     assert_eq!(observer.faults_for("seed").len(), 1);
 }
@@ -212,9 +244,9 @@ async fn run_playbook_unregistered_observer_receives_nothing_further() {
         Arc::clone(&bus) as Arc<dyn Publisher<ScopedPlaybookEvent>>;
     let a_match = Match::new("healthy", vec![], vec![])
         .register_playbook(probe_playbook("reset-orders").into_playbook(), false);
+    bus.unregister_observer(registration);
     a_match.attach_scoped_playbook_publisher(ARENA_ID, publisher);
 
-    bus.unregister_observer(registration);
     let active = a_match
         .run_playbook("reset-orders")
         .await
@@ -239,7 +271,11 @@ async fn start_startup_playbook_reports_starting_then_started() {
 
     assert_eq!(
         observer.states_for("apply-schema"),
-        vec![RunnableState::Starting, RunnableState::Started]
+        vec![
+            RunnableState::NotStarted,
+            RunnableState::Starting,
+            RunnableState::Started
+        ]
     );
 }
 
@@ -264,7 +300,11 @@ async fn start_failing_startup_playbook_reports_faulted_on_its_own_row() {
 
     assert_eq!(
         observer.states_for("seed"),
-        vec![RunnableState::Starting, RunnableState::Faulted]
+        vec![
+            RunnableState::NotStarted,
+            RunnableState::Starting,
+            RunnableState::Faulted
+        ]
     );
     assert_eq!(observer.faults_for("seed").len(), 1);
 }
@@ -285,6 +325,7 @@ async fn release_all_marks_a_started_playbook_stopped() {
     assert_eq!(
         observer.states_for("apply-schema"),
         vec![
+            RunnableState::NotStarted,
             RunnableState::Starting,
             RunnableState::Started,
             RunnableState::Stopping,
@@ -370,7 +411,11 @@ async fn run_playbook_panicking_run_reports_faulted_rather_than_sticking_at_star
     assert!(outcome.is_err());
     assert_eq!(
         observer.states_for("seed"),
-        vec![RunnableState::Starting, RunnableState::Faulted]
+        vec![
+            RunnableState::NotStarted,
+            RunnableState::Starting,
+            RunnableState::Faulted
+        ]
     );
 }
 
@@ -394,7 +439,11 @@ fn report_starting_while_already_started_is_not_reported_as_illegal() {
     let bus: Arc<EventBus<ScopedPlaybookEvent>> = Arc::new(EventBus::new(CHANNEL));
     bus.register_observer(observer.clone());
     let lifecycle = ScopedPlaybookLifecycle::new("reset-orders");
-    lifecycle.attach(ARENA_ID, Arc::clone(&bus) as Arc<dyn Publisher<ScopedPlaybookEvent>>);
+    lifecycle.attach(
+        ARENA_ID,
+        PlaybookKind::Scoped,
+        Arc::clone(&bus) as Arc<dyn Publisher<ScopedPlaybookEvent>>,
+    );
     lifecycle.report_starting();
     lifecycle.report_started();
 
@@ -402,7 +451,102 @@ fn report_starting_while_already_started_is_not_reported_as_illegal() {
 
     assert_eq!(
         observer.states_for("reset-orders"),
-        vec![RunnableState::Starting, RunnableState::Started]
+        vec![
+            RunnableState::NotStarted,
+            RunnableState::Starting,
+            RunnableState::Started
+        ]
     );
+}
+
+#[test]
+fn report_starting_after_a_fault_clears_the_previous_fault() {
+    let lifecycle = ScopedPlaybookLifecycle::new("reset-orders");
+    lifecycle.report(RunnableState::Starting);
+    lifecycle.report_fault(Fault::playbook("reset-orders", "seed data rejected"));
+    assert_eq!(lifecycle.faults().len(), 1);
+
+    lifecycle.report_starting();
+
+    assert_eq!(lifecycle.faults(), Vec::new());
+    assert_eq!(lifecycle.state(), RunnableState::Starting);
+}
+
+#[tokio::test]
+async fn state_read_through_the_playbook_traits_follows_the_run() {
+    let playbook = probe_playbook("reset-orders").into_playbook();
+    assert_eq!(playbook.state(), RunnableState::NotStarted);
+    assert_eq!(playbook.faults(), Vec::new());
+
+    let active = playbook.run(&[]).await.expect("playbook should run");
+
+    assert_eq!(active.state(), RunnableState::Started);
+    assert_eq!(active.faults(), Vec::new());
+    assert_eq!(playbook.state(), RunnableState::Started);
+
+    drop(active);
+
+    assert_eq!(playbook.state(), RunnableState::Stopped);
+}
+
+#[tokio::test]
+async fn faults_read_through_the_playbook_trait_carry_the_reported_fault() {
+    let playbook = probe_playbook("seed")
+        .behaving(Behaviour::FailStart)
+        .into_playbook();
+
+    let Err(fault) = playbook.run(&[]).await else {
+        panic!("playbook should fault");
+    };
+    playbook.lifecycle().report_fault(fault);
+
+    assert_eq!(playbook.state(), RunnableState::Faulted);
+    assert_eq!(playbook.faults().len(), 1);
+    assert_eq!(playbook.faults()[0].id, "seed");
+}
+
+#[test]
+fn attach_registered_playbook_announces_its_kind_and_held_state() {
+    let observer = RecordingObserver::new();
+    let (_a_match, _bus) = attached_match(
+        Match::new("healthy", vec![], vec![])
+            .register_playbook(probe_playbook("apply-schema").into_playbook(), true)
+            .register_playbook(probe_playbook("reset-orders").into_playbook(), false),
+        observer.clone(),
+    );
+
+    assert_eq!(
+        observer.kinds_for("apply-schema"),
+        vec![PlaybookKind::Startup]
+    );
+    assert_eq!(
+        observer.kinds_for("reset-orders"),
+        vec![PlaybookKind::Scoped]
+    );
+    assert_eq!(
+        observer.states_for("reset-orders"),
+        vec![RunnableState::NotStarted]
+    );
+}
+
+#[tokio::test]
+async fn report_every_event_carries_the_moment_it_happened() {
+    let observer = RecordingObserver::new();
+    let (a_match, _bus) = attached_match(
+        Match::new("healthy", vec![], vec![])
+            .register_playbook(probe_playbook("reset-orders").into_playbook(), false),
+        observer.clone(),
+    );
+
+    let active = a_match
+        .run_playbook("reset-orders")
+        .await
+        .expect("playbook registered")
+        .expect("playbook should run");
+    drop(active);
+
+    let stamps = observer.timestamps_for("reset-orders");
+    assert_eq!(stamps.len(), 5);
+    assert!(stamps.windows(2).all(|pair| pair[0] <= pair[1]));
 }
 

@@ -867,6 +867,62 @@ describe("App full screen profile", () => {
     expect(screen.queryByText("Arena Topology Dashboard")).toBeNull();
   });
 
+  it("appDisconnectedWithArenasInMemoryMarksEachCanvasStale", () => {
+    vi.useFakeTimers();
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onopen?.();
+      source.onmessage?.({ data: JSON.stringify(arenaState()) });
+    });
+    act(() => {
+      vi.advanceTimersByTime(1600);
+    });
+
+    expect(screen.getByTestId("stale-notice-arena-1").textContent).toContain(
+      "last known state",
+    );
+    expect(screen.getByText("Replay")).toBeDefined();
+    vi.useRealTimers();
+  });
+
+  it("appConnectedRunningArenaIsNotMarkedStale", () => {
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onopen?.();
+      source.onmessage?.({ data: JSON.stringify(arenaState()) });
+    });
+
+    expect(screen.queryByTestId("stale-notice-arena-1")).toBeNull();
+    expect(screen.queryByText("Replay")).toBeNull();
+  });
+
+  it("appPlaybookEventMarksTheRowWithItsKind", () => {
+    render(<App />);
+    const source = latestEventSource();
+
+    act(() => {
+      source.onopen?.();
+      source.onmessage?.({ data: JSON.stringify(arenaState()) });
+      source.onmessage?.({
+        data: JSON.stringify({
+          type: "scoped_playbook",
+          arena: "arena-1",
+          playbook: "apply-schema",
+          kind: "startup",
+          state: "started",
+          at: "2026-10-18T00:00:00.000Z",
+          faults: [],
+        }),
+      });
+    });
+
+    expect(screen.getByTestId("scoped-playbook-apply-schema").textContent).toContain("startup");
+  });
+
   it("appDisconnectedWithArenasInMemoryShowsNoNotice", () => {
     vi.useFakeTimers();
     render(<App />);
