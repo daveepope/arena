@@ -62,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `arena`: a startup playbook now reports stopped as soon as its run returns, instead of staying started for the whole open arena because the arena holds its handle until teardown; the handle drop at teardown adds nothing further
+- `arena-oracledb`: the default database and admin passwords are generated per run through `arena-container`'s existing unique-suffix generator instead of being literals in the source, which also clears the hard-coded-credential alert code scanning raised against them
+- Agent rules forbid hard-coding a password, secret or key in any test or example; generate it per run the way `examples/tests/pytest-shared/arena_config.py` does
+- `arena-http`: the loopback TLS verification alert from code scanning is dismissed with its reason recorded, and the real fix (Arena generating the HTTPS stub's own certificate) is tracked in GH #279
 - `arena-ffi`: the dashboard observer tests no longer race each other through the process-wide observer registry; one test now covers register, forward and remove, and asserts on cpu profile posts rather than on any request reaching the listener
 - `arena-dashboard`: `ServerShutdown::trigger` set the shutdown flag only while something was already subscribed, so a `POST /shutdown` arriving before the server subscribed was lost and the later wait never returned
 - macOS release binaries are re-signed ad-hoc after stripping, so the darwin `arena_ffi_shared` no longer ships with an invalidated signature

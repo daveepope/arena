@@ -524,6 +524,11 @@ impl Match {
         }
 
         self.active_playbooks = actives;
+        for (playbook, exec_on_start) in &self.playbooks {
+            if *exec_on_start {
+                playbook.lifecycle().report_terminal();
+            }
+        }
 
         if faults.is_empty() {
             tracing::debug!(

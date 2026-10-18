@@ -5,7 +5,9 @@ use arena::component::{Component, RunnableComponent};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::{ClosedArena, Fault, Match, MatchTrait, RunnableState};
 use arena_dashboard::{HttpForwardingObserver, ScopedPlaybookForwarder};
-use arena::playbook::{ActivePlaybook, Playbook, ScopedPlaybookLifecycle, UnmanagedPlaybook};
+use arena::playbook::{
+    ActivePlaybook, ManagedPlaybook, Playbook, ScopedPlaybookLifecycle, UnmanagedPlaybook,
+};
 use arena_profile::observer::{register_observer, report, report_complete, unregister_observer};
 use rand::Rng;
 
@@ -258,17 +260,49 @@ impl RunnableComponent for ProbeComponent {
 }
 
 
+enum ProbeBase {
+    Managed(ManagedPlaybook),
+    Unmanaged(UnmanagedPlaybook),
+}
+
+impl ProbeBase {
+    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+        match self {
+            ProbeBase::Managed(base) => base.lifecycle(),
+            ProbeBase::Unmanaged(base) => base.lifecycle(),
+        }
+    }
+
+    async fn apply(
+        &self,
+        apply: impl std::future::Future<Output = Result<Box<dyn ActivePlaybook>, Fault>>,
+    ) -> Result<Box<dyn ActivePlaybook>, Fault> {
+        match self {
+            ProbeBase::Managed(base) => base.apply(apply).await,
+            ProbeBase::Unmanaged(base) => base.apply(apply).await,
+        }
+    }
+}
+
 struct ProbePlaybook {
     identifier: String,
-    unmanaged: UnmanagedPlaybook,
+    base: ProbeBase,
     fails: bool,
 }
 
 impl ProbePlaybook {
-    fn new(identifier: &str) -> Self {
+    fn managed(identifier: &str) -> Self {
         Self {
             identifier: identifier.to_string(),
-            unmanaged: UnmanagedPlaybook::new(identifier),
+            base: ProbeBase::Managed(ManagedPlaybook::new(identifier)),
+            fails: false,
+        }
+    }
+
+    fn unmanaged(identifier: &str) -> Self {
+        Self {
+            identifier: identifier.to_string(),
+            base: ProbeBase::Unmanaged(UnmanagedPlaybook::new(identifier)),
             fails: false,
         }
     }
@@ -289,7 +323,7 @@ impl ProbePlaybook {
         }
         Ok(Box::new(ProbeActivePlaybook {
             identifier: self.identifier.clone(),
-            lifecycle: Arc::clone(self.unmanaged.lifecycle()),
+            lifecycle: Arc::clone(self.base.lifecycle()),
         }))
     }
 }
@@ -301,11 +335,11 @@ impl Playbook for ProbePlaybook {
     }
 
     fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
-        self.unmanaged.lifecycle()
+        self.base.lifecycle()
     }
 
     async fn run(&self, _dependencies: &[Dependency]) -> Result<Box<dyn ActivePlaybook>, Fault> {
-        self.unmanaged.apply(self.apply_probe()).await
+        self.base.apply(self.apply_probe()).await
     }
 }
 
@@ -470,14 +504,22 @@ fn closed_arena_for(
     faulting_playbook: bool,
 ) -> ClosedArena {
     let mut a_match = Match::new(arena_id, dependencies, components)
-        .register_playbook(ProbePlaybook::new("apply-schema-migrations").into_playbook(), true)
-        .register_playbook(ProbePlaybook::new("seed-reference-data").into_playbook(), true);
+        .register_playbook(
+            ProbePlaybook::unmanaged("apply-schema-migrations").into_playbook(),
+            true,
+        )
+        .register_playbook(ProbePlaybook::unmanaged("seed-reference-data").into_playbook(), true);
     for scoped in scoped_playbooks_for(arena_id) {
-        a_match = a_match.register_playbook(ProbePlaybook::new(scoped).into_playbook(), false);
+        a_match = a_match.register_playbook(ProbePlaybook::managed(scoped).into_playbook(), false);
     }
     if faulting_playbook {
         a_match = a_match
-            .register_playbook(ProbePlaybook::new("seed-croquet-data").failing().into_playbook(), true);
+            .register_playbook(
+                ProbePlaybook::unmanaged("seed-croquet-data")
+                    .failing()
+                    .into_playbook(),
+                true,
+            );
     }
     let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new(a_match)];
     ClosedArena::new(arena_id.to_string(), matches)

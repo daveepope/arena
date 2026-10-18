@@ -191,7 +191,7 @@ async fn run_playbook_unregistered_observer_receives_nothing_further() {
 }
 
 #[tokio::test]
-async fn start_startup_playbook_reports_starting_then_started() {
+async fn start_startup_playbook_finishes_once_its_run_returns() {
     let observer = RecordingPlaybookObserver::new();
     let (mut a_match, _bus) = attached_match(
         Match::new("healthy", vec![], vec![])
@@ -207,7 +207,9 @@ async fn start_startup_playbook_reports_starting_then_started() {
         vec![
             RunnableState::NotStarted,
             RunnableState::Starting,
-            RunnableState::Started
+            RunnableState::Started,
+            RunnableState::Stopping,
+            RunnableState::Stopped
         ]
     );
 }
@@ -481,5 +483,22 @@ async fn report_every_event_carries_the_moment_it_happened() {
     let stamps = observer.timestamps_for("reset-orders");
     assert_eq!(stamps.len(), 5);
     assert!(stamps.windows(2).all(|pair| pair[0] <= pair[1]));
+}
+
+#[tokio::test]
+async fn release_all_startup_playbook_already_finished_reports_nothing_further() {
+    let observer = RecordingPlaybookObserver::new();
+    let (mut a_match, _bus) = attached_match(
+        Match::new("healthy", vec![], vec![])
+            .register_playbook(probe_playbook("apply-schema").into_playbook(), true),
+        observer.clone(),
+    );
+    let publisher = arena::lifecycle::ArenaLifecyclePublisher::new("arena-under-test", vec![]);
+    a_match.start(&publisher).await.expect("match should open");
+    let reported_at_open = observer.states_for("apply-schema");
+
+    a_match.release_all();
+
+    assert_eq!(observer.states_for("apply-schema"), reported_at_open);
 }
 
