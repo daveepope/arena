@@ -277,6 +277,7 @@ async fn scoped_playbook_ingest_handler(
     let record = serde_json::json!({
         "arena": arena,
         "playbook": playbook,
+        "playbook_type": payload.playbook_type,
         "kind": payload.kind,
         "state": payload.state,
         "at": payload.at,

@@ -913,6 +913,7 @@ describe("App full screen profile", () => {
           arena: "arena-1",
           playbook: "apply-schema",
           kind: "startup",
+          playbook_type: "managed",
           state: "started",
           at: "2026-10-18T00:00:00.000Z",
           faults: [],
@@ -921,6 +922,45 @@ describe("App full screen profile", () => {
     });
 
     expect(screen.getByTestId("scoped-playbook-apply-schema").textContent).toContain("startup");
+    expect(screen.getByTestId("scoped-playbook-apply-schema").textContent).toContain("managed");
+  });
+
+  it("appPlaybookHistoryFillsTheRowFromTheServer", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((input: string) => {
+        if (input === "/history") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve([
+                {
+                  id: "arena-1",
+                  states: [arenaState()],
+                  playbooks: [
+                    {
+                      arena: "arena-1",
+                      playbook: "seed-reference-data",
+                      state: "stopped",
+                      kind: "scoped",
+                      playbook_type: "unmanaged",
+                      at: "2026-01-01T00:00:01.000Z",
+                      faults: [],
+                    },
+                  ],
+                },
+              ]),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }),
+    );
+
+    render(<App />);
+
+    const row = await screen.findByTestId("scoped-playbook-seed-reference-data");
+    expect(row.textContent).toContain("unmanaged");
+    expect(row.textContent).toContain("stopped");
   });
 
   it("appDisconnectedWithArenasInMemoryShowsNoNotice", () => {

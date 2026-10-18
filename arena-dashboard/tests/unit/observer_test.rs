@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 
 use arena::lifecycle::{ArenaLifecycleObserver, ArenaLifecycleState, ArenaState, RunnableState};
 use arena::lifecycle::bus::Observer;
-use arena::playbook::{PlaybookKind, ScopedPlaybookEvent};
+use arena::playbook::{PlaybookKind, PlaybookType, ScopedPlaybookEvent};
 use arena_dashboard::{HttpForwardingObserver, ScopedPlaybookForwarder};
 use arena_profile::{CpuProfileEvent, CpuProfileObserver};
 use axum::extract::State;
@@ -232,6 +232,7 @@ fn scoped_playbook_event(playbook_id: &str) -> ScopedPlaybookEvent {
     ScopedPlaybookEvent::new(
         "arena-under-test",
         playbook_id,
+        PlaybookType::Unmanaged,
         PlaybookKind::Scoped,
         RunnableState::Started,
         Vec::new(),

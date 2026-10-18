@@ -405,6 +405,7 @@ async fn post_scoped_playbook_validpayload_isaccepted() {
         serde_json::json!({
             "arena_id": "arena-orders",
             "playbook_id": "reset-orders",
+            "playbook_type": "managed",
             "kind": "scoped",
             "at": "2026-10-18T00:00:00.000Z",
             "state": "started",
@@ -438,6 +439,7 @@ async fn post_scoped_playbook_twoarenassameplaybookid_arekeptapart() {
         serde_json::json!({
             "arena_id": arena,
             "playbook_id": "reset-orders",
+            "playbook_type": "managed",
             "kind": "scoped",
             "at": "2026-10-18T00:00:00.000Z",
             "state": "started",
@@ -462,6 +464,7 @@ async fn post_scoped_playbook_pathdisagreeingwithbody_isrejected() {
         serde_json::json!({
             "arena_id": "arena-catalog",
             "playbook_id": "reset-orders",
+            "playbook_type": "managed",
             "kind": "scoped",
             "at": "2026-10-18T00:00:00.000Z",
             "state": "started",
@@ -485,6 +488,7 @@ async fn post_scoped_playbook_faults_reachthebrowserinfull() {
         serde_json::json!({
             "arena_id": "arena-orders",
             "playbook_id": "reset-orders",
+            "playbook_type": "managed",
             "kind": "scoped",
             "at": "2026-10-18T00:00:00.000Z",
             "state": "faulted",
@@ -512,6 +516,7 @@ async fn clear_scopedplaybooksheld_areforgotten() {
         serde_json::json!({
             "arena_id": "arena-orders",
             "playbook_id": "reset-orders",
+            "playbook_type": "managed",
             "kind": "scoped",
             "at": "2026-10-18T00:00:00.000Z",
             "state": "started",
@@ -542,6 +547,7 @@ async fn post_scoped_playbook_beyondthelimit_isrefusedratherthangrowing() {
             serde_json::json!({
                 "arena_id": "arena-orders",
                 "playbook_id": playbook,
+                "playbook_type": "managed",
                 "kind": "scoped",
                 "at": "2026-10-18T00:00:00.000Z",
                 "state": "started",
@@ -558,6 +564,7 @@ async fn post_scoped_playbook_beyondthelimit_isrefusedratherthangrowing() {
         serde_json::json!({
             "arena_id": "arena-orders",
             "playbook_id": "one-too-many",
+            "playbook_type": "managed",
             "kind": "scoped",
             "at": "2026-10-18T00:00:00.000Z",
             "state": "started",
@@ -718,6 +725,7 @@ fn playbook_body(arena: &str, playbook: &str, kind: &str, state: &str, at: &str)
     serde_json::json!({
         "arena_id": arena,
         "playbook_id": playbook,
+        "playbook_type": "managed",
         "kind": kind,
         "at": at,
         "state": state,
@@ -770,6 +778,40 @@ async fn get_history_everyplaybookreport_isreplayableinorder() {
         .map(|entry| entry["state"].as_str().expect("state"))
         .collect();
     assert_eq!(states, vec!["starting", "started", "stopped"]);
+}
+
+#[tokio::test]
+async fn post_scoped_playbook_playbooktype_reachesthestreamandthehistory() {
+    let (base_url, state) = serve_dashboard().await;
+    let mut events = state.subscribe();
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+
+    post_scoped_playbook(
+        &base_url,
+        "arena-tea-party",
+        "seed-reference-data",
+        serde_json::json!({
+            "arena_id": "arena-tea-party",
+            "playbook_id": "seed-reference-data",
+            "playbook_type": "unmanaged",
+            "kind": "scoped",
+            "at": "2026-10-18T00:00:00.000Z",
+            "state": "started",
+            "faults": []
+        }),
+    )
+    .await;
+
+    let mut announcement = events.recv().await.expect("announcement");
+    while !announcement.contains("scoped_playbook") {
+        announcement = events.recv().await.expect("announcement");
+    }
+    assert!(
+        announcement.contains(r#""playbook_type":"unmanaged""#),
+        "got: {announcement}"
+    );
+    let arena = history_for(&base_url, "arena-tea-party").await;
+    assert_eq!(arena["playbooks"][0]["playbook_type"], "unmanaged");
 }
 
 #[tokio::test]

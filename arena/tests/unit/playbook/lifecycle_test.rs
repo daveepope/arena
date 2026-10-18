@@ -1,85 +1,18 @@
 #[path = "../subjects.rs"]
 mod subjects;
 
-use arena::lifecycle::bus::{EventBus, Observer, Publisher};
+use arena::lifecycle::bus::{EventBus, Publisher};
 use arena::lifecycle::{Fault, RunnableState};
 use arena::playbook::lifecycle::{
     PlaybookKind, ScopedPlaybookEvent, ScopedPlaybookLifecycle, CHANNEL,
 };
 use arena::{Match, MatchTrait};
-use std::sync::{Arc, Mutex};
-use subjects::{probe_playbook, Behaviour};
+use std::sync::Arc;
+use subjects::{probe_playbook, Behaviour, RecordingPlaybookObserver};
 
 const ARENA_ID: &str = "arena-under-test";
 
-struct RecordingObserver {
-    events: Mutex<Vec<ScopedPlaybookEvent>>,
-}
-
-impl RecordingObserver {
-    fn new() -> Arc<Self> {
-        Arc::new(Self {
-            events: Mutex::new(Vec::new()),
-        })
-    }
-
-    fn states_for(&self, playbook_id: &str) -> Vec<RunnableState> {
-        self.events
-            .lock()
-            .expect("events lock")
-            .iter()
-            .filter(|event| event.playbook_id == playbook_id)
-            .map(|event| event.state)
-            .collect()
-    }
-
-    fn faults_for(&self, playbook_id: &str) -> Vec<Fault> {
-        self.events
-            .lock()
-            .expect("events lock")
-            .iter()
-            .filter(|event| event.playbook_id == playbook_id)
-            .flat_map(|event| event.faults.clone())
-            .collect()
-    }
-
-    fn kinds_for(&self, playbook_id: &str) -> Vec<PlaybookKind> {
-        self.events
-            .lock()
-            .expect("events lock")
-            .iter()
-            .filter(|event| event.playbook_id == playbook_id)
-            .map(|event| event.kind)
-            .collect()
-    }
-
-    fn timestamps_for(&self, playbook_id: &str) -> Vec<chrono::DateTime<chrono::Utc>> {
-        self.events
-            .lock()
-            .expect("events lock")
-            .iter()
-            .filter(|event| event.playbook_id == playbook_id)
-            .map(|event| event.at)
-            .collect()
-    }
-
-    fn arena_ids(&self) -> Vec<String> {
-        self.events
-            .lock()
-            .expect("events lock")
-            .iter()
-            .map(|event| event.arena_id.clone())
-            .collect()
-    }
-}
-
-impl Observer<ScopedPlaybookEvent> for RecordingObserver {
-    fn on_event(&self, event: &ScopedPlaybookEvent) {
-        self.events.lock().expect("events lock").push(event.clone());
-    }
-}
-
-fn attached_match(a_match: Match, observer: Arc<RecordingObserver>) -> (Match, Arc<EventBus<ScopedPlaybookEvent>>) {
+fn attached_match(a_match: Match, observer: Arc<RecordingPlaybookObserver>) -> (Match, Arc<EventBus<ScopedPlaybookEvent>>) {
     let bus: Arc<EventBus<ScopedPlaybookEvent>> = Arc::new(EventBus::new(CHANNEL));
     bus.register_observer(observer);
     let publisher: Arc<dyn Publisher<ScopedPlaybookEvent>> =
@@ -116,7 +49,7 @@ fn report_without_an_attachment_still_tracks_the_state() {
 
 #[tokio::test]
 async fn run_playbook_scoped_run_reports_started_then_stopped_on_drop() {
-    let observer = RecordingObserver::new();
+    let observer = RecordingPlaybookObserver::new();
     let (a_match, _bus) = attached_match(
         Match::new("healthy", vec![], vec![])
             .register_playbook(probe_playbook("reset-orders").into_playbook(), false),
@@ -153,7 +86,7 @@ async fn run_playbook_scoped_run_reports_started_then_stopped_on_drop() {
 
 #[tokio::test]
 async fn run_playbook_run_twice_reports_two_cycles() {
-    let observer = RecordingObserver::new();
+    let observer = RecordingPlaybookObserver::new();
     let (a_match, _bus) = attached_match(
         Match::new("healthy", vec![], vec![])
             .register_playbook(probe_playbook("reset-orders").into_playbook(), false),
@@ -187,7 +120,7 @@ async fn run_playbook_run_twice_reports_two_cycles() {
 
 #[tokio::test]
 async fn run_playbook_failing_run_reports_faulted_with_its_fault() {
-    let observer = RecordingObserver::new();
+    let observer = RecordingPlaybookObserver::new();
     let (a_match, _bus) = attached_match(
         Match::new("healthy", vec![], vec![]).register_playbook(
             probe_playbook("seed")
@@ -217,7 +150,7 @@ async fn run_playbook_failing_run_reports_faulted_with_its_fault() {
 
 #[tokio::test]
 async fn attach_scoped_playbook_publisher_stamps_the_arena_id_on_every_event() {
-    let observer = RecordingObserver::new();
+    let observer = RecordingPlaybookObserver::new();
     let (a_match, _bus) = attached_match(
         Match::new("healthy", vec![], vec![])
             .register_playbook(probe_playbook("reset-orders").into_playbook(), false),
@@ -237,7 +170,7 @@ async fn attach_scoped_playbook_publisher_stamps_the_arena_id_on_every_event() {
 
 #[tokio::test]
 async fn run_playbook_unregistered_observer_receives_nothing_further() {
-    let observer = RecordingObserver::new();
+    let observer = RecordingPlaybookObserver::new();
     let bus: Arc<EventBus<ScopedPlaybookEvent>> = Arc::new(EventBus::new(CHANNEL));
     let registration = bus.register_observer(observer.clone());
     let publisher: Arc<dyn Publisher<ScopedPlaybookEvent>> =
@@ -259,7 +192,7 @@ async fn run_playbook_unregistered_observer_receives_nothing_further() {
 
 #[tokio::test]
 async fn start_startup_playbook_reports_starting_then_started() {
-    let observer = RecordingObserver::new();
+    let observer = RecordingPlaybookObserver::new();
     let (mut a_match, _bus) = attached_match(
         Match::new("healthy", vec![], vec![])
             .register_playbook(probe_playbook("apply-schema").into_playbook(), true),
@@ -281,7 +214,7 @@ async fn start_startup_playbook_reports_starting_then_started() {
 
 #[tokio::test]
 async fn start_failing_startup_playbook_reports_faulted_on_its_own_row() {
-    let observer = RecordingObserver::new();
+    let observer = RecordingPlaybookObserver::new();
     let (mut a_match, _bus) = attached_match(
         Match::new("faulting", vec![], vec![]).register_playbook(
             probe_playbook("seed")
@@ -311,7 +244,7 @@ async fn start_failing_startup_playbook_reports_faulted_on_its_own_row() {
 
 #[tokio::test]
 async fn release_all_marks_a_started_playbook_stopped() {
-    let observer = RecordingObserver::new();
+    let observer = RecordingPlaybookObserver::new();
     let (mut a_match, _bus) = attached_match(
         Match::new("healthy", vec![], vec![])
             .register_playbook(probe_playbook("apply-schema").into_playbook(), true),
@@ -368,7 +301,7 @@ fn report_terminal_called_twice_stays_stopped() {
 
 #[tokio::test]
 async fn run_playbook_successful_run_reports_started_exactly_once() {
-    let observer = RecordingObserver::new();
+    let observer = RecordingPlaybookObserver::new();
     let (a_match, _bus) = attached_match(
         Match::new("healthy", vec![], vec![])
             .register_playbook(probe_playbook("reset-orders").into_playbook(), false),
@@ -392,7 +325,7 @@ async fn run_playbook_successful_run_reports_started_exactly_once() {
 
 #[tokio::test]
 async fn run_playbook_panicking_run_reports_faulted_rather_than_sticking_at_starting() {
-    let observer = RecordingObserver::new();
+    let observer = RecordingPlaybookObserver::new();
     let (a_match, _bus) = attached_match(
         Match::new("panicking", vec![], vec![]).register_playbook(
             probe_playbook("seed")
@@ -435,7 +368,7 @@ fn exit_two_live_handles_only_reports_stopped_once_the_last_one_goes() {
 
 #[test]
 fn report_starting_while_already_started_is_not_reported_as_illegal() {
-    let observer = RecordingObserver::new();
+    let observer = RecordingPlaybookObserver::new();
     let bus: Arc<EventBus<ScopedPlaybookEvent>> = Arc::new(EventBus::new(CHANNEL));
     bus.register_observer(observer.clone());
     let lifecycle = ScopedPlaybookLifecycle::new("reset-orders");
@@ -507,7 +440,7 @@ async fn faults_read_through_the_playbook_trait_carry_the_reported_fault() {
 
 #[test]
 fn attach_registered_playbook_announces_its_kind_and_held_state() {
-    let observer = RecordingObserver::new();
+    let observer = RecordingPlaybookObserver::new();
     let (_a_match, _bus) = attached_match(
         Match::new("healthy", vec![], vec![])
             .register_playbook(probe_playbook("apply-schema").into_playbook(), true)
@@ -531,7 +464,7 @@ fn attach_registered_playbook_announces_its_kind_and_held_state() {
 
 #[tokio::test]
 async fn report_every_event_carries_the_moment_it_happened() {
-    let observer = RecordingObserver::new();
+    let observer = RecordingPlaybookObserver::new();
     let (a_match, _bus) = attached_match(
         Match::new("healthy", vec![], vec![])
             .register_playbook(probe_playbook("reset-orders").into_playbook(), false),

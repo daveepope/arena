@@ -67,7 +67,7 @@ impl Playbook {
             lifecycle: self
                 .lifecycle
                 .clone()
-                .unwrap_or_else(|| ScopedPlaybookLifecycle::new(self.identifier.clone())),
+                .unwrap_or_else(|| ScopedPlaybookLifecycle::managed(self.identifier.clone())),
             oracle_impl: self.oracle_impl,
             username: self.username,
             password: self.password,

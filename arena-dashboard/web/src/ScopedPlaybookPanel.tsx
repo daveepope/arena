@@ -41,7 +41,8 @@ export function ScopedPlaybookPanel({ arenaId }: { arenaId: string }) {
               >
                 <span className="block truncate">{playbookId}</span>
                 <span className="block text-[9px] uppercase tracking-wide opacity-70">
-                  {playbook.kind} / {playbook.state}
+                  {[playbook.playbookType, playbook.kind].filter(Boolean).join(" ")} /{" "}
+                  {playbook.state}
                 </span>
               </button>
             </li>

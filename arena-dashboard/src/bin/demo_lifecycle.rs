@@ -5,7 +5,7 @@ use arena::component::{Component, RunnableComponent};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::{ClosedArena, Fault, Match, MatchTrait, RunnableState};
 use arena_dashboard::{HttpForwardingObserver, ScopedPlaybookForwarder};
-use arena::playbook::{ActivePlaybook, Playbook, ScopedPlaybookLifecycle};
+use arena::playbook::{ActivePlaybook, Playbook, ScopedPlaybookLifecycle, UnmanagedPlaybook};
 use arena_profile::observer::{register_observer, report, report_complete, unregister_observer};
 use rand::Rng;
 
@@ -260,7 +260,7 @@ impl RunnableComponent for ProbeComponent {
 
 struct ProbePlaybook {
     identifier: String,
-    lifecycle: Arc<ScopedPlaybookLifecycle>,
+    unmanaged: UnmanagedPlaybook,
     fails: bool,
 }
 
@@ -268,7 +268,7 @@ impl ProbePlaybook {
     fn new(identifier: &str) -> Self {
         Self {
             identifier: identifier.to_string(),
-            lifecycle: ScopedPlaybookLifecycle::new(identifier),
+            unmanaged: UnmanagedPlaybook::new(identifier),
             fails: false,
         }
     }
@@ -281,6 +281,17 @@ impl ProbePlaybook {
     fn into_playbook(self) -> Box<dyn Playbook> {
         Box::new(self)
     }
+
+    async fn apply_probe(&self) -> Result<Box<dyn ActivePlaybook>, Fault> {
+        tokio::time::sleep(random_step_delay()).await;
+        if self.fails {
+            return Err(Fault::playbook(&self.identifier, "seed data rejected"));
+        }
+        Ok(Box::new(ProbeActivePlaybook {
+            identifier: self.identifier.clone(),
+            lifecycle: Arc::clone(self.unmanaged.lifecycle()),
+        }))
+    }
 }
 
 #[async_trait::async_trait]
@@ -290,20 +301,11 @@ impl Playbook for ProbePlaybook {
     }
 
     fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
-        &self.lifecycle
+        self.unmanaged.lifecycle()
     }
 
     async fn run(&self, _dependencies: &[Dependency]) -> Result<Box<dyn ActivePlaybook>, Fault> {
-        self.lifecycle.report_starting();
-        tokio::time::sleep(random_step_delay()).await;
-        if self.fails {
-            return Err(Fault::playbook(&self.identifier, "seed data rejected"));
-        }
-        self.lifecycle.report_started();
-        Ok(Box::new(ProbeActivePlaybook {
-            identifier: self.identifier.clone(),
-            lifecycle: Arc::clone(&self.lifecycle),
-        }))
+        self.unmanaged.apply(self.apply_probe()).await
     }
 }
 

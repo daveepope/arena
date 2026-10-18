@@ -45,6 +45,7 @@ export interface CpuProfilerState {
 export interface ScopedPlaybookState {
   state: string;
   kind: string;
+  playbookType: string;
   faults: Fault[];
 }
 
@@ -53,5 +54,6 @@ export interface ScopedPlaybookEntry {
   playbookId: string;
   state: string;
   kind: string;
+  playbookType: string;
   faults: Fault[];
 }

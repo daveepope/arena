@@ -67,6 +67,7 @@ interface RecordedPlaybook {
   playbook: string;
   state: string;
   kind: string;
+  playbook_type: string;
   at: string;
   faults?: Fault[];
 }
@@ -77,6 +78,7 @@ function recordedPlaybookEntry(recorded: RecordedPlaybook): ScopedPlaybookEntry 
     playbookId: recorded.playbook,
     state: recorded.state,
     kind: recorded.kind,
+    playbookType: recorded.playbook_type,
     faults: recorded.faults ?? [],
   };
 }
@@ -399,6 +401,7 @@ export function App() {
             playbookId: data.playbook,
             state: data.state,
             kind: data.kind,
+            playbookType: data.playbook_type,
             faults: Array.isArray(data.faults) ? data.faults : [],
           });
           return;

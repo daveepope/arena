@@ -49,6 +49,8 @@ pub struct CpuProfilePayload {
 pub struct ScopedPlaybookPayload {
     pub arena_id: String,
     pub playbook_id: String,
+    #[serde(default)]
+    pub playbook_type: String,
     pub kind: String,
     pub state: String,
     pub at: String,

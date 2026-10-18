@@ -53,6 +53,27 @@ rust_test(
 )
 
 rust_test(
+    name = "playbook_test",
+    srcs = [
+        "tests/unit/playbook_test.rs",
+        "tests/unit/subjects.rs",
+    ],
+    crate_root = "tests/unit/playbook_test.rs",
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
     name = "playbook_lifecycle_test",
     srcs = [
         "tests/unit/playbook/lifecycle_test.rs",

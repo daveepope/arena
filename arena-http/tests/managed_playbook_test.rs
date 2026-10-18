@@ -73,6 +73,10 @@ async fn run_dependency_present_applies_build_fn() {
 
     let active = playbook.run(&deps).await.expect("playbook should run");
     assert_eq!(active.identifier(), "managed-run");
+    assert_eq!(
+        active.lifecycle().playbook_type(),
+        arena::playbook::PlaybookType::Managed
+    );
 }
 
 #[tokio::test]
@@ -133,4 +137,14 @@ async fn run_missing_dependency_leaves_the_playbook_starting_until_the_arena_rep
     let _ = playbook.run(&deps).await;
 
     assert_eq!(playbook.state(), RunnableState::Starting);
+}
+
+#[test]
+fn playbook_type_arena_provided_playbook_reports_managed() {
+    let playbook = ManagedHttpPlaybook::new("type-probe", "http-dep", |p| Ok(p));
+
+    assert_eq!(
+        playbook.lifecycle().playbook_type(),
+        arena::playbook::PlaybookType::Managed
+    );
 }

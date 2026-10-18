@@ -177,7 +177,7 @@ impl Playbook {
             lifecycle: self
                 .lifecycle
                 .clone()
-                .unwrap_or_else(|| ScopedPlaybookLifecycle::new(self.identifier.clone())),
+                .unwrap_or_else(|| ScopedPlaybookLifecycle::managed(self.identifier.clone())),
             identifier: self.identifier,
             admin_url: self.admin_url,
             trusted_tls_certificate_pem: self.trusted_tls_certificate_pem,

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `arena`: `ManagedPlaybook` and `UnmanagedPlaybook` base types own a playbook's lifecycle and its start reporting, mirroring the client libraries' split; the five Arena-provided playbooks hold the managed one, leaving the FFI and every client untouched
+- `arena`, `arena-dashboard`: playbook events carry `playbook_type`, stamped `managed` or `unmanaged` by the base class that built the playbook, and each dashboard row names it; the field stays inside the playbook event channel, so the FFI and the client libraries have no counterpart and a client-implemented playbook never reaches the Rust side to be labelled
 - `arena`: playbook events name their kind, `startup` or `scoped`, and carry the moment they happened; every registered playbook is announced once the arena has announced itself, so a playbook that has not run yet is still visible
 - `arena-dashboard`: playbook reports join the arena's own timeline, recorded per arena and served from `GET /history`, so the graph and the playbook panel replay and scrub off one history keyed by the arena's own timestamps
 - `arena-dashboard`: a canvas whose server connection is lost says so, keeps showing the last known state, and offers replay for as far as it got

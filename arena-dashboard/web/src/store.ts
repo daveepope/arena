@@ -118,6 +118,7 @@ function withPlaybook(
   return new Map(playbooks).set(reported.playbookId, {
     state: reported.state,
     kind: reported.kind,
+    playbookType: reported.playbookType,
     faults: reported.faults,
   });
 }

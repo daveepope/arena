@@ -121,3 +121,13 @@ async fn run_missing_dependency_leaves_the_playbook_starting_until_the_arena_rep
 
     assert_eq!(playbook.state(), RunnableState::Starting);
 }
+
+#[test]
+fn playbook_type_arena_provided_playbook_reports_managed() {
+    let playbook = ManagedMssqlPlaybook::new("type-probe", "mssql-dep");
+
+    assert_eq!(
+        playbook.lifecycle().playbook_type(),
+        arena::playbook::PlaybookType::Managed
+    );
+}

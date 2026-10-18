@@ -15,4 +15,6 @@ pub use crate::lifecycle::{
     ArenaLifecyclePublisher, RunnableState, Subject,
 };
 pub use crate::matches::{Match, MatchTrait};
-pub use crate::playbook::{ActivePlaybook, Playbook};
+pub use crate::playbook::{
+    ActivePlaybook, ManagedPlaybook, Playbook, PlaybookType, UnmanagedPlaybook,
+};

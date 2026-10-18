@@ -1,6 +1,8 @@
 use arena::dependency::{find_dependency, Dependency};
 use arena::lifecycle::Fault;
-use arena::playbook::{ActivePlaybook, Playbook as PlaybookTrait, ScopedPlaybookLifecycle};
+use arena::playbook::{
+    ActivePlaybook, ManagedPlaybook, Playbook as PlaybookTrait, ScopedPlaybookLifecycle,
+};
 use std::sync::Arc;
 use async_trait::async_trait;
 
@@ -10,7 +12,7 @@ use crate::playbook::Playbook;
 type BuildFn = dyn Fn(Playbook) -> Result<Playbook, Fault> + Send + Sync;
 
 pub struct ManagedHttpPlaybook {
-    lifecycle: Arc<ScopedPlaybookLifecycle>,
+    managed: ManagedPlaybook,
     identifier: String,
     dependency_identifier: String,
     build: Box<BuildFn>,
@@ -27,7 +29,7 @@ impl ManagedHttpPlaybook {
     {
         let identifier = identifier.into();
         Self {
-            lifecycle: ScopedPlaybookLifecycle::new(identifier.clone()),
+            managed: ManagedPlaybook::new(identifier.clone()),
             identifier,
             dependency_identifier: dependency_identifier.into(),
             build: Box::new(build),
@@ -46,18 +48,11 @@ impl PlaybookTrait for ManagedHttpPlaybook {
     }
 
     fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
-        &self.lifecycle
+        self.managed.lifecycle()
     }
 
     async fn run(&self, dependencies: &[Dependency]) -> Result<Box<dyn ActivePlaybook>, Fault> {
-        self.lifecycle.report_starting();
-        match self.run_inner(dependencies).await {
-            Ok(active) => {
-                self.lifecycle.report_started();
-                Ok(active)
-            }
-            Err(fault) => Err(fault),
-        }
+        self.managed.apply(self.run_inner(dependencies)).await
     }
 }
 
@@ -90,7 +85,7 @@ impl ManagedHttpPlaybook {
 
         let playbook = (self.build)(http.playbook())?
             .with_identifier(&self.identifier)
-            .with_lifecycle(Arc::clone(&self.lifecycle));
+            .with_lifecycle(Arc::clone(self.managed.lifecycle()));
         Ok(Box::new(playbook.run().await))
     }
 }

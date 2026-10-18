@@ -451,7 +451,7 @@ function playbookEntry(
   at = 1,
   kind = "scoped",
 ): ScopedPlaybookEntry {
-  return { at, playbookId, state, kind, faults: [] };
+  return { at, playbookId, state, kind, playbookType: "managed", faults: [] };
 }
 
 describe("useDashboardStore playbooks", () => {

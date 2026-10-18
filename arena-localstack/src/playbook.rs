@@ -49,7 +49,7 @@ impl Playbook {
             lifecycle: self
                 .lifecycle
                 .clone()
-                .unwrap_or_else(|| ScopedPlaybookLifecycle::new(self.identifier.clone())),
+                .unwrap_or_else(|| ScopedPlaybookLifecycle::managed(self.identifier.clone())),
             endpoint: self.endpoint,
             identifier: self.identifier,
             queue_urls: self.queue_urls,

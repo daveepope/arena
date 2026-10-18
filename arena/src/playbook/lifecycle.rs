@@ -11,6 +11,13 @@ pub const CHANNEL: &str = "scoped-playbook";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
+pub enum PlaybookType {
+    Managed,
+    Unmanaged,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum PlaybookKind {
     Startup,
     Scoped,
@@ -20,6 +27,7 @@ pub enum PlaybookKind {
 pub struct ScopedPlaybookEvent {
     pub arena_id: String,
     pub playbook_id: String,
+    pub playbook_type: PlaybookType,
     pub kind: PlaybookKind,
     pub state: RunnableState,
     pub faults: Vec<Fault>,
@@ -31,6 +39,7 @@ impl ScopedPlaybookEvent {
     pub fn new(
         arena_id: impl Into<String>,
         playbook_id: impl Into<String>,
+        playbook_type: PlaybookType,
         kind: PlaybookKind,
         state: RunnableState,
         faults: Vec<Fault>,
@@ -38,6 +47,7 @@ impl ScopedPlaybookEvent {
         Self {
             arena_id: arena_id.into(),
             playbook_id: playbook_id.into(),
+            playbook_type,
             kind,
             state,
             faults,
@@ -54,6 +64,7 @@ struct Attachment {
 
 pub struct ScopedPlaybookLifecycle {
     playbook_id: String,
+    playbook_type: PlaybookType,
     state: Mutex<RunnableState>,
     faults: Mutex<Vec<Fault>>,
     attachment: Mutex<Option<Attachment>>,
@@ -62,8 +73,17 @@ pub struct ScopedPlaybookLifecycle {
 
 impl ScopedPlaybookLifecycle {
     pub fn new(playbook_id: impl Into<String>) -> Arc<Self> {
+        Self::of_type(playbook_id, PlaybookType::Unmanaged)
+    }
+
+    pub fn managed(playbook_id: impl Into<String>) -> Arc<Self> {
+        Self::of_type(playbook_id, PlaybookType::Managed)
+    }
+
+    fn of_type(playbook_id: impl Into<String>, playbook_type: PlaybookType) -> Arc<Self> {
         Arc::new(Self {
             playbook_id: playbook_id.into(),
+            playbook_type,
             state: Mutex::new(RunnableState::NotStarted),
             faults: Mutex::new(Vec::new()),
             attachment: Mutex::new(None),
@@ -87,6 +107,10 @@ impl ScopedPlaybookLifecycle {
 
     pub fn playbook_id(&self) -> &str {
         &self.playbook_id
+    }
+
+    pub fn playbook_type(&self) -> PlaybookType {
+        self.playbook_type
     }
 
     pub fn state(&self) -> RunnableState {
@@ -175,6 +199,7 @@ impl ScopedPlaybookLifecycle {
         publisher.publish(&ScopedPlaybookEvent::new(
             arena_id,
             self.playbook_id.clone(),
+            self.playbook_type,
             kind,
             state,
             self.faults(),

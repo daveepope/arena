@@ -37,10 +37,11 @@ function report(
   faults: Fault[] = [],
   kind = "scoped",
   at = 1,
+  playbookType = "managed",
 ) {
   useDashboardStore
     .getState()
-    .ingestScopedPlaybook(arenaId, { at, playbookId, state, kind, faults });
+    .ingestScopedPlaybook(arenaId, { at, playbookId, state, kind, playbookType, faults });
 }
 
 beforeEach(() => {
@@ -116,6 +117,16 @@ describe("ScopedPlaybookPanel", () => {
     expect(selected?.title).toBe("reset-orders");
     expect(selected?.detail).toContain("kind: playbook");
     expect(selected?.detail).toContain("seed data rejected");
+  });
+
+  it("rowNamesItsPlaybookType", () => {
+    report(ARENA, "seed-reference-data", "started", [], "scoped", 1, "unmanaged");
+
+    render(<ScopedPlaybookPanel arenaId={ARENA} />);
+
+    expect(screen.getByTestId("scoped-playbook-seed-reference-data").textContent).toContain(
+      "unmanaged",
+    );
   });
 
   it("startupPlaybookRowNamesItsKind", () => {

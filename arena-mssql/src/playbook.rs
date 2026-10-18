@@ -57,7 +57,7 @@ impl Playbook {
             lifecycle: self
                 .lifecycle
                 .clone()
-                .unwrap_or_else(|| ScopedPlaybookLifecycle::new(self.identifier.clone())),
+                .unwrap_or_else(|| ScopedPlaybookLifecycle::managed(self.identifier.clone())),
             connection_string: self.connection_string,
             identifier: self.identifier,
             managed_tables: tables,
