@@ -900,12 +900,6 @@ impl MatchTrait for Match {
             let _ = catch_unwind(AssertUnwindSafe(|| comp.release()));
         }
         let _ = catch_unwind(AssertUnwindSafe(|| self.active_playbooks.clear()));
-        for (playbook, _) in &self.playbooks {
-            if playbook.state() == RunnableState::Started {
-                playbook.lifecycle().report(RunnableState::Stopping);
-                playbook.lifecycle().report(RunnableState::Stopped);
-            }
-        }
         for dep in self.dependencies.iter_mut().rev() {
             let _ = catch_unwind(AssertUnwindSafe(|| dep.release()));
         }

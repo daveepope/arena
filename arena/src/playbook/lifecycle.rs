@@ -61,19 +61,29 @@ impl ScopedPlaybookLifecycle {
     }
 
     pub fn report(&self, next: RunnableState) {
-        let current = self.state();
-        if !RunnableRule.is_legal(current, next) {
-            tracing::error!(
-                playbook = %self.playbook_id,
-                from = %current,
-                to = %next,
-                phase = "illegal_playbook_transition",
-                "refusing to report an illegal playbook transition"
-            );
+        {
+            let mut current = self.state.lock().unwrap_or_else(|e| e.into_inner());
+            if !RunnableRule.is_legal(*current, next) {
+                tracing::error!(
+                    playbook = %self.playbook_id,
+                    from = %*current,
+                    to = %next,
+                    phase = "illegal_playbook_transition",
+                    "refusing to report an illegal playbook transition"
+                );
+                return;
+            }
+            *current = next;
+        }
+        self.publish(next);
+    }
+
+    pub fn report_terminal(&self) {
+        if self.state() != RunnableState::Started {
             return;
         }
-        *self.state.lock().unwrap_or_else(|e| e.into_inner()) = next;
-        self.publish(next);
+        self.report(RunnableState::Stopping);
+        self.report(RunnableState::Stopped);
     }
 
     pub fn report_fault(&self, fault: Fault) {

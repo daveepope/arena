@@ -293,3 +293,59 @@ async fn release_all_marks_a_started_playbook_stopped() {
     );
 }
 
+#[test]
+fn report_terminal_from_started_reports_stopping_then_stopped() {
+    let lifecycle = ScopedPlaybookLifecycle::new("reset-orders");
+    lifecycle.report(RunnableState::Starting);
+    lifecycle.report(RunnableState::Started);
+
+    lifecycle.report_terminal();
+
+    assert_eq!(lifecycle.state(), RunnableState::Stopped);
+}
+
+#[test]
+fn report_terminal_from_a_handle_that_never_started_does_nothing() {
+    let lifecycle = ScopedPlaybookLifecycle::new("reset-orders");
+
+    lifecycle.report_terminal();
+
+    assert_eq!(lifecycle.state(), RunnableState::NotStarted);
+}
+
+#[test]
+fn report_terminal_called_twice_stays_stopped() {
+    let lifecycle = ScopedPlaybookLifecycle::new("reset-orders");
+    lifecycle.report(RunnableState::Starting);
+    lifecycle.report(RunnableState::Started);
+
+    lifecycle.report_terminal();
+    lifecycle.report_terminal();
+
+    assert_eq!(lifecycle.state(), RunnableState::Stopped);
+}
+
+#[tokio::test]
+async fn run_playbook_successful_run_reports_started_exactly_once() {
+    let observer = RecordingObserver::new();
+    let (a_match, _bus) = attached_match(
+        Match::new("healthy", vec![], vec![])
+            .register_playbook(probe_playbook("reset-orders").into_playbook(), false),
+        observer.clone(),
+    );
+
+    let active = a_match
+        .run_playbook("reset-orders")
+        .await
+        .expect("playbook registered")
+        .expect("playbook should run");
+    drop(active);
+
+    let started = observer
+        .states_for("reset-orders")
+        .into_iter()
+        .filter(|state| *state == RunnableState::Started)
+        .count();
+    assert_eq!(started, 1);
+}
+

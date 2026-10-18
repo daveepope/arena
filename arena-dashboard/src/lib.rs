@@ -6,7 +6,7 @@ pub mod observer;
 pub mod server;
 
 pub use launcher::{ensure_running, LaunchError, DEFAULT_PORT};
-pub use observer::HttpForwardingObserver;
+pub use observer::{HttpForwardingObserver, ScopedPlaybookForwarder};
 pub use server::{
     app, live_event_stream, record_history, AppState, ServerShutdown, HISTORY_LIMIT_PER_ARENA,
 };

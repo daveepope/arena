@@ -18,6 +18,10 @@ impl Observer<ArenaState> for ObserverAdapter {
     fn on_event(&self, event: &ArenaState) {
         self.observer.on_state(event);
     }
+
+    fn flush(&self, deadline: std::time::Instant) {
+        self.observer.flush(deadline);
+    }
 }
 
 pub struct ArenaLifecyclePublisher {

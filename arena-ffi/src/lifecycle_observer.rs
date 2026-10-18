@@ -39,6 +39,12 @@ struct RegisteredObserver {
     recipient: Arc<dyn ArenaLifecycleObserver>,
 }
 
+type ScopedPlaybookObserver =
+    Arc<dyn arena::lifecycle::bus::Observer<arena::playbook::ScopedPlaybookEvent>>;
+
+static SCOPED_PLAYBOOK_OBSERVERS: std::sync::Mutex<Vec<(u64, ScopedPlaybookObserver)>> =
+    std::sync::Mutex::new(Vec::new());
+
 static REGISTERED_OBSERVERS: LazyLock<ArcSwap<Vec<RegisteredObserver>>> =
     LazyLock::new(|| ArcSwap::from_pointee(Vec::new()));
 
@@ -69,6 +75,32 @@ fn observer_is_registered(token: u64) -> bool {
         .load()
         .iter()
         .any(|entry| entry.token == token)
+}
+
+pub(crate) fn register_scoped_playbook_observer(
+    lifecycle_token: u64,
+    recipient: ScopedPlaybookObserver,
+) {
+    SCOPED_PLAYBOOK_OBSERVERS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .push((lifecycle_token, recipient));
+}
+
+pub(crate) fn registered_scoped_playbook_observers() -> Vec<ScopedPlaybookObserver> {
+    SCOPED_PLAYBOOK_OBSERVERS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .map(|(_, recipient)| Arc::clone(recipient))
+        .collect()
+}
+
+pub(crate) fn remove_scoped_playbook_observers(lifecycle_token: u64) {
+    SCOPED_PLAYBOOK_OBSERVERS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .retain(|(token, _)| *token != lifecycle_token);
 }
 
 pub(crate) fn registered_observers() -> Vec<Arc<dyn ArenaLifecycleObserver>> {
@@ -127,6 +159,7 @@ pub extern "C" fn arena_remove_lifecycle_observer(token: u64) {
         if let Some(profile_token) = take_paired_cpu_profile_observer(token) {
             arena_profile::unregister_observer(profile_token);
         }
+        remove_scoped_playbook_observers(token);
         REGISTERED_OBSERVERS.rcu(|current| {
             let next: Vec<RegisteredObserver> = (**current)
                 .iter()

@@ -69,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena`: `LifecycleRule` validates state transitions, `Monotonic` for the arena phase and `RunnableRule` for any restartable subject, so an illegal transition is logged as a defect rather than published
 - `arena`: scoped playbooks report their own `RunnableState` on their own channel, `Starting` and `Started` from the playbook and `Stopping` and `Stopped` from the handle's drop, so a playbook that runs and stops repeatedly is observable; events carry the arena id, and a failing playbook's fault lands on its own row
 - `arena`: `LifecycleContext` is renamed `ArenaLifecyclePublisher` and moved to `lifecycle/publisher.rs`, since it only ever publishes
+- `arena-dashboard`: `HttpForwardingObserver` observes all three event channels through small single-event forwarders rather than one type with three callbacks, posts scoped playbook events to `/playbook/scoped`, and its drain is now an explicit `flush` that `Drop` calls as a backstop
 - `arena-dashboard`: an arena id starting a fresh run replaces the finished run's history and log instead of appending to it, so a second run no longer reads as the same arena starting and tearing down twice
 - `arena-dashboard`: replay and the no-auto-replay guarantee are now covered by tests, the first coverage that feature has had
 - `arena-dashboard`: a live-joined page draws its graph edges again; react-flow's `remove` changes are no longer applied to nodes and edges that are derived from the arena snapshot

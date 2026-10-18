@@ -64,6 +64,10 @@ pub extern "C" fn arena_register_dashboard_observer(dashboard_url_utf8: *const c
         if token == 0 {
             return 0;
         }
+        crate::lifecycle_observer::register_scoped_playbook_observer(
+            token,
+            arena_dashboard::ScopedPlaybookForwarder::new(Arc::clone(&forwarder)),
+        );
         let profile_token = arena_profile::register_observer(
             forwarder as Arc<dyn arena_profile::CpuProfileObserver>,
         );

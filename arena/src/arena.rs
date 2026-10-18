@@ -504,7 +504,6 @@ impl Drop for OpenArena {
             phase = "drop_without_close",
             "arena dropped without close; releasing subjects without a graceful stop"
         );
-        let _ = catch_unwind(AssertUnwindSafe(|| self.drain_event_buses()));
         for a_match in self.matches.iter_mut() {
             let outcome = catch_unwind(AssertUnwindSafe(|| a_match.release_all()));
             if let Err(payload) = outcome {

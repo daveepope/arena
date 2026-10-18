@@ -3,7 +3,6 @@ pub mod response;
 pub mod stub;
 pub mod verify;
 
-use arena::lifecycle::RunnableState;
 use arena::playbook::ScopedPlaybookLifecycle;
 use std::sync::Arc;
 use crate::admin_client::admin_api_client;
@@ -511,9 +510,11 @@ impl ActivePlaybook {
 
 impl Drop for ActivePlaybook {
     fn drop(&mut self) {
-        self.lifecycle.report(RunnableState::Stopping);
-        self.teardown();
-        self.lifecycle.report(RunnableState::Stopped);
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.teardown()));
+        self.lifecycle.report_terminal();
+        if let Err(payload) = outcome {
+            std::panic::resume_unwind(payload);
+        }
     }
 }
 

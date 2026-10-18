@@ -2,7 +2,9 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use arena::lifecycle::{ArenaLifecycleObserver, ArenaLifecycleState, ArenaState, RunnableState};
-use arena_dashboard::HttpForwardingObserver;
+use arena::lifecycle::bus::Observer;
+use arena::playbook::ScopedPlaybookEvent;
+use arena_dashboard::{HttpForwardingObserver, ScopedPlaybookForwarder};
 use arena_profile::{CpuProfileEvent, CpuProfileObserver};
 use axum::extract::State;
 use axum::routing::post;
@@ -14,6 +16,12 @@ async fn start_capture_server(bodies: CapturedBodies) -> String {
     let router = Router::new()
         .route(
             "/ingest",
+            post(|State(captured): State<CapturedBodies>, body: String| async move {
+                captured.lock().expect("capture lock").push(body);
+            }),
+        )
+        .route(
+            "/playbook/scoped",
             post(|State(captured): State<CapturedBodies>, body: String| async move {
                 captured.lock().expect("capture lock").push(body);
             }),
@@ -218,4 +226,66 @@ async fn on_cpu_profile_everytransition_isforwardedinorder() {
         })
         .collect();
     assert_eq!(states, vec!["starting", "started", "stopping"]);
+}
+
+fn scoped_playbook_event(playbook_id: &str) -> ScopedPlaybookEvent {
+    ScopedPlaybookEvent {
+        arena_id: "arena-under-test".to_string(),
+        playbook_id: playbook_id.to_string(),
+        state: RunnableState::Started,
+        faults: Vec::new(),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn on_event_scoped_playbook_is_forwarded_with_its_arena_and_state() {
+    let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
+    let url = start_capture_server(Arc::clone(&bodies)).await;
+    let forwarder = Arc::new(HttpForwardingObserver::new(url));
+    let playbooks = ScopedPlaybookForwarder::new(Arc::clone(&forwarder));
+
+    playbooks.on_event(&scoped_playbook_event("reset-orders"));
+    drop(playbooks);
+    drop(forwarder);
+
+    let captured = bodies.lock().expect("capture lock").clone();
+    assert_eq!(captured.len(), 1);
+    assert!(captured[0].contains("reset-orders"), "got: {}", captured[0]);
+    assert!(captured[0].contains("arena-under-test"), "got: {}", captured[0]);
+    assert!(captured[0].contains("started"), "got: {}", captured[0]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn on_event_scoped_playbook_forwarder_does_not_forward_arena_states() {
+    let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
+    let url = start_capture_server(Arc::clone(&bodies)).await;
+    let forwarder = Arc::new(HttpForwardingObserver::new(url));
+    let playbooks = ScopedPlaybookForwarder::new(Arc::clone(&forwarder));
+
+    playbooks.on_event(&scoped_playbook_event("reset-orders"));
+    playbooks.on_event(&scoped_playbook_event("seed-reference-data"));
+    drop(playbooks);
+    drop(forwarder);
+
+    let captured = bodies.lock().expect("capture lock").clone();
+    assert_eq!(captured.len(), 2);
+    assert!(captured.iter().all(|body| body.contains("playbook_id")));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn on_event_every_channel_shares_one_forwarding_thread() {
+    let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
+    let url = start_capture_server(Arc::clone(&bodies)).await;
+    let forwarder = Arc::new(HttpForwardingObserver::new(url));
+    let playbooks = ScopedPlaybookForwarder::new(Arc::clone(&forwarder));
+
+    forwarder.on_state(&arena_state("shared-arena"));
+    playbooks.on_event(&scoped_playbook_event("reset-orders"));
+    drop(playbooks);
+    drop(forwarder);
+
+    let captured = bodies.lock().expect("capture lock").clone();
+    assert_eq!(captured.len(), 2);
+    assert!(captured[0].contains("shared-arena"));
+    assert!(captured[1].contains("reset-orders"));
 }

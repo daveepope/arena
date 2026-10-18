@@ -91,8 +91,6 @@ impl ManagedHttpPlaybook {
         let playbook = (self.build)(http.playbook())?
             .with_identifier(&self.identifier)
             .with_lifecycle(Arc::clone(&self.lifecycle));
-        let active = playbook.run().await;
-        self.lifecycle.report(RunnableState::Started);
-        Ok(Box::new(active))
+        Ok(Box::new(playbook.run().await))
     }
 }
