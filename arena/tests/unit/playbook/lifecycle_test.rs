@@ -349,3 +349,60 @@ async fn run_playbook_successful_run_reports_started_exactly_once() {
     assert_eq!(started, 1);
 }
 
+#[tokio::test]
+async fn run_playbook_panicking_run_reports_faulted_rather_than_sticking_at_starting() {
+    let observer = RecordingObserver::new();
+    let (a_match, _bus) = attached_match(
+        Match::new("panicking", vec![], vec![]).register_playbook(
+            probe_playbook("seed")
+                .behaving(Behaviour::PanicStart)
+                .into_playbook(),
+            false,
+        ),
+        observer.clone(),
+    );
+
+    let outcome = a_match
+        .run_playbook("seed")
+        .await
+        .expect("playbook registered");
+
+    assert!(outcome.is_err());
+    assert_eq!(
+        observer.states_for("seed"),
+        vec![RunnableState::Starting, RunnableState::Faulted]
+    );
+}
+
+#[test]
+fn exit_two_live_handles_only_reports_stopped_once_the_last_one_goes() {
+    let lifecycle = ScopedPlaybookLifecycle::new("reset-orders");
+    lifecycle.report_starting();
+    lifecycle.report_started();
+    lifecycle.report_started();
+
+    lifecycle.exit();
+    assert_eq!(lifecycle.state(), RunnableState::Started);
+
+    lifecycle.exit();
+    assert_eq!(lifecycle.state(), RunnableState::Stopped);
+}
+
+#[test]
+fn report_starting_while_already_started_is_not_reported_as_illegal() {
+    let observer = RecordingObserver::new();
+    let bus: Arc<EventBus<ScopedPlaybookEvent>> = Arc::new(EventBus::new(CHANNEL));
+    bus.register_observer(observer.clone());
+    let lifecycle = ScopedPlaybookLifecycle::new("reset-orders");
+    lifecycle.attach(ARENA_ID, Arc::clone(&bus) as Arc<dyn Publisher<ScopedPlaybookEvent>>);
+    lifecycle.report_starting();
+    lifecycle.report_started();
+
+    lifecycle.report_starting();
+
+    assert_eq!(
+        observer.states_for("reset-orders"),
+        vec![RunnableState::Starting, RunnableState::Started]
+    );
+}
+

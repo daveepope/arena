@@ -378,3 +378,184 @@ async fn get_cpu_profile_laterrunsamplednothing_returnsnotfound() {
 
     assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
 }
+
+async fn post_scoped_playbook(
+    base_url: &str,
+    arena: &str,
+    playbook: &str,
+    body: serde_json::Value,
+) -> reqwest::StatusCode {
+    reqwest::Client::new()
+        .post(format!("{base_url}/arena/{arena}/playbook/{playbook}"))
+        .json(&body)
+        .send()
+        .await
+        .expect("post scoped playbook")
+        .status()
+}
+
+#[tokio::test]
+async fn post_scoped_playbook_validpayload_isaccepted() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = post_scoped_playbook(
+        &base_url,
+        "arena-orders",
+        "reset-orders",
+        serde_json::json!({
+            "arena_id": "arena-orders",
+            "playbook_id": "reset-orders",
+            "state": "started",
+            "faults": []
+        }),
+    )
+    .await;
+
+    assert_eq!(status, reqwest::StatusCode::ACCEPTED);
+}
+
+#[tokio::test]
+async fn post_scoped_playbook_malformedbody_isrejected() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = reqwest::Client::new()
+        .post(format!("{base_url}/arena/arena-orders/playbook/reset-orders"))
+        .body("not json")
+        .send()
+        .await
+        .expect("post scoped playbook")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn post_scoped_playbook_twoarenassameplaybookid_arekeptapart() {
+    let (base_url, state) = serve_dashboard().await;
+    let body = |arena: &str| {
+        serde_json::json!({
+            "arena_id": arena,
+            "playbook_id": "reset-orders",
+            "state": "started",
+            "faults": []
+        })
+    };
+
+    post_scoped_playbook(&base_url, "arena-orders", "reset-orders", body("arena-orders")).await;
+    post_scoped_playbook(&base_url, "arena-catalog", "reset-orders", body("arena-catalog")).await;
+
+    assert_eq!(state.scoped_playbook_count(), 2);
+}
+
+#[tokio::test]
+async fn post_scoped_playbook_pathdisagreeingwithbody_isrejected() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = post_scoped_playbook(
+        &base_url,
+        "arena-orders",
+        "reset-orders",
+        serde_json::json!({
+            "arena_id": "arena-catalog",
+            "playbook_id": "reset-orders",
+            "state": "started",
+            "faults": []
+        }),
+    )
+    .await;
+
+    assert_eq!(status, reqwest::StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn post_scoped_playbook_faults_reachthebrowserinfull() {
+    let (base_url, state) = serve_dashboard().await;
+    let mut events = state.subscribe();
+
+    post_scoped_playbook(
+        &base_url,
+        "arena-orders",
+        "reset-orders",
+        serde_json::json!({
+            "arena_id": "arena-orders",
+            "playbook_id": "reset-orders",
+            "state": "faulted",
+            "faults": [{
+                "id": "reset-orders",
+                "subject": "playbook",
+                "message": "seed data rejected",
+                "at": "2026-10-18T00:00:00.000Z"
+            }]
+        }),
+    )
+    .await;
+
+    let announcement = events.recv().await.expect("announcement");
+    assert!(announcement.contains("seed data rejected"), "got: {announcement}");
+}
+
+#[tokio::test]
+async fn clear_scopedplaybooksheld_areforgotten() {
+    let (base_url, state) = serve_dashboard().await;
+    post_scoped_playbook(
+        &base_url,
+        "arena-orders",
+        "reset-orders",
+        serde_json::json!({
+            "arena_id": "arena-orders",
+            "playbook_id": "reset-orders",
+            "state": "started",
+            "faults": []
+        }),
+    )
+    .await;
+    assert_eq!(state.scoped_playbook_count(), 1);
+
+    reqwest::Client::new()
+        .post(format!("{base_url}/clear"))
+        .send()
+        .await
+        .expect("clear");
+
+    assert_eq!(state.scoped_playbook_count(), 0);
+}
+
+#[tokio::test]
+async fn post_scoped_playbook_beyondthelimit_isrefusedratherthangrowing() {
+    let (base_url, state) = serve_dashboard().await;
+    for index in 0..arena_dashboard::server::SCOPED_PLAYBOOK_LIMIT {
+        let playbook = format!("playbook-{index}");
+        post_scoped_playbook(
+            &base_url,
+            "arena-orders",
+            &playbook,
+            serde_json::json!({
+                "arena_id": "arena-orders",
+                "playbook_id": playbook,
+                "state": "started",
+                "faults": []
+            }),
+        )
+        .await;
+    }
+
+    let status = post_scoped_playbook(
+        &base_url,
+        "arena-orders",
+        "one-too-many",
+        serde_json::json!({
+            "arena_id": "arena-orders",
+            "playbook_id": "one-too-many",
+            "state": "started",
+            "faults": []
+        }),
+    )
+    .await;
+
+    assert_eq!(status, reqwest::StatusCode::INSUFFICIENT_STORAGE);
+    assert_eq!(
+        state.scoped_playbook_count(),
+        arena_dashboard::server::SCOPED_PLAYBOOK_LIMIT
+    );
+}
+

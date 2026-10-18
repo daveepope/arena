@@ -13,7 +13,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 use std::time::Instant;
 
-const EVENT_FLUSH_BUDGET: std::time::Duration = std::time::Duration::from_secs(2);
+const EVENT_FLUSH_BUDGET: std::time::Duration = std::time::Duration::from_millis(200);
 
 #[derive(Clone, Copy)]
 enum ResetKind {

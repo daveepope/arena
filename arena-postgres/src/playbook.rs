@@ -184,9 +184,15 @@ impl ActivePlaybook {
 impl Drop for ActivePlaybook {
     fn drop(&mut self) {
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.teardown()));
-        self.lifecycle.report_terminal();
-        if let Err(payload) = outcome {
-            std::panic::resume_unwind(payload);
+        match outcome {
+            Ok(()) => self.lifecycle.exit(),
+            Err(payload) => {
+                self.lifecycle.report_fault(arena::lifecycle::Fault::playbook(
+                    self.lifecycle.playbook_id(),
+                    "playbook teardown failed",
+                ));
+                std::panic::resume_unwind(payload);
+            }
         }
     }
 }

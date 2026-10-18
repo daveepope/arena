@@ -1,6 +1,6 @@
 use std::sync::mpsc::{channel, Sender};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -21,13 +21,12 @@ enum Forwarded {
     ScopedPlaybook(ScopedPlaybookEvent),
 }
 
-const DRAIN_POLL_INTERVAL: Duration = Duration::from_millis(5);
-
 pub struct HttpForwardingObserver {
     sender: Mutex<Option<Sender<Forwarded>>>,
     handle: Mutex<Option<JoinHandle<()>>>,
     drain_deadline: Arc<OnceLock<Instant>>,
     pending: Arc<AtomicUsize>,
+    drained: Arc<(Mutex<()>, Condvar)>,
 }
 
 impl HttpForwardingObserver {
@@ -38,18 +37,25 @@ impl HttpForwardingObserver {
         let forwarding_deadline = Arc::clone(&drain_deadline);
         let pending = Arc::new(AtomicUsize::new(0));
         let forwarding_pending = Arc::clone(&pending);
+        let drained: Arc<(Mutex<()>, Condvar)> = Arc::new((Mutex::new(()), Condvar::new()));
+        let forwarding_drained = Arc::clone(&drained);
+
         let handle = thread::spawn(move || {
             let Some(client) = build_client(INGEST_TIMEOUT) else {
-                for _ in receiver {}
+                for _ in receiver {
+                    forwarding_pending.fetch_sub(1, Ordering::SeqCst);
+                    forwarding_drained.1.notify_all();
+                }
                 return;
             };
             let base_url = dashboard_url.trim_end_matches('/');
             let ingest_url = format!("{base_url}/ingest");
             let cpu_profile_url = format!("{base_url}/profile/cpu");
-            let scoped_playbook_url = format!("{base_url}/playbook/scoped");
+            let scoped_playbook_base = base_url.to_string();
             let mut past_budget = 0usize;
             for forwarded in receiver {
-                let _outstanding = PendingGuard(Arc::clone(&forwarding_pending));
+                let _outstanding =
+                    PendingGuard(Arc::clone(&forwarding_pending), Arc::clone(&forwarding_drained));
                 if forwarding_deadline
                     .get()
                     .is_some_and(|deadline| Instant::now() >= *deadline)
@@ -70,7 +76,23 @@ impl HttpForwardingObserver {
                         let _ = client.post(&cpu_profile_url).json(&payload).send();
                     }
                     Forwarded::ScopedPlaybook(event) => {
-                        let _ = client.post(&scoped_playbook_url).json(&event).send();
+                        let Some(url) = scoped_playbook_url(
+                            &scoped_playbook_base,
+                            &event.arena_id,
+                            &event.playbook_id,
+                        ) else {
+                            continue;
+                        };
+                        match client.post(url).json(&event).send() {
+                            Ok(response) if !response.status().is_success() => {
+                                tracing::warn!(
+                                    status = %response.status(),
+                                    playbook = %event.playbook_id,
+                                    "arena-dashboard rejected a scoped playbook update"
+                                );
+                            }
+                            _ => {}
+                        }
                     }
                 }
             }
@@ -87,6 +109,7 @@ impl HttpForwardingObserver {
             handle: Mutex::new(Some(handle)),
             drain_deadline,
             pending,
+            drained,
         }
     }
 }
@@ -96,9 +119,6 @@ impl ArenaLifecycleObserver for HttpForwardingObserver {
         self.forward(Forwarded::State(state.clone()), "state update");
     }
 
-    fn flush(&self, deadline: Instant) {
-        self.flush_within(deadline.saturating_duration_since(Instant::now()));
-    }
 }
 
 impl CpuProfileObserver for HttpForwardingObserver {
@@ -125,10 +145,6 @@ impl Observer<ScopedPlaybookEvent> for ScopedPlaybookForwarder {
         );
     }
 
-    fn flush(&self, deadline: Instant) {
-        self.forwarder
-            .flush_within(deadline.saturating_duration_since(Instant::now()));
-    }
 }
 
 impl HttpForwardingObserver {
@@ -147,19 +163,43 @@ impl HttpForwardingObserver {
     }
 }
 
-struct PendingGuard(Arc<AtomicUsize>);
+fn scoped_playbook_url(base: &str, arena_id: &str, playbook_id: &str) -> Option<reqwest::Url> {
+    let mut url = reqwest::Url::parse(base).ok()?;
+    url.path_segments_mut()
+        .ok()?
+        .pop_if_empty()
+        .extend(["arena", arena_id, "playbook", playbook_id]);
+    Some(url)
+}
+
+struct PendingGuard(Arc<AtomicUsize>, Arc<(Mutex<()>, Condvar)>);
 
 impl Drop for PendingGuard {
     fn drop(&mut self) {
         self.0.fetch_sub(1, Ordering::SeqCst);
+        self.1 .1.notify_all();
     }
 }
 
 impl HttpForwardingObserver {
     pub fn flush_within(&self, budget: Duration) {
         let deadline = Instant::now() + budget;
+        let (lock, drained) = &*self.drained;
+        let mut waiting = lock.lock().unwrap_or_else(|e| e.into_inner());
         while self.pending.load(Ordering::SeqCst) > 0 {
-            if Instant::now() >= deadline {
+            let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
+                tracing::warn!(
+                    outstanding = self.pending.load(Ordering::SeqCst),
+                    budget = ?budget,
+                    "arena-dashboard flush budget reached with updates still in flight"
+                );
+                return;
+            };
+            let (next, outcome) = drained
+                .wait_timeout(waiting, remaining)
+                .unwrap_or_else(|e| e.into_inner());
+            waiting = next;
+            if outcome.timed_out() && self.pending.load(Ordering::SeqCst) > 0 {
                 tracing::warn!(
                     outstanding = self.pending.load(Ordering::SeqCst),
                     budget = ?budget,
@@ -167,7 +207,6 @@ impl HttpForwardingObserver {
                 );
                 return;
             }
-            std::thread::sleep(DRAIN_POLL_INTERVAL);
         }
     }
 

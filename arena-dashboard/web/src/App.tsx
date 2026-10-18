@@ -358,6 +358,9 @@ export function App() {
           ingestCpuProfile(data.component, data.state, data.report === true);
           return;
         }
+        if (data && typeof data.type === "string") {
+          return;
+        }
         ingest(data as ArenaState);
       } catch {}
     };

@@ -945,10 +945,23 @@ impl MatchTrait for Match {
             .iter()
             .find(|(p, _)| p.identifier() == identifier)?;
         let span = playbook_span(identifier);
-        let outcome = pb.0.run(&self.dependencies).instrument(span).await;
-        if let Err(fault) = &outcome {
-            self.report_playbook_fault(identifier, fault.clone());
+        let outcome = AssertUnwindSafe(pb.0.run(&self.dependencies))
+            .catch_unwind()
+            .instrument(span)
+            .await;
+        match outcome {
+            Ok(Ok(active)) => Some(Ok(active)),
+            Ok(Err(fault)) => {
+                self.report_playbook_fault(identifier, fault.clone());
+                Some(Err(fault))
+            }
+            Err(payload) => {
+                let fault = Fault::playbook(identifier, message::playbook_failed()).caused_by(
+                    Fault::from_panic(identifier, Subject::Playbook, payload.as_ref()),
+                );
+                self.report_playbook_fault(identifier, fault.clone());
+                Some(Err(fault))
+            }
         }
-        Some(outcome)
     }
 }

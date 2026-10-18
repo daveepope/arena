@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::lifecycle::bus::Publisher;
@@ -25,6 +26,7 @@ pub struct ScopedPlaybookLifecycle {
     state: Mutex<RunnableState>,
     faults: Mutex<Vec<Fault>>,
     attachment: Mutex<Option<Attachment>>,
+    live_handles: AtomicUsize,
 }
 
 impl ScopedPlaybookLifecycle {
@@ -34,6 +36,7 @@ impl ScopedPlaybookLifecycle {
             state: Mutex::new(RunnableState::NotStarted),
             faults: Mutex::new(Vec::new()),
             attachment: Mutex::new(None),
+            live_handles: AtomicUsize::new(0),
         })
     }
 
@@ -78,12 +81,38 @@ impl ScopedPlaybookLifecycle {
         self.publish(next);
     }
 
+    pub fn enter(&self) {
+        self.live_handles.fetch_add(1, Ordering::SeqCst);
+    }
+
+    pub fn exit(&self) {
+        if self.live_handles.fetch_sub(1, Ordering::SeqCst) != 1 {
+            return;
+        }
+        self.report_terminal();
+    }
+
     pub fn report_terminal(&self) {
         if self.state() != RunnableState::Started {
             return;
         }
         self.report(RunnableState::Stopping);
         self.report(RunnableState::Stopped);
+    }
+
+    pub fn report_starting(&self) {
+        if self.state() == RunnableState::Started {
+            return;
+        }
+        self.report(RunnableState::Starting);
+    }
+
+    pub fn report_started(&self) {
+        self.enter();
+        if self.state() == RunnableState::Started {
+            return;
+        }
+        self.report(RunnableState::Started);
     }
 
     pub fn report_fault(&self, fault: Fault) {
@@ -95,12 +124,17 @@ impl ScopedPlaybookLifecycle {
     }
 
     fn publish(&self, state: RunnableState) {
-        let attachment = self.attachment.lock().unwrap_or_else(|e| e.into_inner());
-        let Some(attachment) = attachment.as_ref() else {
+        let attached = {
+            let attachment = self.attachment.lock().unwrap_or_else(|e| e.into_inner());
+            attachment
+                .as_ref()
+                .map(|attachment| (attachment.arena_id.clone(), Arc::clone(&attachment.publisher)))
+        };
+        let Some((arena_id, publisher)) = attached else {
             return;
         };
-        attachment.publisher.publish(&ScopedPlaybookEvent {
-            arena_id: attachment.arena_id.clone(),
+        publisher.publish(&ScopedPlaybookEvent {
+            arena_id,
             playbook_id: self.playbook_id.clone(),
             state,
             faults: self.faults(),

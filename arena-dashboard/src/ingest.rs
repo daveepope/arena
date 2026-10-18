@@ -1,6 +1,6 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct IngestFault {
     pub id: String,
     pub subject: String,
@@ -43,4 +43,17 @@ pub struct CpuProfilePayload {
     pub state: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub folded: Option<String>,
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct ScopedPlaybookPayload {
+    pub arena_id: String,
+    pub playbook_id: String,
+    pub state: String,
+    #[serde(default)]
+    pub faults: Vec<IngestFault>,
+}
+
+pub fn parse_scoped_playbook(body: &str) -> Result<ScopedPlaybookPayload, serde_json::Error> {
+    serde_json::from_str(body)
 }

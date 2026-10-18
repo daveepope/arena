@@ -1,5 +1,5 @@
 use arena::dependency::{find_dependency, Dependency};
-use arena::lifecycle::{Fault, RunnableState};
+use arena::lifecycle::Fault;
 use arena::playbook::{ActivePlaybook, Playbook as PlaybookTrait, ScopedPlaybookLifecycle};
 use std::sync::Arc;
 use async_trait::async_trait;
@@ -50,10 +50,10 @@ impl PlaybookTrait for ManagedHttpPlaybook {
     }
 
     async fn run(&self, dependencies: &[Dependency]) -> Result<Box<dyn ActivePlaybook>, Fault> {
-        self.lifecycle.report(RunnableState::Starting);
+        self.lifecycle.report_starting();
         match self.run_inner(dependencies).await {
             Ok(active) => {
-                self.lifecycle.report(RunnableState::Started);
+                self.lifecycle.report_started();
                 Ok(active)
             }
             Err(fault) => Err(fault),

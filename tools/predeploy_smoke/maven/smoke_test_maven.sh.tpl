@@ -146,10 +146,10 @@ public final class SmokeTest {
 
         int port = pickFreePort();
         Match dashboardMatch = new MatchBuilder("maven-dashboard-smoke-test-match").build();
-        ClosedArena dashboardClosed =
+        OpenArena dashboardArena =
                 new ClosedArena("maven-dashboard-smoke-test-arena", List.of(dashboardMatch))
-                        .withLifecycleDashboard(port, null);
-        OpenArena dashboardArena = dashboardClosed.open();
+                        .withLifecycleDashboard(port, null)
+                        .open();
         boolean serving = dashboardIsServing(port);
         dashboardArena.close();
         stopDashboard(port);

@@ -21,7 +21,7 @@ async fn start_capture_server(bodies: CapturedBodies) -> String {
             }),
         )
         .route(
-            "/playbook/scoped",
+            "/arena/{arena}/playbook/{playbook}",
             post(|State(captured): State<CapturedBodies>, body: String| async move {
                 captured.lock().expect("capture lock").push(body);
             }),
