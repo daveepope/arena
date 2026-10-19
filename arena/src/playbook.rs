@@ -4,24 +4,26 @@ use std::future::Future;
 use std::sync::Arc;
 
 use crate::dependency::Dependency;
-use crate::lifecycle::{Fault, RunnableState};
+use crate::lifecycle::Fault;
 
 pub mod lifecycle;
+pub mod state;
 
-pub use lifecycle::{PlaybookKind, PlaybookType, ScopedPlaybookEvent, ScopedPlaybookLifecycle};
+pub use lifecycle::{PlaybookKind, PlaybookType, PlaybookEvent, PlaybookLifecycle};
+pub use state::{PlaybookRule, PlaybookState};
 
 pub struct ManagedPlaybook {
-    lifecycle: Arc<ScopedPlaybookLifecycle>,
+    lifecycle: Arc<PlaybookLifecycle>,
 }
 
 impl ManagedPlaybook {
     pub fn new(identifier: impl Into<String>) -> Self {
         Self {
-            lifecycle: ScopedPlaybookLifecycle::managed(identifier),
+            lifecycle: PlaybookLifecycle::managed(identifier),
         }
     }
 
-    pub fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+    pub fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
         &self.lifecycle
     }
 
@@ -34,17 +36,17 @@ impl ManagedPlaybook {
 }
 
 pub struct UnmanagedPlaybook {
-    lifecycle: Arc<ScopedPlaybookLifecycle>,
+    lifecycle: Arc<PlaybookLifecycle>,
 }
 
 impl UnmanagedPlaybook {
     pub fn new(identifier: impl Into<String>) -> Self {
         Self {
-            lifecycle: ScopedPlaybookLifecycle::new(identifier),
+            lifecycle: PlaybookLifecycle::new(identifier),
         }
     }
 
-    pub fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+    pub fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
         &self.lifecycle
     }
 
@@ -57,29 +59,34 @@ impl UnmanagedPlaybook {
 }
 
 async fn report_around<F>(
-    lifecycle: &ScopedPlaybookLifecycle,
+    lifecycle: &PlaybookLifecycle,
     apply: F,
 ) -> Result<Box<dyn ActivePlaybook>, Fault>
 where
     F: Future<Output = Result<Box<dyn ActivePlaybook>, Fault>>,
 {
-    lifecycle.report_starting();
-    let outcome = apply.await;
-    if outcome.is_ok() {
-        lifecycle.report_started();
+    lifecycle.report_running();
+    match apply.await {
+        Ok(active) => {
+            lifecycle.enter();
+            Ok(active)
+        }
+        Err(fault) => {
+            lifecycle.report_fault(fault.clone());
+            Err(fault)
+        }
     }
-    outcome
 }
 
 #[async_trait]
 pub trait Playbook: Send + Sync {
     fn identifier(&self) -> &str;
 
-    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle>;
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle>;
 
     async fn run(&self, dependencies: &[Dependency]) -> Result<Box<dyn ActivePlaybook>, Fault>;
 
-    fn state(&self) -> RunnableState {
+    fn state(&self) -> PlaybookState {
         self.lifecycle().state()
     }
 
@@ -93,9 +100,9 @@ pub trait ActivePlaybook: Send + Sync {
 
     fn as_any(&self) -> &dyn Any;
 
-    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle>;
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle>;
 
-    fn state(&self) -> RunnableState {
+    fn state(&self) -> PlaybookState {
         self.lifecycle().state()
     }
 

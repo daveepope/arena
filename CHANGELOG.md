@@ -9,13 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `arena-dashboard`: holding `Ctrl` (or `Cmd`) while scrolling zooms the canvas, with the page's own zoom cancelled over the canvas only, so a plain scroll still scrolls the page
+- `examples`: the FastAPI suite carries py-spy and the .NET suites carry `dotnet-trace` as platform-selected test data, and the .NET example declares `WithBuildTool(BuildTool.Dotnet)` so its profiler backend resolves
+- `arena-dashboard`: `GET /profiles` returns the profiler state the server holds and the page fetches it on load, so reloading no longer loses every profile report until the next event
+- `arena-junit`, `arena-xunit`: `@ArenaVisualize(cpuProfile = {"component-id"})` and `[ArenaVisualize(CpuProfile = new[] { "component-id" })]` request a cpu profiler for the dashboard, matching what `with_cpu_profiler` already gave `arena-pytest`; the example suites visualize without it, since cpu profiling is a local workflow
+- `arena-profile`, `arena-dashboard`: a rendered profile carries a second hotspot ranking crediting each runtime-leaf sample to its nearest application caller rather than dropping it, so an application function is credited the runtime time spent beneath it and reads higher there than in the leaf-only ranking, both over the same whole-profile denominator; runtime frames are matched against how .NET, the JVM, CPython and native code actually spell them, and the panel's `app only` toggle switches the table between the two rankings while leaving the flamegraph alone, with an info button naming the frames each language hides
+- `arena`, `arena-dashboard`: each playbook counts how many times it has been run, kept on its lifecycle beside its state and faults under one lock and carried on every event, and the dashboard row names the count; every activation counts, including one that starts while another is still open and one whose body faults, and the count resets when the arena attaches its playbooks so reopening an arena starts from zero
+- `arena`: playbooks report their own `PlaybookState` (`registered`, `running`, `stopped`, `faulted`) validated by a `PlaybookRule`, instead of borrowing the dependency and component `RunnableState`; a playbook has no readiness gate and no stopping step, so those states are gone from its channel, and the dashboard row reads `running`
+- `arena`, `arena-dashboard`: the playbook channel drops the stale `Scoped` prefix now that startup playbooks report on it too (`PlaybookEvent`, `PlaybookLifecycle`, `PlaybookForwarder`, `observe_playbooks`, `PlaybookPanel`), and the channel is named `playbook`
 - `arena`: `ManagedPlaybook` and `UnmanagedPlaybook` base types own a playbook's lifecycle and its start reporting, mirroring the client libraries' split; the five Arena-provided playbooks hold the managed one, leaving the FFI and every client untouched
 - `arena`, `arena-dashboard`: playbook events carry `playbook_type`, stamped `managed` or `unmanaged` by the base class that built the playbook, and each dashboard row names it; the field stays inside the playbook event channel, so the FFI and the client libraries have no counterpart and a client-implemented playbook never reaches the Rust side to be labelled
 - `arena`: playbook events name their kind, `startup` or `scoped`, and carry the moment they happened; every registered playbook is announced once the arena has announced itself, so a playbook that has not run yet is still visible
 - `arena-dashboard`: playbook reports join the arena's own timeline, recorded per arena and served from `GET /history`, so the graph and the playbook panel replay and scrub off one history keyed by the arena's own timestamps
+- `arena-dashboard`: a component's detail dialog carries the same cpu profile report button its graph node does, both from one shared control
+- `examples`: the FastAPI example scores a reading on the event loop thread in pure Python, holding the interpreter lock for roughly a quarter of a second per request so it dominates the captured flamegraph
 - `arena-dashboard`: a canvas whose server connection is lost says so, keeps showing the last known state, and offers replay for as far as it got
 - `arena-dashboard`: the playbook panel stays on screen when an arena has no playbooks and says so
 - `arena-dashboard`: each arena's canvas carries a scrollable playbook panel on its left, one row per playbook with its live state, faulted rows marked, and a row click opening the same detail dialog the graph nodes use
+- `arena-dashboard`: the lifecycle demo simulates four parallel test runs per arena, and both arenas run theirs at once, each opening every scoped playbook (one of them caller-implemented) and dropping the handles at the end, the way a parallel suite would
 - `arena-dashboard`: the lifecycle demo registers startup playbooks (`apply-schema-migrations`, `seed-reference-data`) and per-arena scoped ones, cycles the scoped ones while the arenas are open, renames its subjects onto an Alice in Wonderland theme, and gains a fourth arena whose startup playbook faults
 - `arena`: publishing and observing are split into `Publisher<E>`, `Observer<E>` and an `EventBus<E>` that owns the routing, with symmetrical register, unregister and bounded flush on both sides; the arena lifecycle and cpu profile channels now share that one mechanism instead of hand-rolling it twice
 - `arena`: `LifecycleRule` validates state transitions, `Monotonic` for the arena phase and `RunnableRule` for any restartable subject, so an illegal transition is logged as a defect rather than published
@@ -44,9 +55,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena-executable-component`: a failed cpu profile capture faults the component's stop instead of only being logged
 - `arena-dashboard`: the lifecycle demo binary reports a cpu profile lifecycle for two of its components, so the profiler node state and flamegraph can be driven without a real profiled process
 - `arena-dashboard`: a profiled component's node shows the profiler's live state and opens its flamegraph in context over the graph, pinnable, with a ranked hotspot table, regex filter, hover linking, layout toggle and a full screen view at `/?profile=<component>`
+- `arena-dashboard`: clicking a node or a playbook opens the detail in the same draggable, resizable, pinnable panel the cpu profile uses, at its previous size, and a playbook's detail names its type, kind and run count; pinned panels stay open when another node, playbook or profile is opened
+- `arena-dashboard`: the header separates the server connection from the colour legend, each in its own labelled box, and the legend is grouped into `state` and `subject`, naming the states Arena itself reports (`not_started`, `registered`, `starting`, `readiness_check`, `started`, `running`, `stopping`, `stopped`, `faulted`)
 
 ### Changed
 
+- `arena-container`: `credential::new_password()` takes no prefix, generating the whole password itself
+- Example suites name their language in the arena id so the dashboard can tell them apart: the Spring Boot suites became `JavaSpringBootComponentTestSuite` and `JavaSpringBootChainedComponentTestSuite`, and the FastAPI arenas became `example-fastapi-python-arena` and `example-fastapi-python-chained-arena`
+- `arena`: `ArenaLifecyclePublisher::transition`, `notify_progress` and `finish` no longer take subject lists; a match reserves a `MatchSlot` and reports into it, and the publisher assembles the arena snapshot from those frames
 - Arena dependency teardown runs in parallel instead of sequentially
 - `zip` 2.4.2 -> 9.0.3 (RUSTSEC-2026-0367, RUSTSEC-2026-0368, RUSTSEC-2026-0369)
 - `rustls` 0.23.43 -> 0.23.46 (RUSTSEC-2026-0285, RUSTSEC-2026-0346, RUSTSEC-2026-0349)
@@ -62,6 +78,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `arena-profile`: async-profiler writes to a pid-scoped file and the sampler reads back the profiled child's own output, so a launcher process can no longer overwrite the component's profile
+- `arena-executable-component`: profiler environment is appended to a caller's existing value for the same variable instead of replacing it
+- `examples`: the Java and .NET examples rename their second web app so its name no longer shares a profiler request with the first one
+- `arena-profile`: the async-profiler agent travels in `JAVA_TOOL_OPTIONS` instead of being prepended to the component's arguments, so a Java component launched through a wrapper script is profiled instead of faulting at capture with no output file
+- `arena-dashboard`: the hotspot table lays out in fixed columns with the function name truncating, so self and share stay visible without scrolling sideways
+- `arena-dashboard`: the header is in the page flow instead of floating over it, so narrowing the window no longer hides the first arena's replay button and timeline behind the wrapped legend; the clear and stop buttons sit in the top right at the title's level and only the legend wraps
+- `arena`: a match published only its own dependencies and components, so in a multi-match arena every frame it emitted dropped the other matches' subjects from the dashboard until the arena published again; the lifecycle publisher now holds one frame per match and assembles the whole arena from them
+- `arena`: progress snapshots described a dependency or component still in flight with no children, faults or profiled component ids, so nested subjects vanished from the dashboard canvas mid-start and mid-teardown; the snapshot now carries what the subject last reported
+- `arena`: `PlaybookLifecycle::exit` could underflow its live-handle count when a playbook built through the dependency-level builder was dropped without a matching run, which silently stopped that playbook ever reporting stopped again; a startup playbook no longer keeps a retained handle counted after it finishes, and a playbook whose teardown panics releases its handle instead of leaking it
+- `arena`: a playbook run that fails now reports itself faulted from the base type rather than waiting for the arena to report, so a direct `run()` no longer leaves the row reading as live
 - `arena`: a startup playbook now reports stopped as soon as its run returns, instead of staying started for the whole open arena because the arena holds its handle until teardown; the handle drop at teardown adds nothing further
 - `arena-oracledb`: the default database and admin passwords are generated per run through `arena-container`'s existing unique-suffix generator instead of being literals in the source, which also clears the hard-coded-credential alert code scanning raised against them
 - Agent rules forbid hard-coding a password, secret or key in any test or example; generate it per run the way `examples/tests/pytest-shared/arena_config.py` does

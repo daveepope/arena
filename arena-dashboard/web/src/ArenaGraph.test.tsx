@@ -7,6 +7,18 @@ import { ArenaGraph } from "./ArenaGraph";
 import { useDashboardStore } from "./store";
 import type { ArenaState } from "./types";
 
+function lastProfile() {
+  const profiles = useDashboardStore.getState().profiles;
+  return profiles.length === 0 ? null : profiles[profiles.length - 1];
+}
+
+
+function lastDetail() {
+  const details = useDashboardStore.getState().details;
+  return details.length === 0 ? null : details[details.length - 1];
+}
+
+
 function arenaState(overrides: Partial<ArenaState> = {}): ArenaState {
   return {
     id: "arena-1",
@@ -22,9 +34,9 @@ function arenaState(overrides: Partial<ArenaState> = {}): ArenaState {
 beforeEach(() => {
   useDashboardStore.setState({
     arenas: new Map(),
-    selected: null,
+    details: [],
     cpuProfiles: new Map(),
-    profileView: null,
+    profiles: [],
   });
 });
 
@@ -105,7 +117,7 @@ describe("ArenaGraph", () => {
 
     fireEvent.click(screen.getByText("postgres"));
 
-    expect(useDashboardStore.getState().selected?.title).toBe("postgres");
+    expect(lastDetail()?.title).toBe("postgres");
   });
 
   it("clicking the arena panel button sets the store selection to the arena's own detail", () => {
@@ -117,7 +129,7 @@ describe("ArenaGraph", () => {
 
     fireEvent.click(screen.getByText(/arena-1.*state: arena_open/));
 
-    expect(useDashboardStore.getState().selected?.title).toContain("arena-1");
+    expect(lastDetail()?.title).toContain("arena-1");
   });
 
   it("not_started subjects are not visible as rendered node text", () => {
@@ -167,7 +179,7 @@ describe("ArenaGraph profiler label", () => {
 
     fireEvent.click(screen.getByTestId("profiler-label-svc"));
 
-    expect(useDashboardStore.getState().profileView?.componentId).toBe("svc");
+    expect(lastProfile()?.componentId).toBe("svc");
   });
 
   it("opening the profile view does not also select the node", () => {
@@ -179,7 +191,7 @@ describe("ArenaGraph profiler label", () => {
 
     fireEvent.click(screen.getByTestId("profiler-label-svc"));
 
-    expect(useDashboardStore.getState().selected).toBeNull();
+    expect(lastDetail()).toBeNull();
   });
 
   it("stoppedProfilerWithoutAReportCannotBeOpened", () => {
@@ -195,7 +207,7 @@ describe("ArenaGraph profiler label", () => {
     expect(label.disabled).toBe(true);
   });
 
-  it.each([["recenter-graph"], ["zoom-in-graph"], ["zoom-out-graph"]])(
+  it.each([["recenter-graph"], ["zoom-in-graph"], ["zoom-out-graph"], ["zoom-hint-graph"]])(
     "%s controlIsOfferedOnTheCanvas",
     (testId) => {
       act(() => {
@@ -216,5 +228,22 @@ describe("ArenaGraph profiler label", () => {
     render(<ArenaGraph arenaId="arena-1" />);
 
     expect(screen.getByTestId("recenter-graph")).toBeDefined();
+  });
+  it.each([
+    ["ctrlKey", { ctrlKey: true }, true],
+    ["metaKey", { metaKey: true }, true],
+    ["noModifier", {}, false],
+  ])("wheelWith%sCancelsThePagesOwnZoom", (_name, modifier, isCancelled) => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+    });
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    const event = new WheelEvent("wheel", { deltaY: -120, cancelable: true, bubbles: true, ...modifier });
+    act(() => {
+      screen.getByTestId("arena-canvas").dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(isCancelled);
   });
 });

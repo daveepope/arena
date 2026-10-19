@@ -194,3 +194,130 @@ fn top_hotspots_all_counts_zero_returns_zero_percentage() {
     assert_eq!(hotspots[0].self_pct, 0.0);
     assert_eq!(hotspots[0].severity, Severity::Low);
 }
+
+#[test]
+fn top_application_hotspots_runtime_leaf_credits_the_frame_that_called_it() {
+    let folded = "main;handler;compute 40\nmain;UNMANAGED_CODE_TIME 400\nmain;java.lang.Thread.run 50\n";
+
+    let application = arena_profile::render::top_application_hotspots(folded, 10);
+
+    let functions: Vec<&str> = application.iter().map(|h| h.function.as_str()).collect();
+    assert_eq!(functions, vec!["main", "compute"]);
+    assert_eq!(application[0].self_count, 450);
+}
+
+#[test]
+fn top_application_hotspots_frame_without_runtime_descendants_keeps_its_share() {
+    let folded = "main;handler;compute 40\nmain;UNMANAGED_CODE_TIME 360\n";
+
+    let all = arena_profile::render::top_hotspots(folded, 10);
+    let application = arena_profile::render::top_application_hotspots(folded, 10);
+
+    let compute_in_all = all.iter().find(|h| h.function == "compute").expect("compute");
+    let compute_in_application = application
+        .iter()
+        .find(|h| h.function == "compute")
+        .expect("compute");
+    assert_eq!(compute_in_all.self_count, 40);
+    assert_eq!(compute_in_all.self_pct, compute_in_application.self_pct);
+    assert_eq!(compute_in_all.severity, compute_in_application.severity);
+}
+
+#[test]
+fn top_application_hotspots_frame_with_runtime_descendants_reads_higher_than_the_leaf_ranking() {
+    let folded = "main;handler;compute 40\nmain;handler;compute;UNMANAGED_CODE_TIME 360\n";
+
+    let all = arena_profile::render::top_hotspots(folded, 10);
+    let application = arena_profile::render::top_application_hotspots(folded, 10);
+
+    let compute_in_all = all.iter().find(|h| h.function == "compute").expect("compute");
+    let compute_in_application = application
+        .iter()
+        .find(|h| h.function == "compute")
+        .expect("compute");
+    assert_eq!(compute_in_all.self_count, 40);
+    assert_eq!(compute_in_application.self_count, 400);
+    assert!(compute_in_application.self_pct > compute_in_all.self_pct);
+}
+
+#[test]
+fn top_application_hotspots_stack_of_only_runtime_frames_is_left_out() {
+    let folded = "UNMANAGED_CODE_TIME 400\njava.lang.Thread.run 100\n";
+
+    let application = arena_profile::render::top_application_hotspots(folded, 10);
+
+    assert!(application.is_empty());
+}
+
+#[test]
+fn top_hotspots_runtime_frames_are_kept() {
+    let folded = "main;handler;compute 40\nmain;UNMANAGED_CODE_TIME 400\n";
+
+    let all = arena_profile::render::top_hotspots(folded, 10);
+
+    let functions: Vec<&str> = all.iter().map(|h| h.function.as_str()).collect();
+    assert_eq!(functions, vec!["UNMANAGED_CODE_TIME", "compute"]);
+}
+
+#[test]
+fn render_folded_any_profile_carries_both_rankings() {
+    let folded = "main;handler;compute 40\nmain;CPU_TIME 10\n";
+
+    let rendered = arena_profile::render_folded(folded).expect("render");
+
+    let all: Vec<&str> = rendered.hotspots.iter().map(|h| h.function.as_str()).collect();
+    let application: Vec<&str> = rendered
+        .application_hotspots
+        .iter()
+        .map(|h| h.function.as_str())
+        .collect();
+    assert_eq!(all, vec!["compute", "CPU_TIME"]);
+    assert_eq!(application, vec!["compute", "main"]);
+}
+
+#[test]
+fn is_runtime_frame_frames_the_runtimes_report_are_matched() {
+    for frame in [
+        "UNMANAGED_CODE_TIME",
+        "CPU_TIME",
+        "System.Threading.LowLevelLifoSemaphore.Wait(int32,bool)",
+        "System.IO.FileSystemWatcher+RunningInstance.AddDirectoryWatchUnlocked(class WatchedDirectory)",
+        "Thread (1549961) (.NET ThreadPool)",
+        "IndexSetIterator::advance_and_next",
+        "PhaseChaitin::elide_copy",
+        "SymbolTable::do_lookup",
+        "java.lang.Thread.run",
+        "__tls_get_addr",
+        "/usr/lib/x86_64-linux-gnu/libz.so.1.3.1",
+        "_worker (concurrent/futures/thread.py:90)",
+        "run (asyncio/runners.py:118)",
+        "_call_with_frames_removed (<frozen importlib._bootstrap>:488)",
+        "read (ssl.py:1103)",
+        "readinto (socket.py:720)",
+    ] {
+        assert!(
+            arena_profile::render::is_runtime_frame(frame),
+            "should be a runtime frame: {frame}"
+        );
+    }
+}
+
+#[test]
+fn is_runtime_frame_application_frames_are_kept() {
+    for frame in [
+        "compute_reading",
+        "arena.examples.readings.ReadingsController.create",
+        "ArenaExamples.Readings.ReadingsController.Create()",
+        "create_reading (app/api/readings.py:42)",
+        "Readings::insert",
+        "com.app.OrderService.sortByPrice",
+        "__init__ (app/models.py:10)",
+        "libcompute_total",
+    ] {
+        assert!(
+            !arena_profile::render::is_runtime_frame(frame),
+            "should be an application frame: {frame}"
+        );
+    }
+}
+

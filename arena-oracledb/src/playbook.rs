@@ -1,10 +1,10 @@
-use arena::playbook::ScopedPlaybookLifecycle;
+use arena::playbook::PlaybookLifecycle;
 use std::sync::Arc;
 use crate::oracle_dependency::oracle_container_impl::{self, OracleImpl};
 use crate::oracle_dependency::OracleDependency;
 
 pub struct Playbook {
-    lifecycle: Option<Arc<ScopedPlaybookLifecycle>>,
+    lifecycle: Option<Arc<PlaybookLifecycle>>,
     oracle_impl: Arc<dyn OracleImpl>,
     username: String,
     password: String,
@@ -33,7 +33,7 @@ impl Playbook {
         self
     }
 
-    pub fn with_lifecycle(mut self, lifecycle: Arc<ScopedPlaybookLifecycle>) -> Self {
+    pub fn with_lifecycle(mut self, lifecycle: Arc<PlaybookLifecycle>) -> Self {
         self.lifecycle = Some(lifecycle);
         self
     }
@@ -67,7 +67,7 @@ impl Playbook {
             lifecycle: self
                 .lifecycle
                 .clone()
-                .unwrap_or_else(|| ScopedPlaybookLifecycle::managed(self.identifier.clone())),
+                .unwrap_or_else(|| PlaybookLifecycle::managed(self.identifier.clone())),
             oracle_impl: self.oracle_impl,
             username: self.username,
             password: self.password,
@@ -127,7 +127,7 @@ fn reset_on_drop(
 }
 
 pub struct ActivePlaybook {
-    lifecycle: Arc<ScopedPlaybookLifecycle>,
+    lifecycle: Arc<PlaybookLifecycle>,
     oracle_impl: Arc<dyn OracleImpl>,
     username: String,
     password: String,
@@ -140,7 +140,7 @@ impl arena::ActivePlaybook for ActivePlaybook {
         &self.identifier
     }
 
-    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
         &self.lifecycle
     }
 
@@ -198,6 +198,7 @@ impl Drop for ActivePlaybook {
                     self.lifecycle.playbook_id(),
                     "playbook teardown failed",
                 ));
+                self.lifecycle.exit();
                 std::panic::resume_unwind(payload);
             }
         }

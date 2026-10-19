@@ -60,12 +60,12 @@ import org.slf4j.LoggerFactory;
 @SelectClasses({ChainedDeviceLifecycleComponentTest.class})
 @Arena
 @ArenaVisualize
-public final class ChainedComponentTestSuite {
+public final class JavaSpringBootChainedComponentTestSuite {
 
   static final ObjectMapper MAPPER = new ObjectMapper();
 
   @ArenaLogger(level = ArenaLogLevel.INFO)
-  static final Logger LOG = LoggerFactory.getLogger(ChainedComponentTestSuite.class);
+  static final Logger LOG = LoggerFactory.getLogger(JavaSpringBootChainedComponentTestSuite.class);
 
   private static final EphemeralTestRuntime RT = EphemeralTestRuntime.get();
   private static final int WEB_APP_PORT = RT.execWebAppPort;
@@ -84,10 +84,10 @@ public final class ChainedComponentTestSuite {
   private static final String OAUTH_ISSUER = RT.oauthIssuer;
   private static final String POSTGRES_DB_NAME = "readings_db";
   private static final String POSTGRES_DB_USER = "readings_user";
-  private static final String POSTGRES_DB_PASS = "readings_password";
+  private static final String POSTGRES_DB_PASS = "pw" + RT.runSuffix.substring(0, 12);
   private static final String MSSQL_DB_NAME = "validationDb";
   private static final String MSSQL_DB_USER = "sa";
-  private static final String MSSQL_DB_PASS = "yourStrong(!)Password";
+  private static final String MSSQL_DB_PASS = "pw" + RT.runSuffix.substring(0, 12) + "Aa1";
   private static final String ORACLE_DB_NAME = "FREEPDB1";
   private static final String ORACLE_DB_USER = "weather_user_" + RT.runSuffix.substring(0, 8);
   private static final String ORACLE_DB_PASS = "pw_" + RT.runSuffix.substring(8, 20);
@@ -317,14 +317,14 @@ public final class ChainedComponentTestSuite {
 
   static ApiClient apiClient() throws Exception {
     String token =
-        OauthSigner.forFixture(ChainedComponentTestSuite.class)
+        OauthSigner.forFixture(JavaSpringBootChainedComponentTestSuite.class)
             .sign(new Provider.Custom(null), claimsWithScope("readings"));
     return new ApiClient("http://127.0.0.1:" + WEB_APP_PORT, token, MAPPER);
   }
 
   static ApiClient apiClient2() throws Exception {
     String token =
-        OauthSigner.forFixture(ChainedComponentTestSuite.class)
+        OauthSigner.forFixture(JavaSpringBootChainedComponentTestSuite.class)
             .sign(new Provider.Custom(null), claimsWithScope("readings"));
     return new ApiClient("http://127.0.0.1:" + WEB_APP_CHILD_PORT, token, MAPPER);
   }

@@ -32,9 +32,16 @@ export interface Hotspot {
   severity: Severity;
 }
 
+export interface RuntimeFrames {
+  language: string;
+  frames: string[];
+}
+
 export interface RenderedProfile {
   svg: string;
   hotspots: Hotspot[];
+  application_hotspots?: Hotspot[];
+  runtime_frames?: RuntimeFrames[];
 }
 
 export interface CpuProfilerState {
@@ -42,18 +49,20 @@ export interface CpuProfilerState {
   reportReady: boolean;
 }
 
-export interface ScopedPlaybookState {
+export interface PlaybookRowState {
   state: string;
   kind: string;
   playbookType: string;
+  runs: number;
   faults: Fault[];
 }
 
-export interface ScopedPlaybookEntry {
+export interface PlaybookEntry {
   at: number;
   playbookId: string;
   state: string;
   kind: string;
   playbookType: string;
+  runs: number;
   faults: Fault[];
 }

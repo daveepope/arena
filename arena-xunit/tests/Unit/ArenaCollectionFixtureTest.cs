@@ -28,6 +28,11 @@ public class ArenaCollectionFixtureTest
     {
     }
 
+    [ArenaVisualize(CpuProfile = new[] { "svc", "worker" })]
+    private class VisualizeProfiledFixture : ArenaCollectionFixture
+    {
+    }
+
     private class NullAttributeFieldFixture : ArenaCollectionFixture
     {
 #pragma warning disable CS0414
@@ -228,6 +233,28 @@ public class ArenaCollectionFixtureTest
         var result = ApplyVisualizeMethod().Invoke(null, new object[] { typeof(NoAttributesFixture), closed });
 
         Assert.Same(closed, result);
+    }
+
+    [Fact]
+    public void ApplyVisualize_CpuProfileListed_ReturnsArenaCarryingEveryProfiledComponent()
+    {
+        var closed = new ClosedArena("with-profiler", new MatchBuilder("with-profiler-match").Build());
+
+        var result = (ClosedArena)ApplyVisualizeMethod()
+            .Invoke(null, new object[] { typeof(VisualizeProfiledFixture), closed })!;
+
+        Assert.Contains("\"cpu_profiled_components\":[\"svc\",\"worker\"]", result.MatchConfigForFfi());
+    }
+
+    [Fact]
+    public void ApplyVisualize_AttributeWithoutCpuProfile_LeavesTheArenaUnprofiled()
+    {
+        var closed = new ClosedArena("no-profiler", new MatchBuilder("no-profiler-match").Build());
+
+        var result = (ClosedArena)ApplyVisualizeMethod()
+            .Invoke(null, new object[] { typeof(VisualizeAnnotatedFixture), closed })!;
+
+        Assert.DoesNotContain("cpu_profiled_components", result.MatchConfigForFfi());
     }
 
     [Fact]

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ArenaGraph } from "./ArenaGraph";
-import { ScopedPlaybookPanel } from "./ScopedPlaybookPanel";
-import { CpuProfilePopover, CpuProfileView } from "./CpuProfilePanel";
+import { PlaybookPanel } from "./PlaybookPanel";
+import { CpuProfileButton, CpuProfilePopover, CpuProfileView } from "./CpuProfilePanel";
+import { FloatingPanel } from "./FloatingPanel";
 import { lastRecordedSnapshot, useDashboardStore } from "./store";
+import type { DetailPanel } from "./store";
 import { TERMINAL_ARENA_STATES } from "./presentation";
-import type { ArenaState, Fault, ScopedPlaybookEntry } from "./types";
+import type { ArenaState, Fault, PlaybookEntry } from "./types";
 
 type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
@@ -68,17 +70,19 @@ interface RecordedPlaybook {
   state: string;
   kind: string;
   playbook_type: string;
+  runs: number;
   at: string;
   faults?: Fault[];
 }
 
-function recordedPlaybookEntry(recorded: RecordedPlaybook): ScopedPlaybookEntry {
+function recordedPlaybookEntry(recorded: RecordedPlaybook): PlaybookEntry {
   return {
     at: Date.parse(recorded.at),
     playbookId: recorded.playbook,
     state: recorded.state,
     kind: recorded.kind,
     playbookType: recorded.playbook_type,
+    runs: recorded.runs,
     faults: recorded.faults ?? [],
   };
 }
@@ -173,7 +177,7 @@ function ArenaPanel({ arenaId, isStale }: { arenaId: string; isStale: boolean })
         </div>
       )}
       <div className="flex gap-3">
-        <ScopedPlaybookPanel arenaId={arenaId} />
+        <PlaybookPanel arenaId={arenaId} />
         <div className="min-w-0 flex-1">
           <ArenaGraph arenaId={arenaId} />
         </div>
@@ -200,14 +204,15 @@ interface LegendEntry {
 }
 
 const STATE_LEGEND: LegendEntry[] = [
-  { label: "not started / stopped", dotClass: "bg-slate-500", shapeClass: "rounded-full" },
-  { label: "starting", dotClass: "bg-amber-400", shapeClass: "rounded-full" },
-  { label: "started", dotClass: "bg-emerald-400", shapeClass: "rounded-full" },
+  { label: "not_started / registered", dotClass: "bg-slate-500", shapeClass: "rounded-full" },
+  { label: "starting / readiness_check", dotClass: "bg-amber-400", shapeClass: "rounded-full" },
+  { label: "started / running", dotClass: "bg-emerald-400", shapeClass: "rounded-full" },
   { label: "stopping", dotClass: "bg-orange-400", shapeClass: "rounded-full" },
+  { label: "stopped", dotClass: "bg-slate-700", shapeClass: "rounded-full" },
   { label: "faulted", dotClass: "bg-rose-500", shapeClass: "rounded-full" },
 ];
 
-const KIND_LEGEND: LegendEntry[] = [
+const SUBJECT_LEGEND: LegendEntry[] = [
   { label: "dependency", dotClass: "bg-sky-400", shapeClass: "rounded-sm" },
   { label: "component", dotClass: "bg-fuchsia-400", shapeClass: "rounded-full" },
 ];
@@ -221,61 +226,83 @@ function LegendItem({ label, dotClass, shapeClass }: LegendEntry) {
   );
 }
 
+function LegendGroup({ title, entries }: { title: string; entries: LegendEntry[] }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-slate-800 px-2 py-1">
+      <span className="text-[10px] uppercase tracking-wide text-slate-500">{title}</span>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        {entries.map((item) => (
+          <LegendItem key={item.label} {...item} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Legend() {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      {STATE_LEGEND.map((item) => (
-        <LegendItem key={item.label} {...item} />
-      ))}
-      <span className="h-3 w-px bg-slate-700" />
-      {KIND_LEGEND.map((item) => (
-        <LegendItem key={item.label} {...item} />
-      ))}
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="legend">
+      <LegendGroup title="state" entries={STATE_LEGEND} />
+      <LegendGroup title="subject" entries={SUBJECT_LEGEND} />
+    </div>
+  );
+}
+
+function ServerStatus({ status }: { status: ConnectionStatus }) {
+  return (
+    <div
+      data-testid="server-status"
+      className="flex items-center gap-2 rounded-md border border-slate-800 bg-[#121735] px-2 py-1"
+    >
+      <span className="text-[10px] uppercase tracking-wide text-slate-500">server</span>
+      <span
+        className={`h-2 w-2 rounded-full ${
+          status === "connected"
+            ? "bg-emerald-400"
+            : isDisconnected(status)
+              ? "bg-rose-500"
+              : "bg-amber-400"
+        }`}
+        title={`SSE: ${status}`}
+      />
+      <span className="text-xs text-slate-300">{status}</span>
     </div>
   );
 }
 
 const DETAIL_PANEL_WIDTH = 320;
 const DETAIL_PANEL_MAX_HEIGHT = 360;
-const VIEWPORT_MARGIN = 8;
-
-function clampPosition(x: number, y: number): { left: number; top: number } {
-  const maxLeft = window.innerWidth - DETAIL_PANEL_WIDTH - VIEWPORT_MARGIN;
-  const maxTop = window.innerHeight - DETAIL_PANEL_MAX_HEIGHT - VIEWPORT_MARGIN;
-  return {
-    left: Math.min(Math.max(x, VIEWPORT_MARGIN), Math.max(maxLeft, VIEWPORT_MARGIN)),
-    top: Math.min(Math.max(y, VIEWPORT_MARGIN), Math.max(maxTop, VIEWPORT_MARGIN)),
-  };
-}
 
 function SelectedDetailPopover({
-  selected,
+  panel,
+  onTogglePin,
   onClose,
 }: {
-  selected: { title: string; detail: string; position: { x: number; y: number } };
+  panel: DetailPanel;
+  onTogglePin: () => void;
   onClose: () => void;
 }) {
-  const { left, top } = clampPosition(selected.position.x, selected.position.y);
+  const profiler = useDashboardStore((s) => s.cpuProfiles.get(panel.title));
 
   return (
-    <>
-      <div className="fixed inset-0" onClick={onClose} />
-      <div
-        style={{ left, top, width: DETAIL_PANEL_WIDTH, maxHeight: DETAIL_PANEL_MAX_HEIGHT }}
-        className="fixed overflow-y-auto rounded-md border border-slate-700 bg-[#121735] p-4 text-slate-200 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="mb-2 text-sm font-semibold">{selected.title}</h3>
-        <pre className="whitespace-pre-wrap text-xs text-slate-400">{selected.detail}</pre>
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-3 cursor-pointer rounded-md border border-slate-700 px-3 py-1 text-xs"
-        >
-          Close
-        </button>
-      </div>
-    </>
+    <FloatingPanel
+      testId="detail-panel"
+      handleId="detail"
+      title={panel.title}
+      position={panel.position}
+      size={{ width: DETAIL_PANEL_WIDTH, height: DETAIL_PANEL_MAX_HEIGHT }}
+      minSize={{ width: 240, height: 160 }}
+      isPinned={panel.isPinned}
+      onTogglePin={onTogglePin}
+      onClose={onClose}
+    >
+      <pre className="whitespace-pre-wrap text-xs text-slate-400">{panel.detail}</pre>
+      {profiler !== undefined && (
+        <div className="mt-3">
+          <CpuProfileButton componentId={panel.title} profiler={profiler} variant="detail" />
+        </div>
+      )}
+    </FloatingPanel>
   );
 }
 
@@ -343,12 +370,14 @@ export function fullScreenProfileComponentId(search: string): string | null {
 export function App() {
   const ingest = useDashboardStore((s) => s.ingest);
   const ingestCpuProfile = useDashboardStore((s) => s.ingestCpuProfile);
-  const ingestScopedPlaybook = useDashboardStore((s) => s.ingestScopedPlaybook);
+  const ingestPlaybook = useDashboardStore((s) => s.ingestPlaybook);
   const ingestHistory = useDashboardStore((s) => s.ingestHistory);
   const arenas = useDashboardStore((s) => s.arenas);
   const arenaIds = useMemo(() => Array.from(arenas.keys()), [arenas]);
-  const selected = useDashboardStore((s) => s.selected);
+  const details = useDashboardStore((s) => s.details);
   const clearSelected = useDashboardStore((s) => s.clearSelected);
+  const closeDetail = useDashboardStore((s) => s.closeDetail);
+  const toggleDetailPin = useDashboardStore((s) => s.toggleDetailPin);
   const clearArenas = useDashboardStore((s) => s.clearArenas);
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const lastHeartbeatAtRef = useRef<number | null>(null);
@@ -364,10 +393,17 @@ export function App() {
         );
       })
       .catch(() => {});
+    fetch("/profiles")
+      .then((response) => (response.ok ? response.json() : []))
+      .then((held: { component: string; state: string; report: boolean }[]) => {
+        if (abandoned || !Array.isArray(held)) return;
+        held.forEach((entry) => ingestCpuProfile(entry.component, entry.state, entry.report));
+      })
+      .catch(() => {});
     return () => {
       abandoned = true;
     };
-  }, [ingestHistory]);
+  }, [ingestHistory, ingestCpuProfile]);
 
   useEffect(() => {
     const source = new EventSource("/events");
@@ -395,13 +431,14 @@ export function App() {
           ingestCpuProfile(data.component, data.state, data.report === true);
           return;
         }
-        if (data && data.type === "scoped_playbook") {
-          ingestScopedPlaybook(data.arena, {
+        if (data && data.type === "playbook") {
+          ingestPlaybook(data.arena, {
             at: Date.parse(data.at),
             playbookId: data.playbook,
             state: data.state,
             kind: data.kind,
             playbookType: data.playbook_type,
+            runs: data.runs,
             faults: Array.isArray(data.faults) ? data.faults : [],
           });
           return;
@@ -424,7 +461,7 @@ export function App() {
       clearInterval(heartbeatCheck);
       source.close();
     };
-  }, [ingest, clearArenas, ingestCpuProfile, ingestScopedPlaybook]);
+  }, [ingest, clearArenas, ingestCpuProfile, ingestPlaybook]);
 
   const fullScreenProfile = useMemo(() => fullScreenProfileComponentId(window.location.search), []);
   const [actionFeedback, setActionFeedback] = useState<{ text: string; isError: boolean } | null>(null);
@@ -467,24 +504,16 @@ export function App() {
 
   return (
     <div className="w-full bg-[#0e1330] text-slate-200">
-      <div className="fixed inset-x-0 top-0 z-40 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate-800 bg-[#0e1330] px-3 py-3 pr-64">
-        <div className="flex items-center gap-2">
-          <h1 className="text-base font-semibold text-slate-200">Arena Topology Dashboard</h1>
-          <span
-            className={`h-2 w-2 rounded-full ${
-              status === "connected"
-                ? "bg-emerald-400"
-                : isDisconnected(status)
-                  ? "bg-rose-500"
-                  : "bg-amber-400"
-            }`}
-            title={`SSE: ${status}`}
-          />
-          <span className="text-xs text-slate-400">{status}</span>
-        </div>
-        <Legend />
-      </div>
-      <div className="fixed right-4 top-3 z-50 flex items-center gap-2">
+      <div
+        data-testid="dashboard-header"
+        className="sticky top-0 z-40 flex flex-col gap-2 border-b border-slate-800 bg-[#0e1330] px-3 py-3"
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+            <h1 className="text-base font-semibold text-slate-200">Arena Topology Dashboard</h1>
+            <ServerStatus status={status} />
+          </div>
+          <div data-testid="server-actions" className="ml-auto flex shrink-0 items-center gap-2">
         {actionFeedback && (
           <span className={`text-xs ${actionFeedback.isError ? "text-rose-400" : "text-teal-300"}`}>
             {actionFeedback.text}
@@ -508,9 +537,12 @@ export function App() {
             </button>
           </>
         )}
+          </div>
+        </div>
+        <Legend />
       </div>
 
-      <div className="px-3 pb-4 pt-24">
+      <div className="px-3 pb-4 pt-4">
         {arenaIds.length === 0 && (
           <div
             data-testid={isDisconnected(status) ? "disconnected-notice" : "empty-notice"}
@@ -545,7 +577,14 @@ export function App() {
         />
       )}
 
-      {selected && <SelectedDetailPopover selected={selected} onClose={clearSelected} />}
+      {details.map((panel) => (
+        <SelectedDetailPopover
+          key={panel.key}
+          panel={panel}
+          onTogglePin={() => toggleDetailPin(panel.key)}
+          onClose={() => (panel.isPinned ? closeDetail(panel.key) : clearSelected())}
+        />
+      ))}
       <CpuProfilePopover />
     </div>
   );

@@ -16,5 +16,5 @@ pub use crate::lifecycle::{
 };
 pub use crate::matches::{Match, MatchTrait};
 pub use crate::playbook::{
-    ActivePlaybook, ManagedPlaybook, Playbook, PlaybookType, UnmanagedPlaybook,
+    ActivePlaybook, ManagedPlaybook, Playbook, PlaybookState, PlaybookType, UnmanagedPlaybook,
 };

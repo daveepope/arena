@@ -22,6 +22,10 @@ final class MssqlDependencyBuilderSerializationTest {
     }
   }
 
+  private static String generatedPassword() {
+    return "pw" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+  }
+
   @Test
   void build_minimalName_serializesTypeAndIdentifier() {
     ObjectNode config = new MssqlDependencyBuilder("mssql").build().forFfi();
@@ -32,6 +36,7 @@ final class MssqlDependencyBuilderSerializationTest {
 
   @Test
   void withOverrides_allFields_serializesConfiguredFields() {
+    String password = generatedPassword();
     ObjectNode config =
         new MssqlDependencyBuilder("mssql")
             .withImage("2022-latest")
@@ -39,7 +44,7 @@ final class MssqlDependencyBuilderSerializationTest {
             .withPort(11433)
             .withDatabaseName("arena")
             .withDatabaseUsername("sa")
-            .withDatabasePassword("secret")
+            .withDatabasePassword(password)
             .withContainerName("mssql-box")
             .withEncryption(MssqlEncryption.ON)
             .build()
@@ -49,7 +54,7 @@ final class MssqlDependencyBuilderSerializationTest {
     assertEquals(11433, config.path("port").asInt());
     assertEquals("arena", config.path("database_name").asText());
     assertEquals("sa", config.path("database_username").asText());
-    assertEquals("secret", config.path("database_password").asText());
+    assertEquals(password, config.path("database_password").asText());
     assertEquals("mssql-box", config.path("container_name").asText());
     assertEquals("on", config.path("encryption").asText());
   }

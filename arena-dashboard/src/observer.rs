@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use arena::lifecycle::bus::Observer;
 use arena::lifecycle::{ArenaLifecycleObserver, ArenaState};
-use arena::playbook::ScopedPlaybookEvent;
+use arena::playbook::PlaybookEvent;
 use arena_profile::{CpuProfileEvent, CpuProfileObserver};
 
 use crate::http_client::build_client;
@@ -18,7 +18,7 @@ const DRAIN_BUDGET: Duration = Duration::from_secs(2);
 enum Forwarded {
     State(ArenaState),
     CpuProfile(CpuProfileEvent),
-    ScopedPlaybook(ScopedPlaybookEvent),
+    Playbook(PlaybookEvent),
 }
 
 pub struct HttpForwardingObserver {
@@ -51,7 +51,7 @@ impl HttpForwardingObserver {
             let base_url = dashboard_url.trim_end_matches('/');
             let ingest_url = format!("{base_url}/ingest");
             let cpu_profile_url = format!("{base_url}/profile/cpu");
-            let scoped_playbook_base = base_url.to_string();
+            let playbook_base = base_url.to_string();
             let mut past_budget = 0usize;
             for forwarded in receiver {
                 let _outstanding =
@@ -75,11 +75,11 @@ impl HttpForwardingObserver {
                         };
                         let _ = client.post(&cpu_profile_url).json(&payload).send();
                     }
-                    Forwarded::ScopedPlaybook(event) => {
-                        let Some(url) = scoped_playbook_url(
-                            &scoped_playbook_base,
+                    Forwarded::Playbook(event) => {
+                        let Some(url) = playbook_url(
+                            &playbook_base,
                             &event.arena_id,
-                            &event.playbook_id,
+                            &event.id,
                         ) else {
                             continue;
                         };
@@ -87,8 +87,8 @@ impl HttpForwardingObserver {
                             Ok(response) if !response.status().is_success() => {
                                 tracing::warn!(
                                     status = %response.status(),
-                                    playbook = %event.playbook_id,
-                                    "arena-dashboard rejected a scoped playbook update"
+                                    playbook = %event.id,
+                                    "arena-dashboard rejected a playbook update"
                                 );
                             }
                             _ => {}
@@ -127,21 +127,21 @@ impl CpuProfileObserver for HttpForwardingObserver {
     }
 }
 
-pub struct ScopedPlaybookForwarder {
+pub struct PlaybookForwarder {
     forwarder: Arc<HttpForwardingObserver>,
 }
 
-impl ScopedPlaybookForwarder {
+impl PlaybookForwarder {
     pub fn new(forwarder: Arc<HttpForwardingObserver>) -> Arc<Self> {
         Arc::new(Self { forwarder })
     }
 }
 
-impl Observer<ScopedPlaybookEvent> for ScopedPlaybookForwarder {
-    fn on_event(&self, event: &ScopedPlaybookEvent) {
+impl Observer<PlaybookEvent> for PlaybookForwarder {
+    fn on_event(&self, event: &PlaybookEvent) {
         self.forwarder.forward(
-            Forwarded::ScopedPlaybook(event.clone()),
-            "scoped playbook update",
+            Forwarded::Playbook(event.clone()),
+            "playbook update",
         );
     }
 
@@ -163,7 +163,7 @@ impl HttpForwardingObserver {
     }
 }
 
-fn scoped_playbook_url(base: &str, arena_id: &str, playbook_id: &str) -> Option<reqwest::Url> {
+fn playbook_url(base: &str, arena_id: &str, playbook_id: &str) -> Option<reqwest::Url> {
     let mut url = reqwest::Url::parse(base).ok()?;
     url.path_segments_mut()
         .ok()?

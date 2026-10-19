@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   Background,
   BackgroundVariant,
@@ -19,10 +19,10 @@ import {
 import { ArenaEdge, type ArenaEdgeData } from "./ArenaEdge";
 import { dagreLayout, estimateNodeWidth } from "./dagreLayout";
 import { computeLayout, type LayoutNode } from "./layout";
-import { isProfileAvailable, profilerLabel } from "./cpuProfile";
+import { profilerLabel } from "./cpuProfile";
+import { CpuProfileButton } from "./CpuProfilePanel";
 import { arenaClasses, formatDetail, isActiveState, nodeClasses } from "./presentation";
 import { useDashboardStore } from "./store";
-import type { CpuProfilerState } from "./types";
 
 const edgeTypes = { arena: ArenaEdge };
 
@@ -41,36 +41,6 @@ function syncedAnimationDelay(durationMs: number): string {
 function pulseStyle(isPulsing: boolean, isStrongPulse: boolean): Record<string, unknown> {
   if (!isPulsing) return {};
   return { animationDelay: syncedAnimationDelay(isStrongPulse ? PULSE_DURATION_MS : PULSE_SOFT_DURATION_MS) };
-}
-
-function ProfilerLabel({
-  componentId,
-  profiler,
-}: {
-  componentId: string;
-  profiler: CpuProfilerState;
-}) {
-  const openProfileView = useDashboardStore((s) => s.openProfileView);
-  const isAvailable = isProfileAvailable(profiler.state, profiler.reportReady);
-
-  return (
-    <button
-      type="button"
-      data-testid={`profiler-label-${componentId}`}
-      disabled={!isAvailable}
-      onClick={(e) => {
-        e.stopPropagation();
-        openProfileView(componentId, { x: e.clientX, y: e.clientY });
-      }}
-      className={`mt-0.5 whitespace-nowrap rounded-sm border px-1 py-0 text-[8px] uppercase leading-[1.5] tracking-tight ${
-        isAvailable
-          ? "cursor-pointer border-teal-500 bg-teal-950/60 text-teal-300"
-          : "cursor-default border-slate-600 bg-slate-900/60 text-slate-400"
-      }`}
-    >
-      {profilerLabel(profiler.state, profiler.reportReady)}
-    </button>
-  );
 }
 
 function ArenaNode({ data }: NodeProps) {
@@ -105,7 +75,9 @@ function ArenaNode({ data }: NodeProps) {
       <span>{node.label}</span>
       <span className="text-[9px] uppercase tracking-wide opacity-70">{node.kind}</span>
       <span className="text-[9px] uppercase tracking-wide opacity-60">{node.state}</span>
-      {profiler !== undefined && <ProfilerLabel componentId={node.label} profiler={profiler} />}
+      {profiler !== undefined && (
+        <CpuProfileButton componentId={node.label} profiler={profiler} variant="node" />
+      )}
     </div>
   );
 }
@@ -120,6 +92,12 @@ function GraphControls() {
 
   return (
     <div className="flex items-center gap-1">
+      <span
+        data-testid="zoom-hint-graph"
+        className="mr-1 whitespace-nowrap rounded-sm border border-slate-700 bg-[#0e1330]/80 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-slate-400"
+      >
+        Ctrl + scroll to zoom
+      </span>
       <button
         type="button"
         data-testid="zoom-out-graph"
@@ -166,8 +144,19 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
   const snapshot = useDashboardStore((s) => s.arenas.get(arenaId)?.snapshot ?? null);
   const select = useDashboardStore((s) => s.select);
 
+  const canvasRef = useRef<HTMLDivElement | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas === null) return;
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) event.preventDefault();
+    };
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", onWheel);
+  }, []);
 
   const applyNodeChanges = (changes: Parameters<typeof onNodesChange>[0]) =>
     onNodesChange(changes.filter((change) => change.type !== "remove"));
@@ -206,7 +195,11 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
   }, [snapshot, setNodes, setEdges]);
 
   return (
-    <div className="h-[480px] w-full overflow-hidden rounded-md bg-[#0e1330]">
+    <div
+      ref={canvasRef}
+      data-testid="arena-canvas"
+      className="h-[480px] w-full overflow-hidden rounded-md bg-[#0e1330]"
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -217,22 +210,22 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
         fitView
         zoomOnScroll={false}
         preventScrolling={false}
-        zoomActivationKeyCode="Control"
+        zoomActivationKeyCode={["Control", "Meta"]}
         proOptions={{ hideAttribution: true }}
       >
         <FitViewOnNodeSetChange nodeIds={nodes.map((n) => n.id).join("|")} />
-        <Panel position="top-right">
-          <GraphControls />
-        </Panel>
         <Background
           variant={BackgroundVariant.Lines}
           color={GRID_LINE_COLOR}
           gap={24}
           lineWidth={GRID_LINE_WIDTH}
         />
-        <Panel position="top-left">
+        <Panel position="top-left" className="flex w-[calc(100%-30px)] items-start justify-between gap-3">
+          <div className="min-w-0">
           <button
             type="button"
+            data-testid={`arena-state-${arenaId}`}
+            title={snapshot ? `${snapshot.id} · state: ${snapshot.state}` : undefined}
             onClick={(e) =>
               snapshot &&
               select({
@@ -248,12 +241,16 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
               })
             }
             style={snapshot ? pulseStyle(true, snapshot.state === "arena_faulted") : {}}
-            className={`cursor-pointer rounded-md border px-3 py-1.5 text-xs uppercase tracking-wide ${
+            className={`block max-w-full cursor-pointer truncate rounded-md border px-3 py-1.5 text-left text-xs uppercase tracking-wide ${
               snapshot ? arenaClasses(snapshot.state) : "border-slate-700 text-slate-500"
             }`}
           >
             {snapshot ? `${snapshot.id} · state: ${snapshot.state}` : "waiting for events..."}
           </button>
+          </div>
+          <div className="shrink-0">
+            <GraphControls />
+          </div>
         </Panel>
       </ReactFlow>
     </div>

@@ -12,6 +12,7 @@ alwaysApply: true
 - Use **`cargo check --workspace`** for fast Rust feedback when useful; treat **Bazel** as the source of truth for green builds.
 - Always report to the developer if you are adding ANY new 3rd party libraries
 - Never stray away from the plan set out by the developer
+- **NEVER create, edit, close or comment on an issue or ticket** (GitHub, JIRA or anywhere else) without the developer asking for it in that message. Finding a real problem is not permission: report it in the reply and let the developer decide whether it becomes a ticket.
 - **NEVER commit code.** Do not run `git commit`, `git add`, `git push`, or any other command that stages or records changes. Leave changes in the working tree; committing is the developer's job. Supply a commit message as text only when asked for one.
 - **NEVER run a repin or a version bump without the developer's explicit permission.** This covers `bazel run //scripts:repin`, `bazel run //scripts:bump_version`, `CARGO_BAZEL_REPIN=1`, and any hand edit of `VERSION`, `workspace.package.version`, the `module()` version in `MODULE.bazel`, or the workspace-member versions in `Cargo.lock` / `Cargo.Bazel.lock`. These rewrite release metadata and every lockfile. Tell the developer the command to run and let them run it.
 - You will function as an informative AI coding agent to ASSIST the developer in adding new features, fixing bugs, increasing test coverage, maintaing the architecture.

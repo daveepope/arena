@@ -1,7 +1,7 @@
 use arena::dependency::{find_dependency, Dependency};
 use arena::lifecycle::Fault;
 use arena::playbook::{
-    ActivePlaybook, ManagedPlaybook, Playbook as PlaybookTrait, ScopedPlaybookLifecycle,
+    ActivePlaybook, ManagedPlaybook, Playbook as PlaybookTrait, PlaybookLifecycle,
 };
 use std::sync::Arc;
 use async_trait::async_trait;
@@ -35,7 +35,7 @@ impl PlaybookTrait for ManagedOraclePlaybook {
         &self.identifier
     }
 
-    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
         self.managed.lifecycle()
     }
 

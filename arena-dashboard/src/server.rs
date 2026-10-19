@@ -34,7 +34,7 @@ const STYLES_CSS: &str = "";
 const RECONNECT_INTERVAL: Duration = Duration::from_millis(250);
 const KEEP_ALIVE_INTERVAL: Duration = Duration::from_millis(500);
 pub const HISTORY_LIMIT_PER_ARENA: usize = 1000;
-pub const SCOPED_PLAYBOOK_LIMIT: usize = 1000;
+pub const PLAYBOOK_LIMIT: usize = 1000;
 
 pub struct ServerShutdown {
     tx: watch::Sender<bool>,
@@ -68,13 +68,14 @@ pub struct AppState {
     last_state: Arc<Mutex<Vec<(String, String)>>>,
     history: Arc<Mutex<Vec<(String, Vec<String>)>>>,
     cpu_profiles: Arc<Mutex<Vec<(String, CpuProfileRecord)>>>,
-    scoped_playbooks: Arc<Mutex<Vec<(String, String)>>>,
+    playbooks: Arc<Mutex<Vec<(String, String)>>>,
     playbook_history: Arc<Mutex<Vec<(String, Vec<String>)>>>,
     shutdown: Arc<ServerShutdown>,
 }
 
 #[derive(Clone, Default)]
 struct CpuProfileRecord {
+    state: String,
     folded: Option<String>,
     rendered: Option<String>,
 }
@@ -87,7 +88,7 @@ impl Default for AppState {
             last_state: Arc::new(Mutex::new(Vec::new())),
             history: Arc::new(Mutex::new(Vec::new())),
             cpu_profiles: Arc::new(Mutex::new(Vec::new())),
-            scoped_playbooks: Arc::new(Mutex::new(Vec::new())),
+            playbooks: Arc::new(Mutex::new(Vec::new())),
             playbook_history: Arc::new(Mutex::new(Vec::new())),
             shutdown: Arc::new(ServerShutdown::default()),
         }
@@ -99,8 +100,8 @@ impl AppState {
         Self::default()
     }
 
-    pub fn scoped_playbook_count(&self) -> usize {
-        self.scoped_playbooks
+    pub fn playbook_count(&self) -> usize {
+        self.playbooks
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .len()
@@ -123,10 +124,11 @@ pub fn app(state: AppState) -> Router {
         .route("/history", get(history_handler))
         .route("/shutdown", post(shutdown_handler))
         .route("/profile/cpu", post(cpu_profile_ingest_handler))
+        .route("/profiles", get(cpu_profiles_handler))
         .route("/profile/cpu/{component}", get(cpu_profile_handler))
         .route(
             "/arena/{arena}/playbook/{playbook}",
-            post(scoped_playbook_ingest_handler),
+            post(playbook_ingest_handler),
         )
         .with_state(state);
 
@@ -201,7 +203,7 @@ async fn clear_handler(State(state): State<AppState>) -> impl IntoResponse {
     state.history.lock().unwrap_or_else(|e| e.into_inner()).clear();
     state.cpu_profiles.lock().unwrap_or_else(|e| e.into_inner()).clear();
     state
-        .scoped_playbooks
+        .playbooks
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .clear();
@@ -255,21 +257,21 @@ fn json_response(status: StatusCode, body: String) -> axum::response::Response {
 
 const PROFILE_TERMINAL_STATES: [&str; 2] = ["stopped", "faulted"];
 
-async fn scoped_playbook_ingest_handler(
+async fn playbook_ingest_handler(
     State(state): State<AppState>,
     axum::extract::Path((arena, playbook)): axum::extract::Path<(String, String)>,
     body: String,
 ) -> impl IntoResponse {
-    let Ok(payload) = ingest::parse_scoped_playbook(&body) else {
+    let Ok(payload) = ingest::parse_playbook(&body) else {
         return StatusCode::BAD_REQUEST;
     };
-    if payload.arena_id != arena || payload.playbook_id != playbook {
+    if payload.arena_id != arena || payload.id != playbook {
         tracing::warn!(
             path_arena = %arena,
             path_playbook = %playbook,
             body_arena = %payload.arena_id,
-            body_playbook = %payload.playbook_id,
-            "scoped playbook update disagrees with its own path"
+            body_playbook = %payload.id,
+            "playbook update disagrees with its own path"
         );
         return StatusCode::BAD_REQUEST;
     }
@@ -280,27 +282,28 @@ async fn scoped_playbook_ingest_handler(
         "playbook_type": payload.playbook_type,
         "kind": payload.kind,
         "state": payload.state,
+        "runs": payload.runs,
         "at": payload.at,
         "faults": payload.faults,
     });
     let recorded = record.to_string();
     let mut announced = record;
-    announced["type"] = serde_json::Value::String("scoped_playbook".to_string());
+    announced["type"] = serde_json::Value::String("playbook".to_string());
     let announcement = announced.to_string();
 
     {
         let mut playbooks = state
-            .scoped_playbooks
+            .playbooks
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         let key = (arena.clone(), playbook.clone());
         if !playbooks.contains(&key) {
-            if playbooks.len() >= SCOPED_PLAYBOOK_LIMIT {
+            if playbooks.len() >= PLAYBOOK_LIMIT {
                 tracing::error!(
-                    limit = SCOPED_PLAYBOOK_LIMIT,
+                    limit = PLAYBOOK_LIMIT,
                     arena = %arena,
                     playbook = %playbook,
-                    "arena-dashboard is holding its limit of scoped playbooks; raise SCOPED_PLAYBOOK_LIMIT to hold more"
+                    "arena-dashboard is holding its limit of playbooks; raise PLAYBOOK_LIMIT to hold more"
                 );
                 return StatusCode::INSUFFICIENT_STORAGE;
             }
@@ -318,6 +321,23 @@ async fn scoped_playbook_ingest_handler(
 
     let _ = state.tx.send(announcement);
     StatusCode::ACCEPTED
+}
+
+async fn cpu_profiles_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let held: Vec<serde_json::Value> = state
+        .cpu_profiles
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .map(|(component, record)| {
+            serde_json::json!({
+                "component": component,
+                "state": record.state,
+                "report": record.folded.is_some() || record.rendered.is_some(),
+            })
+        })
+        .collect();
+    json_response(StatusCode::OK, serde_json::Value::Array(held).to_string())
 }
 
 async fn cpu_profile_ingest_handler(
@@ -338,6 +358,7 @@ async fn cpu_profile_ingest_handler(
                 &mut profiles.last_mut().expect("just pushed").1
             }
         };
+        record.state = payload.state.clone();
         match &payload.folded {
             Some(folded) => {
                 record.folded = Some(folded.clone());
@@ -389,6 +410,15 @@ async fn cpu_profile_handler(
             let body = serde_json::json!({
                 "svg": profile.svg,
                 "hotspots": profile.hotspots,
+                "application_hotspots": profile.application_hotspots,
+                "runtime_frames": arena_profile::render::RUNTIME_FRAMES
+                    .iter()
+                    .map(|group| {
+                        let mut frames: Vec<&str> = group.starts_with.to_vec();
+                        frames.extend(group.contains.iter().copied());
+                        serde_json::json!({ "language": group.language, "frames": frames })
+                    })
+                    .collect::<Vec<serde_json::Value>>(),
             })
             .to_string();
             let mut profiles = state.cpu_profiles.lock().unwrap_or_else(|e| e.into_inner());

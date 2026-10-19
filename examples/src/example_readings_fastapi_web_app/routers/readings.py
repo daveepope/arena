@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from example_readings_fastapi_web_app.event_publish import put_reading_created_event
+from example_readings_fastapi_web_app.reading_score import score_reading
 
 router = APIRouter(prefix="/readings", tags=["readings"])
 
@@ -19,6 +20,7 @@ class CreateReadingBody(BaseModel):
 class CreateReadingResponse(BaseModel):
     valid: bool
     id: Optional[int] = None
+    drift_score: Optional[float] = None
 
 
 @router.get("")
@@ -39,6 +41,7 @@ async def list_readings(request: Request):
 
 @router.post("")
 async def create_reading(request: Request, body: CreateReadingBody):
+    drift_score = score_reading(body.value)
     st = request.app.state
     settings = st.settings
     try:
@@ -94,4 +97,4 @@ async def create_reading(request: Request, body: CreateReadingBody):
         )
     except Exception:
         pass
-    return CreateReadingResponse(valid=valid, id=int(rid))
+    return CreateReadingResponse(valid=valid, id=int(rid), drift_score=drift_score)

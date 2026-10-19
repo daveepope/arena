@@ -379,7 +379,7 @@ async fn get_cpu_profile_laterrunsamplednothing_returnsnotfound() {
     assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
 }
 
-async fn post_scoped_playbook(
+async fn post_playbook(
     base_url: &str,
     arena: &str,
     playbook: &str,
@@ -390,25 +390,26 @@ async fn post_scoped_playbook(
         .json(&body)
         .send()
         .await
-        .expect("post scoped playbook")
+        .expect("post playbook")
         .status()
 }
 
 #[tokio::test]
-async fn post_scoped_playbook_validpayload_isaccepted() {
+async fn post_playbook_validpayload_isaccepted() {
     let (base_url, _state) = serve_dashboard().await;
 
-    let status = post_scoped_playbook(
+    let status = post_playbook(
         &base_url,
         "arena-orders",
         "reset-orders",
         serde_json::json!({
             "arena_id": "arena-orders",
-            "playbook_id": "reset-orders",
+            "id": "reset-orders",
             "playbook_type": "managed",
+            "runs": 1,
             "kind": "scoped",
             "at": "2026-10-18T00:00:00.000Z",
-            "state": "started",
+            "state": "running",
             "faults": []
         }),
     )
@@ -418,7 +419,7 @@ async fn post_scoped_playbook_validpayload_isaccepted() {
 }
 
 #[tokio::test]
-async fn post_scoped_playbook_malformedbody_isrejected() {
+async fn post_playbook_malformedbody_isrejected() {
     let (base_url, _state) = serve_dashboard().await;
 
     let status = reqwest::Client::new()
@@ -426,48 +427,50 @@ async fn post_scoped_playbook_malformedbody_isrejected() {
         .body("not json")
         .send()
         .await
-        .expect("post scoped playbook")
+        .expect("post playbook")
         .status();
 
     assert_eq!(status, reqwest::StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
-async fn post_scoped_playbook_twoarenassameplaybookid_arekeptapart() {
+async fn post_playbook_twoarenassameplaybookid_arekeptapart() {
     let (base_url, state) = serve_dashboard().await;
     let body = |arena: &str| {
         serde_json::json!({
             "arena_id": arena,
-            "playbook_id": "reset-orders",
+            "id": "reset-orders",
             "playbook_type": "managed",
+            "runs": 1,
             "kind": "scoped",
             "at": "2026-10-18T00:00:00.000Z",
-            "state": "started",
+            "state": "running",
             "faults": []
         })
     };
 
-    post_scoped_playbook(&base_url, "arena-orders", "reset-orders", body("arena-orders")).await;
-    post_scoped_playbook(&base_url, "arena-catalog", "reset-orders", body("arena-catalog")).await;
+    post_playbook(&base_url, "arena-orders", "reset-orders", body("arena-orders")).await;
+    post_playbook(&base_url, "arena-catalog", "reset-orders", body("arena-catalog")).await;
 
-    assert_eq!(state.scoped_playbook_count(), 2);
+    assert_eq!(state.playbook_count(), 2);
 }
 
 #[tokio::test]
-async fn post_scoped_playbook_pathdisagreeingwithbody_isrejected() {
+async fn post_playbook_pathdisagreeingwithbody_isrejected() {
     let (base_url, _state) = serve_dashboard().await;
 
-    let status = post_scoped_playbook(
+    let status = post_playbook(
         &base_url,
         "arena-orders",
         "reset-orders",
         serde_json::json!({
             "arena_id": "arena-catalog",
-            "playbook_id": "reset-orders",
+            "id": "reset-orders",
             "playbook_type": "managed",
+            "runs": 1,
             "kind": "scoped",
             "at": "2026-10-18T00:00:00.000Z",
-            "state": "started",
+            "state": "running",
             "faults": []
         }),
     )
@@ -477,18 +480,19 @@ async fn post_scoped_playbook_pathdisagreeingwithbody_isrejected() {
 }
 
 #[tokio::test]
-async fn post_scoped_playbook_faults_reachthebrowserinfull() {
+async fn post_playbook_faults_reachthebrowserinfull() {
     let (base_url, state) = serve_dashboard().await;
     let mut events = state.subscribe();
 
-    post_scoped_playbook(
+    post_playbook(
         &base_url,
         "arena-orders",
         "reset-orders",
         serde_json::json!({
             "arena_id": "arena-orders",
-            "playbook_id": "reset-orders",
+            "id": "reset-orders",
             "playbook_type": "managed",
+            "runs": 1,
             "kind": "scoped",
             "at": "2026-10-18T00:00:00.000Z",
             "state": "faulted",
@@ -507,24 +511,25 @@ async fn post_scoped_playbook_faults_reachthebrowserinfull() {
 }
 
 #[tokio::test]
-async fn clear_scopedplaybooksheld_areforgotten() {
+async fn clear_heldplaybooks_areforgotten() {
     let (base_url, state) = serve_dashboard().await;
-    post_scoped_playbook(
+    post_playbook(
         &base_url,
         "arena-orders",
         "reset-orders",
         serde_json::json!({
             "arena_id": "arena-orders",
-            "playbook_id": "reset-orders",
+            "id": "reset-orders",
             "playbook_type": "managed",
+            "runs": 1,
             "kind": "scoped",
             "at": "2026-10-18T00:00:00.000Z",
-            "state": "started",
+            "state": "running",
             "faults": []
         }),
     )
     .await;
-    assert_eq!(state.scoped_playbook_count(), 1);
+    assert_eq!(state.playbook_count(), 1);
 
     reqwest::Client::new()
         .post(format!("{base_url}/clear"))
@@ -532,42 +537,44 @@ async fn clear_scopedplaybooksheld_areforgotten() {
         .await
         .expect("clear");
 
-    assert_eq!(state.scoped_playbook_count(), 0);
+    assert_eq!(state.playbook_count(), 0);
 }
 
 #[tokio::test]
-async fn post_scoped_playbook_beyondthelimit_isrefusedratherthangrowing() {
+async fn post_playbook_beyondthelimit_isrefusedratherthangrowing() {
     let (base_url, state) = serve_dashboard().await;
-    for index in 0..arena_dashboard::server::SCOPED_PLAYBOOK_LIMIT {
+    for index in 0..arena_dashboard::server::PLAYBOOK_LIMIT {
         let playbook = format!("playbook-{index}");
-        post_scoped_playbook(
+        post_playbook(
             &base_url,
             "arena-orders",
             &playbook,
             serde_json::json!({
                 "arena_id": "arena-orders",
-                "playbook_id": playbook,
+                "id": playbook,
                 "playbook_type": "managed",
+                "runs": 1,
                 "kind": "scoped",
                 "at": "2026-10-18T00:00:00.000Z",
-                "state": "started",
+                "state": "running",
                 "faults": []
             }),
         )
         .await;
     }
 
-    let status = post_scoped_playbook(
+    let status = post_playbook(
         &base_url,
         "arena-orders",
         "one-too-many",
         serde_json::json!({
             "arena_id": "arena-orders",
-            "playbook_id": "one-too-many",
+            "id": "one-too-many",
             "playbook_type": "managed",
+            "runs": 1,
             "kind": "scoped",
             "at": "2026-10-18T00:00:00.000Z",
-            "state": "started",
+            "state": "running",
             "faults": []
         }),
     )
@@ -575,8 +582,8 @@ async fn post_scoped_playbook_beyondthelimit_isrefusedratherthangrowing() {
 
     assert_eq!(status, reqwest::StatusCode::INSUFFICIENT_STORAGE);
     assert_eq!(
-        state.scoped_playbook_count(),
-        arena_dashboard::server::SCOPED_PLAYBOOK_LIMIT
+        state.playbook_count(),
+        arena_dashboard::server::PLAYBOOK_LIMIT
     );
 }
 
@@ -724,8 +731,9 @@ async fn wait_alreadytriggered_returnsimmediately() {
 fn playbook_body(arena: &str, playbook: &str, kind: &str, state: &str, at: &str) -> serde_json::Value {
     serde_json::json!({
         "arena_id": arena,
-        "playbook_id": playbook,
+        "id": playbook,
         "playbook_type": "managed",
+        "runs": 2,
         "kind": kind,
         "at": at,
         "state": state,
@@ -753,8 +761,8 @@ async fn history_for(base_url: &str, arena: &str) -> serde_json::Value {
 async fn get_history_everyplaybookreport_isreplayableinorder() {
     let (base_url, _state) = serve_dashboard().await;
     post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
-    for state in ["starting", "started", "stopped"] {
-        post_scoped_playbook(
+    for state in ["registered", "running", "stopped"] {
+        post_playbook(
             &base_url,
             "arena-tea-party",
             "reset-tea-party-db",
@@ -777,39 +785,41 @@ async fn get_history_everyplaybookreport_isreplayableinorder() {
         .iter()
         .map(|entry| entry["state"].as_str().expect("state"))
         .collect();
-    assert_eq!(states, vec!["starting", "started", "stopped"]);
+    assert_eq!(states, vec!["registered", "running", "stopped"]);
 }
 
 #[tokio::test]
-async fn post_scoped_playbook_playbooktype_reachesthestreamandthehistory() {
+async fn post_playbook_playbooktype_reachesthestreamandthehistory() {
     let (base_url, state) = serve_dashboard().await;
     let mut events = state.subscribe();
     post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
 
-    post_scoped_playbook(
+    post_playbook(
         &base_url,
         "arena-tea-party",
         "seed-reference-data",
         serde_json::json!({
             "arena_id": "arena-tea-party",
-            "playbook_id": "seed-reference-data",
+            "id": "seed-reference-data",
             "playbook_type": "unmanaged",
+            "runs": 1,
             "kind": "scoped",
             "at": "2026-10-18T00:00:00.000Z",
-            "state": "started",
+            "state": "running",
             "faults": []
         }),
     )
     .await;
 
     let mut announcement = events.recv().await.expect("announcement");
-    while !announcement.contains("scoped_playbook") {
+    while !announcement.contains("playbook") {
         announcement = events.recv().await.expect("announcement");
     }
     assert!(
         announcement.contains(r#""playbook_type":"unmanaged""#),
         "got: {announcement}"
     );
+    assert!(announcement.contains(r#""runs":1"#), "got: {announcement}");
     let arena = history_for(&base_url, "arena-tea-party").await;
     assert_eq!(arena["playbooks"][0]["playbook_type"], "unmanaged");
 }
@@ -818,7 +828,7 @@ async fn post_scoped_playbook_playbooktype_reachesthestreamandthehistory() {
 async fn get_history_playbookreport_carriesitskindandmoment() {
     let (base_url, _state) = serve_dashboard().await;
     post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
-    post_scoped_playbook(
+    post_playbook(
         &base_url,
         "arena-tea-party",
         "apply-schema",
@@ -826,7 +836,7 @@ async fn get_history_playbookreport_carriesitskindandmoment() {
             "arena-tea-party",
             "apply-schema",
             "startup",
-            "started",
+            "running",
             "2026-10-18T12:00:00.000Z",
         ),
     )
@@ -835,6 +845,7 @@ async fn get_history_playbookreport_carriesitskindandmoment() {
     let arena = history_for(&base_url, "arena-tea-party").await;
 
     assert_eq!(arena["playbooks"][0]["kind"], "startup");
+    assert_eq!(arena["playbooks"][0]["runs"], 2);
     assert_eq!(arena["playbooks"][0]["at"], "2026-10-18T12:00:00.000Z");
     assert_eq!(arena["playbooks"][0]["playbook"], "apply-schema");
 }
@@ -844,7 +855,7 @@ async fn get_history_anotherarenasplaybooks_arenotincluded() {
     let (base_url, _state) = serve_dashboard().await;
     post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
     post_ingest(&base_url, arena_snapshot_body("arena-rabbit-hole", "arena_open")).await;
-    post_scoped_playbook(
+    post_playbook(
         &base_url,
         "arena-rabbit-hole",
         "reset-rabbit-hole",
@@ -852,7 +863,7 @@ async fn get_history_anotherarenasplaybooks_arenotincluded() {
             "arena-rabbit-hole",
             "reset-rabbit-hole",
             "scoped",
-            "started",
+            "running",
             "2026-10-18T00:00:00.000Z",
         ),
     )
@@ -869,7 +880,7 @@ async fn get_history_anotherarenasplaybooks_arenotincluded() {
 async fn clear_recordedplaybooks_areforgotten() {
     let (base_url, _state) = serve_dashboard().await;
     post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
-    post_scoped_playbook(
+    post_playbook(
         &base_url,
         "arena-tea-party",
         "reset-tea-party-db",
@@ -877,7 +888,7 @@ async fn clear_recordedplaybooks_areforgotten() {
             "arena-tea-party",
             "reset-tea-party-db",
             "scoped",
-            "started",
+            "running",
             "2026-10-18T00:00:00.000Z",
         ),
     )
@@ -892,5 +903,79 @@ async fn clear_recordedplaybooks_areforgotten() {
 
     let arena = history_for(&base_url, "arena-tea-party").await;
     assert_eq!(arena["playbooks"], serde_json::json!([]));
+}
+
+#[tokio::test]
+async fn get_profiles_heldstate_isreturnedforareloadingpage() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({
+            "component": "svc",
+            "state": "stopped",
+            "folded": "main;handler;compute 42\n"
+        }),
+    )
+    .await;
+
+    let held: serde_json::Value = reqwest::get(format!("{base_url}/profiles"))
+        .await
+        .expect("get profiles")
+        .json()
+        .await
+        .expect("json body");
+
+    assert_eq!(held[0]["component"], "svc");
+    assert_eq!(held[0]["state"], "stopped");
+    assert_eq!(held[0]["report"], true);
+}
+
+#[tokio::test]
+async fn get_profiles_statewithoutsamples_reportsnoreport() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc", "state": "started"}),
+    )
+    .await;
+
+    let held: serde_json::Value = reqwest::get(format!("{base_url}/profiles"))
+        .await
+        .expect("get profiles")
+        .json()
+        .await
+        .expect("json body");
+
+    assert_eq!(held[0]["state"], "started");
+    assert_eq!(held[0]["report"], false);
+}
+
+#[tokio::test]
+async fn get_cpu_profile_rendered_carriesanapplicationonlyranking() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({
+            "component": "svc",
+            "state": "stopped",
+            "folded": "main;handler;compute 40\nmain;UNMANAGED_CODE_TIME 400\n"
+        }),
+    )
+    .await;
+
+    let profile: serde_json::Value = reqwest::get(format!("{base_url}/profile/cpu/svc"))
+        .await
+        .expect("get profile")
+        .json()
+        .await
+        .expect("json body");
+
+    assert_eq!(profile["hotspots"].as_array().expect("array").len(), 2);
+    let application = profile["application_hotspots"].as_array().expect("array");
+    assert_eq!(application.len(), 2);
+    assert_eq!(application[0]["function"], "main");
+    assert_eq!(application[0]["self_count"], 400);
+    assert_eq!(application[1]["function"], "compute");
+    assert!(!profile["runtime_frames"].as_array().expect("array").is_empty());
 }
 

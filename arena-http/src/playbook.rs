@@ -3,7 +3,7 @@ pub mod response;
 pub mod stub;
 pub mod verify;
 
-use arena::playbook::ScopedPlaybookLifecycle;
+use arena::playbook::PlaybookLifecycle;
 use std::sync::Arc;
 use crate::admin_client::admin_api_client;
 use crate::http_dependency::HttpDependency;
@@ -78,7 +78,7 @@ impl Expectation {
 }
 
 pub struct Playbook {
-    lifecycle: Option<Arc<ScopedPlaybookLifecycle>>,
+    lifecycle: Option<Arc<PlaybookLifecycle>>,
     identifier: String,
     admin_url: String,
     trusted_tls_certificate_pem: Option<String>,
@@ -106,7 +106,7 @@ impl Playbook {
         self
     }
 
-    pub fn with_lifecycle(mut self, lifecycle: Arc<ScopedPlaybookLifecycle>) -> Self {
+    pub fn with_lifecycle(mut self, lifecycle: Arc<PlaybookLifecycle>) -> Self {
         self.lifecycle = Some(lifecycle);
         self
     }
@@ -177,7 +177,7 @@ impl Playbook {
             lifecycle: self
                 .lifecycle
                 .clone()
-                .unwrap_or_else(|| ScopedPlaybookLifecycle::managed(self.identifier.clone())),
+                .unwrap_or_else(|| PlaybookLifecycle::managed(self.identifier.clone())),
             identifier: self.identifier,
             admin_url: self.admin_url,
             trusted_tls_certificate_pem: self.trusted_tls_certificate_pem,
@@ -188,7 +188,7 @@ impl Playbook {
 }
 
 pub struct ActivePlaybook {
-    lifecycle: Arc<ScopedPlaybookLifecycle>,
+    lifecycle: Arc<PlaybookLifecycle>,
     identifier: String,
     admin_url: String,
     trusted_tls_certificate_pem: Option<String>,
@@ -201,7 +201,7 @@ impl arena::ActivePlaybook for ActivePlaybook {
         &self.identifier
     }
 
-    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
         &self.lifecycle
     }
 
@@ -518,6 +518,7 @@ impl Drop for ActivePlaybook {
                     self.lifecycle.playbook_id(),
                     "playbook teardown failed",
                 ));
+                self.lifecycle.exit();
                 std::panic::resume_unwind(payload);
             }
         }

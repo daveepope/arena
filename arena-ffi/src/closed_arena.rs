@@ -131,8 +131,8 @@ async fn open_arena_from_config(
     for observer in crate::lifecycle_observer::registered_observers() {
         closed = closed.observe(observer);
     }
-    for observer in crate::lifecycle_observer::registered_scoped_playbook_observers() {
-        closed = closed.observe_scoped_playbooks(observer);
+    for observer in crate::lifecycle_observer::registered_playbook_observers() {
+        closed = closed.observe_playbooks(observer);
     }
     closed
         .open()

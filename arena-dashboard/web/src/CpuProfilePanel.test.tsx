@@ -3,9 +3,16 @@ import "./testSetup";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CpuProfilePopover, CpuProfileView, snapToViewportCorner } from "./CpuProfilePanel";
+import { CpuProfilePopover, CpuProfileView } from "./CpuProfilePanel";
+import { snapToViewportCorner } from "./FloatingPanel";
 import { useDashboardStore } from "./store";
 import type { RenderedProfile } from "./types";
+
+function lastProfile() {
+  const profiles = useDashboardStore.getState().profiles;
+  return profiles.length === 0 ? null : profiles[profiles.length - 1];
+}
+
 
 const SAMPLE_PROFILE: RenderedProfile = {
   svg: "<svg id='flamegraph'></svg>",
@@ -26,7 +33,7 @@ function respondWithProfile(profile: RenderedProfile | null): void {
 }
 
 beforeEach(() => {
-  useDashboardStore.setState({ profileView: null });
+  useDashboardStore.setState({ profiles: [] });
 });
 
 afterEach(() => {
@@ -189,7 +196,7 @@ describe("CpuProfilePopover", () => {
 
     fireEvent.click(screen.getByText("Close"));
 
-    expect(useDashboardStore.getState().profileView).toBeNull();
+    expect(lastProfile()).toBeNull();
   });
 
   it("escape clears the profile view", async () => {
@@ -200,7 +207,7 @@ describe("CpuProfilePopover", () => {
 
     fireEvent.keyDown(window, { key: "Escape" });
 
-    expect(useDashboardStore.getState().profileView).toBeNull();
+    expect(lastProfile()).toBeNull();
   });
 
   it("pin button keeps the panel open when the backdrop would be clicked", async () => {
@@ -211,7 +218,7 @@ describe("CpuProfilePopover", () => {
 
     fireEvent.click(screen.getByLabelText("Pin"));
 
-    expect(useDashboardStore.getState().profileView?.isPinned).toBe(true);
+    expect(lastProfile()?.isPinned).toBe(true);
     expect(screen.getByLabelText("Unpin")).toBeTruthy();
   });
 
@@ -223,7 +230,7 @@ describe("CpuProfilePopover", () => {
 
     fireEvent.click(container.querySelector(".fixed.inset-0")!);
 
-    expect(useDashboardStore.getState().profileView).toBeNull();
+    expect(lastProfile()).toBeNull();
   });
 
   it("position beyond the viewport is clamped into view", async () => {
@@ -272,5 +279,87 @@ describe("snapToViewportCorner", () => {
       left: 400,
       top: 400,
     });
+  });
+});
+
+describe("CpuHotspots runtime frames", () => {
+  const MIXED: RenderedProfile = {
+    svg: "<svg></svg>",
+    hotspots: [
+      { function: "UNMANAGED_CODE_TIME", self_count: 400, self_pct: 90.9, severity: "critical" },
+      { function: "compute", self_count: 40, self_pct: 9.1, severity: "low" },
+    ],
+    application_hotspots: [
+      { function: "compute", self_count: 40, self_pct: 100.0, severity: "critical" },
+    ],
+    runtime_frames: [
+      { language: "dotnet", frames: ["UNMANAGED_CODE_TIME", "CPU_TIME"] },
+      { language: "java", frames: ["java."] },
+    ],
+  };
+
+  it("appOnlyToggled_ranksWithoutRuntimeFrames", async () => {
+    respondWithProfile(MIXED);
+    render(<CpuProfileView componentId="svc" isFullScreen={false} />);
+    await screen.findByTestId("cpu-hotspots");
+    expect(screen.getByTestId("cpu-hotspot-UNMANAGED_CODE_TIME")).toBeDefined();
+
+    fireEvent.click(screen.getByTestId("cpu-hide-runtime-frames"));
+
+    expect(screen.queryByTestId("cpu-hotspot-UNMANAGED_CODE_TIME")).toBeNull();
+    expect(screen.getByTestId("cpu-hotspot-compute").textContent).toContain("100");
+  });
+
+  it("appOnlyToggledOff_bringsTheRuntimeFramesBack", async () => {
+    respondWithProfile(MIXED);
+    render(<CpuProfileView componentId="svc" isFullScreen={false} />);
+    await screen.findByTestId("cpu-hotspots");
+
+    fireEvent.click(screen.getByTestId("cpu-hide-runtime-frames"));
+    fireEvent.click(screen.getByTestId("cpu-hide-runtime-frames"));
+
+    expect(screen.getByTestId("cpu-hotspot-UNMANAGED_CODE_TIME")).toBeDefined();
+  });
+
+  it("infoToggled_namesTheHiddenFramesPerLanguage", async () => {
+    respondWithProfile(MIXED);
+    render(<CpuProfileView componentId="svc" isFullScreen={false} />);
+    await screen.findByTestId("cpu-hotspots");
+
+    fireEvent.click(screen.getByTestId("cpu-runtime-frames-info-toggle"));
+
+    const info = screen.getByTestId("cpu-runtime-frames-info");
+    expect(info.textContent).toContain("dotnet");
+    expect(info.textContent).toContain("UNMANAGED_CODE_TIME");
+    expect(info.textContent).toContain("java");
+  });
+
+  it("appOnlyToggled_leavesTheFlamegraphAlone", async () => {
+    respondWithProfile(MIXED);
+    render(<CpuProfileView componentId="svc" isFullScreen={false} />);
+    const frame = await screen.findByTestId("cpu-flamegraph");
+    const before = frame.getAttribute("srcDoc") ?? frame.getAttribute("srcdoc");
+
+    fireEvent.click(screen.getByTestId("cpu-hide-runtime-frames"));
+
+    const after = frame.getAttribute("srcDoc") ?? frame.getAttribute("srcdoc");
+    expect(after).toBe(before);
+  });
+});
+
+describe("CpuHotspots layout", () => {
+  it("hotspotTableFixesTheColumnsSoSelfAndShareStayVisible", async () => {
+    respondWithProfile(SAMPLE_PROFILE);
+    render(<CpuProfileView componentId="svc" isFullScreen={false} />);
+
+    const table = await screen.findByTestId("cpu-hotspots");
+
+    expect(table.className).toContain("table-fixed");
+    expect(table.className).toContain("w-full");
+    const headers = table.querySelectorAll("th");
+    expect(headers[1].textContent).toBe("Self");
+    expect(headers[2].textContent).toBe("Share");
+    const functionCell = table.querySelector("tbody td");
+    expect(functionCell?.className).toContain("truncate");
   });
 });

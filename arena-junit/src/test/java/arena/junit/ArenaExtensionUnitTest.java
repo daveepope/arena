@@ -84,6 +84,9 @@ final class ArenaExtensionUnitTest {
   @ArenaVisualize
   static final class VisualizeAnnotatedTopology {}
 
+  @ArenaVisualize(cpuProfile = {"svc", "worker"})
+  static final class VisualizeProfiledTopology {}
+
   static final class NonStaticDependencyFieldTopology {
     @ArenaDependency final StubMatchPiece dependency = new StubMatchPiece();
   }
@@ -371,6 +374,30 @@ final class ArenaExtensionUnitTest {
   void applyVisualize_annotationPresent_returnsDifferentClosedArenaWithDashboardEnabled() throws Exception {
     ClosedArena closedArena = new ClosedArena("with-visualize", List.<Match>of());
     assertNotSame(closedArena, invokeApplyVisualize(VisualizeAnnotatedTopology.class, closedArena));
+  }
+
+  @Test
+  void applyVisualize_cpuProfileListed_returnsAnArenaCarryingEveryProfiledComponent() throws Exception {
+    ClosedArena closedArena =
+        new ClosedArena(
+            "with-profiler", List.of(new arena.junit.match.MatchBuilder("with-profiler-match").build()));
+
+    ClosedArena configured = invokeApplyVisualize(VisualizeProfiledTopology.class, closedArena);
+
+    assertEquals(
+        "[\"svc\",\"worker\"]",
+        configured.matchConfigForFfi().path("cpu_profiled_components").toString());
+  }
+
+  @Test
+  void applyVisualize_annotationWithoutCpuProfile_leavesTheArenaUnprofiled() throws Exception {
+    ClosedArena closedArena =
+        new ClosedArena(
+            "no-profiler", List.of(new arena.junit.match.MatchBuilder("no-profiler-match").build()));
+
+    ClosedArena configured = invokeApplyVisualize(VisualizeAnnotatedTopology.class, closedArena);
+
+    assertFalse(configured.matchConfigForFfi().has("cpu_profiled_components"));
   }
 
   @Test

@@ -27,12 +27,17 @@ fn prepare_cpu_profile_real_async_profiler_agent_flag_against_jvm_busy_loop_repo
 
     let prepared = prepare_cpu_profile(CpuProfilerBackend::AsyncProfiler, request, component_id, DEFAULT_CPU_PROFILE_LIMIT_BYTES)
         .expect("prepare async-profiler profile");
-    let PreparedLaunch::ArgsAugmented { args, shutdown_signal, session } = prepared else {
+    let PreparedLaunch::ArgsAugmented { args, env, shutdown_signal, session } = prepared else {
         panic!("expected ArgsAugmented variant for AsyncProfiler backend");
     };
     assert_eq!(shutdown_signal, ShutdownSignal::Terminate);
+    assert!(
+        env.iter().any(|(key, value)| key == "JAVA_TOOL_OPTIONS" && value.contains("-agentpath:")),
+        "the agent must travel in JAVA_TOOL_OPTIONS so a launcher script passes it on: {env:?}"
+    );
 
     let mut jvm = Command::new("java")
+        .envs(env.iter().map(|(key, value)| (key.clone(), value.clone())))
         .args(&args)
         .stdout(Stdio::null())
         .stderr(Stdio::null())

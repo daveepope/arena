@@ -348,7 +348,7 @@ async fn run_scoped_playbooks_test(ctx: &TestContext) -> Result<(), String> {
     let telemetry = setup_telemetry_playbook(ctx).await;
     let cabin = setup_cabin_playbook(ctx).await;
 
-    tracing::info!(suite = "crate_component", crate_under_test = "arena_http", case = "scoped_playbooks", phase = "requests_begin", "playbooks applied, firing requests");
+    tracing::info!(suite = "crate_component", crate_under_test = "arena_http", case = "playbooks", phase = "requests_begin", "playbooks applied, firing requests");
 
     for _ in 0..3 {
         let resp = ctx.fire_get("/api/guidance/state").await?;
@@ -429,7 +429,7 @@ async fn run_scoped_playbooks_test(ctx: &TestContext) -> Result<(), String> {
         assert_eq!(resp.status().as_u16(), 200);
     }
 
-    tracing::info!(suite = "crate_component", crate_under_test = "arena_http", case = "scoped_playbooks", phase = "verification_begin", "all requests fired, verifying each playbook");
+    tracing::info!(suite = "crate_component", crate_under_test = "arena_http", case = "playbooks", phase = "verification_begin", "all requests fired, verifying each playbook");
 
     guidance
         .verify(3, get_requested_for("/api/guidance/state"))
@@ -479,7 +479,7 @@ async fn run_scoped_playbooks_test(ctx: &TestContext) -> Result<(), String> {
         .verify(3, put_requested_for("/api/cabin/pressure"))
         .await;
 
-    tracing::info!(suite = "crate_component", crate_under_test = "arena_http", case = "scoped_playbooks", phase = "scenario_ok", "all playbooks verified");
+    tracing::info!(suite = "crate_component", crate_under_test = "arena_http", case = "playbooks", phase = "scenario_ok", "all playbooks verified");
     Ok(())
 }
 

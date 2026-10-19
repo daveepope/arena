@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import { isArenaRestart } from "./presentation";
-import type { ArenaState, CpuProfilerState, ScopedPlaybookEntry, ScopedPlaybookState, Subject } from "./types";
+import type { ArenaState, CpuProfilerState, PlaybookEntry, PlaybookRowState, Subject } from "./types";
 
 export type SubjectKind = "dependency" | "component";
 
@@ -29,10 +29,19 @@ export interface ProfileView {
   isPinned: boolean;
 }
 
+export interface DetailPanel extends Selected {
+  key: number;
+  isPinned: boolean;
+}
+
+export interface ProfilePanel extends ProfileView {
+  key: number;
+}
+
 export interface HistoryEntry {
   at: number;
   snapshot?: ArenaState;
-  playbook?: ScopedPlaybookEntry;
+  playbook?: PlaybookEntry;
 }
 
 interface DiffState {
@@ -40,7 +49,7 @@ interface DiffState {
   lastArenaState: string | null;
   lastSubjectStates: Map<string, SubjectSnapshot>;
   nextLogId: number;
-  playbooks: Map<string, ScopedPlaybookState>;
+  playbooks: Map<string, PlaybookRowState>;
 }
 
 interface ArenaEntry extends DiffState {
@@ -51,6 +60,13 @@ interface ArenaEntry extends DiffState {
 }
 
 const MAX_HISTORY = 1000;
+
+let panelKey = 0;
+
+function nextPanelKey(): number {
+  panelKey += 1;
+  return panelKey;
+}
 const REPLAY_MIN_DELAY_MS = 150;
 const REPLAY_MAX_DELAY_MS = 1500;
 
@@ -112,13 +128,14 @@ function diffEntry(prev: DiffState | undefined, next: ArenaState): DiffState & {
 }
 
 function withPlaybook(
-  playbooks: Map<string, ScopedPlaybookState>,
-  reported: ScopedPlaybookEntry,
-): Map<string, ScopedPlaybookState> {
+  playbooks: Map<string, PlaybookRowState>,
+  reported: PlaybookEntry,
+): Map<string, PlaybookRowState> {
   return new Map(playbooks).set(reported.playbookId, {
     state: reported.state,
     kind: reported.kind,
     playbookType: reported.playbookType,
+    runs: reported.runs,
     faults: reported.faults,
   });
 }
@@ -156,19 +173,21 @@ export function foldUpTo(
 
 interface DashboardStore {
   arenas: Map<string, ArenaEntry>;
-  selected: Selected | null;
+  details: DetailPanel[];
   cpuProfiles: Map<string, CpuProfilerState>;
-  profileView: ProfileView | null;
+  profiles: ProfilePanel[];
   ingest: (next: ArenaState) => void;
-  ingestHistory: (snapshots: ArenaState[], playbooks?: ScopedPlaybookEntry[]) => void;
+  ingestHistory: (snapshots: ArenaState[], playbooks?: PlaybookEntry[]) => void;
   select: (selected: Selected) => void;
   clearSelected: () => void;
+  closeDetail: (key: number) => void;
+  toggleDetailPin: (key: number) => void;
   clearArenas: () => void;
   ingestCpuProfile: (componentId: string, state: string, reportReady: boolean) => void;
-  ingestScopedPlaybook: (arenaId: string, reported: ScopedPlaybookEntry) => void;
+  ingestPlaybook: (arenaId: string, reported: PlaybookEntry) => void;
   openProfileView: (componentId: string, position: { x: number; y: number }) => void;
-  closeProfileView: () => void;
-  toggleProfileViewPin: () => void;
+  closeProfileView: (key: number) => void;
+  toggleProfileViewPin: (key: number) => void;
   replayArena: (arenaId: string) => void;
   stopReplay: (arenaId: string) => void;
   scrubArena: (arenaId: string, index: number) => void;
@@ -176,9 +195,9 @@ interface DashboardStore {
 
 export const useDashboardStore = create<DashboardStore>((set, get) => ({
   arenas: new Map(),
-  selected: null,
+  details: [],
   cpuProfiles: new Map(),
-  profileView: null,
+  profiles: [],
 
   ingest: (next) => {
     const { arenas } = get();
@@ -231,17 +250,30 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ arenas: updated });
   },
 
-  select: (selected) => set({ selected }),
-  clearSelected: () => set({ selected: null }),
+  select: (selected) =>
+    set({
+      details: [
+        ...get().details.filter((panel) => panel.isPinned),
+        { ...selected, key: nextPanelKey(), isPinned: false },
+      ],
+    }),
+  clearSelected: () => set({ details: get().details.filter((panel) => panel.isPinned) }),
+  closeDetail: (key) => set({ details: get().details.filter((panel) => panel.key !== key) }),
+  toggleDetailPin: (key) =>
+    set({
+      details: get().details.map((panel) =>
+        panel.key === key ? { ...panel, isPinned: !panel.isPinned } : panel,
+      ),
+    }),
   clearArenas: () =>
     set({
       arenas: new Map(),
-      selected: null,
+      details: [],
       cpuProfiles: new Map(),
-      profileView: null,
+      profiles: [],
     }),
 
-  ingestScopedPlaybook: (arenaId, reported) => {
+  ingestPlaybook: (arenaId, reported) => {
     const { arenas } = get();
     const prev = arenas.get(arenaId);
     if (prev === undefined) return;
@@ -250,6 +282,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
         entry.playbook !== undefined &&
         entry.playbook.playbookId === reported.playbookId &&
         entry.playbook.state === reported.state &&
+        entry.playbook.runs === reported.runs &&
         entry.at === reported.at,
     );
     const history = alreadyRecorded
@@ -271,15 +304,22 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     }),
 
   openProfileView: (componentId, position) =>
-    set({ profileView: { componentId, position, isPinned: false } }),
+    set({
+      profiles: [
+        ...get().profiles.filter((panel) => panel.isPinned),
+        { componentId, position, key: nextPanelKey(), isPinned: false },
+      ],
+    }),
 
-  closeProfileView: () => set({ profileView: null }),
+  closeProfileView: (key) =>
+    set({ profiles: get().profiles.filter((panel) => panel.key !== key) }),
 
-  toggleProfileViewPin: () => {
-    const { profileView } = get();
-    if (!profileView) return;
-    set({ profileView: { ...profileView, isPinned: !profileView.isPinned } });
-  },
+  toggleProfileViewPin: (key) =>
+    set({
+      profiles: get().profiles.map((panel) =>
+        panel.key === key ? { ...panel, isPinned: !panel.isPinned } : panel,
+      ),
+    }),
 
   replayArena: (arenaId) => {
     const entry = get().arenas.get(arenaId);

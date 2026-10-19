@@ -3,7 +3,19 @@ import "./testSetup";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useDashboardStore } from "./store";
-import type { ArenaState, ScopedPlaybookEntry } from "./types";
+import type { ArenaState, PlaybookEntry } from "./types";
+
+function lastProfile() {
+  const profiles = useDashboardStore.getState().profiles;
+  return profiles.length === 0 ? null : profiles[profiles.length - 1];
+}
+
+
+function lastDetail() {
+  const details = useDashboardStore.getState().details;
+  return details.length === 0 ? null : details[details.length - 1];
+}
+
 
 function arenaState(overrides: Partial<ArenaState> = {}): ArenaState {
   return {
@@ -20,9 +32,9 @@ function arenaState(overrides: Partial<ArenaState> = {}): ArenaState {
 beforeEach(() => {
   useDashboardStore.setState({
     arenas: new Map(),
-    selected: null,
+    details: [],
     cpuProfiles: new Map(),
-    profileView: null,
+    profiles: [],
   });
 });
 
@@ -93,10 +105,11 @@ describe("useDashboardStore selection", () => {
   it("select sets the selected detail", () => {
     useDashboardStore.getState().select({ title: "postgres", detail: "id: postgres", position: { x: 10, y: 20 } });
 
-    expect(useDashboardStore.getState().selected).toEqual({
+    expect(lastDetail()).toMatchObject({
       title: "postgres",
       detail: "id: postgres",
       position: { x: 10, y: 20 },
+      isPinned: false,
     });
   });
 
@@ -105,7 +118,7 @@ describe("useDashboardStore selection", () => {
 
     useDashboardStore.getState().clearSelected();
 
-    expect(useDashboardStore.getState().selected).toBeNull();
+    expect(lastDetail()).toBeNull();
   });
 
   it("clearArenas empties the arena map and the current selection", () => {
@@ -115,7 +128,7 @@ describe("useDashboardStore selection", () => {
     useDashboardStore.getState().clearArenas();
 
     expect(useDashboardStore.getState().arenas.size).toBe(0);
-    expect(useDashboardStore.getState().selected).toBeNull();
+    expect(lastDetail()).toBeNull();
   });
 });
 
@@ -356,7 +369,7 @@ describe("useDashboardStore cpu profiles", () => {
     useDashboardStore.getState().clearArenas();
 
     expect(useDashboardStore.getState().cpuProfiles.size).toBe(0);
-    expect(useDashboardStore.getState().profileView).toBeNull();
+    expect(lastProfile()).toBeNull();
   });
 });
 
@@ -364,7 +377,7 @@ describe("useDashboardStore profile view", () => {
   it("opening a view records the component and position unpinned", () => {
     useDashboardStore.getState().openProfileView("svc", { x: 4, y: 8 });
 
-    expect(useDashboardStore.getState().profileView).toEqual({
+    expect(lastProfile()).toMatchObject({
       componentId: "svc",
       position: { x: 4, y: 8 },
       isPinned: false,
@@ -374,25 +387,35 @@ describe("useDashboardStore profile view", () => {
   it("closing a view clears it", () => {
     useDashboardStore.getState().openProfileView("svc", { x: 4, y: 8 });
 
-    useDashboardStore.getState().closeProfileView();
+    useDashboardStore.getState().closeProfileView(lastProfile()!.key);
 
-    expect(useDashboardStore.getState().profileView).toBeNull();
+    expect(lastProfile()).toBeNull();
   });
 
   it("toggling the pin flips it both ways", () => {
     useDashboardStore.getState().openProfileView("svc", { x: 4, y: 8 });
 
-    useDashboardStore.getState().toggleProfileViewPin();
-    expect(useDashboardStore.getState().profileView?.isPinned).toBe(true);
+    useDashboardStore.getState().toggleProfileViewPin(lastProfile()!.key);
+    expect(lastProfile()?.isPinned).toBe(true);
 
-    useDashboardStore.getState().toggleProfileViewPin();
-    expect(useDashboardStore.getState().profileView?.isPinned).toBe(false);
+    useDashboardStore.getState().toggleProfileViewPin(lastProfile()!.key);
+    expect(lastProfile()?.isPinned).toBe(false);
   });
 
   it("toggling the pin with no view open does nothing", () => {
-    useDashboardStore.getState().toggleProfileViewPin();
+    useDashboardStore.getState().toggleProfileViewPin(1);
 
-    expect(useDashboardStore.getState().profileView).toBeNull();
+    expect(lastProfile()).toBeNull();
+  });
+
+  it("openingAnotherProfileKeepsAPinnedOne", () => {
+    useDashboardStore.getState().openProfileView("svc", { x: 4, y: 8 });
+    useDashboardStore.getState().toggleProfileViewPin(lastProfile()!.key);
+
+    useDashboardStore.getState().openProfileView("other-svc", { x: 10, y: 20 });
+
+    const open = useDashboardStore.getState().profiles.map((panel) => panel.componentId);
+    expect(open).toEqual(["svc", "other-svc"]);
   });
 });
 
@@ -445,13 +468,22 @@ describe("useDashboardStore replay", () => {
   });
 });
 
+function playbookRun(
+  playbookId: string,
+  state: string,
+  at: number,
+  runs: number,
+): PlaybookEntry {
+  return { at, playbookId, state, kind: "scoped", playbookType: "managed", runs, faults: [] };
+}
+
 function playbookEntry(
   playbookId: string,
   state: string,
   at = 1,
   kind = "scoped",
-): ScopedPlaybookEntry {
-  return { at, playbookId, state, kind, playbookType: "managed", faults: [] };
+): PlaybookEntry {
+  return { at, playbookId, state, kind, playbookType: "managed", runs: 1, faults: [] };
 }
 
 describe("useDashboardStore playbooks", () => {
@@ -469,15 +501,15 @@ describe("useDashboardStore playbooks", () => {
     openArena("arena-a");
     openArena("arena-b");
 
-    useDashboardStore.getState().ingestScopedPlaybook("arena-a", playbookEntry("reset", "started"));
-    useDashboardStore.getState().ingestScopedPlaybook("arena-b", playbookEntry("reset", "stopped"));
+    useDashboardStore.getState().ingestPlaybook("arena-a", playbookEntry("reset", "running"));
+    useDashboardStore.getState().ingestPlaybook("arena-b", playbookEntry("reset", "stopped"));
 
-    expect(playbooksOf("arena-a")?.get("reset")?.state).toBe("started");
+    expect(playbooksOf("arena-a")?.get("reset")?.state).toBe("running");
     expect(playbooksOf("arena-b")?.get("reset")?.state).toBe("stopped");
   });
 
   it("reportForAnArenaThatIsNotOnScreenIsDropped", () => {
-    useDashboardStore.getState().ingestScopedPlaybook("arena-unknown", playbookEntry("reset", "started"));
+    useDashboardStore.getState().ingestPlaybook("arena-unknown", playbookEntry("reset", "running"));
 
     expect(useDashboardStore.getState().arenas.get("arena-unknown")).toBeUndefined();
   });
@@ -486,7 +518,7 @@ describe("useDashboardStore playbooks", () => {
     const store = useDashboardStore.getState();
     store.ingest(arenaState({ id: "arena-restart", state: "arena_starting" }));
     store.ingest(arenaState({ id: "arena-restart", state: "arena_closed" }));
-    store.ingestScopedPlaybook("arena-restart", playbookEntry("reset", "faulted"));
+    store.ingestPlaybook("arena-restart", playbookEntry("reset", "faulted"));
 
     useDashboardStore.getState().ingest(arenaState({ id: "arena-restart", state: "arena_starting" }));
 
@@ -495,7 +527,7 @@ describe("useDashboardStore playbooks", () => {
 
   it("clearingArenasForgetsEveryPlaybook", () => {
     openArena("arena-a");
-    useDashboardStore.getState().ingestScopedPlaybook("arena-a", playbookEntry("reset", "started"));
+    useDashboardStore.getState().ingestPlaybook("arena-a", playbookEntry("reset", "running"));
 
     useDashboardStore.getState().clearArenas();
 
@@ -505,15 +537,15 @@ describe("useDashboardStore playbooks", () => {
   it("everyReportedStateJoinsTheSameTimelineAsTheSnapshots", () => {
     openArena("arena-a", "2026-10-18T00:00:00.000Z");
     const store = useDashboardStore.getState();
-    store.ingestScopedPlaybook("arena-a", playbookEntry("reset", "starting", 10));
-    store.ingestScopedPlaybook("arena-a", playbookEntry("reset", "started", 20));
-    store.ingestScopedPlaybook("arena-a", playbookEntry("reset", "stopped", 30));
+    store.ingestPlaybook("arena-a", playbookEntry("reset", "registered", 10));
+    store.ingestPlaybook("arena-a", playbookEntry("reset", "running", 20));
+    store.ingestPlaybook("arena-a", playbookEntry("reset", "stopped", 30));
 
     const history = useDashboardStore.getState().arenas.get("arena-a")?.history ?? [];
     expect(history.map((entry) => entry.playbook?.state ?? entry.snapshot?.state)).toEqual([
       "arena_open",
-      "starting",
-      "started",
+      "registered",
+      "running",
       "stopped",
     ]);
   });
@@ -521,9 +553,9 @@ describe("useDashboardStore playbooks", () => {
   it("sameReportArrivingTwiceIsRecordedOnce", () => {
     openArena("arena-a");
     const store = useDashboardStore.getState();
-    store.ingestScopedPlaybook("arena-a", playbookEntry("reset", "started", 20));
+    store.ingestPlaybook("arena-a", playbookEntry("reset", "running", 20));
 
-    store.ingestScopedPlaybook("arena-a", playbookEntry("reset", "started", 20));
+    store.ingestPlaybook("arena-a", playbookEntry("reset", "running", 20));
 
     expect(useDashboardStore.getState().arenas.get("arena-a")?.history).toHaveLength(2);
   });
@@ -535,14 +567,14 @@ describe("useDashboardStore playbooks", () => {
         arenaState({ id: "arena-a", state: "arena_open", at: "2026-10-18T00:00:03.000Z" }),
       ],
       [
-        playbookEntry("reset", "started", Date.parse("2026-10-18T00:00:02.000Z")),
-        playbookEntry("reset", "starting", Date.parse("2026-10-18T00:00:01.500Z")),
+        playbookEntry("reset", "running", Date.parse("2026-10-18T00:00:02.000Z")),
+        playbookEntry("reset", "registered", Date.parse("2026-10-18T00:00:01.500Z")),
       ],
     );
 
     const entry = useDashboardStore.getState().arenas.get("arena-a");
     expect(entry?.snapshot.state).toBe("arena_open");
-    expect(entry?.playbooks.get("reset")?.state).toBe("started");
+    expect(entry?.playbooks.get("reset")?.state).toBe("running");
     expect(entry?.history).toHaveLength(4);
   });
 
@@ -553,17 +585,49 @@ describe("useDashboardStore playbooks", () => {
         arenaState({ id: "arena-a", state: "arena_open", at: "2026-10-18T00:00:04.000Z" }),
       ],
       [
-        playbookEntry("reset", "starting", Date.parse("2026-10-18T00:00:02.000Z")),
-        playbookEntry("seed", "started", Date.parse("2026-10-18T00:00:03.000Z")),
+        playbookEntry("reset", "registered", Date.parse("2026-10-18T00:00:02.000Z")),
+        playbookEntry("seed", "running", Date.parse("2026-10-18T00:00:03.000Z")),
       ],
     );
 
     useDashboardStore.getState().scrubArena("arena-a", 1);
 
     const entry = useDashboardStore.getState().arenas.get("arena-a");
-    expect(entry?.playbooks.get("reset")?.state).toBe("starting");
+    expect(entry?.playbooks.get("reset")?.state).toBe("registered");
     expect(entry?.playbooks.get("seed")).toBeUndefined();
     expect(entry?.snapshot.state).toBe("arena_starting");
+  });
+
+  it("scrubbingBackShowsTheRunCountAsOfThatMoment", () => {
+    useDashboardStore.getState().ingestHistory(
+      [
+        arenaState({ id: "arena-a", state: "arena_starting", at: "2026-10-18T00:00:01.000Z" }),
+        arenaState({ id: "arena-a", state: "arena_open", at: "2026-10-18T00:00:06.000Z" }),
+      ],
+      [
+        playbookRun("reset", "running", Date.parse("2026-10-18T00:00:02.000Z"), 1),
+        playbookRun("reset", "stopped", Date.parse("2026-10-18T00:00:03.000Z"), 1),
+        playbookRun("reset", "running", Date.parse("2026-10-18T00:00:04.000Z"), 2),
+        playbookRun("reset", "stopped", Date.parse("2026-10-18T00:00:05.000Z"), 2),
+      ],
+    );
+
+    useDashboardStore.getState().scrubArena("arena-a", 2);
+
+    expect(useDashboardStore.getState().arenas.get("arena-a")?.playbooks.get("reset")?.runs).toBe(
+      1,
+    );
+  });
+
+  it("twoRunsInsideOneMillisecondAreBothRecorded", () => {
+    openArena("arena-a");
+    const store = useDashboardStore.getState();
+    store.ingestPlaybook("arena-a", playbookRun("reset", "running", 10, 1));
+
+    store.ingestPlaybook("arena-a", playbookRun("reset", "running", 10, 2));
+
+    const recorded = useDashboardStore.getState().arenas.get("arena-a")?.history ?? [];
+    expect(recorded.filter((entry) => entry.playbook !== undefined)).toHaveLength(2);
   });
 
   it("scrubbingBackToTheStartShowsNoPlaybooks", () => {
@@ -572,7 +636,7 @@ describe("useDashboardStore playbooks", () => {
         arenaState({ id: "arena-a", state: "arena_starting", at: "2026-10-18T00:00:01.000Z" }),
         arenaState({ id: "arena-a", state: "arena_open", at: "2026-10-18T00:00:03.000Z" }),
       ],
-      [playbookEntry("reset", "starting", Date.parse("2026-10-18T00:00:02.000Z"))],
+      [playbookEntry("reset", "registered", Date.parse("2026-10-18T00:00:02.000Z"))],
     );
 
     useDashboardStore.getState().scrubArena("arena-a", 0);
@@ -586,13 +650,13 @@ describe("useDashboardStore playbooks", () => {
         arenaState({ id: "arena-a", state: "arena_starting", at: "2026-10-18T00:00:01.000Z" }),
         arenaState({ id: "arena-a", state: "arena_open", at: "2026-10-18T00:00:03.000Z" }),
       ],
-      [playbookEntry("reset", "starting", Date.parse("2026-10-18T00:00:02.000Z"))],
+      [playbookEntry("reset", "registered", Date.parse("2026-10-18T00:00:02.000Z"))],
     );
     useDashboardStore.getState().scrubArena("arena-a", 0);
 
     useDashboardStore
       .getState()
-      .ingestScopedPlaybook("arena-a", playbookEntry("seed", "started", Date.parse("2026-10-18T00:00:04.000Z")));
+      .ingestPlaybook("arena-a", playbookEntry("seed", "running", Date.parse("2026-10-18T00:00:04.000Z")));
 
     const entry = useDashboardStore.getState().arenas.get("arena-a");
     expect(entry?.playbooks.size).toBe(0);

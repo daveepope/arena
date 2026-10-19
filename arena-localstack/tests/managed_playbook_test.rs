@@ -1,3 +1,4 @@
+use arena::playbook::PlaybookState;
 use arena::lifecycle::{Fault, RunnableState, Subject};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::healthcheck::ReadinessCheck;
@@ -160,21 +161,21 @@ fn into_box_wraps_playbook_trait_object() {
 }
 
 #[test]
-fn state_newly_built_playbook_is_not_started() {
+fn state_newly_built_playbook_is_registered() {
     let playbook = ManagedLocalstackPlaybook::new("lifecycle-probe", "does-not-exist");
 
-    assert_eq!(playbook.state(), RunnableState::NotStarted);
+    assert_eq!(playbook.state(), PlaybookState::Registered);
     assert_eq!(playbook.faults(), Vec::new());
 }
 
 #[tokio::test]
-async fn run_missing_dependency_leaves_the_playbook_starting_until_the_arena_reports() {
+async fn run_missing_dependency_reports_the_playbook_faulted() {
     let playbook = ManagedLocalstackPlaybook::new("lifecycle-probe", "does-not-exist");
     let deps: Vec<Dependency> = Vec::new();
 
     let _ = playbook.run(&deps).await;
 
-    assert_eq!(playbook.state(), RunnableState::Starting);
+    assert_eq!(playbook.state(), PlaybookState::Faulted);
 }
 
 #[test]

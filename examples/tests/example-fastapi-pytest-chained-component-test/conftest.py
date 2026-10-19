@@ -94,7 +94,7 @@ QUEUE_NAME = "example-api-chained-events-q"
 EVENT_RULE_NAME = "example-api-chained-rule"
 DUMMY_CREDS = {"aws_access_key_id": "test", "aws_secret_access_key": "test"}
 REGION = "us-east-1"
-CLOSED_ARENA_NAME = "example-fastapi-chained-arena"
+CLOSED_ARENA_NAME = "example-fastapi-python-chained-arena"
 MATCH_NAME = "example-fastapi-chained-match"
 
 

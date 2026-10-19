@@ -5,30 +5,23 @@ import {
   flamegraphDocument,
   formatSelfPct,
   highlightFrames,
+  isProfileAvailable,
+  profilerLabel,
   severityClasses,
   visibleHotspots,
 } from "./cpuProfile";
+import { FloatingPanel } from "./FloatingPanel";
 import { useDashboardStore } from "./store";
-import type { RenderedProfile } from "./types";
+import type { CpuProfilerState, RenderedProfile, RuntimeFrames } from "./types";
 
 const PANEL_WIDTH = 760;
 const PANEL_MAX_HEIGHT = 560;
 const PANEL_MIN_WIDTH = 360;
 const PANEL_MIN_HEIGHT = 260;
-const VIEWPORT_MARGIN = 8;
 const FLAMEGRAPH_MIN_HEIGHT = 240;
 
 type LoadState = "loading" | "ready" | "unavailable";
 type Layout = "stacked" | "side-by-side";
-
-function clampPanelPosition(x: number, y: number): { left: number; top: number } {
-  const maxLeft = window.innerWidth - PANEL_WIDTH - VIEWPORT_MARGIN;
-  const maxTop = window.innerHeight - PANEL_MAX_HEIGHT - VIEWPORT_MARGIN;
-  return {
-    left: Math.min(Math.max(x, VIEWPORT_MARGIN), Math.max(maxLeft, VIEWPORT_MARGIN)),
-    top: Math.min(Math.max(y, VIEWPORT_MARGIN), Math.max(maxTop, VIEWPORT_MARGIN)),
-  };
-}
 
 function Flamegraph({
   svg,
@@ -73,16 +66,38 @@ function Flamegraph({
   );
 }
 
+function RuntimeFramesInfo({ frames }: { frames: RuntimeFrames[] }) {
+  return (
+    <div
+      data-testid="cpu-runtime-frames-info"
+      className="rounded-md border border-slate-700 bg-[#0b0f28] p-2 text-xs text-slate-400"
+    >
+      <p className="mb-1 text-slate-300">Hidden as runtime frames, by language:</p>
+      {frames.map((group) => (
+        <p key={group.language} className="font-mono">
+          <span className="text-slate-300">{group.language}</span>: {group.frames.join(", ")}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function HotspotTable({
   profile,
   filter,
+  hideRuntimeFrames,
   onHover,
 }: {
   profile: RenderedProfile;
   filter: string;
+  hideRuntimeFrames: boolean;
   onHover: (func: string | null) => void;
 }) {
-  const rows = visibleHotspots(profile.hotspots, filter);
+  const ranked =
+    hideRuntimeFrames && profile.application_hotspots !== undefined
+      ? profile.application_hotspots
+      : profile.hotspots;
+  const rows = visibleHotspots(ranked, filter);
 
   if (rows.length === 0) {
     return (
@@ -93,12 +108,12 @@ function HotspotTable({
   }
 
   return (
-    <table data-testid="cpu-hotspots" className="w-full text-left text-xs">
+    <table data-testid="cpu-hotspots" className="w-full table-fixed text-left text-xs">
       <thead className="text-slate-500">
         <tr>
-          <th className="px-2 py-1 font-medium">Function</th>
-          <th className="px-2 py-1 font-medium">Self</th>
-          <th className="px-2 py-1 font-medium">Share</th>
+          <th className="w-auto px-2 py-1 font-medium">Function</th>
+          <th className="w-14 px-2 py-1 text-right font-medium">Self</th>
+          <th className="w-20 px-2 py-1 text-right font-medium">Share</th>
         </tr>
       </thead>
       <tbody>
@@ -110,9 +125,11 @@ function HotspotTable({
             onMouseLeave={() => onHover(null)}
             className="cursor-default border-t border-slate-800 hover:bg-slate-800/40"
           >
-            <td className="px-2 py-1 font-mono text-slate-300">{hotspot.function}</td>
-            <td className="px-2 py-1 text-slate-400">{hotspot.self_count}</td>
-            <td className="px-2 py-1">
+            <td className="truncate px-2 py-1 font-mono text-slate-300" title={hotspot.function}>
+              {hotspot.function}
+            </td>
+            <td className="px-2 py-1 text-right text-slate-400">{hotspot.self_count}</td>
+            <td className="px-2 py-1 text-right">
               <span
                 className={`rounded-sm border px-1.5 py-0.5 ${severityClasses(hotspot.severity)}`}
               >
@@ -136,6 +153,8 @@ export function CpuProfileView({
   const [profile, setProfile] = useState<RenderedProfile | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [filter, setFilter] = useState("");
+  const [hideRuntimeFrames, setHideRuntimeFrames] = useState(false);
+  const [showRuntimeFrames, setShowRuntimeFrames] = useState(false);
   const [hoveredFunction, setHoveredFunction] = useState<string | null>(null);
   const [layout, setLayout] = useState<Layout>("stacked");
 
@@ -199,6 +218,30 @@ export function CpuProfileView({
         </div>
         <button
           type="button"
+          data-testid="cpu-hide-runtime-frames"
+          onClick={() => setHideRuntimeFrames(!hideRuntimeFrames)}
+          aria-pressed={hideRuntimeFrames}
+          className={`cursor-pointer rounded-md border px-2 py-1 text-xs uppercase tracking-wide ${
+            hideRuntimeFrames
+              ? "border-teal-500 bg-teal-950/60 text-teal-300"
+              : "border-slate-600 bg-[#0e1330] text-slate-300"
+          }`}
+        >
+          App only
+        </button>
+        <button
+          type="button"
+          data-testid="cpu-runtime-frames-info-toggle"
+          onClick={() => setShowRuntimeFrames(!showRuntimeFrames)}
+          aria-pressed={showRuntimeFrames}
+          aria-label="Which functions are hidden"
+          title="Which functions are hidden"
+          className="cursor-pointer rounded-md border border-slate-600 bg-[#0e1330] px-2 py-1 text-xs uppercase tracking-wide text-slate-300"
+        >
+          i
+        </button>
+        <button
+          type="button"
           onClick={() => setLayout(isSideBySide ? "stacked" : "side-by-side")}
           className="cursor-pointer rounded-md border border-slate-600 bg-[#0e1330] px-2 py-1 text-xs uppercase tracking-wide text-slate-300"
         >
@@ -216,6 +259,8 @@ export function CpuProfileView({
         )}
       </div>
 
+      {showRuntimeFrames && <RuntimeFramesInfo frames={profile.runtime_frames ?? []} />}
+
       <div className={`flex min-h-0 flex-1 gap-2 ${isSideBySide ? "flex-row" : "flex-col"}`}>
         <Flamegraph
           svg={profile.svg}
@@ -228,202 +273,79 @@ export function CpuProfileView({
             isSideBySide ? "w-80 shrink-0" : "max-h-48"
           }`}
         >
-          <HotspotTable profile={profile} filter={filter} onHover={setHoveredFunction} />
+          <HotspotTable
+            profile={profile}
+            filter={filter}
+            hideRuntimeFrames={hideRuntimeFrames}
+            onHover={setHoveredFunction}
+          />
         </div>
       </div>
     </div>
   );
 }
 
-const SNAP_THRESHOLD_PX = 48;
 
-function PinIcon({ isPinned }: { isPinned: boolean }) {
+const PROFILE_BUTTON_CLASSES: Record<"node" | "detail", string> = {
+  node: "mt-0.5 px-1 py-0 text-[8px] leading-[1.5] tracking-tight",
+  detail: "px-2 py-1 text-[10px] tracking-wide",
+};
+
+export function CpuProfileButton({
+  componentId,
+  profiler,
+  variant,
+}: {
+  componentId: string;
+  profiler: CpuProfilerState;
+  variant: "node" | "detail";
+}) {
+  const openProfileView = useDashboardStore((s) => s.openProfileView);
+  const isAvailable = isProfileAvailable(profiler.state, profiler.reportReady);
+
   return (
-    <svg
-      viewBox="0 0 16 16"
-      aria-hidden="true"
-      className="h-3.5 w-3.5"
-      fill={isPinned ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <button
+      type="button"
+      data-testid={`profiler-label-${componentId}`}
+      disabled={!isAvailable}
+      onClick={(e) => {
+        e.stopPropagation();
+        openProfileView(componentId, { x: e.clientX, y: e.clientY });
+      }}
+      className={`${PROFILE_BUTTON_CLASSES[variant]} whitespace-nowrap rounded-sm border uppercase ${
+        isAvailable
+          ? "cursor-pointer border-teal-500 bg-teal-950/60 text-teal-300"
+          : "cursor-default border-slate-600 bg-slate-900/60 text-slate-400"
+      }`}
     >
-      <path d="M9.5 1.5 14.5 6.5 12 7l-4 4-1.5-1.5 4-4 .5-2.5Z" />
-      <path d="M6.5 9.5 2 14" />
-    </svg>
+      {profilerLabel(profiler.state, profiler.reportReady)}
+    </button>
   );
-}
-
-type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
-
-const RESIZE_EDGES: { edge: ResizeEdge; className: string }[] = [
-  { edge: "n", className: "left-2 right-2 top-0 h-1.5 cursor-ns-resize" },
-  { edge: "s", className: "bottom-0 left-2 right-2 h-1.5 cursor-ns-resize" },
-  { edge: "w", className: "bottom-2 left-0 top-2 w-1.5 cursor-ew-resize" },
-  { edge: "e", className: "bottom-2 right-0 top-2 w-1.5 cursor-ew-resize" },
-  { edge: "nw", className: "left-0 top-0 h-3 w-3 cursor-nwse-resize" },
-  { edge: "ne", className: "right-0 top-0 h-3 w-3 cursor-nesw-resize" },
-  { edge: "sw", className: "bottom-0 left-0 h-3 w-3 cursor-nesw-resize" },
-  { edge: "se", className: "bottom-0 right-0 h-3 w-3 cursor-nwse-resize" },
-];
-
-export function snapToViewportCorner(
-  rect: { left: number; top: number; width: number; height: number },
-  viewport: { width: number; height: number },
-): { left: number; top: number } {
-  const right = viewport.width - VIEWPORT_MARGIN - rect.width;
-  const bottom = viewport.height - VIEWPORT_MARGIN - rect.height;
-  const left =
-    rect.left <= VIEWPORT_MARGIN + SNAP_THRESHOLD_PX
-      ? VIEWPORT_MARGIN
-      : rect.left >= right - SNAP_THRESHOLD_PX
-        ? Math.max(right, VIEWPORT_MARGIN)
-        : rect.left;
-  const top =
-    rect.top <= VIEWPORT_MARGIN + SNAP_THRESHOLD_PX
-      ? VIEWPORT_MARGIN
-      : rect.top >= bottom - SNAP_THRESHOLD_PX
-        ? Math.max(bottom, VIEWPORT_MARGIN)
-        : rect.top;
-  return { left, top };
 }
 
 export function CpuProfilePopover() {
-  const profileView = useDashboardStore((s) => s.profileView);
+  const profiles = useDashboardStore((s) => s.profiles);
   const closeProfileView = useDashboardStore((s) => s.closeProfileView);
   const toggleProfileViewPin = useDashboardStore((s) => s.toggleProfileViewPin);
-  const [rect, setRect] = useState<{ left: number; top: number; width: number; height: number } | null>(
-    null,
-  );
-
-  useEffect(() => {
-    if (!profileView) return;
-    const { left, top } = clampPanelPosition(profileView.position.x, profileView.position.y);
-    setRect({ left, top, width: PANEL_WIDTH, height: PANEL_MAX_HEIGHT });
-  }, [profileView?.componentId, profileView?.position.x, profileView?.position.y]);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeProfileView();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closeProfileView]);
-
-  const trackPointer = (
-    event: React.PointerEvent,
-    onDelta: (dx: number, dy: number) => void,
-    onFinish?: () => void,
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const origin = { x: event.clientX, y: event.clientY };
-    const onMove = (move: PointerEvent) => onDelta(move.clientX - origin.x, move.clientY - origin.y);
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      onFinish?.();
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  };
-
-  const startDrag = (event: React.PointerEvent) => {
-    if (!rect) return;
-    const start = { ...rect };
-    trackPointer(
-      event,
-      (dx, dy) => setRect({ ...start, left: start.left + dx, top: start.top + dy }),
-      () =>
-        setRect((current) =>
-          current === null
-            ? current
-            : {
-                ...current,
-                ...snapToViewportCorner(current, {
-                  width: window.innerWidth,
-                  height: window.innerHeight,
-                }),
-              },
-        ),
-    );
-  };
-
-  const startResize = (event: React.PointerEvent, edge: ResizeEdge) => {
-    if (!rect) return;
-    const start = { ...rect };
-    trackPointer(event, (dx, dy) => {
-      const next = { ...start };
-      if (edge.includes("e")) next.width = Math.max(PANEL_MIN_WIDTH, start.width + dx);
-      if (edge.includes("s")) next.height = Math.max(PANEL_MIN_HEIGHT, start.height + dy);
-      if (edge.includes("w")) {
-        next.width = Math.max(PANEL_MIN_WIDTH, start.width - dx);
-        next.left = start.left + (start.width - next.width);
-      }
-      if (edge.includes("n")) {
-        next.height = Math.max(PANEL_MIN_HEIGHT, start.height - dy);
-        next.top = start.top + (start.height - next.height);
-      }
-      setRect(next);
-    });
-  };
-
-  if (!profileView || !rect) return null;
 
   return (
     <>
-      {!profileView.isPinned && <div className="fixed inset-0 z-40" onClick={closeProfileView} />}
-      <div
-        data-testid="cpu-profile-panel"
-        style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
-        className="fixed z-50 flex flex-col gap-2 overflow-hidden rounded-md border border-slate-700 bg-[#121735] p-3 text-slate-200 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          data-testid="cpu-profile-drag-handle"
-          onPointerDown={startDrag}
-          title="Drag to move, release near an edge to snap"
-          className="-mx-3 -mt-3 flex cursor-grab items-center justify-between gap-2 border-b border-slate-700 bg-[#0b0f28] px-3 py-2 active:cursor-grabbing hover:bg-[#161c44]"
+      {profiles.map((panel) => (
+        <FloatingPanel
+          key={panel.key}
+          testId="cpu-profile-panel"
+          handleId="cpu-profile"
+          title={`cpu profile \u00b7 ${panel.componentId}`}
+          position={panel.position}
+          size={{ width: PANEL_WIDTH, height: PANEL_MAX_HEIGHT }}
+          minSize={{ width: PANEL_MIN_WIDTH, height: PANEL_MIN_HEIGHT }}
+          isPinned={panel.isPinned}
+          onTogglePin={() => toggleProfileViewPin(panel.key)}
+          onClose={() => closeProfileView(panel.key)}
         >
-          <h3 className="truncate text-sm font-semibold">cpu profile · {profileView.componentId}</h3>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={toggleProfileViewPin}
-              aria-pressed={profileView.isPinned}
-              aria-label={profileView.isPinned ? "Unpin" : "Pin"}
-              title={profileView.isPinned ? "Unpin" : "Pin"}
-              className={`cursor-pointer rounded-md border px-1.5 py-1 ${
-                profileView.isPinned
-                  ? "border-teal-500 bg-teal-950/60 text-teal-300"
-                  : "border-slate-600 bg-[#0e1330] text-slate-300"
-              }`}
-            >
-              <PinIcon isPinned={profileView.isPinned} />
-            </button>
-            <button
-              type="button"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={closeProfileView}
-              className="cursor-pointer rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-300"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-        <CpuProfileView componentId={profileView.componentId} isFullScreen={false} />
-        {RESIZE_EDGES.map(({ edge, className }) => (
-          <div
-            key={edge}
-            data-testid={`cpu-profile-resize-${edge}`}
-            onPointerDown={(e) => startResize(e, edge)}
-            className={`absolute ${className}`}
-          />
-        ))}
-      </div>
+          <CpuProfileView componentId={panel.componentId} isFullScreen={false} />
+        </FloatingPanel>
+      ))}
     </>
   );
 }
-

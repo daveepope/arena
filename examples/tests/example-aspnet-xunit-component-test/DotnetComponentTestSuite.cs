@@ -60,7 +60,7 @@ public sealed class DotnetComponentTestSuite : ArenaCollectionFixture
     private static readonly ExecutableComponent WebApp = BuildWebApp("example-api-web-app", WebAppPort);
 
     [ArenaComponent(Logs = false)]
-    private static readonly ExecutableComponent WebApp2 = BuildWebApp("example-api-web-app-2", WebApp2Port);
+    private static readonly ExecutableComponent WebApp2 = BuildWebApp("example-api-second-web-app", WebApp2Port);
 
     [ArenaDependency]
     private static readonly PostgresDependency Postgres =
@@ -184,6 +184,7 @@ public sealed class DotnetComponentTestSuite : ArenaCollectionFixture
     private static ExecutableComponent BuildWebApp(string name, int port) =>
         new ExecutableComponentBuilder(name)
             .WithExecutablePath(ResolveWebAppExecutablePath())
+            .WithBuildTool(BuildTool.Dotnet)
             .WithEnvVar("WEB_APP_PORT", port.ToString())
             .WithEnvVar("CALIBRATION_URL", $"http://127.0.0.1:{CalibrationPort}")
             .WithEnvVar("POSTGRES_HOST", PostgresHost)

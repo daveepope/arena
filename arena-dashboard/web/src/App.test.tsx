@@ -1,11 +1,17 @@
 import "./testSetup";
 
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App, fullScreenProfileComponentId } from "./App";
 import { useDashboardStore } from "./store";
 import type { ArenaState } from "./types";
+
+function lastDetail() {
+  const details = useDashboardStore.getState().details;
+  return details.length === 0 ? null : details[details.length - 1];
+}
+
 
 const SLIDER_SETTLE_MS = 400;
 
@@ -67,9 +73,9 @@ beforeEach(() => {
   (globalThis as unknown as { EventSource: typeof FakeEventSource }).EventSource = FakeEventSource;
   useDashboardStore.setState({
     arenas: new Map(),
-    selected: null,
+    details: [],
     cpuProfiles: new Map(),
-    profileView: null,
+    profiles: [],
   });
   window.history.replaceState(null, "", "/");
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
@@ -88,13 +94,25 @@ describe("App", () => {
     expect(screen.getByText("connecting")).toBeDefined();
   });
 
-  it("renders a legend explaining state and kind colors", () => {
+  it("legendGroupsStateAndSubjectUnderTheirOwnLabels", () => {
     render(<App />);
 
-    expect(screen.getByText("started")).toBeDefined();
-    expect(screen.getByText("faulted")).toBeDefined();
-    expect(screen.getByText("dependency")).toBeDefined();
-    expect(screen.getByText("component")).toBeDefined();
+    const legend = screen.getByTestId("legend");
+    expect(legend.textContent).toContain("state");
+    expect(legend.textContent).toContain("started / running");
+    expect(legend.textContent).toContain("faulted");
+    expect(legend.textContent).toContain("subject");
+    expect(legend.textContent).toContain("dependency");
+    expect(legend.textContent).toContain("component");
+  });
+
+  it("serverStatusIsLabelledAndSeparateFromTheLegend", () => {
+    render(<App />);
+
+    const server = screen.getByTestId("server-status");
+    expect(server.textContent).toContain("server");
+    expect(server.textContent).toContain("connecting");
+    expect(screen.getByTestId("legend").textContent).not.toContain("server");
   });
 
   it("shows connected once the event source opens", () => {
@@ -237,7 +255,7 @@ describe("App", () => {
         data: JSON.stringify(
           arenaState({
             state: "arena_open",
-            dependencies: [{ id: "postgres", state: "started", faults: [], children: [] }],
+            dependencies: [{ id: "postgres", state: "running", faults: [], children: [] }],
           }),
         ),
       });
@@ -552,10 +570,83 @@ describe("App", () => {
       useDashboardStore.getState().select({ title: "postgres", detail: "id: postgres", position: { x: 50, y: 60 } });
     });
 
-    const heading = screen.getByText("postgres");
-    const popover = heading.parentElement as HTMLElement;
+    const popover = screen.getByTestId("detail-panel");
     expect(popover.style.left).toBe("50px");
     expect(popover.style.top).toBe("60px");
+  });
+
+  it("selectComponentWithReadyProfileShowsReportButtonInDetail", () => {
+    render(<App />);
+
+    act(() => {
+      useDashboardStore.getState().ingestCpuProfile("web-app", "stopped", true);
+      useDashboardStore
+        .getState()
+        .select({ title: "web-app", detail: "id: web-app", position: { x: 10, y: 20 } });
+    });
+
+    const button = screen.getByTestId("profiler-label-web-app") as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+
+    act(() => {
+      button.click();
+    });
+
+    expect(useDashboardStore.getState().profiles.map((panel) => panel.componentId)).toEqual([
+      "web-app",
+    ]);
+  });
+
+  it("selectComponentWithoutProfileShowsNoReportButtonInDetail", () => {
+    render(<App />);
+
+    act(() => {
+      useDashboardStore
+        .getState()
+        .select({ title: "postgres", detail: "id: postgres", position: { x: 10, y: 20 } });
+    });
+
+    expect(screen.queryByTestId("profiler-label-postgres")).toBeNull();
+  });
+
+  it("detailPopoverPinnedStaysOpenWhenAnotherNodeIsSelected", () => {
+    render(<App />);
+    act(() => {
+      useDashboardStore
+        .getState()
+        .select({ title: "postgres", detail: "id: postgres", position: { x: 50, y: 60 } });
+    });
+    act(() => {
+      screen.getByLabelText("Pin").click();
+    });
+
+    act(() => {
+      useDashboardStore
+        .getState()
+        .select({ title: "kafka", detail: "id: kafka", position: { x: 80, y: 90 } });
+    });
+
+    expect(screen.getAllByTestId("detail-panel")).toHaveLength(2);
+    expect(screen.getByText("postgres")).toBeDefined();
+    expect(screen.getByText("kafka")).toBeDefined();
+  });
+
+  it("detailPopoverPinnedStaysOpenWhenClickingAway", () => {
+    render(<App />);
+    act(() => {
+      useDashboardStore
+        .getState()
+        .select({ title: "postgres", detail: "id: postgres", position: { x: 50, y: 60 } });
+    });
+
+    act(() => {
+      screen.getByLabelText("Pin").click();
+    });
+
+    expect(lastDetail()?.isPinned).toBe(true);
+    expect(screen.getByTestId("detail-panel")).toBeDefined();
+    expect(screen.getByTestId("detail-drag-handle")).toBeDefined();
+    expect(screen.getByTestId("detail-resize-se")).toBeDefined();
   });
 
   it("ignores a malformed message instead of crashing", () => {
@@ -730,7 +821,7 @@ describe("App", () => {
       popover.click();
     });
 
-    expect(useDashboardStore.getState().selected).not.toBeNull();
+    expect(lastDetail()).not.toBeNull();
   });
 
   it("clicking the backdrop dismisses the detail popover", () => {
@@ -739,13 +830,13 @@ describe("App", () => {
     act(() => {
       useDashboardStore.getState().select({ title: "postgres", detail: "id: postgres", position: { x: 50, y: 60 } });
     });
-    const backdrop = screen.getByText("postgres").parentElement?.previousElementSibling as HTMLElement;
+    const backdrop = screen.getByTestId("detail-panel").previousElementSibling as HTMLElement;
 
     act(() => {
       backdrop.click();
     });
 
-    expect(useDashboardStore.getState().selected).toBeNull();
+    expect(lastDetail()).toBeNull();
   });
 
   it("a rejected shutdown request reports the server as stopped", async () => {
@@ -909,20 +1000,47 @@ describe("App full screen profile", () => {
       source.onmessage?.({ data: JSON.stringify(arenaState()) });
       source.onmessage?.({
         data: JSON.stringify({
-          type: "scoped_playbook",
+          type: "playbook",
           arena: "arena-1",
           playbook: "apply-schema",
           kind: "startup",
           playbook_type: "managed",
-          state: "started",
+          runs: 2,
+          state: "running",
           at: "2026-10-18T00:00:00.000Z",
           faults: [],
         }),
       });
     });
 
-    expect(screen.getByTestId("scoped-playbook-apply-schema").textContent).toContain("startup");
-    expect(screen.getByTestId("scoped-playbook-apply-schema").textContent).toContain("managed");
+    expect(screen.getByTestId("playbook-apply-schema").textContent).toContain("startup");
+    expect(screen.getByTestId("playbook-apply-schema").textContent).toContain("managed");
+    expect(screen.getByTestId("playbook-apply-schema").textContent).toContain("2 runs");
+  });
+
+  it("appHeldProfilerStateIsFetchedOnLoad", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((input: string) => {
+        if (input === "/profiles") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve([{ component: "svc", state: "stopped", report: true }]),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }),
+    );
+
+    render(<App />);
+
+    await waitFor(() =>
+      expect(useDashboardStore.getState().cpuProfiles.get("svc")).toEqual({
+        state: "stopped",
+        reportReady: true,
+      }),
+    );
   });
 
   it("appPlaybookHistoryFillsTheRowFromTheServer", async () => {
@@ -944,6 +1062,7 @@ describe("App full screen profile", () => {
                       state: "stopped",
                       kind: "scoped",
                       playbook_type: "unmanaged",
+                      runs: 5,
                       at: "2026-01-01T00:00:01.000Z",
                       faults: [],
                     },
@@ -958,8 +1077,9 @@ describe("App full screen profile", () => {
 
     render(<App />);
 
-    const row = await screen.findByTestId("scoped-playbook-seed-reference-data");
+    const row = await screen.findByTestId("playbook-seed-reference-data");
     expect(row.textContent).toContain("unmanaged");
+    expect(row.textContent).toContain("5 runs");
     expect(row.textContent).toContain("stopped");
   });
 

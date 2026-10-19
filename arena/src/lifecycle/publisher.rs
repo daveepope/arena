@@ -24,12 +24,22 @@ impl Observer<ArenaState> for ObserverAdapter {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MatchSlot(usize);
+
+#[derive(Clone, Default)]
+struct MatchFrame {
+    dependencies: Vec<DependencyState>,
+    components: Vec<ComponentState>,
+}
+
 pub struct ArenaLifecyclePublisher {
     arena_id: String,
     bus: EventBus<ArenaState>,
     registrations: Mutex<Vec<Registration>>,
     current: Mutex<ArenaLifecycleState>,
     arena_faults: Mutex<Vec<Fault>>,
+    frames: Mutex<Vec<MatchFrame>>,
 }
 
 impl ArenaLifecyclePublisher {
@@ -44,6 +54,7 @@ impl ArenaLifecyclePublisher {
             bus,
             registrations: Mutex::new(registrations),
             current: Mutex::new(ArenaLifecycleState::ArenaCreated),
+            frames: Mutex::new(Vec::new()),
             arena_faults: Mutex::new(Vec::new()),
         }
     }
@@ -85,12 +96,45 @@ impl ArenaLifecyclePublisher {
             .clone()
     }
 
-    pub fn transition(
+    pub fn reserve_match(&self) -> MatchSlot {
+        let mut frames = self.frames.lock().unwrap_or_else(|e| e.into_inner());
+        frames.push(MatchFrame::default());
+        MatchSlot(frames.len() - 1)
+    }
+
+    pub fn report_match(
         &self,
-        state: ArenaLifecycleState,
+        slot: MatchSlot,
         dependencies: Vec<DependencyState>,
         components: Vec<ComponentState>,
-    ) -> ArenaState {
+    ) {
+        let mut frames = self.frames.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(frame) = frames.get_mut(slot.0) else {
+            tracing::error!(
+                arena = %self.arena_id,
+                phase = "unknown_match_slot",
+                "a match reported against a slot this arena never reserved"
+            );
+            return;
+        };
+        *frame = MatchFrame {
+            dependencies,
+            components,
+        };
+    }
+
+    fn assembled(&self) -> (Vec<DependencyState>, Vec<ComponentState>) {
+        let frames = self.frames.lock().unwrap_or_else(|e| e.into_inner());
+        let mut dependencies = Vec::new();
+        let mut components = Vec::new();
+        for frame in frames.iter() {
+            dependencies.extend(frame.dependencies.iter().cloned());
+            components.extend(frame.components.iter().cloned());
+        }
+        (dependencies, components)
+    }
+
+    pub fn transition(&self, state: ArenaLifecycleState) -> ArenaState {
         let advanced = {
             let mut current = self.current.lock().unwrap_or_else(|e| e.into_inner());
             let advanced = Monotonic.is_legal(*current, state);
@@ -99,15 +143,7 @@ impl ArenaLifecyclePublisher {
             }
             advanced
         };
-        let effective = self.current();
-
-        let snapshot = ArenaState::new(
-            self.arena_id.clone(),
-            effective,
-            dependencies,
-            components,
-            self.recorded_faults(),
-        );
+        let snapshot = self.assemble_snapshot(self.current());
 
         if advanced {
             self.notify(&snapshot);
@@ -115,31 +151,25 @@ impl ArenaLifecyclePublisher {
         snapshot
     }
 
-    pub fn notify_progress(&self, dependencies: Vec<DependencyState>, components: Vec<ComponentState>) {
-        let snapshot = ArenaState::new(
-            self.arena_id.clone(),
-            self.current(),
-            dependencies,
-            components,
-            self.recorded_faults(),
-        );
+    pub fn notify_progress(&self) {
+        let snapshot = self.assemble_snapshot(self.current());
         self.notify(&snapshot);
     }
 
-    pub fn finish(
-        &self,
-        dependencies: Vec<DependencyState>,
-        components: Vec<ComponentState>,
-    ) -> ArenaState {
-        let pending = ArenaState::new(
+    pub fn finish(&self) -> ArenaState {
+        let pending = self.assemble_snapshot(self.current());
+        self.transition(pending.terminal_state())
+    }
+
+    fn assemble_snapshot(&self, state: ArenaLifecycleState) -> ArenaState {
+        let (dependencies, components) = self.assembled();
+        ArenaState::new(
             self.arena_id.clone(),
-            self.current(),
+            state,
             dependencies,
             components,
             self.recorded_faults(),
-        );
-        let terminal = pending.terminal_state();
-        self.transition(terminal, pending.dependencies, pending.components)
+        )
     }
 
     fn notify(&self, snapshot: &ArenaState) {

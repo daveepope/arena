@@ -39,6 +39,113 @@ impl From<std::string::FromUtf8Error> for RenderError {
 pub struct RenderedProfile {
     pub svg: String,
     pub hotspots: Vec<Hotspot>,
+    pub application_hotspots: Vec<Hotspot>,
+}
+
+pub struct RuntimeFrames {
+    pub language: &'static str,
+    pub starts_with: &'static [&'static str],
+    pub contains: &'static [&'static str],
+}
+
+pub const RUNTIME_FRAMES: &[RuntimeFrames] = &[
+    RuntimeFrames {
+        language: "dotnet",
+        starts_with: &[
+            "UNMANAGED_CODE_TIME",
+            "CPU_TIME",
+            "Thread (",
+            "System.",
+            "Microsoft.",
+            "Internal.",
+            "Interop",
+        ],
+        contains: &[],
+    },
+    RuntimeFrames {
+        language: "java",
+        starts_with: &[
+            "java.",
+            "javax.",
+            "jdk.",
+            "sun.",
+            "org.springframework.",
+            "org.apache.",
+            "JVM_",
+            "Phase",
+            "Compile::",
+            "IndexSet",
+            "SymbolTable::",
+            "JavaThread::",
+            "SharedRuntime::",
+            "InterpreterRuntime::",
+            "Universe::",
+            "G1",
+            "ciMethod",
+            "ciEnv",
+            "OopMap",
+            "CodeCache",
+            "Monitor::",
+            "os::",
+            "Node::",
+            "GraphKit::",
+        ],
+        contains: &[],
+    },
+    RuntimeFrames {
+        language: "python",
+        starts_with: &[],
+        contains: &[
+            "(<frozen importlib",
+            "(importlib/",
+            "(asyncio/",
+            "(concurrent/futures/",
+            "(encodings/",
+            "(logging/",
+            "(json/",
+            "(re/",
+            "(threading.py",
+            "(socket.py",
+            "(ssl.py",
+            "(selectors.py",
+            "(dataclasses.py",
+            "(typing.py",
+            "(functools.py",
+            "(abc.py",
+            "(enum.py",
+        ],
+    },
+    RuntimeFrames {
+        language: "native",
+        starts_with: &[
+            "[unknown",
+            "/usr/lib/",
+            "/lib/",
+            "__tls_get_addr",
+            "__memset",
+            "__memcpy",
+            "__memmove",
+            "__pthread",
+            "__libc",
+            "std::",
+            "core::",
+            "tokio::",
+        ],
+        contains: &[],
+    },
+];
+
+pub fn is_runtime_frame(function: &str) -> bool {
+    RUNTIME_FRAMES.iter().any(|group| {
+        group
+            .starts_with
+            .iter()
+            .any(|prefix| function.starts_with(prefix))
+            || group
+                .contains
+                .iter()
+                .any(|marker| function.contains(marker))
+    })
 }
 
 pub fn render_folded(folded: &str) -> Result<RenderedProfile, RenderError> {
@@ -54,6 +161,7 @@ pub fn render_folded(folded: &str) -> Result<RenderedProfile, RenderError> {
     Ok(RenderedProfile {
         svg: String::from_utf8(svg)?,
         hotspots: top_hotspots(folded, HOTSPOT_LIMIT),
+        application_hotspots: top_application_hotspots(folded, HOTSPOT_LIMIT),
     })
 }
 
@@ -119,7 +227,15 @@ pub struct Hotspot {
     pub severity: Severity,
 }
 
+pub fn top_application_hotspots(folded: &str, limit: usize) -> Vec<Hotspot> {
+    ranked_hotspots(folded, limit, true)
+}
+
 pub fn top_hotspots(folded: &str, limit: usize) -> Vec<Hotspot> {
+    ranked_hotspots(folded, limit, false)
+}
+
+fn ranked_hotspots(folded: &str, limit: usize, skip_runtime_frames: bool) -> Vec<Hotspot> {
     let mut self_counts: HashMap<&str, u64> = HashMap::new();
     let mut total: u64 = 0;
 
@@ -131,9 +247,17 @@ pub fn top_hotspots(folded: &str, limit: usize) -> Vec<Hotspot> {
         let Ok(count) = count.parse::<u64>() else {
             continue;
         };
-        let leaf = stack.rsplit(';').next().unwrap_or(stack);
-        *self_counts.entry(leaf).or_insert(0) += count;
         total += count;
+        let leaf = stack.rsplit(';').next().unwrap_or(stack);
+        let credited = if skip_runtime_frames {
+            match stack.rsplit(';').find(|frame| !is_runtime_frame(frame)) {
+                Some(frame) => frame,
+                None => continue,
+            }
+        } else {
+            leaf
+        };
+        *self_counts.entry(credited).or_insert(0) += count;
     }
 
     let mut hotspots: Vec<Hotspot> = self_counts

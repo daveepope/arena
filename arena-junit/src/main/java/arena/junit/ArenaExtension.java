@@ -227,7 +227,15 @@ public final class ArenaExtension implements BeforeAllCallback, AfterAllCallback
   }
 
   private static ClosedArena applyVisualize(Class<?> root, ClosedArena closedArena) {
-    return root.isAnnotationPresent(ArenaVisualize.class) ? closedArena.withLifecycleDashboard().done() : closedArena;
+    ArenaVisualize visualize = root.getAnnotation(ArenaVisualize.class);
+    if (visualize == null) {
+      return closedArena;
+    }
+    LifecycleDashboardBuilder dashboard = closedArena.withLifecycleDashboard();
+    for (String componentId : visualize.cpuProfile()) {
+      dashboard = dashboard.withCpuProfiler(componentId);
+    }
+    return dashboard.done();
   }
 
   private static ClosedArena closedArenaFor(Class<?> root, Match match, LogIdentifiers logIdentifiers) {

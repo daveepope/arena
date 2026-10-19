@@ -155,9 +155,19 @@ public abstract class ArenaCollectionFixture : IDisposable
 
     private static ClosedArena ApplyVisualize(Type fixtureType, ClosedArena closed)
     {
-        return fixtureType.GetCustomAttribute<ArenaVisualizeAttribute>() != null
-            ? closed.WithLifecycleDashboard().Done()
-            : closed;
+        var visualize = fixtureType.GetCustomAttribute<ArenaVisualizeAttribute>();
+        if (visualize == null)
+        {
+            return closed;
+        }
+
+        var dashboard = closed.WithLifecycleDashboard();
+        foreach (var componentId in visualize.CpuProfile)
+        {
+            dashboard = dashboard.WithCpuProfiler(componentId);
+        }
+
+        return dashboard.Done();
     }
 
     internal (List<string> DependencyIds, List<string> ComponentIds) CollectLogIdentifiers()

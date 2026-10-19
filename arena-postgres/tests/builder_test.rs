@@ -66,7 +66,7 @@ fn builder_with_container_name_and_network_builds_ok() {
         .with_port(5555)
         .with_database_name("custom_db")
         .with_database_username("custom_user")
-        .with_database_password("custom_pass")
+        .with_database_password(arena_container::credential::new_password())
         .with_container_name("custom-container")
         .with_network("custom-network")
         .with_image_name("custom/image")

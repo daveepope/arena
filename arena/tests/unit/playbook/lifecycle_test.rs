@@ -2,9 +2,10 @@
 mod subjects;
 
 use arena::lifecycle::bus::{EventBus, Publisher};
-use arena::lifecycle::{Fault, RunnableState};
+use arena::lifecycle::Fault;
+use arena::playbook::PlaybookState;
 use arena::playbook::lifecycle::{
-    PlaybookKind, ScopedPlaybookEvent, ScopedPlaybookLifecycle, CHANNEL,
+    PlaybookKind, PlaybookEvent, PlaybookLifecycle, CHANNEL,
 };
 use arena::{Match, MatchTrait};
 use std::sync::Arc;
@@ -12,43 +13,43 @@ use subjects::{probe_playbook, Behaviour, RecordingPlaybookObserver};
 
 const ARENA_ID: &str = "arena-under-test";
 
-fn attached_match(a_match: Match, observer: Arc<RecordingPlaybookObserver>) -> (Match, Arc<EventBus<ScopedPlaybookEvent>>) {
-    let bus: Arc<EventBus<ScopedPlaybookEvent>> = Arc::new(EventBus::new(CHANNEL));
+fn attached_match(a_match: Match, observer: Arc<RecordingPlaybookObserver>) -> (Match, Arc<EventBus<PlaybookEvent>>) {
+    let bus: Arc<EventBus<PlaybookEvent>> = Arc::new(EventBus::new(CHANNEL));
     bus.register_observer(observer);
-    let publisher: Arc<dyn Publisher<ScopedPlaybookEvent>> =
-        Arc::clone(&bus) as Arc<dyn Publisher<ScopedPlaybookEvent>>;
-    a_match.attach_scoped_playbook_publisher(ARENA_ID, publisher);
+    let publisher: Arc<dyn Publisher<PlaybookEvent>> =
+        Arc::clone(&bus) as Arc<dyn Publisher<PlaybookEvent>>;
+    a_match.attach_playbook_publisher(ARENA_ID, publisher);
     (a_match, bus)
 }
 
 #[test]
-fn state_newly_built_lifecycle_is_not_started() {
-    let lifecycle = ScopedPlaybookLifecycle::new("seed");
+fn state_newly_built_lifecycle_is_registered() {
+    let lifecycle = PlaybookLifecycle::new("seed");
 
-    assert_eq!(lifecycle.state(), RunnableState::NotStarted);
+    assert_eq!(lifecycle.state(), PlaybookState::Registered);
     assert_eq!(lifecycle.faults(), Vec::new());
 }
 
 #[test]
 fn report_illegal_transition_leaves_the_state_alone() {
-    let lifecycle = ScopedPlaybookLifecycle::new("seed");
+    let lifecycle = PlaybookLifecycle::new("seed");
 
-    lifecycle.report(RunnableState::Started);
+    lifecycle.report(PlaybookState::Stopped);
 
-    assert_eq!(lifecycle.state(), RunnableState::NotStarted);
+    assert_eq!(lifecycle.state(), PlaybookState::Registered);
 }
 
 #[test]
 fn report_without_an_attachment_still_tracks_the_state() {
-    let lifecycle = ScopedPlaybookLifecycle::new("seed");
+    let lifecycle = PlaybookLifecycle::new("seed");
 
-    lifecycle.report(RunnableState::Starting);
+    lifecycle.report(PlaybookState::Running);
 
-    assert_eq!(lifecycle.state(), RunnableState::Starting);
+    assert_eq!(lifecycle.state(), PlaybookState::Running);
 }
 
 #[tokio::test]
-async fn run_playbook_scoped_run_reports_started_then_stopped_on_drop() {
+async fn run_playbook_run_reports_running_then_stopped_on_drop() {
     let observer = RecordingPlaybookObserver::new();
     let (a_match, _bus) = attached_match(
         Match::new("healthy", vec![], vec![])
@@ -64,9 +65,8 @@ async fn run_playbook_scoped_run_reports_started_then_stopped_on_drop() {
     assert_eq!(
         observer.states_for("reset-orders"),
         vec![
-            RunnableState::NotStarted,
-            RunnableState::Starting,
-            RunnableState::Started
+            PlaybookState::Registered,
+            PlaybookState::Running
         ]
     );
 
@@ -75,11 +75,9 @@ async fn run_playbook_scoped_run_reports_started_then_stopped_on_drop() {
     assert_eq!(
         observer.states_for("reset-orders"),
         vec![
-            RunnableState::NotStarted,
-            RunnableState::Starting,
-            RunnableState::Started,
-            RunnableState::Stopping,
-            RunnableState::Stopped
+            PlaybookState::Registered,
+            PlaybookState::Running,
+            PlaybookState::Stopped
         ]
     );
 }
@@ -105,15 +103,11 @@ async fn run_playbook_run_twice_reports_two_cycles() {
     assert_eq!(
         observer.states_for("reset-orders"),
         vec![
-            RunnableState::NotStarted,
-            RunnableState::Starting,
-            RunnableState::Started,
-            RunnableState::Stopping,
-            RunnableState::Stopped,
-            RunnableState::Starting,
-            RunnableState::Started,
-            RunnableState::Stopping,
-            RunnableState::Stopped
+            PlaybookState::Registered,
+            PlaybookState::Running,
+            PlaybookState::Stopped,
+            PlaybookState::Running,
+            PlaybookState::Stopped
         ]
     );
 }
@@ -140,16 +134,16 @@ async fn run_playbook_failing_run_reports_faulted_with_its_fault() {
     assert_eq!(
         observer.states_for("seed"),
         vec![
-            RunnableState::NotStarted,
-            RunnableState::Starting,
-            RunnableState::Faulted
+            PlaybookState::Registered,
+            PlaybookState::Running,
+            PlaybookState::Faulted
         ]
     );
     assert_eq!(observer.faults_for("seed").len(), 1);
 }
 
 #[tokio::test]
-async fn attach_scoped_playbook_publisher_stamps_the_arena_id_on_every_event() {
+async fn attach_playbook_publisher_stamps_the_arena_id_on_every_event() {
     let observer = RecordingPlaybookObserver::new();
     let (a_match, _bus) = attached_match(
         Match::new("healthy", vec![], vec![])
@@ -171,14 +165,14 @@ async fn attach_scoped_playbook_publisher_stamps_the_arena_id_on_every_event() {
 #[tokio::test]
 async fn run_playbook_unregistered_observer_receives_nothing_further() {
     let observer = RecordingPlaybookObserver::new();
-    let bus: Arc<EventBus<ScopedPlaybookEvent>> = Arc::new(EventBus::new(CHANNEL));
+    let bus: Arc<EventBus<PlaybookEvent>> = Arc::new(EventBus::new(CHANNEL));
     let registration = bus.register_observer(observer.clone());
-    let publisher: Arc<dyn Publisher<ScopedPlaybookEvent>> =
-        Arc::clone(&bus) as Arc<dyn Publisher<ScopedPlaybookEvent>>;
+    let publisher: Arc<dyn Publisher<PlaybookEvent>> =
+        Arc::clone(&bus) as Arc<dyn Publisher<PlaybookEvent>>;
     let a_match = Match::new("healthy", vec![], vec![])
         .register_playbook(probe_playbook("reset-orders").into_playbook(), false);
     bus.unregister_observer(registration);
-    a_match.attach_scoped_playbook_publisher(ARENA_ID, publisher);
+    a_match.attach_playbook_publisher(ARENA_ID, publisher);
 
     let active = a_match
         .run_playbook("reset-orders")
@@ -205,11 +199,9 @@ async fn start_startup_playbook_finishes_once_its_run_returns() {
     assert_eq!(
         observer.states_for("apply-schema"),
         vec![
-            RunnableState::NotStarted,
-            RunnableState::Starting,
-            RunnableState::Started,
-            RunnableState::Stopping,
-            RunnableState::Stopped
+            PlaybookState::Registered,
+            PlaybookState::Running,
+            PlaybookState::Stopped
         ]
     );
 }
@@ -236,73 +228,47 @@ async fn start_failing_startup_playbook_reports_faulted_on_its_own_row() {
     assert_eq!(
         observer.states_for("seed"),
         vec![
-            RunnableState::NotStarted,
-            RunnableState::Starting,
-            RunnableState::Faulted
+            PlaybookState::Registered,
+            PlaybookState::Running,
+            PlaybookState::Faulted
         ]
     );
     assert_eq!(observer.faults_for("seed").len(), 1);
 }
 
-#[tokio::test]
-async fn release_all_marks_a_started_playbook_stopped() {
-    let observer = RecordingPlaybookObserver::new();
-    let (mut a_match, _bus) = attached_match(
-        Match::new("healthy", vec![], vec![])
-            .register_playbook(probe_playbook("apply-schema").into_playbook(), true),
-        observer.clone(),
-    );
-    let publisher = arena::lifecycle::ArenaLifecyclePublisher::new("arena-under-test", vec![]);
-    a_match.start(&publisher).await.expect("match should open");
 
-    a_match.release_all();
+#[test]
+fn report_stopped_from_running_reports_stopped() {
+    let lifecycle = PlaybookLifecycle::new("reset-orders");
+    lifecycle.report(PlaybookState::Running);
 
-    assert_eq!(
-        observer.states_for("apply-schema"),
-        vec![
-            RunnableState::NotStarted,
-            RunnableState::Starting,
-            RunnableState::Started,
-            RunnableState::Stopping,
-            RunnableState::Stopped
-        ]
-    );
+    lifecycle.report_stopped();
+
+    assert_eq!(lifecycle.state(), PlaybookState::Stopped);
 }
 
 #[test]
-fn report_terminal_from_started_reports_stopping_then_stopped() {
-    let lifecycle = ScopedPlaybookLifecycle::new("reset-orders");
-    lifecycle.report(RunnableState::Starting);
-    lifecycle.report(RunnableState::Started);
+fn report_stopped_from_a_handle_that_never_ran_does_nothing() {
+    let lifecycle = PlaybookLifecycle::new("reset-orders");
 
-    lifecycle.report_terminal();
+    lifecycle.report_stopped();
 
-    assert_eq!(lifecycle.state(), RunnableState::Stopped);
+    assert_eq!(lifecycle.state(), PlaybookState::Registered);
 }
 
 #[test]
-fn report_terminal_from_a_handle_that_never_started_does_nothing() {
-    let lifecycle = ScopedPlaybookLifecycle::new("reset-orders");
+fn report_stopped_called_twice_stays_stopped() {
+    let lifecycle = PlaybookLifecycle::new("reset-orders");
+    lifecycle.report(PlaybookState::Running);
 
-    lifecycle.report_terminal();
+    lifecycle.report_stopped();
+    lifecycle.report_stopped();
 
-    assert_eq!(lifecycle.state(), RunnableState::NotStarted);
-}
-
-#[test]
-fn report_terminal_called_twice_stays_stopped() {
-    let lifecycle = ScopedPlaybookLifecycle::new("reset-orders");
-    lifecycle.report(RunnableState::Starting);
-    lifecycle.report(RunnableState::Started);
-
-    lifecycle.report_terminal();
-    lifecycle.report_terminal();
-
-    assert_eq!(lifecycle.state(), RunnableState::Stopped);
+    assert_eq!(lifecycle.state(), PlaybookState::Stopped);
 }
 
 #[tokio::test]
-async fn run_playbook_successful_run_reports_started_exactly_once() {
+async fn run_playbook_successful_run_reports_running_exactly_once() {
     let observer = RecordingPlaybookObserver::new();
     let (a_match, _bus) = attached_match(
         Match::new("healthy", vec![], vec![])
@@ -320,13 +286,13 @@ async fn run_playbook_successful_run_reports_started_exactly_once() {
     let started = observer
         .states_for("reset-orders")
         .into_iter()
-        .filter(|state| *state == RunnableState::Started)
+        .filter(|state| *state == PlaybookState::Running)
         .count();
     assert_eq!(started, 1);
 }
 
 #[tokio::test]
-async fn run_playbook_panicking_run_reports_faulted_rather_than_sticking_at_starting() {
+async fn run_playbook_panicking_run_reports_faulted_rather_than_sticking_at_running() {
     let observer = RecordingPlaybookObserver::new();
     let (a_match, _bus) = attached_match(
         Match::new("panicking", vec![], vec![]).register_playbook(
@@ -347,81 +313,81 @@ async fn run_playbook_panicking_run_reports_faulted_rather_than_sticking_at_star
     assert_eq!(
         observer.states_for("seed"),
         vec![
-            RunnableState::NotStarted,
-            RunnableState::Starting,
-            RunnableState::Faulted
+            PlaybookState::Registered,
+            PlaybookState::Running,
+            PlaybookState::Faulted
         ]
     );
 }
 
 #[test]
 fn exit_two_live_handles_only_reports_stopped_once_the_last_one_goes() {
-    let lifecycle = ScopedPlaybookLifecycle::new("reset-orders");
-    lifecycle.report_starting();
-    lifecycle.report_started();
-    lifecycle.report_started();
+    let lifecycle = PlaybookLifecycle::new("reset-orders");
+    lifecycle.report_running();
+    lifecycle.enter();
+    lifecycle.enter();
 
     lifecycle.exit();
-    assert_eq!(lifecycle.state(), RunnableState::Started);
+    assert_eq!(lifecycle.state(), PlaybookState::Running);
 
     lifecycle.exit();
-    assert_eq!(lifecycle.state(), RunnableState::Stopped);
+    assert_eq!(lifecycle.state(), PlaybookState::Stopped);
 }
 
 #[test]
-fn report_starting_while_already_started_is_not_reported_as_illegal() {
+fn report_running_while_already_running_reports_the_extra_run() {
     let observer = RecordingPlaybookObserver::new();
-    let bus: Arc<EventBus<ScopedPlaybookEvent>> = Arc::new(EventBus::new(CHANNEL));
+    let bus: Arc<EventBus<PlaybookEvent>> = Arc::new(EventBus::new(CHANNEL));
     bus.register_observer(observer.clone());
-    let lifecycle = ScopedPlaybookLifecycle::new("reset-orders");
+    let lifecycle = PlaybookLifecycle::new("reset-orders");
     lifecycle.attach(
         ARENA_ID,
         PlaybookKind::Scoped,
-        Arc::clone(&bus) as Arc<dyn Publisher<ScopedPlaybookEvent>>,
+        Arc::clone(&bus) as Arc<dyn Publisher<PlaybookEvent>>,
     );
-    lifecycle.report_starting();
-    lifecycle.report_started();
+    lifecycle.report_running();
 
-    lifecycle.report_starting();
+    lifecycle.report_running();
 
     assert_eq!(
         observer.states_for("reset-orders"),
         vec![
-            RunnableState::NotStarted,
-            RunnableState::Starting,
-            RunnableState::Started
+            PlaybookState::Registered,
+            PlaybookState::Running,
+            PlaybookState::Running
         ]
     );
+    assert_eq!(observer.runs_for("reset-orders"), vec![0, 1, 2]);
 }
 
 #[test]
-fn report_starting_after_a_fault_clears_the_previous_fault() {
-    let lifecycle = ScopedPlaybookLifecycle::new("reset-orders");
-    lifecycle.report(RunnableState::Starting);
+fn report_running_after_a_fault_clears_the_previous_fault() {
+    let lifecycle = PlaybookLifecycle::new("reset-orders");
+    lifecycle.report(PlaybookState::Running);
     lifecycle.report_fault(Fault::playbook("reset-orders", "seed data rejected"));
     assert_eq!(lifecycle.faults().len(), 1);
 
-    lifecycle.report_starting();
+    lifecycle.report_running();
 
     assert_eq!(lifecycle.faults(), Vec::new());
-    assert_eq!(lifecycle.state(), RunnableState::Starting);
+    assert_eq!(lifecycle.state(), PlaybookState::Running);
 }
 
 #[tokio::test]
 async fn state_read_through_the_playbook_traits_follows_the_run() {
     let playbook = probe_playbook("reset-orders").into_playbook();
-    assert_eq!(playbook.state(), RunnableState::NotStarted);
+    assert_eq!(playbook.state(), PlaybookState::Registered);
     assert_eq!(playbook.faults(), Vec::new());
 
     let active = playbook.run(&[]).await.expect("playbook should run");
 
-    assert_eq!(active.state(), RunnableState::Started);
+    assert_eq!(active.state(), PlaybookState::Running);
     assert_eq!(active.faults(), Vec::new());
-    assert_eq!(playbook.state(), RunnableState::Started);
+    assert_eq!(playbook.state(), PlaybookState::Running);
 
     drop(active);
 
-    assert_eq!(playbook.state(), RunnableState::Stopped);
+    assert_eq!(playbook.state(), PlaybookState::Stopped);
 }
 
 #[tokio::test]
@@ -430,12 +396,11 @@ async fn faults_read_through_the_playbook_trait_carry_the_reported_fault() {
         .behaving(Behaviour::FailStart)
         .into_playbook();
 
-    let Err(fault) = playbook.run(&[]).await else {
+    let Err(_) = playbook.run(&[]).await else {
         panic!("playbook should fault");
     };
-    playbook.lifecycle().report_fault(fault);
 
-    assert_eq!(playbook.state(), RunnableState::Faulted);
+    assert_eq!(playbook.state(), PlaybookState::Faulted);
     assert_eq!(playbook.faults().len(), 1);
     assert_eq!(playbook.faults()[0].id, "seed");
 }
@@ -460,7 +425,7 @@ fn attach_registered_playbook_announces_its_kind_and_held_state() {
     );
     assert_eq!(
         observer.states_for("reset-orders"),
-        vec![RunnableState::NotStarted]
+        vec![PlaybookState::Registered]
     );
 }
 
@@ -481,7 +446,7 @@ async fn report_every_event_carries_the_moment_it_happened() {
     drop(active);
 
     let stamps = observer.timestamps_for("reset-orders");
-    assert_eq!(stamps.len(), 5);
+    assert_eq!(stamps.len(), 3);
     assert!(stamps.windows(2).all(|pair| pair[0] <= pair[1]));
 }
 
@@ -500,5 +465,61 @@ async fn release_all_startup_playbook_already_finished_reports_nothing_further()
     a_match.release_all();
 
     assert_eq!(observer.states_for("apply-schema"), reported_at_open);
+    assert_eq!(observer.runs_for("apply-schema"), vec![0, 1, 1]);
+}
+
+#[tokio::test]
+async fn run_playbook_startup_playbook_rerun_by_hand_reports_a_second_cycle() {
+    let observer = RecordingPlaybookObserver::new();
+    let (mut a_match, _bus) = attached_match(
+        Match::new("healthy", vec![], vec![])
+            .register_playbook(probe_playbook("apply-schema").into_playbook(), true),
+        observer.clone(),
+    );
+    let publisher = arena::lifecycle::ArenaLifecyclePublisher::new("arena-under-test", vec![]);
+    a_match.start(&publisher).await.expect("match should open");
+
+    let active = a_match
+        .run_playbook("apply-schema")
+        .await
+        .expect("playbook registered")
+        .expect("playbook should run");
+    drop(active);
+
+    assert_eq!(
+        observer.states_for("apply-schema"),
+        vec![
+            PlaybookState::Registered,
+            PlaybookState::Running,
+            PlaybookState::Stopped,
+            PlaybookState::Running,
+            PlaybookState::Stopped
+        ]
+    );
+    assert_eq!(observer.runs_for("apply-schema"), vec![0, 1, 1, 2, 2]);
+}
+
+#[tokio::test]
+async fn attach_reopened_arena_starts_its_playbooks_from_zero() {
+    let observer = RecordingPlaybookObserver::new();
+    let (mut a_match, bus) = attached_match(
+        Match::new("healthy", vec![], vec![])
+            .register_playbook(probe_playbook("apply-schema").into_playbook(), true),
+        observer.clone(),
+    );
+    let publisher = arena::lifecycle::ArenaLifecyclePublisher::new("arena-under-test", vec![]);
+    a_match.start(&publisher).await.expect("match should open");
+    assert_eq!(observer.runs_for("apply-schema").last(), Some(&1));
+
+    a_match.attach_playbook_publisher(
+        ARENA_ID,
+        Arc::clone(&bus) as Arc<dyn Publisher<PlaybookEvent>>,
+    );
+
+    assert_eq!(observer.runs_for("apply-schema").last(), Some(&0));
+    assert_eq!(
+        observer.states_for("apply-schema").last(),
+        Some(&PlaybookState::Registered)
+    );
 }
 

@@ -4,9 +4,9 @@ use std::time::Duration;
 use arena::component::{Component, RunnableComponent};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::{ClosedArena, Fault, Match, MatchTrait, RunnableState};
-use arena_dashboard::{HttpForwardingObserver, ScopedPlaybookForwarder};
+use arena_dashboard::{HttpForwardingObserver, PlaybookForwarder};
 use arena::playbook::{
-    ActivePlaybook, ManagedPlaybook, Playbook, ScopedPlaybookLifecycle, UnmanagedPlaybook,
+    ActivePlaybook, ManagedPlaybook, Playbook, PlaybookLifecycle, UnmanagedPlaybook,
 };
 use arena_profile::observer::{register_observer, report, report_complete, unregister_observer};
 use rand::Rng;
@@ -266,7 +266,7 @@ enum ProbeBase {
 }
 
 impl ProbeBase {
-    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
         match self {
             ProbeBase::Managed(base) => base.lifecycle(),
             ProbeBase::Unmanaged(base) => base.lifecycle(),
@@ -334,7 +334,7 @@ impl Playbook for ProbePlaybook {
         &self.identifier
     }
 
-    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
         self.base.lifecycle()
     }
 
@@ -345,7 +345,7 @@ impl Playbook for ProbePlaybook {
 
 struct ProbeActivePlaybook {
     identifier: String,
-    lifecycle: Arc<ScopedPlaybookLifecycle>,
+    lifecycle: Arc<PlaybookLifecycle>,
 }
 
 impl ActivePlaybook for ProbeActivePlaybook {
@@ -357,7 +357,7 @@ impl ActivePlaybook for ProbeActivePlaybook {
         self
     }
 
-    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
         &self.lifecycle
     }
 }
@@ -488,11 +488,21 @@ fn folded_profile_for(component_id: &str) -> String {
     }
 }
 
-fn scoped_playbooks_for(arena_id: &str) -> Vec<&'static str> {
+const TEST_ROUNDS: usize = 4;
+
+fn playbooks_for(arena_id: &str) -> Vec<&'static str> {
     match arena_id {
         "arena-tea-party" => vec!["reset-tea-party-db", "hatter-gateway-outage"],
         "arena-rabbit-hole" => vec!["reset-rabbit-hole-db", "caterpillar-cache-purge"],
         _ => vec!["reset-looking-glass-db"],
+    }
+}
+
+fn caller_playbooks_for(arena_id: &str) -> Vec<&'static str> {
+    match arena_id {
+        "arena-tea-party" => vec!["seed-tea-party-reading"],
+        "arena-rabbit-hole" => vec!["seed-rabbit-hole-reading"],
+        _ => vec![],
     }
 }
 
@@ -509,8 +519,12 @@ fn closed_arena_for(
             true,
         )
         .register_playbook(ProbePlaybook::unmanaged("seed-reference-data").into_playbook(), true);
-    for scoped in scoped_playbooks_for(arena_id) {
-        a_match = a_match.register_playbook(ProbePlaybook::managed(scoped).into_playbook(), false);
+    for playbook in playbooks_for(arena_id) {
+        a_match = a_match.register_playbook(ProbePlaybook::managed(playbook).into_playbook(), false);
+    }
+    for playbook in caller_playbooks_for(arena_id) {
+        a_match =
+            a_match.register_playbook(ProbePlaybook::unmanaged(playbook).into_playbook(), false);
     }
     if faulting_playbook {
         a_match = a_match
@@ -524,20 +538,38 @@ fn closed_arena_for(
     let matches: Vec<Box<dyn MatchTrait>> = vec![Box::new(a_match)];
     ClosedArena::new(arena_id.to_string(), matches)
         .observe(observer.clone())
-        .observe_scoped_playbooks(ScopedPlaybookForwarder::new(observer))
+        .observe_playbooks(PlaybookForwarder::new(observer))
 }
 
-async fn cycle_scoped_playbooks(arena: &arena::OpenArena, arena_id: &str) {
-    for scoped in scoped_playbooks_for(arena_id) {
-        let Some(outcome) = arena.run_playbook(scoped).await else {
+async fn run_one_test(arena: &arena::OpenArena, arena_id: &str, label: &str) {
+    let mut opened = Vec::new();
+    for playbook in playbooks_for(arena_id)
+        .into_iter()
+        .chain(caller_playbooks_for(arena_id))
+    {
+        let Some(outcome) = arena.run_playbook(playbook).await else {
             continue;
         };
-        if let Ok(active) = outcome {
-            tokio::time::sleep(random_step_delay()).await;
-            drop(active);
+        match outcome {
+            Ok(active) => opened.push(active),
+            Err(fault) => eprintln!("{arena_id} {label}: {playbook} faulted: {fault}"),
         }
         tokio::time::sleep(random_step_delay()).await;
     }
+    tokio::time::sleep(random_step_delay()).await;
+    drop(opened);
+}
+
+async fn simulate_tests(arena: &arena::OpenArena, arena_id: &str) {
+    println!("{arena_id}: running {TEST_ROUNDS} tests in parallel");
+    futures::future::join_all((1..=TEST_ROUNDS).map(|round| {
+        let label = format!("test {round} of {TEST_ROUNDS}");
+        async move {
+            tokio::time::sleep(random_step_delay()).await;
+            run_one_test(arena, arena_id, &label).await;
+        }
+    }))
+    .await;
 }
 
 #[tokio::main]
@@ -572,10 +604,13 @@ async fn main() {
         Err(state) => println!("arena-croquet-ground faulted as expected: {state}"),
     }
 
-    cycle_scoped_playbooks(&open_a, "arena-tea-party").await;
-    cycle_scoped_playbooks(&open_b, "arena-rabbit-hole").await;
-
     println!("\nAll arenas open. Press enter to tear down...");
+
+    tokio::join!(
+        simulate_tests(&open_a, "arena-tea-party"),
+        simulate_tests(&open_b, "arena-rabbit-hole")
+    );
+
     let _ = tokio::task::spawn_blocking(|| {
         let mut line = String::new();
         let _ = std::io::stdin().read_line(&mut line);

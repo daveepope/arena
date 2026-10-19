@@ -6,9 +6,10 @@ use arena::lifecycle::{
     ArenaLifecycleObserver, ArenaLifecycleState, ArenaState, Fault, RunnableState,
 };
 use arena::lifecycle::bus::{EventBus, Observer, Publisher};
+use arena::playbook::PlaybookState;
 use arena::playbook::lifecycle::{PlaybookKind, PlaybookType, CHANNEL as PLAYBOOK_CHANNEL};
 use arena::playbook::{
-    ActivePlaybook, Playbook, ScopedPlaybookEvent, ScopedPlaybookLifecycle, UnmanagedPlaybook,
+    ActivePlaybook, Playbook, PlaybookEvent, PlaybookLifecycle, UnmanagedPlaybook,
 };
 use chrono::{DateTime, Utc};
 use async_trait::async_trait;
@@ -449,10 +450,10 @@ impl RunnableComponent for ProbeComponent {
 
 pub struct ProbeActivePlaybook {
     identifier: String,
-    lifecycle: Arc<ScopedPlaybookLifecycle>,
+    lifecycle: Arc<PlaybookLifecycle>,
 }
 
-pub fn probe_active_playbook(lifecycle: &Arc<ScopedPlaybookLifecycle>) -> Box<dyn ActivePlaybook> {
+pub fn probe_active_playbook(lifecycle: &Arc<PlaybookLifecycle>) -> Box<dyn ActivePlaybook> {
     Box::new(ProbeActivePlaybook {
         identifier: lifecycle.playbook_id().to_string(),
         lifecycle: Arc::clone(lifecycle),
@@ -468,7 +469,7 @@ impl ActivePlaybook for ProbeActivePlaybook {
         self
     }
 
-    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
         &self.lifecycle
     }
 }
@@ -518,7 +519,7 @@ impl Playbook for ProbePlaybook {
         &self.identifier
     }
 
-    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
         self.unmanaged.lifecycle()
     }
 
@@ -736,7 +737,7 @@ where
 }
 
 pub struct RecordingPlaybookObserver {
-    events: Mutex<Vec<ScopedPlaybookEvent>>,
+    events: Mutex<Vec<PlaybookEvent>>,
 }
 
 impl RecordingPlaybookObserver {
@@ -746,15 +747,15 @@ impl RecordingPlaybookObserver {
         })
     }
 
-    pub fn events(&self) -> Vec<ScopedPlaybookEvent> {
+    pub fn events(&self) -> Vec<PlaybookEvent> {
         self.events.lock().expect("events lock").clone()
     }
 
-    pub fn states(&self) -> Vec<RunnableState> {
+    pub fn states(&self) -> Vec<PlaybookState> {
         self.events().iter().map(|event| event.state).collect()
     }
 
-    pub fn states_for(&self, playbook_id: &str) -> Vec<RunnableState> {
+    pub fn states_for(&self, playbook_id: &str) -> Vec<PlaybookState> {
         self.for_playbook(playbook_id)
             .iter()
             .map(|event| event.state)
@@ -772,6 +773,13 @@ impl RecordingPlaybookObserver {
         self.for_playbook(playbook_id)
             .iter()
             .map(|event| event.playbook_type)
+            .collect()
+    }
+
+    pub fn runs_for(&self, playbook_id: &str) -> Vec<usize> {
+        self.for_playbook(playbook_id)
+            .iter()
+            .map(|event| event.runs)
             .collect()
     }
 
@@ -796,32 +804,32 @@ impl RecordingPlaybookObserver {
             .collect()
     }
 
-    fn for_playbook(&self, playbook_id: &str) -> Vec<ScopedPlaybookEvent> {
+    fn for_playbook(&self, playbook_id: &str) -> Vec<PlaybookEvent> {
         self.events()
             .into_iter()
-            .filter(|event| event.playbook_id == playbook_id)
+            .filter(|event| event.id == playbook_id)
             .collect()
     }
 }
 
-impl Observer<ScopedPlaybookEvent> for RecordingPlaybookObserver {
-    fn on_event(&self, event: &ScopedPlaybookEvent) {
+impl Observer<PlaybookEvent> for RecordingPlaybookObserver {
+    fn on_event(&self, event: &PlaybookEvent) {
         self.events.lock().expect("events lock").push(event.clone());
     }
 }
 
 pub fn observe_playbooks(
-    lifecycle: &Arc<ScopedPlaybookLifecycle>,
+    lifecycle: &Arc<PlaybookLifecycle>,
     arena_id: &str,
     kind: PlaybookKind,
 ) -> Arc<RecordingPlaybookObserver> {
     let observer = RecordingPlaybookObserver::new();
-    let bus: Arc<EventBus<ScopedPlaybookEvent>> = Arc::new(EventBus::new(PLAYBOOK_CHANNEL));
+    let bus: Arc<EventBus<PlaybookEvent>> = Arc::new(EventBus::new(PLAYBOOK_CHANNEL));
     bus.register_observer(observer.clone());
     lifecycle.attach(
         arena_id,
         kind,
-        Arc::clone(&bus) as Arc<dyn Publisher<ScopedPlaybookEvent>>,
+        Arc::clone(&bus) as Arc<dyn Publisher<PlaybookEvent>>,
     );
     observer
 }

@@ -3,8 +3,8 @@ use std::time::{Duration, Instant};
 
 use arena::lifecycle::{ArenaLifecycleObserver, ArenaLifecycleState, ArenaState, RunnableState};
 use arena::lifecycle::bus::Observer;
-use arena::playbook::{PlaybookKind, PlaybookType, ScopedPlaybookEvent};
-use arena_dashboard::{HttpForwardingObserver, ScopedPlaybookForwarder};
+use arena::playbook::{PlaybookEvent, PlaybookKind, PlaybookState, PlaybookType};
+use arena_dashboard::{HttpForwardingObserver, PlaybookForwarder};
 use arena_profile::{CpuProfileEvent, CpuProfileObserver};
 use axum::extract::State;
 use axum::routing::post;
@@ -228,25 +228,26 @@ async fn on_cpu_profile_everytransition_isforwardedinorder() {
     assert_eq!(states, vec!["starting", "started", "stopping"]);
 }
 
-fn scoped_playbook_event(playbook_id: &str) -> ScopedPlaybookEvent {
-    ScopedPlaybookEvent::new(
+fn playbook_event(id: &str) -> PlaybookEvent {
+    PlaybookEvent::new(
         "arena-under-test",
-        playbook_id,
+        id,
         PlaybookType::Unmanaged,
         PlaybookKind::Scoped,
-        RunnableState::Started,
+        PlaybookState::Running,
+        1,
         Vec::new(),
     )
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn on_event_scoped_playbook_is_forwarded_with_its_arena_and_state() {
+async fn on_event_playbook_is_forwarded_with_its_arena_and_state() {
     let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
     let url = start_capture_server(Arc::clone(&bodies)).await;
     let forwarder = Arc::new(HttpForwardingObserver::new(url));
-    let playbooks = ScopedPlaybookForwarder::new(Arc::clone(&forwarder));
+    let playbooks = PlaybookForwarder::new(Arc::clone(&forwarder));
 
-    playbooks.on_event(&scoped_playbook_event("reset-orders"));
+    playbooks.on_event(&playbook_event("reset-orders"));
     drop(playbooks);
     drop(forwarder);
 
@@ -254,24 +255,27 @@ async fn on_event_scoped_playbook_is_forwarded_with_its_arena_and_state() {
     assert_eq!(captured.len(), 1);
     assert!(captured[0].contains("reset-orders"), "got: {}", captured[0]);
     assert!(captured[0].contains("arena-under-test"), "got: {}", captured[0]);
-    assert!(captured[0].contains("started"), "got: {}", captured[0]);
+    assert!(captured[0].contains("running"), "got: {}", captured[0]);
+    assert!(captured[0].contains(r#""runs":1"#), "got: {}", captured[0]);
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn on_event_scoped_playbook_forwarder_does_not_forward_arena_states() {
+async fn on_event_playbook_forwarder_does_not_forward_arena_states() {
     let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
     let url = start_capture_server(Arc::clone(&bodies)).await;
     let forwarder = Arc::new(HttpForwardingObserver::new(url));
-    let playbooks = ScopedPlaybookForwarder::new(Arc::clone(&forwarder));
+    let playbooks = PlaybookForwarder::new(Arc::clone(&forwarder));
 
-    playbooks.on_event(&scoped_playbook_event("reset-orders"));
-    playbooks.on_event(&scoped_playbook_event("seed-reference-data"));
+    playbooks.on_event(&playbook_event("reset-orders"));
+    playbooks.on_event(&playbook_event("seed-reference-data"));
     drop(playbooks);
     drop(forwarder);
 
     let captured = bodies.lock().expect("capture lock").clone();
     assert_eq!(captured.len(), 2);
-    assert!(captured.iter().all(|body| body.contains("playbook_id")));
+    assert!(captured
+        .iter()
+        .all(|body| body.contains(r#""kind":"scoped""#)));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -279,10 +283,10 @@ async fn on_event_every_channel_shares_one_forwarding_thread() {
     let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
     let url = start_capture_server(Arc::clone(&bodies)).await;
     let forwarder = Arc::new(HttpForwardingObserver::new(url));
-    let playbooks = ScopedPlaybookForwarder::new(Arc::clone(&forwarder));
+    let playbooks = PlaybookForwarder::new(Arc::clone(&forwarder));
 
     forwarder.on_state(&arena_state("shared-arena"));
-    playbooks.on_event(&scoped_playbook_event("reset-orders"));
+    playbooks.on_event(&playbook_event("reset-orders"));
     drop(playbooks);
     drop(forwarder);
 

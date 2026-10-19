@@ -11,7 +11,13 @@ function kindShapeClass(kind: NodeKind): string {
 }
 
 export function isActiveState(state: string): boolean {
-  return state === "starting" || state === "readiness_check" || state === "started" || state === "stopping";
+  return (
+    state === "starting" ||
+    state === "readiness_check" ||
+    state === "started" ||
+    state === "running" ||
+    state === "stopping"
+  );
 }
 
 export function fillClasses(state: string): string {
@@ -20,6 +26,7 @@ export function fillClasses(state: string): string {
     case "readiness_check":
       return "bg-amber-500/60 text-amber-50";
     case "started":
+    case "running":
       return "bg-emerald-500/60 text-emerald-50";
     case "stopping":
       return "bg-orange-500/60 text-orange-50";
@@ -72,6 +79,24 @@ export function formatDetail(id: string, kind: string, state: string, faults: Fa
   return [`id: ${id}`, `kind: ${kind}`, `state: ${state}`, `children: ${childCount}`, formatFaults(faults)].join(
     "\n"
   );
+}
+
+export function formatPlaybookDetail(
+  id: string,
+  playbookType: string,
+  kind: string,
+  state: string,
+  runs: number,
+  faults: Fault[]
+): string {
+  return [
+    `id: ${id}`,
+    `kind: playbook`,
+    `type: ${playbookType} ${kind}`,
+    `state: ${state}`,
+    `runs: ${runs}`,
+    formatFaults(faults),
+  ].join("\n");
 }
 
 export const TERMINAL_ARENA_STATES = new Set(["arena_closed", "arena_faulted"]);

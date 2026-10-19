@@ -243,7 +243,7 @@ impl ExecutableComponent {
 
         let base_args: Vec<String> = self.runtime_args.iter().map(|(_, v)| v.clone()).collect();
 
-        let (spawn_program, spawn_args, active_profile) = if let Some(cfg) = self.cpu_profile.as_ref() {
+        let (spawn_program, spawn_args, profile_env, active_profile) = if let Some(cfg) = self.cpu_profile.as_ref() {
             let request = arena_profile::LaunchRequest {
                 program: executable_path.clone(),
                 args: base_args,
@@ -257,14 +257,17 @@ impl ExecutableComponent {
                 .map_err(|e| format!("cpu profiler preparation failed: {}", e))?;
             match prepared {
                 PreparedLaunch::Wrapped { program, args, session } => {
-                    (program, args, Some(ActiveCpuProfile::Wrapped(session)))
+                    (program, args, Vec::new(), Some(ActiveCpuProfile::Wrapped(session)))
                 }
-                PreparedLaunch::ArgsAugmented { args, shutdown_signal, session } => {
-                    (executable_path.clone(), args, Some(ActiveCpuProfile::ArgAugmented(session, shutdown_signal)))
-                }
+                PreparedLaunch::ArgsAugmented { args, env, shutdown_signal, session } => (
+                    executable_path.clone(),
+                    args,
+                    env,
+                    Some(ActiveCpuProfile::ArgAugmented(session, shutdown_signal)),
+                ),
             }
         } else {
-            (executable_path.clone(), base_args, None)
+            (executable_path.clone(), base_args, Vec::new(), None)
         };
 
         tracing::debug!(
@@ -278,6 +281,13 @@ impl ExecutableComponent {
 
         for (key, value) in &self.env_vars {
             cmd.env(key, value);
+        }
+
+        for (key, value) in &profile_env {
+            match self.env_vars.iter().rfind(|(existing, _)| existing == key) {
+                Some((_, caller_value)) => cmd.env(key, format!("{caller_value} {value}")),
+                None => cmd.env(key, value),
+            };
         }
 
         for arg in &spawn_args {

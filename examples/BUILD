@@ -642,7 +642,11 @@ py_test(
         "//examples:arena_config",
         "//examples:validation_db_schema",
         "//examples:weather_db_schema",
-    ],
+    ] + select({
+        "@platforms//os:linux": ["@profiling_tools//:py-spy__py-spy"],
+        "@platforms//os:macos": ["@profiling_tools//:py-spy__py-spy"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":pytest_shared",
         "//arena-pytest:arena_pytest_lib",
@@ -813,7 +817,7 @@ java_test(
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
         "--include-engine=junit-platform-suite",
-        "--select-class=arena.examples.component.ComponentTestSuite",
+        "--select-class=arena.examples.component.JavaSpringBootComponentTestSuite",
     ],
     data = [
         ":example-readings-spring-boot-web-app",
@@ -868,7 +872,7 @@ java_test(
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
         "--include-engine=junit-platform-suite",
-        "--select-class=arena.examples.component.ChainedComponentTestSuite",
+        "--select-class=arena.examples.component.JavaSpringBootChainedComponentTestSuite",
     ],
     data = [
         ":example-readings-spring-boot-web-app",
@@ -1052,6 +1056,7 @@ csharp_test(
         ":validation_db_schema",
         ":weather_db_schema",
         "//arena-xunit:xunit_core_netstandard",
+        "//tools/dotnet_trace:dotnet_trace_tool",
     ],
     deps = [
         ":xunit_shared",

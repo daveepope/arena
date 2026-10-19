@@ -1,10 +1,10 @@
-use arena::playbook::ScopedPlaybookLifecycle;
+use arena::playbook::PlaybookLifecycle;
 use std::sync::Arc;
 use crate::blocking::run_blocking;
 use crate::postgres_dependency::PostgresDependency;
 
 pub struct Playbook {
-    lifecycle: Option<Arc<ScopedPlaybookLifecycle>>,
+    lifecycle: Option<Arc<PlaybookLifecycle>>,
     connection_string: String,
     identifier: String,
     managed_tables: Vec<(String, String)>,
@@ -29,7 +29,7 @@ impl Playbook {
         self
     }
 
-    pub fn with_lifecycle(mut self, lifecycle: Arc<ScopedPlaybookLifecycle>) -> Self {
+    pub fn with_lifecycle(mut self, lifecycle: Arc<PlaybookLifecycle>) -> Self {
         self.lifecycle = Some(lifecycle);
         self
     }
@@ -65,7 +65,7 @@ impl Playbook {
             lifecycle: self
                 .lifecycle
                 .clone()
-                .unwrap_or_else(|| ScopedPlaybookLifecycle::managed(self.identifier.clone())),
+                .unwrap_or_else(|| PlaybookLifecycle::managed(self.identifier.clone())),
             connection_string: self.connection_string,
             identifier: self.identifier,
             managed_tables: tables,
@@ -96,7 +96,7 @@ fn reset_on_drop(identifier: String, connection_string: String, managed_tables: 
 }
 
 pub struct ActivePlaybook {
-    lifecycle: Arc<ScopedPlaybookLifecycle>,
+    lifecycle: Arc<PlaybookLifecycle>,
     connection_string: String,
     identifier: String,
     managed_tables: Vec<(String, String)>,
@@ -107,7 +107,7 @@ impl arena::ActivePlaybook for ActivePlaybook {
         &self.identifier
     }
 
-    fn lifecycle(&self) -> &Arc<ScopedPlaybookLifecycle> {
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
         &self.lifecycle
     }
 
@@ -191,6 +191,7 @@ impl Drop for ActivePlaybook {
                     self.lifecycle.playbook_id(),
                     "playbook teardown failed",
                 ));
+                self.lifecycle.exit();
                 std::panic::resume_unwind(payload);
             }
         }

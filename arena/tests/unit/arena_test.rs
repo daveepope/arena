@@ -1245,3 +1245,36 @@ async fn state_closed_arena_after_close_returns_the_terminal_state() {
     assert_eq!(state.state, ArenaLifecycleState::ArenaClosed);
     assert_eq!(state.dependencies[0].state, RunnableState::Stopped);
 }
+
+#[tokio::test]
+async fn open_two_matches_every_snapshot_carries_both_matches_subjects() {
+    let first = Match::new(
+        "first",
+        vec![probe_dependency("postgres-1").into_dependency()],
+        vec![],
+    );
+    let second = Match::new(
+        "second",
+        vec![probe_dependency("kafka-1").into_dependency()],
+        vec![],
+    );
+    let (closed, recorder) = arena_with(vec![Box::new(first), Box::new(second)]);
+
+    let open = closed.open().await.expect("arena should open");
+    open.close().await.expect("arena should close");
+
+    for snapshot in recorder.snapshots() {
+        let ids: Vec<&str> = snapshot
+            .dependencies
+            .iter()
+            .map(|dep| dep.id.as_str())
+            .collect();
+        assert_eq!(
+            ids,
+            vec!["postgres-1", "kafka-1"],
+            "a snapshot at {} lost a match's subjects",
+            snapshot.state
+        );
+    }
+}
+

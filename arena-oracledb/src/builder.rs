@@ -202,10 +202,10 @@ impl OracleDependencyBuilder {
             .unwrap_or_else(|| Self::DEFAULT_DATABASE_USERNAME.to_string());
         let database_password = self
             .database_password
-            .unwrap_or_else(|| arena_container::credential::new_password("arena"));
+            .unwrap_or_else(arena_container::credential::new_password);
         let admin_password = self
             .admin_password
-            .unwrap_or_else(|| arena_container::credential::new_password("arenaadmin"));
+            .unwrap_or_else(arena_container::credential::new_password);
         let startup_sql_scripts = self.startup_sql_scripts;
         let dependencies = self.dependencies;
         let image_name = self

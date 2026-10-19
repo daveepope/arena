@@ -119,12 +119,21 @@ pub fn signed_token_with_scope(arena: &OpenArena, scope: &str) -> String {
         .expect("sign_claims")
 }
 
+pub fn postgres_db_pass() -> &'static str {
+    static PASSWORD: OnceLock<String> = OnceLock::new();
+    PASSWORD.get_or_init(|| format!("pw{}Aa1", run_suffix()))
+}
+
+pub fn mssql_db_pass() -> &'static str {
+    static PASSWORD: OnceLock<String> = OnceLock::new();
+    PASSWORD.get_or_init(|| format!("pw{}Aa1", run_suffix()))
+}
+
 pub const POSTGRES_DB_NAME: &str = "readings_db";
 pub const POSTGRES_DB_USER: &str = "readings_user";
-pub const POSTGRES_DB_PASS: &str = "readings_password";
+
 pub const MSSQL_DB_NAME: &str = "validationDb";
 pub const MSSQL_DB_USER: &str = "sa";
-pub const MSSQL_DB_PASS: &str = "yourStrong(!)Password";
 
 pub fn setup_dependencies() -> Vec<Dependency> {
     let rt = test_runtime();
@@ -136,7 +145,7 @@ pub fn setup_dependencies() -> Vec<Dependency> {
         .with_port(rt.postgres_port)
         .with_database_name(POSTGRES_DB_NAME)
         .with_database_username(POSTGRES_DB_USER)
-        .with_database_password(POSTGRES_DB_PASS)
+        .with_database_password(postgres_db_pass())
         .with_startup_sql_scripts(startup_sql_scripts)
         .build();
 
@@ -164,7 +173,7 @@ pub fn setup_dependencies() -> Vec<Dependency> {
         .with_port(rt.mssql_port)
         .with_database_name(MSSQL_DB_NAME)
         .with_database_username(MSSQL_DB_USER)
-        .with_database_password(MSSQL_DB_PASS)
+        .with_database_password(mssql_db_pass())
         .with_startup_sql_scripts(mssql_startup_sql_scripts)
         .build();
     MSSQL_ID
@@ -226,7 +235,7 @@ pub fn setup_exec_component() -> Component {
             "postgres_connection_string",
             format!(
                 "host=localhost port={} user={} password={} dbname={}",
-                rt.postgres_port, POSTGRES_DB_USER, POSTGRES_DB_PASS, POSTGRES_DB_NAME
+                rt.postgres_port, POSTGRES_DB_USER, postgres_db_pass(), POSTGRES_DB_NAME
             ),
         )
         .with_runtime_arg("kafka_bootstrap", format!("localhost:{}", rt.kafka_port))
@@ -238,7 +247,7 @@ pub fn setup_exec_component() -> Component {
             "mssql_connection_string",
             format!(
                 "Server=tcp:localhost,{};Database={};User Id={};Password={};TrustServerCertificate=True;encrypt=DANGER_PLAINTEXT;",
-                rt.mssql_port, MSSQL_DB_NAME, MSSQL_DB_USER, MSSQL_DB_PASS
+                rt.mssql_port, MSSQL_DB_NAME, MSSQL_DB_USER, mssql_db_pass()
             ),
         )
         .with_runtime_arg("oauth_issuer_url", rt.oauth_provider_issuer.clone())

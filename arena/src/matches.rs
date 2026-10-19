@@ -1,14 +1,14 @@
 use super::component::{component_state, Component};
 use super::dependency::{dependency_state, Dependency};
 use super::dependency::RunnableDependency;
-use super::playbook::lifecycle::{PlaybookKind, ScopedPlaybookEvent};
+use super::playbook::lifecycle::{PlaybookKind, PlaybookEvent};
 use super::playbook::{ActivePlaybook, Playbook};
 use crate::lifecycle::bus::Publisher;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use crate::lifecycle::message;
 use crate::lifecycle::{
     panic_message, ArenaLifecycleState, ComponentState, DependencyState, Fault, ArenaLifecyclePublisher,
-    RunnableState, Subject,
+    MatchSlot, Subject,
 };
 use async_trait::async_trait;
 use futures::future::join_all;
@@ -203,7 +203,15 @@ async fn force_stop_component(comp: &mut Component) -> Option<Fault> {
 #[async_trait]
 pub trait MatchTrait: Send + Sync {
     async fn start(&mut self, ctx: &ArenaLifecyclePublisher) -> Result<(), Vec<Fault>>;
+
+
     async fn stop(&mut self, ctx: &ArenaLifecyclePublisher) -> Result<(), Vec<Fault>>;
+
+    fn attach_report_slot(&mut self, _slot: MatchSlot) {}
+
+    fn report_slot(&self) -> Option<MatchSlot> {
+        None
+    }
 
     async fn force_stop_all(&mut self) -> Vec<Fault> {
         Vec::new()
@@ -231,10 +239,10 @@ pub trait MatchTrait: Send + Sync {
         None
     }
 
-    fn attach_scoped_playbook_publisher(
+    fn attach_playbook_publisher(
         &self,
         _arena_id: &str,
-        _publisher: Arc<dyn Publisher<ScopedPlaybookEvent>>,
+        _publisher: Arc<dyn Publisher<PlaybookEvent>>,
     ) {
     }
 }
@@ -282,6 +290,7 @@ pub struct Match {
     active_playbooks: Vec<Box<dyn ActivePlaybook>>,
     cpu_profiled_component_ids: Vec<String>,
     cpu_profile_limit_bytes: Option<usize>,
+    slot: OnceLock<MatchSlot>,
     started: bool,
 }
 
@@ -295,6 +304,7 @@ impl Match {
             active_playbooks: Vec::new(),
             cpu_profiled_component_ids: Vec::new(),
             cpu_profile_limit_bytes: None,
+            slot: OnceLock::new(),
             started: false,
         }
     }
@@ -322,9 +332,27 @@ impl Match {
         (self.dependency_states(), self.component_states())
     }
 
+    fn slot(&self, ctx: &ArenaLifecyclePublisher) -> MatchSlot {
+        *self.slot.get_or_init(|| ctx.reserve_match())
+    }
+
     fn transition(&self, ctx: &ArenaLifecyclePublisher, state: ArenaLifecycleState) {
         let (dependencies, components) = self.snapshot();
-        ctx.transition(state, dependencies, components);
+        ctx.report_match(self.slot(ctx), dependencies, components);
+        let published = ctx.transition(state);
+        if published.state != state {
+            ctx.notify_progress();
+        }
+    }
+
+    fn report_progress(
+        &self,
+        ctx: &ArenaLifecyclePublisher,
+        dependencies: Vec<DependencyState>,
+        components: Vec<ComponentState>,
+    ) {
+        ctx.report_match(self.slot(ctx), dependencies, components);
+        ctx.notify_progress();
     }
 
     async fn start_dependencies(&mut self, ctx: &ArenaLifecyclePublisher) -> Vec<Fault> {
@@ -340,7 +368,8 @@ impl Match {
         let sw_batch = Instant::now();
         let match_label = self.name.clone();
         let deps = std::mem::take(&mut self.dependencies);
-        let pending_ids: Vec<String> = deps.iter().map(|d| d.identifier().to_string()).collect();
+        let pending_states: Vec<DependencyState> =
+            deps.iter().map(|d| dependency_state(d.as_ref())).collect();
 
         let mut in_flight: FuturesUnordered<_> = deps
             .into_iter()
@@ -408,10 +437,10 @@ impl Match {
                 .enumerate()
                 .map(|(j, slot)| match slot {
                     Some(dep) => dependency_state(dep.as_ref()),
-                    None => DependencyState::new(pending_ids[j].clone(), RunnableState::NotStarted, Vec::new(), Vec::new(), Vec::new()),
+                    None => pending_states[j].clone(),
                 })
                 .collect();
-            ctx.notify_progress(progress, self.component_states());
+            self.report_progress(ctx, progress, self.component_states());
         }
 
         self.dependencies = slots
@@ -509,10 +538,7 @@ impl Match {
                     );
                     actives.push(active);
                 }
-                Ok(Err(fault)) => {
-                    self.report_playbook_fault(&id, fault.clone());
-                    faults.push(fault)
-                }
+                Ok(Err(fault)) => faults.push(fault),
                 Err(payload) => {
                     let fault = Fault::playbook(&id, message::playbook_failed()).caused_by(
                         Fault::from_panic(&id, Subject::Playbook, payload.as_ref()),
@@ -526,7 +552,7 @@ impl Match {
         self.active_playbooks = actives;
         for (playbook, exec_on_start) in &self.playbooks {
             if *exec_on_start {
-                playbook.lifecycle().report_terminal();
+                playbook.lifecycle().release();
             }
         }
 
@@ -624,7 +650,8 @@ impl Match {
         let sw_batch = Instant::now();
         let match_label = self.name.clone();
         let comps = std::mem::take(&mut self.components);
-        let pending_ids: Vec<String> = comps.iter().map(|c| c.identifier().to_string()).collect();
+        let pending_states: Vec<ComponentState> =
+            comps.iter().map(|c| component_state(c.as_ref())).collect();
 
         let mut in_flight: FuturesUnordered<_> = comps
             .into_iter()
@@ -692,10 +719,10 @@ impl Match {
                 .enumerate()
                 .map(|(j, slot)| match slot {
                     Some(comp) => component_state(comp.as_ref()),
-                    None => ComponentState::new(pending_ids[j].clone(), RunnableState::NotStarted, Vec::new(), Vec::new()),
+                    None => pending_states[j].clone(),
                 })
                 .collect();
-            ctx.notify_progress(self.dependency_states(), progress);
+            self.report_progress(ctx, self.dependency_states(), progress);
         }
 
         self.components = slots
@@ -727,8 +754,8 @@ impl Match {
         let sw_comps = Instant::now();
         let comps = std::mem::take(&mut self.components);
         let comp_count = comps.len();
-        let pending_ids: Vec<String> = comps.iter().map(|c| c.identifier().to_string()).collect();
-        let pending_states: Vec<RunnableState> = comps.iter().map(|c| c.state()).collect();
+        let pending_states: Vec<ComponentState> =
+            comps.iter().map(|c| component_state(c.as_ref())).collect();
         let mut in_flight: FuturesUnordered<_> = comps
             .into_iter()
             .enumerate()
@@ -749,10 +776,10 @@ impl Match {
                 .enumerate()
                 .map(|(j, slot)| match slot {
                     Some(comp) => component_state(comp.as_ref()),
-                    None => ComponentState::new(pending_ids[j].clone(), pending_states[j], Vec::new(), Vec::new()),
+                    None => pending_states[j].clone(),
                 })
                 .collect();
-            ctx.notify_progress(self.dependency_states(), progress);
+            self.report_progress(ctx, self.dependency_states(), progress);
         }
         self.components = slots
             .into_iter()
@@ -778,8 +805,8 @@ impl Match {
         let sw_deps = Instant::now();
         let deps = std::mem::take(&mut self.dependencies);
         let dep_count = deps.len();
-        let pending_ids: Vec<String> = deps.iter().map(|d| d.identifier().to_string()).collect();
-        let pending_states: Vec<RunnableState> = deps.iter().map(|d| d.state()).collect();
+        let pending_states: Vec<DependencyState> =
+            deps.iter().map(|d| dependency_state(d.as_ref())).collect();
         let mut in_flight: FuturesUnordered<_> = deps
             .into_iter()
             .enumerate()
@@ -800,10 +827,10 @@ impl Match {
                 .enumerate()
                 .map(|(j, slot)| match slot {
                     Some(dep) => dependency_state(dep.as_ref()),
-                    None => DependencyState::new(pending_ids[j].clone(), pending_states[j], Vec::new(), Vec::new(), Vec::new()),
+                    None => pending_states[j].clone(),
                 })
                 .collect();
-            ctx.notify_progress(progress, self.component_states());
+            self.report_progress(ctx, progress, self.component_states());
         }
         self.dependencies = slots
             .into_iter()
@@ -822,6 +849,14 @@ impl Match {
 
 #[async_trait]
 impl MatchTrait for Match {
+    fn attach_report_slot(&mut self, slot: MatchSlot) {
+        self.slot = OnceLock::from(slot);
+    }
+
+    fn report_slot(&self) -> Option<MatchSlot> {
+        self.slot.get().copied()
+    }
+
     async fn start(&mut self, ctx: &ArenaLifecyclePublisher) -> Result<(), Vec<Fault>> {
         if self.started {
             return Ok(());
@@ -932,10 +967,10 @@ impl MatchTrait for Match {
         find_dependency_mut(&mut self.dependencies, identifier)
     }
 
-    fn attach_scoped_playbook_publisher(
+    fn attach_playbook_publisher(
         &self,
         arena_id: &str,
-        publisher: Arc<dyn Publisher<ScopedPlaybookEvent>>,
+        publisher: Arc<dyn Publisher<PlaybookEvent>>,
     ) {
         for (playbook, exec_on_dependency_start) in &self.playbooks {
             let kind = if *exec_on_dependency_start {
@@ -961,10 +996,7 @@ impl MatchTrait for Match {
             .await;
         match outcome {
             Ok(Ok(active)) => Some(Ok(active)),
-            Ok(Err(fault)) => {
-                self.report_playbook_fault(identifier, fault.clone());
-                Some(Err(fault))
-            }
+            Ok(Err(fault)) => Some(Err(fault)),
             Err(payload) => {
                 let fault = Fault::playbook(identifier, message::playbook_failed()).caused_by(
                     Fault::from_panic(identifier, Subject::Playbook, payload.as_ref()),

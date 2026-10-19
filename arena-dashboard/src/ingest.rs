@@ -46,18 +46,18 @@ pub struct CpuProfilePayload {
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
-pub struct ScopedPlaybookPayload {
+pub struct PlaybookPayload {
     pub arena_id: String,
-    pub playbook_id: String,
-    #[serde(default)]
+    pub id: String,
     pub playbook_type: String,
     pub kind: String,
     pub state: String,
+    pub runs: usize,
     pub at: String,
     #[serde(default)]
     pub faults: Vec<IngestFault>,
 }
 
-pub fn parse_scoped_playbook(body: &str) -> Result<ScopedPlaybookPayload, serde_json::Error> {
+pub fn parse_playbook(body: &str) -> Result<PlaybookPayload, serde_json::Error> {
     serde_json::from_str(body)
 }

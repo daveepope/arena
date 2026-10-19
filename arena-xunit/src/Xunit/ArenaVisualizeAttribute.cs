@@ -5,4 +5,5 @@ namespace ArenaDotnet.Xunit;
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class ArenaVisualizeAttribute : Attribute
 {
+    public string[] CpuProfile { get; set; } = Array.Empty<string>();
 }

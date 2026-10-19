@@ -56,7 +56,7 @@ from arena_pytest import (
 from arena_config import (
     CALIBRATION_CONTAINER_NAME,
     CALIBRATION_HOST_PORT,
-    CLOSED_ARENA_NAME,
+    RUNTIME,
     COMPONENT_NAME_EXECUTABLE,
     DEP_NAME_CALIBRATION_HTTP,
     DEP_NAME_MSSQL,
@@ -107,6 +107,8 @@ from playbooks import (
     ResetWeatherDbPlaybook,
     SeedValidationReadingPlaybook,
 )
+FASTAPI_ARENA_NAME = RUNTIME.container_name("example-fastapi-python-arena")
+
 WEB_APP_PORT = EXEC_WEB_APP_PORT
 EVENT_BUS_NAME = "example-api-events"
 EVENT_SOURCE = "readings.api"
@@ -393,13 +395,17 @@ def closed_arena() -> ClosedArena:
     )
 
     closed = ClosedArena(
-        CLOSED_ARENA_NAME,
+        FASTAPI_ARENA_NAME,
         [a_match],
         log_level=ArenaLogLevel.INFO,
         logger=_LOG
     )
     if os.environ.get("ARENA_VISUALIZE") == "1":
-        closed = closed.with_lifecycle_dashboard().done()
+        closed = (
+            closed.with_lifecycle_dashboard()
+            .with_cpu_profiler(fastapi_component.identifier)
+            .done()
+        )
     return closed
 
 
@@ -419,6 +425,7 @@ oauth_signer = oauth_signer_fixture(lambda: _OAUTH)
 @pytest.fixture(scope="session")
 async def api_client(oauth_signer, base_url) -> ApiClient:
     import requests
+
 
     session = requests.Session()
     token = await oauth_signer.sign(Custom(), claims_with_scope(OAUTH_ISSUER, "readings"))

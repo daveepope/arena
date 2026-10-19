@@ -4,10 +4,11 @@ use std::sync::{Arc, Mutex};
 
 use crate::lifecycle::bus::Publisher;
 use crate::lifecycle::fault::{serialize_timestamp, Fault};
-use crate::lifecycle::rule::{LifecycleRule, RunnableRule};
-use crate::lifecycle::state::RunnableState;
+use crate::lifecycle::rule::LifecycleRule;
+use crate::playbook::state::PlaybookRule;
+use crate::playbook::state::PlaybookState;
 
-pub const CHANNEL: &str = "scoped-playbook";
+pub const CHANNEL: &str = "playbook";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -24,32 +25,35 @@ pub enum PlaybookKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
-pub struct ScopedPlaybookEvent {
+pub struct PlaybookEvent {
     pub arena_id: String,
-    pub playbook_id: String,
+    pub id: String,
     pub playbook_type: PlaybookType,
     pub kind: PlaybookKind,
-    pub state: RunnableState,
+    pub state: PlaybookState,
+    pub runs: usize,
     pub faults: Vec<Fault>,
     #[serde(serialize_with = "serialize_timestamp")]
     pub at: DateTime<Utc>,
 }
 
-impl ScopedPlaybookEvent {
+impl PlaybookEvent {
     pub fn new(
         arena_id: impl Into<String>,
-        playbook_id: impl Into<String>,
+        id: impl Into<String>,
         playbook_type: PlaybookType,
         kind: PlaybookKind,
-        state: RunnableState,
+        state: PlaybookState,
+        runs: usize,
         faults: Vec<Fault>,
     ) -> Self {
         Self {
             arena_id: arena_id.into(),
-            playbook_id: playbook_id.into(),
+            id: id.into(),
             playbook_type,
             kind,
             state,
+            runs,
             faults,
             at: Utc::now(),
         }
@@ -59,19 +63,35 @@ impl ScopedPlaybookEvent {
 struct Attachment {
     arena_id: String,
     kind: PlaybookKind,
-    publisher: Arc<dyn Publisher<ScopedPlaybookEvent>>,
+    publisher: Arc<dyn Publisher<PlaybookEvent>>,
 }
 
-pub struct ScopedPlaybookLifecycle {
+#[derive(Clone)]
+struct Progress {
+    state: PlaybookState,
+    runs: usize,
+    faults: Vec<Fault>,
+}
+
+impl Progress {
+    fn fresh() -> Self {
+        Self {
+            state: PlaybookState::Registered,
+            runs: 0,
+            faults: Vec::new(),
+        }
+    }
+}
+
+pub struct PlaybookLifecycle {
     playbook_id: String,
     playbook_type: PlaybookType,
-    state: Mutex<RunnableState>,
-    faults: Mutex<Vec<Fault>>,
+    progress: Mutex<Progress>,
     attachment: Mutex<Option<Attachment>>,
     live_handles: AtomicUsize,
 }
 
-impl ScopedPlaybookLifecycle {
+impl PlaybookLifecycle {
     pub fn new(playbook_id: impl Into<String>) -> Arc<Self> {
         Self::of_type(playbook_id, PlaybookType::Unmanaged)
     }
@@ -84,8 +104,7 @@ impl ScopedPlaybookLifecycle {
         Arc::new(Self {
             playbook_id: playbook_id.into(),
             playbook_type,
-            state: Mutex::new(RunnableState::NotStarted),
-            faults: Mutex::new(Vec::new()),
+            progress: Mutex::new(Progress::fresh()),
             attachment: Mutex::new(None),
             live_handles: AtomicUsize::new(0),
         })
@@ -95,14 +114,20 @@ impl ScopedPlaybookLifecycle {
         &self,
         arena_id: impl Into<String>,
         kind: PlaybookKind,
-        publisher: Arc<dyn Publisher<ScopedPlaybookEvent>>,
+        publisher: Arc<dyn Publisher<PlaybookEvent>>,
     ) {
         *self.attachment.lock().unwrap_or_else(|e| e.into_inner()) = Some(Attachment {
             arena_id: arena_id.into(),
             kind,
             publisher,
         });
-        self.publish(self.state());
+        self.live_handles.store(0, Ordering::SeqCst);
+        let announcement = {
+            let mut progress = self.progress.lock().unwrap_or_else(|e| e.into_inner());
+            *progress = Progress::fresh();
+            progress.clone()
+        };
+        self.publish(announcement);
     }
 
     pub fn playbook_id(&self) -> &str {
@@ -113,30 +138,31 @@ impl ScopedPlaybookLifecycle {
         self.playbook_type
     }
 
-    pub fn state(&self) -> RunnableState {
-        *self.state.lock().unwrap_or_else(|e| e.into_inner())
+    pub fn runs(&self) -> usize {
+        self.progress.lock().unwrap_or_else(|e| e.into_inner()).runs
+    }
+
+    pub fn state(&self) -> PlaybookState {
+        self.progress.lock().unwrap_or_else(|e| e.into_inner()).state
     }
 
     pub fn faults(&self) -> Vec<Fault> {
-        self.faults.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        self.progress
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .faults
+            .clone()
     }
 
-    pub fn report(&self, next: RunnableState) {
-        {
-            let mut current = self.state.lock().unwrap_or_else(|e| e.into_inner());
-            if !RunnableRule.is_legal(*current, next) {
-                tracing::error!(
-                    playbook = %self.playbook_id,
-                    from = %*current,
-                    to = %next,
-                    phase = "illegal_playbook_transition",
-                    "refusing to report an illegal playbook transition"
-                );
-                return;
+    pub fn report(&self, next: PlaybookState) {
+        let reported = {
+            let mut progress = self.progress.lock().unwrap_or_else(|e| e.into_inner());
+            match self.advance(&mut progress, next) {
+                Some(reported) => reported,
+                None => return,
             }
-            *current = next;
-        }
-        self.publish(next);
+        };
+        self.publish(reported);
     }
 
     pub fn enter(&self) {
@@ -144,45 +170,82 @@ impl ScopedPlaybookLifecycle {
     }
 
     pub fn exit(&self) {
-        if self.live_handles.fetch_sub(1, Ordering::SeqCst) != 1 {
+        let held = self
+            .live_handles
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |held| {
+                Some(held.saturating_sub(1))
+            })
+            .unwrap_or(0);
+        if held != 1 {
             return;
         }
-        self.report_terminal();
+        self.report_stopped();
     }
 
-    pub fn report_terminal(&self) {
-        if self.state() != RunnableState::Started {
-            return;
-        }
-        self.report(RunnableState::Stopping);
-        self.report(RunnableState::Stopped);
+    pub fn release(&self) {
+        self.live_handles.store(0, Ordering::SeqCst);
+        self.report_stopped();
     }
 
-    pub fn report_starting(&self) {
-        if self.state() == RunnableState::Started {
-            return;
-        }
-        self.faults.lock().unwrap_or_else(|e| e.into_inner()).clear();
-        self.report(RunnableState::Starting);
+    pub fn report_stopped(&self) {
+        let reported = {
+            let mut progress = self.progress.lock().unwrap_or_else(|e| e.into_inner());
+            if progress.state != PlaybookState::Running {
+                return;
+            }
+            match self.advance(&mut progress, PlaybookState::Stopped) {
+                Some(reported) => reported,
+                None => return,
+            }
+        };
+        self.publish(reported);
     }
 
-    pub fn report_started(&self) {
-        self.enter();
-        if self.state() == RunnableState::Started {
-            return;
-        }
-        self.report(RunnableState::Started);
+    pub fn report_running(&self) {
+        let reported = {
+            let mut progress = self.progress.lock().unwrap_or_else(|e| e.into_inner());
+            progress.runs += 1;
+            if progress.state == PlaybookState::Running {
+                progress.clone()
+            } else {
+                progress.faults.clear();
+                match self.advance(&mut progress, PlaybookState::Running) {
+                    Some(reported) => reported,
+                    None => return,
+                }
+            }
+        };
+        self.publish(reported);
     }
 
     pub fn report_fault(&self, fault: Fault) {
-        self.faults
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .push(fault);
-        self.report(RunnableState::Faulted);
+        let reported = {
+            let mut progress = self.progress.lock().unwrap_or_else(|e| e.into_inner());
+            progress.faults.push(fault);
+            match self.advance(&mut progress, PlaybookState::Faulted) {
+                Some(reported) => reported,
+                None => return,
+            }
+        };
+        self.publish(reported);
     }
 
-    fn publish(&self, state: RunnableState) {
+    fn advance(&self, progress: &mut Progress, next: PlaybookState) -> Option<Progress> {
+        if !PlaybookRule.is_legal(progress.state, next) {
+            tracing::error!(
+                playbook = %self.playbook_id,
+                from = %progress.state,
+                to = %next,
+                phase = "illegal_playbook_transition",
+                "refusing to report an illegal playbook transition"
+            );
+            return None;
+        }
+        progress.state = next;
+        Some(progress.clone())
+    }
+
+    fn publish(&self, reported: Progress) {
         let attached = {
             let attachment = self.attachment.lock().unwrap_or_else(|e| e.into_inner());
             attachment.as_ref().map(|attachment| {
@@ -196,13 +259,14 @@ impl ScopedPlaybookLifecycle {
         let Some((arena_id, kind, publisher)) = attached else {
             return;
         };
-        publisher.publish(&ScopedPlaybookEvent::new(
+        publisher.publish(&PlaybookEvent::new(
             arena_id,
             self.playbook_id.clone(),
             self.playbook_type,
             kind,
-            state,
-            self.faults(),
+            reported.state,
+            reported.runs,
+            reported.faults,
         ));
     }
 }

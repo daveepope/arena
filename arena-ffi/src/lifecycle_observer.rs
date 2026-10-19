@@ -39,10 +39,10 @@ struct RegisteredObserver {
     recipient: Arc<dyn ArenaLifecycleObserver>,
 }
 
-type ScopedPlaybookObserver =
-    Arc<dyn arena::lifecycle::bus::Observer<arena::playbook::ScopedPlaybookEvent>>;
+type PlaybookObserver =
+    Arc<dyn arena::lifecycle::bus::Observer<arena::playbook::PlaybookEvent>>;
 
-static SCOPED_PLAYBOOK_OBSERVERS: std::sync::Mutex<Vec<(u64, ScopedPlaybookObserver)>> =
+static PLAYBOOK_OBSERVERS: std::sync::Mutex<Vec<(u64, PlaybookObserver)>> =
     std::sync::Mutex::new(Vec::new());
 
 static REGISTERED_OBSERVERS: LazyLock<ArcSwap<Vec<RegisteredObserver>>> =
@@ -77,18 +77,18 @@ fn observer_is_registered(token: u64) -> bool {
         .any(|entry| entry.token == token)
 }
 
-pub(crate) fn register_scoped_playbook_observer(
+pub(crate) fn register_playbook_observer(
     lifecycle_token: u64,
-    recipient: ScopedPlaybookObserver,
+    recipient: PlaybookObserver,
 ) {
-    SCOPED_PLAYBOOK_OBSERVERS
+    PLAYBOOK_OBSERVERS
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .push((lifecycle_token, recipient));
 }
 
-pub(crate) fn registered_scoped_playbook_observers() -> Vec<ScopedPlaybookObserver> {
-    SCOPED_PLAYBOOK_OBSERVERS
+pub(crate) fn registered_playbook_observers() -> Vec<PlaybookObserver> {
+    PLAYBOOK_OBSERVERS
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .iter()
@@ -96,8 +96,8 @@ pub(crate) fn registered_scoped_playbook_observers() -> Vec<ScopedPlaybookObserv
         .collect()
 }
 
-pub(crate) fn remove_scoped_playbook_observers(lifecycle_token: u64) {
-    SCOPED_PLAYBOOK_OBSERVERS
+pub(crate) fn remove_playbook_observers(lifecycle_token: u64) {
+    PLAYBOOK_OBSERVERS
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .retain(|(token, _)| *token != lifecycle_token);
@@ -159,7 +159,7 @@ pub extern "C" fn arena_remove_lifecycle_observer(token: u64) {
         if let Some(profile_token) = take_paired_cpu_profile_observer(token) {
             arena_profile::unregister_observer(profile_token);
         }
-        remove_scoped_playbook_observers(token);
+        remove_playbook_observers(token);
         REGISTERED_OBSERVERS.rcu(|current| {
             let next: Vec<RegisteredObserver> = (**current)
                 .iter()

@@ -77,10 +77,10 @@ test("arenaLifecycleStreamsToTheDashboardAndAProfiledComponentReportsItsFlamegra
 
   await expect(page.getByTestId(`event-log-${ORDERS_ARENA}`)).toContainText("duchess-db (postgres)");
 
-  const playbooks = page.getByTestId(`scoped-playbooks-${ORDERS_ARENA}`);
-  await expect(playbooks.getByTestId("scoped-playbook-apply-schema-migrations")).toBeVisible();
-  await expect(playbooks.getByTestId("scoped-playbook-reset-tea-party-db")).toBeVisible();
-  await playbooks.getByTestId("scoped-playbook-apply-schema-migrations").click();
+  const playbooks = page.getByTestId(`playbooks-${ORDERS_ARENA}`);
+  await expect(playbooks.getByTestId("playbook-apply-schema-migrations")).toBeVisible();
+  await expect(playbooks.getByTestId("playbook-reset-tea-party-db")).toBeVisible();
+  await playbooks.getByTestId("playbook-apply-schema-migrations").click();
   await expect(page.getByText("kind: playbook")).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
 

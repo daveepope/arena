@@ -13,15 +13,13 @@ pub enum AugmentState {
 }
 
 pub trait ArgAugmentingSampler: Send + Sync {
-    fn augment(
-        &self,
-        request: &LaunchRequest,
-    ) -> Result<(Vec<String>, AugmentState), CpuProfileError>;
+    fn augment(&self, request: &LaunchRequest) -> Result<Augmentation, CpuProfileError>;
 
     fn collect(
         &self,
         state: AugmentState,
         budget: Duration,
+        profiled_pid: u32,
     ) -> Result<Option<PathBuf>, CpuProfileError>;
 }
 
@@ -48,10 +46,11 @@ impl ProfileSession for AugmentedProfileSession {
 
     fn finish(self: Box<Self>, augmented_process: &mut Child) -> Result<(), CpuProfileError> {
         let AugmentedProfileSession { sampler, state, component_id, limit_bytes } = *self;
+        let profiled_pid = augmented_process.id();
         observer::report(&component_id, RunnableState::Stopping);
         let collected = crate::backend::wait_bounded(augmented_process, FINISH_TIMEOUT)
             .map_err(|e| CpuProfileError::Finish(format!("profiled process did not exit cleanly: {e}")))
-            .and_then(|_status| sampler.collect(state, FINISH_TIMEOUT))
+            .and_then(|_status| sampler.collect(state, FINISH_TIMEOUT, profiled_pid))
             .and_then(|folded_path| match folded_path {
                 Some(folded_path) => read_collected(&folded_path, limit_bytes).map(Some),
                 None => Ok(None),
@@ -73,15 +72,22 @@ impl ProfileSession for AugmentedProfileSession {
     }
 }
 
+pub struct Augmentation {
+    pub args: Vec<String>,
+    pub env: Vec<(String, String)>,
+    pub state: AugmentState,
+}
+
 pub fn prepare_augmented(
     sampler: Box<dyn ArgAugmentingSampler>,
     request: &LaunchRequest,
     component_id: String,
     limit_bytes: usize,
 ) -> Result<PreparedLaunch, CpuProfileError> {
-    let (args, state) = sampler.augment(request)?;
+    let Augmentation { args, env, state } = sampler.augment(request)?;
     Ok(PreparedLaunch::ArgsAugmented {
         args,
+        env,
         shutdown_signal: ShutdownSignal::Terminate,
         session: Box::new(AugmentedProfileSession {
             sampler,

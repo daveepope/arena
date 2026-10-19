@@ -196,7 +196,7 @@ fn with_container_name_and_network_are_accepted() {
 #[test]
 fn with_admin_password_overrides_default() {
     let _dep = OracleDependency::builder("custom-admin-password")
-        .with_admin_password("SuperSecret1!")
+        .with_admin_password(arena_container::credential::new_password())
         .build().expect("build oracle dependency");
 }
 

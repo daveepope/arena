@@ -1090,6 +1090,38 @@ async fn start_cpu_profiler_ambiguous_name_faults_naming_every_match() {
 }
 
 #[tokio::test]
+async fn start_cpu_profiler_name_shared_by_two_components_faults() {
+    let shared_names = [
+        ("web-app", "arena-executable-component-web-app-ab12cd", "arena-executable-component-web-app-ef34gh"),
+        ("web-app", "arena-executable-component-web-app-ab12cd", "arena-executable-component-web-app-2-ef34gh"),
+        ("api", "arena-executable-component-api-gateway-ab12cd", "arena-executable-component-billing-api-ef34gh"),
+    ];
+
+    for (requested, first, second) in shared_names {
+        let mut a_match = Match::new(
+            "profiled",
+            Vec::new(),
+            vec![
+                probe_component(first).into_component(),
+                probe_component(second).into_component(),
+            ],
+        )
+        .with_cpu_profiled_components(vec![requested.to_string()]);
+
+        let faults = a_match
+            .start(&context().0)
+            .await
+            .err()
+            .unwrap_or_else(|| panic!("{requested} is shared by two components and must fault"));
+
+        let message = faults[0].message.clone();
+        assert!(message.contains("matches 2 components"), "got: {message}");
+        assert!(message.contains(first), "got: {message}");
+        assert!(message.contains(second), "got: {message}");
+    }
+}
+
+#[tokio::test]
 async fn start_cpu_profiler_component_refuses_attachment_faults_the_match() {
     let mut a_match = Match::new(
         "profiled",
@@ -1150,3 +1182,266 @@ async fn start_cpu_profile_limit_unset_passes_no_limit_to_the_component() {
     assert_eq!(counts.cpu_profiler_attaches(), 1);
     assert_eq!(counts.cpu_profile_limit_bytes(), 0);
 }
+
+fn nested_dependency_in(snapshot: &arena::lifecycle::ArenaState, id: &str) -> usize {
+    snapshot
+        .dependencies
+        .iter()
+        .find(|dep| dep.id == id)
+        .map(|dep| dep.children.len())
+        .unwrap_or(0)
+}
+
+#[tokio::test]
+async fn stop_dependency_still_in_flight_keeps_what_it_last_reported() {
+    let mut a_match = Match::new(
+        "nested",
+        vec![
+            probe_dependency("white-rabbit-queue")
+                .with_child(probe_dependency("dormouse-cache").into_dependency())
+                .into_dependency(),
+            probe_dependency("queen-of-hearts-db")
+                .with_component_id("mad-hatter-api")
+                .with_child(probe_dependency("mad-hatter-service").into_dependency())
+                .into_dependency(),
+        ],
+        vec![],
+    );
+    let (ctx, recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    a_match.stop(&ctx).await.expect("match should stop");
+
+    let snapshots = recorder.snapshots();
+    let in_flight = snapshots
+        .iter()
+        .find(|snapshot| {
+            snapshot.state == ArenaLifecycleState::DependenciesStopping
+                && snapshot
+                    .dependencies
+                    .iter()
+                    .any(|dep| dep.id == "white-rabbit-queue" && dep.state == RunnableState::Stopped)
+                && snapshot
+                    .dependencies
+                    .iter()
+                    .any(|dep| dep.id == "queen-of-hearts-db" && dep.state != RunnableState::Stopped)
+        })
+        .expect("expected a progress snapshot with one dependency stopped and one still stopping");
+
+    let pending = in_flight
+        .dependencies
+        .iter()
+        .find(|dep| dep.id == "queen-of-hearts-db")
+        .expect("the stopping dependency is in the snapshot");
+    assert_eq!(pending.children.len(), 1);
+    assert_eq!(pending.children[0].id, "mad-hatter-service");
+    assert_eq!(pending.component_ids, vec!["mad-hatter-api".to_string()]);
+}
+
+#[tokio::test]
+async fn stop_dependency_that_faulted_before_the_stop_keeps_its_faults_while_in_flight() {
+    let mut a_match = Match::new(
+        "nested",
+        vec![
+            probe_dependency("white-rabbit-queue").into_dependency(),
+            probe_dependency("queen-of-hearts-db")
+                .behaving(Behaviour::FailStop)
+                .with_child(probe_dependency("mad-hatter-service").into_dependency())
+                .into_dependency(),
+        ],
+        vec![],
+    );
+    let (ctx, recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    let faults = a_match.stop(&ctx).await.expect_err("the stop should fault");
+
+    assert_eq!(faults.len(), 1);
+    for snapshot in recorder.snapshots() {
+        if snapshot.state != ArenaLifecycleState::DependenciesStopping {
+            continue;
+        }
+        assert_eq!(
+            nested_dependency_in(&snapshot, "queen-of-hearts-db"),
+            1,
+            "child missing from a snapshot at {}",
+            snapshot.state
+        );
+    }
+}
+
+#[tokio::test]
+async fn stop_three_level_dependency_keeps_the_whole_tree_while_in_flight() {
+    let mut a_match = Match::new(
+        "nested",
+        vec![
+            probe_dependency("white-rabbit-queue").into_dependency(),
+            probe_dependency("queen-of-hearts-db")
+                .with_child(
+                    probe_dependency("mad-hatter-service")
+                        .with_child(probe_dependency("dormouse-worker").into_dependency())
+                        .into_dependency(),
+                )
+                .into_dependency(),
+        ],
+        vec![],
+    );
+    let (ctx, recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    a_match.stop(&ctx).await.expect("match should stop");
+
+    for snapshot in recorder.snapshots() {
+        let Some(parent) = snapshot
+            .dependencies
+            .iter()
+            .find(|dep| dep.id == "queen-of-hearts-db")
+        else {
+            continue;
+        };
+        assert_eq!(parent.children.len(), 1, "at {}", snapshot.state);
+        assert_eq!(
+            parent.children[0].children.len(),
+            1,
+            "grandchild missing at {}",
+            snapshot.state
+        );
+    }
+}
+
+#[tokio::test]
+async fn start_dependency_still_in_flight_keeps_its_children_in_the_snapshot() {
+    let mut a_match = Match::new(
+        "nested",
+        vec![
+            probe_dependency("white-rabbit-queue").into_dependency(),
+            probe_dependency("queen-of-hearts-db")
+                .with_child(probe_dependency("mad-hatter-service").into_dependency())
+                .into_dependency(),
+        ],
+        vec![],
+    );
+    let (ctx, recorder) = context();
+
+    a_match.start(&ctx).await.expect("match should start");
+
+    for snapshot in recorder.snapshots() {
+        if snapshot.state != ArenaLifecycleState::DependenciesStarting {
+            continue;
+        }
+        assert_eq!(
+            nested_dependency_in(&snapshot, "queen-of-hearts-db"),
+            1,
+            "child missing from a snapshot at {}",
+            snapshot.state
+        );
+    }
+}
+
+#[tokio::test]
+async fn stop_nested_component_stays_in_every_progress_snapshot() {
+    let mut a_match = Match::new(
+        "nested",
+        vec![],
+        vec![
+            probe_component("dodo-service").into_component(),
+            probe_component("cheshire-api")
+                .with_child(probe_component("dormouse-worker").into_component())
+                .into_component(),
+        ],
+    );
+    let (ctx, recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    a_match.stop(&ctx).await.expect("match should stop");
+
+    for snapshot in recorder.snapshots() {
+        let Some(parent) = snapshot
+            .components
+            .iter()
+            .find(|comp| comp.id == "cheshire-api")
+        else {
+            continue;
+        };
+        assert_eq!(
+            parent.children.len(),
+            1,
+            "child missing from a snapshot at {}",
+            snapshot.state
+        );
+    }
+}
+
+fn seed_frames(ctx: &ArenaLifecyclePublisher, matches: [&mut Match; 2]) {
+    for a_match in matches {
+        let slot = ctx.reserve_match();
+        a_match.attach_report_slot(slot);
+        ctx.report_match(slot, a_match.dependency_states(), a_match.component_states());
+    }
+}
+
+#[tokio::test]
+async fn transition_two_matches_one_publisher_keeps_both_matches_subjects() {
+    let recorder = Arc::new(StateRecorder::default());
+    let ctx = ArenaLifecyclePublisher::new("test-arena", vec![recorder.clone()]);
+    let mut first = Match::new(
+        "first",
+        vec![probe_dependency("postgres-1").into_dependency()],
+        vec![],
+    );
+    let mut second = Match::new(
+        "second",
+        vec![probe_dependency("kafka-1").into_dependency()],
+        vec![],
+    );
+    seed_frames(&ctx, [&mut first, &mut second]);
+
+    first.start(&ctx).await.expect("first match should start");
+    second.start(&ctx).await.expect("second match should start");
+
+    for snapshot in recorder.snapshots() {
+        let ids: Vec<&str> = snapshot
+            .dependencies
+            .iter()
+            .map(|dep| dep.id.as_str())
+            .collect();
+        assert_eq!(
+            ids,
+            vec!["postgres-1", "kafka-1"],
+            "a snapshot at {} lost a match's subjects",
+            snapshot.state
+        );
+    }
+}
+
+#[tokio::test]
+async fn stop_two_matches_one_publisher_keeps_both_matches_subjects() {
+    let recorder = Arc::new(StateRecorder::default());
+    let ctx = ArenaLifecyclePublisher::new("test-arena", vec![recorder.clone()]);
+    let mut first = Match::new(
+        "first",
+        vec![probe_dependency("postgres-1").into_dependency()],
+        vec![],
+    );
+    let mut second = Match::new(
+        "second",
+        vec![probe_dependency("kafka-1").into_dependency()],
+        vec![],
+    );
+    seed_frames(&ctx, [&mut first, &mut second]);
+    first.start(&ctx).await.expect("first match should start");
+    second.start(&ctx).await.expect("second match should start");
+
+    first.stop(&ctx).await.expect("first match should stop");
+    second.stop(&ctx).await.expect("second match should stop");
+
+    for snapshot in recorder.snapshots() {
+        assert_eq!(
+            snapshot.dependencies.len(),
+            2,
+            "a snapshot at {} lost a match's subjects",
+            snapshot.state
+        );
+    }
+}
+

@@ -1,9 +1,10 @@
-import { fillClasses, formatDetail, isActiveState } from "./presentation";
+import { fillClasses, formatPlaybookDetail, isActiveState } from "./presentation";
 import { useDashboardStore } from "./store";
+import type { PlaybookRowState } from "./types";
 
-const NO_PLAYBOOKS = new Map();
+const NO_PLAYBOOKS: Map<string, PlaybookRowState> = new Map();
 
-export function ScopedPlaybookPanel({ arenaId }: { arenaId: string }) {
+export function PlaybookPanel({ arenaId }: { arenaId: string }) {
   const playbooks = useDashboardStore((s) => s.arenas.get(arenaId)?.playbooks ?? NO_PLAYBOOKS);
   const select = useDashboardStore((s) => s.select);
 
@@ -11,7 +12,7 @@ export function ScopedPlaybookPanel({ arenaId }: { arenaId: string }) {
 
   return (
     <aside
-      data-testid={`scoped-playbooks-${arenaId}`}
+      data-testid={`playbooks-${arenaId}`}
       className="h-[480px] w-56 shrink-0 overflow-y-auto rounded-md border border-slate-800 bg-[#0e1330] p-2"
     >
       <h3 className="mb-2 px-1 text-[10px] uppercase tracking-wide text-slate-400">playbooks</h3>
@@ -25,11 +26,18 @@ export function ScopedPlaybookPanel({ arenaId }: { arenaId: string }) {
             <li key={playbookId}>
               <button
                 type="button"
-                data-testid={`scoped-playbook-${playbookId}`}
+                data-testid={`playbook-${playbookId}`}
                 onClick={(e) =>
                   select({
                     title: playbookId,
-                    detail: formatDetail(playbookId, "playbook", playbook.state, playbook.faults, 0),
+                    detail: formatPlaybookDetail(
+                      playbookId,
+                      playbook.playbookType,
+                      playbook.kind,
+                      playbook.state,
+                      playbook.runs,
+                      playbook.faults,
+                    ),
                     position: { x: e.clientX, y: e.clientY },
                   })
                 }
@@ -43,6 +51,9 @@ export function ScopedPlaybookPanel({ arenaId }: { arenaId: string }) {
                 <span className="block text-[9px] uppercase tracking-wide opacity-70">
                   {[playbook.playbookType, playbook.kind].filter(Boolean).join(" ")} /{" "}
                   {playbook.state}
+                </span>
+                <span className="block text-[9px] uppercase tracking-wide opacity-70">
+                  {playbook.runs === 1 ? "1 run" : `${playbook.runs} runs`}
                 </span>
               </button>
             </li>

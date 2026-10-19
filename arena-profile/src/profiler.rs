@@ -73,6 +73,7 @@ pub enum PreparedLaunch {
     },
     ArgsAugmented {
         args: Vec<String>,
+        env: Vec<(String, String)>,
         shutdown_signal: ShutdownSignal,
         session: Box<dyn ProfileSession>,
     },
