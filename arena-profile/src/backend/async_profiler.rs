@@ -1,5 +1,5 @@
-use super::{resolve_binary, sampled_nothing, scratch_path};
-use crate::profiler::{CpuProfileError, LaunchRequest};
+use super::{resolve_binary, sampled_nothing, ScratchDir};
+use crate::profiler::{CpuProfileError, LaunchRequest, ProfileEnvVar};
 use crate::augmented::{ArgAugmentingSampler, AugmentState, Augmentation};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -7,9 +7,16 @@ use std::time::Duration;
 const LIBASYNC_PROFILER_RLOCATIONS: &[&str] = &[
     "_main~_repo_rules~async_profiler_linux_x64/lib/libasyncProfiler.so",
     "_main~_repo_rules~async_profiler_linux_arm64/lib/libasyncProfiler.so",
+    "_main~_repo_rules~async_profiler_macos/lib/libasyncProfiler.dylib",
 ];
+#[cfg(target_os = "macos")]
+const LIBASYNC_PROFILER_PATH_FALLBACK: &str = "libasyncProfiler.dylib";
+#[cfg(not(target_os = "macos"))]
 const LIBASYNC_PROFILER_PATH_FALLBACK: &str = "libasyncProfiler.so";
 const JAVA_TOOL_OPTIONS: &str = "JAVA_TOOL_OPTIONS";
+#[cfg(target_os = "macos")]
+const INSTALL_HINT: &str = "install async-profiler and ensure libasyncProfiler.dylib is on PATH";
+#[cfg(not(target_os = "macos"))]
 const INSTALL_HINT: &str = "install async-profiler and ensure libasyncProfiler.so is on PATH";
 
 const PID_PLACEHOLDER: &str = "%p";
@@ -28,7 +35,8 @@ impl ArgAugmentingSampler for AsyncProfilerSampler {
             LIBASYNC_PROFILER_PATH_FALLBACK,
             INSTALL_HINT,
         )?;
-        let folded_path = scratch_path("arena-profile-asprof", "collapsed");
+        let scratch = ScratchDir::create("arena-profile-asprof")?;
+        let folded_path = scratch.file_path("profile.collapsed");
 
         let folded_pattern = pid_scoped_output(&folded_path, PID_PLACEHOLDER);
         let agent_arg = format!(
@@ -39,8 +47,8 @@ impl ArgAugmentingSampler for AsyncProfilerSampler {
 
         Ok(Augmentation {
             args: request.args.clone(),
-            env: vec![(JAVA_TOOL_OPTIONS.to_string(), agent_arg)],
-            state: AugmentState::AsyncProfiler { folded_path },
+            env: vec![ProfileEnvVar::space_joined(JAVA_TOOL_OPTIONS, agent_arg)],
+            state: AugmentState::AsyncProfiler { scratch, folded_path },
         })
     }
 
@@ -49,8 +57,13 @@ impl ArgAugmentingSampler for AsyncProfilerSampler {
         state: AugmentState,
         _budget: Duration,
         profiled_pid: u32,
-    ) -> Result<Option<PathBuf>, CpuProfileError> {
-        let AugmentState::AsyncProfiler { folded_path } = state;
+        limit_bytes: usize,
+    ) -> Result<Option<String>, CpuProfileError> {
+        let AugmentState::AsyncProfiler { scratch: _scratch, folded_path } = state else {
+            return Err(CpuProfileError::Finish(
+                "async-profiler was handed another backend's state".to_string(),
+            ));
+        };
         let folded_path = pid_scoped_output(&folded_path, &profiled_pid.to_string());
         if !folded_path.exists() {
             return Err(CpuProfileError::Finish(format!(
@@ -60,10 +73,9 @@ impl ArgAugmentingSampler for AsyncProfilerSampler {
             )));
         }
         if sampled_nothing(&folded_path) {
-            let _ = std::fs::remove_file(&folded_path);
             return Ok(None);
         }
 
-        Ok(Some(folded_path))
+        crate::profiler::read_collected(&folded_path, limit_bytes).map(Some)
     }
 }

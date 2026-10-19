@@ -321,3 +321,20 @@ fn is_runtime_frame_application_frames_are_kept() {
     }
 }
 
+
+#[test]
+fn render_folded_hostile_frame_name_is_escaped_in_the_svg() {
+    let folded = "main;</text><script>alert(1)</script> 10\nmain;a\"onload=\"alert(2) 5\n";
+
+    let rendered = render_folded(folded).expect("render");
+
+    assert!(
+        !rendered.svg.contains("<script>alert(1)"),
+        "a hostile frame name reached the svg unescaped"
+    );
+    assert!(
+        !rendered.svg.contains("\"onload=\"alert(2)"),
+        "a hostile attribute break reached the svg unescaped"
+    );
+    assert!(rendered.svg.contains("&lt;script&gt;"), "the frame name should still be shown, escaped");
+}

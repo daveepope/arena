@@ -3,6 +3,7 @@ use std::process::{Child, ChildStderr, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use arena_dashboard::launcher::poll_ready;
+use arena_dashboard::{CALLER_HEADER, CALLER_HEADER_VALUE};
 use futures::StreamExt;
 
 struct KillOnDrop(Child);
@@ -91,6 +92,7 @@ async fn shutdown_witheventsclientconnected_processexitsandfreesport() {
 
     client
         .post(format!("{base_url}/shutdown"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .send()
         .await
         .expect("post shutdown");
@@ -109,6 +111,7 @@ async fn shutdown_noclientsconnected_processexits() {
 
     reqwest::Client::new()
         .post(format!("{base_url}/shutdown"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .send()
         .await
         .expect("post shutdown");

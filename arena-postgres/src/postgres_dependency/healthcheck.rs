@@ -34,8 +34,8 @@ fn run_with_retry_blocking(
     loop {
         if start.elapsed() >= timeout_duration {
             return Err(format!(
-                "[PostgresDependency-{}] postgres did not become ready within {:?}. connection_string={:?}",
-                identifier, timeout_duration, connection_string
+                "[PostgresDependency-{}] postgres did not become ready within {:?}",
+                identifier, timeout_duration
             ));
         }
 

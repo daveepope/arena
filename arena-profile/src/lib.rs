@@ -11,7 +11,7 @@ pub use observer::{
     register_observer, unregister_observer, CpuProfileEvent, CpuProfileObserver,
 };
 pub use profiler::{
-    prepare_cpu_profile, CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch,
-    ProfileSession, ShutdownSignal, DEFAULT_CPU_PROFILE_LIMIT_BYTES, FINISH_TIMEOUT,
+    prepare_cpu_profile, CpuProfileError, CpuProfilerBackend, EnvMerge, LaunchRequest, PreparedLaunch,
+    ProfileEnvVar, ProfileSession, ShutdownSignal, DEFAULT_CPU_PROFILE_LIMIT_BYTES, FINISH_TIMEOUT,
 };
 pub use render::{render_folded, Hotspot, RenderError, RenderedProfile, Severity};

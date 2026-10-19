@@ -1,6 +1,7 @@
 use arena_profile::backend::dotnet_trace::{chromium_trace_to_folded, record_args, DotnetTraceSampler};
+use arena_profile::backend::ScratchDir;
 use arena_profile::wrapped::{WrapState, WrappingSampler};
-use arena_profile::{CpuProfileError, LaunchRequest};
+use arena_profile::{CpuProfileError, LaunchRequest, DEFAULT_CPU_PROFILE_LIMIT_BYTES};
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
@@ -36,11 +37,16 @@ fn collect_missing_trace_file_returns_finish_error() {
     // the wrapping_child as failure. The real failure signal is the trace file never being written.
     let mut child = Command::new("false").spawn().expect("spawn false");
     let _ = child.wait();
-    let state = WrapState::DotnetTrace {
-        nettrace_path: PathBuf::from("/tmp/arena-profile-dotnet-trace-test-collect-missing.nettrace"),
-    };
+    let scratch = ScratchDir::create("arena-profile-dotnet-trace-test").expect("scratch");
+    let nettrace_path = scratch.file_path("trace.nettrace");
+    let state = WrapState::DotnetTrace { scratch, nettrace_path };
 
-    let result = DotnetTraceSampler.collect(state, &mut child, Duration::from_secs(5));
+    let result = DotnetTraceSampler.collect(
+        state,
+        &mut child,
+        Duration::from_secs(5),
+        DEFAULT_CPU_PROFILE_LIMIT_BYTES,
+    );
 
     assert!(matches!(result, Err(CpuProfileError::Finish(_))));
 }
@@ -52,12 +58,18 @@ fn collect_non_zero_exit_status_with_trace_file_present_is_not_treated_as_failur
     // non-zero status from the wrapping child must not short-circuit collect() by itself.
     let mut child = Command::new("false").spawn().expect("spawn false");
     let _ = child.wait();
-    let nettrace_path = PathBuf::from("/tmp/arena-profile-dotnet-trace-test-collect-present.nettrace");
-    std::fs::write(&nettrace_path, b"not a real nettrace file, just needs to exist")
-        .expect("write placeholder nettrace file");
-    let state = WrapState::DotnetTrace { nettrace_path: nettrace_path.clone() };
+    let scratch = ScratchDir::create("arena-profile-dotnet-trace-test").expect("scratch");
+    let (nettrace_path, _file) = scratch.create_file("trace.nettrace").expect("create trace file");
+    std::fs::write(&nettrace_path, b"not a real trace file, it only needs to exist")
+        .expect("write the stand-in trace file");
+    let state = WrapState::DotnetTrace { scratch, nettrace_path };
 
-    let result = DotnetTraceSampler.collect(state, &mut child, Duration::from_secs(5));
+    let result = DotnetTraceSampler.collect(
+        state,
+        &mut child,
+        Duration::from_secs(5),
+        DEFAULT_CPU_PROFILE_LIMIT_BYTES,
+    );
 
     // Past the exit-status/file-exists checks, collect() proceeds to `dotnet-trace convert`,
     // which fails either because the tool isn't resolvable (MissingBinary) or because it
@@ -68,7 +80,6 @@ fn collect_non_zero_exit_status_with_trace_file_present_is_not_treated_as_failur
         Err(CpuProfileError::Finish(ref msg)) if msg.contains("convert") => {}
         other => panic!("expected collect() to proceed to dotnet-trace convert, got {other:?}"),
     }
-    let _ = std::fs::remove_file(&nettrace_path);
 }
 
 #[cfg(unix)]
@@ -78,10 +89,13 @@ fn collect_wrong_wrap_state_panics_unreachable() {
     let mut child = Command::new("true").spawn().expect("spawn true");
     let _ = child.wait();
 
+    let scratch = ScratchDir::create("arena-profile-dotnet-trace-test").expect("scratch");
+    let data_path = scratch.file_path("perf.data");
     let _ = DotnetTraceSampler.collect(
-        WrapState::Perf { data_path: PathBuf::from("/tmp/unused") },
+        WrapState::Perf { scratch, data_path },
         &mut child,
         Duration::from_secs(5),
+        DEFAULT_CPU_PROFILE_LIMIT_BYTES,
     );
 }
 

@@ -15,6 +15,7 @@ pub enum CpuProfilerBackend {
     Perf,
     AsyncProfiler,
     PySpy,
+    PythonSiteSampler,
     DotnetTrace,
 }
 
@@ -65,6 +66,29 @@ pub trait ProfileSession: Send + Sync {
     fn finish(self: Box<Self>, child: &mut Child) -> Result<(), CpuProfileError>;
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EnvMerge {
+    Space,
+    PathList,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProfileEnvVar {
+    pub key: String,
+    pub value: String,
+    pub merge: EnvMerge,
+}
+
+impl ProfileEnvVar {
+    pub fn space_joined(key: impl Into<String>, value: impl Into<String>) -> Self {
+        Self { key: key.into(), value: value.into(), merge: EnvMerge::Space }
+    }
+
+    pub fn path_joined(key: impl Into<String>, value: impl Into<String>) -> Self {
+        Self { key: key.into(), value: value.into(), merge: EnvMerge::PathList }
+    }
+}
+
 pub enum PreparedLaunch {
     Wrapped {
         program: PathBuf,
@@ -73,7 +97,7 @@ pub enum PreparedLaunch {
     },
     ArgsAugmented {
         args: Vec<String>,
-        env: Vec<(String, String)>,
+        env: Vec<ProfileEnvVar>,
         shutdown_signal: ShutdownSignal,
         session: Box<dyn ProfileSession>,
     },
@@ -98,12 +122,14 @@ pub fn prepare_cpu_profile(
                 limit_bytes,
             )
         }
-        CpuProfilerBackend::AsyncProfiler => crate::augmented::prepare_augmented(
-            crate::augmented::augmenting_sampler_for(backend),
+        CpuProfilerBackend::AsyncProfiler | CpuProfilerBackend::PythonSiteSampler => {
+            crate::augmented::prepare_augmented(
+            crate::augmented::augmenting_sampler_for(backend, limit_bytes),
             &request,
             component_id.clone(),
             limit_bytes,
-        ),
+        )
+        }
     };
 
     if prepared.is_err() {

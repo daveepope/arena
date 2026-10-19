@@ -1,6 +1,7 @@
 use arena_profile::backend::perf::{record_args, PerfSampler};
+use arena_profile::backend::ScratchDir;
 use arena_profile::wrapped::{WrapState, WrappingSampler};
-use arena_profile::LaunchRequest;
+use arena_profile::{LaunchRequest, DEFAULT_CPU_PROFILE_LIMIT_BYTES};
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
@@ -37,9 +38,12 @@ fn collect_wrong_wrap_state_panics_unreachable() {
     let mut child = Command::new("true").spawn().expect("spawn true");
     let _ = child.wait();
 
+    let scratch = ScratchDir::create("arena-profile-perf-test").expect("scratch");
+    let folded_path = scratch.file_path("profile.folded");
     let _ = PerfSampler.collect(
-        WrapState::PySpy { folded_path: PathBuf::from("/tmp/unused") },
+        WrapState::PySpy { scratch, folded_path },
         &mut child,
         Duration::from_secs(5),
+        DEFAULT_CPU_PROFILE_LIMIT_BYTES,
     );
 }

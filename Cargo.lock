@@ -421,6 +421,7 @@ version = "7.1.0"
 dependencies = [
  "arena",
  "inferno",
+ "rand 0.8.6",
  "runfiles",
  "serde",
  "serde_json",

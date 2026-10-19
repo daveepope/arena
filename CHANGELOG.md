@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `arena-profile`: the python sampler refuses to arm on an interpreter older than 3.11 or in a directory that is not private to this user, flushes from its own thread rather than the signal handler so nothing it does can escape into the application, disarms before the final flush, restores a cpu timer another library had already armed, and denies the profile outright when it cannot record why it refused
+- `arena-profile`: unit coverage that the generated sampler carries no unfilled placeholder, interpolates only numbers, never names a host path, and that a refusal status cannot be forged by appending to it; plus component coverage that losing `SIGPROF` mid-run faults instead of reporting a profile
+- `arena-profile`: `PythonSiteSampler`, a cpu profiler backend that samples inside the component's own interpreter through a generated `sitecustomize.py` on `PYTHONPATH`, selected for `BuildTool::Python` on macOS where py-spy needs root; it arms `SIGPROF` with `ITIMER_PROF`, collapses every thread's stack on each tick, flushes periodically so a SIGTERM loses at most one interval, caps distinct stacks and bytes against the existing cpu profile limit, and refuses rather than stealing a `SIGPROF` or timer another library already holds
+- `arena-profile`: the sampler payload is compiled into the crate and written out at run time, so it needs no vendored tool, no runfiles and no PATH lookup, and ships identically in the pip wheel, maven jar and nuget package
+- `arena-profile`: `ScratchDir` gives every profiled run a private 0700 directory with a random name and exclusively created 0600 files, refusing unless the directory is this process's at exactly 0700 and the temp root is either ours or sticky
+- `arena-dashboard`: the server sends a `Content-Security-Policy` confining the page to its own origin, with `frame-ancestors`, `base-uri`, `form-action` and `object-src` all denied
+- CI: profiler targets carry a `cpu_profile_test` tag that both macOS jobs run explicitly, since those jobs filter out `component_test` and would otherwise never exercise the profilers on the one platform that needs them; the Python and Java profiler targets are `no-windows` and the .NET one runs everywhere
+- CI: Chrome for Testing is vendored for `mac-x64` and `mac-arm64` at the existing pin, so the dashboard browser test runs on macOS as well as linux x86_64
+- `arena-dashboard`: browser coverage for opening a cpu profile report from a component's detail dialog, not only from its graph node
+- `arena-profile`: a test proving a hostile frame name (`</text><script>` and an attribute break) is escaped before it reaches the rendered flamegraph
+- `arena-profile`: async-profiler's macOS build is vendored alongside the linux ones, so Java components profile on macOS, resolving `libasyncProfiler.dylib` from runfiles with the same PATH fallback
+- `arena-dashboard`: the server refuses any request whose `Host` or `Origin` is not loopback, and every mutating `POST` must carry the `x-arena-dashboard` caller header, so a page on another origin can no longer stop the server or wipe its state
+- `arena-dashboard`: the arena count and the cpu profile count are capped, and a breach is refused with the limit named rather than evicting the oldest
 - `arena-dashboard`: holding `Ctrl` (or `Cmd`) while scrolling zooms the canvas, with the page's own zoom cancelled over the canvas only, so a plain scroll still scrolls the page
 - `examples`: the FastAPI suite carries py-spy and the .NET suites carry `dotnet-trace` as platform-selected test data, and the .NET example declares `WithBuildTool(BuildTool.Dotnet)` so its profiler backend resolves
 - `arena-dashboard`: `GET /profiles` returns the profiler state the server holds and the page fetches it on load, so reloading no longer loses every profile report until the next event
@@ -60,6 +73,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `arena-profile`, `arena-executable-component`: profiler environment carries a per-variable merge rule, so `JAVA_TOOL_OPTIONS` is space-joined behind a caller's value while `PYTHONPATH` is path-joined with the platform separator; the previous single space-join would have destroyed a caller's `PYTHONPATH` and produced one unusable `sys.path` entry
+- `arena-profile`: a sampler's `collect` returns the folded stacks rather than a path and takes the byte limit, so the directory holding them can be released once they are read
+- `arena-profile`: perf, py-spy, dotnet-trace and async-profiler all write into a `ScratchDir` held by their session, replacing the predictable `temp_dir/prefix-pid-counter` naming, which `scratch_path` provided and which is now gone
 - `arena-container`: `credential::new_password()` takes no prefix, generating the whole password itself
 - Example suites name their language in the arena id so the dashboard can tell them apart: the Spring Boot suites became `JavaSpringBootComponentTestSuite` and `JavaSpringBootChainedComponentTestSuite`, and the FastAPI arenas became `example-fastapi-python-arena` and `example-fastapi-python-chained-arena`
 - `arena`: `ArenaLifecyclePublisher::transition`, `notify_progress` and `finish` no longer take subject lists; a match reserves a `MatchSlot` and reports into it, and the publisher assembles the arena snapshot from those frames
@@ -78,6 +94,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `arena-profile`: a profile flushed before the component was torn down is read even when the process does not exit within the finish budget, where the previous ordering discarded it
+- CI: the .NET predeploy smoke test takes only the FFI library from the staged prebuilt directory, instead of everything in it, so the dashboard server binary now staged alongside it no longer breaks the macOS NuGet smoke jobs
+- `arena-profile`: a profile directory is removed on every exit path, including a teardown that times out before `collect` runs and a spawn that fails after the profiler was prepared, where the previous naming left files behind
+- `arena-dashboard`: a per-arena history breach refuses the report instead of dropping the oldest, so a replay can no longer silently lose its first states
+- `arena-postgres`, `arena-mssql`: a readiness timeout no longer puts the connection string, password included, in the fault message that reaches the dashboard and its history
 - `arena-profile`: async-profiler writes to a pid-scoped file and the sampler reads back the profiled child's own output, so a launcher process can no longer overwrite the component's profile
 - `arena-executable-component`: profiler environment is appended to a caller's existing value for the same variable instead of replacing it
 - `examples`: the Java and .NET examples rename their second web app so its name no longer shares a profiler request with the first one

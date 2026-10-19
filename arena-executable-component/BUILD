@@ -24,7 +24,10 @@ rust_test(
     crate_root = "tests/component/cpu_profile_component_test.rs",
     size = "small",
     edition = "2021",
-    tags = ["component_test"],
+    tags = [
+        "component_test",
+        "cpu_profile_test",
+    ],
     data = [
         "//arena-profile:async_profiler_library",
         "//tools/profile_subjects:BusyLoop.java",
@@ -33,6 +36,7 @@ rust_test(
     ],
     target_compatible_with = select({
         "@platforms//os:linux": [],
+        "@platforms//os:macos": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = all_crate_deps(

@@ -1,5 +1,5 @@
 use super::{
-    map_spawn_error, resolve_binary, sampled_nothing, scratch_path, signal_interrupt, wait_bounded,
+    map_spawn_error, resolve_binary, sampled_nothing, signal_interrupt, wait_bounded, ScratchDir,
 };
 use crate::profiler::{CpuProfileError, LaunchRequest};
 use crate::wrapped::{WrapState, WrappingSampler};
@@ -33,10 +33,11 @@ impl WrappingSampler for DotnetTraceSampler {
     ) -> Result<(PathBuf, Vec<String>, WrapState), CpuProfileError> {
         let dotnet_trace =
             resolve_binary(DOTNET_TRACE_RLOCATIONS, DOTNET_TRACE_PATH_FALLBACK, DOTNET_TRACE_PATH_FALLBACK, INSTALL_HINT)?;
-        let nettrace_path = scratch_path("arena-profile-dotnet-trace", "nettrace");
+        let scratch = ScratchDir::create("arena-profile-dotnet-trace")?;
+        let nettrace_path = scratch.file_path("trace.nettrace");
         let args = record_args(&nettrace_path, request);
 
-        Ok((PathBuf::from(dotnet_trace), args, WrapState::DotnetTrace { nettrace_path }))
+        Ok((PathBuf::from(dotnet_trace), args, WrapState::DotnetTrace { scratch, nettrace_path }))
     }
 
     fn collect(
@@ -44,8 +45,9 @@ impl WrappingSampler for DotnetTraceSampler {
         state: WrapState,
         wrapping_child: &mut Child,
         budget: Duration,
-    ) -> Result<Option<PathBuf>, CpuProfileError> {
-        let WrapState::DotnetTrace { nettrace_path } = state else {
+        limit_bytes: usize,
+    ) -> Result<Option<String>, CpuProfileError> {
+        let WrapState::DotnetTrace { scratch, nettrace_path } = state else {
             unreachable!("DotnetTraceSampler::collect given a non-dotnet-trace WrapState");
         };
 
@@ -63,17 +65,19 @@ impl WrappingSampler for DotnetTraceSampler {
             )));
         }
 
-        let folded_path = convert_nettrace_to_folded(&nettrace_path)?;
+        let folded_path = convert_nettrace_to_folded(&scratch, &nettrace_path)?;
         if sampled_nothing(&folded_path) {
-            let _ = std::fs::remove_file(&folded_path);
             return Ok(None);
         }
 
-        Ok(Some(folded_path))
+        crate::profiler::read_collected(&folded_path, limit_bytes).map(Some)
     }
 }
 
-fn convert_nettrace_to_folded(nettrace_path: &Path) -> Result<PathBuf, CpuProfileError> {
+fn convert_nettrace_to_folded(
+    scratch: &ScratchDir,
+    nettrace_path: &Path,
+) -> Result<PathBuf, CpuProfileError> {
     let dotnet_trace =
         resolve_binary(DOTNET_TRACE_RLOCATIONS, DOTNET_TRACE_PATH_FALLBACK, DOTNET_TRACE_PATH_FALLBACK, INSTALL_HINT)?;
     let convert_base = nettrace_path.with_extension("");
@@ -102,8 +106,8 @@ fn convert_nettrace_to_folded(nettrace_path: &Path) -> Result<PathBuf, CpuProfil
     let folded_text = chromium_trace_to_folded(&chromium_json)
         .map_err(|e| CpuProfileError::Finish(format!("failed to fold dotnet-trace chromium output: {e}")))?;
 
-    let folded_path = scratch_path("arena-profile-dotnet-trace", "folded");
-    std::fs::write(&folded_path, folded_text)
+    let (folded_path, mut folded_file) = scratch.create_file("profile.folded")?;
+    std::io::Write::write_all(&mut folded_file, folded_text.as_bytes())
         .map_err(|e| CpuProfileError::Finish(format!("failed to write folded stacks: {e}")))?;
 
     let _ = std::fs::remove_file(nettrace_path);

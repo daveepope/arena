@@ -1,6 +1,6 @@
 use crate::observer;
 use crate::profiler::{
-    read_collected, CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch, ProfileSession,
+    CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch, ProfileSession,
     FINISH_TIMEOUT,
 };
 use arena::lifecycle::RunnableState;
@@ -9,9 +9,9 @@ use std::process::Child;
 use std::time::Duration;
 
 pub enum WrapState {
-    Perf { data_path: PathBuf },
-    PySpy { folded_path: PathBuf },
-    DotnetTrace { nettrace_path: PathBuf },
+    Perf { scratch: crate::backend::ScratchDir, data_path: PathBuf },
+    PySpy { scratch: crate::backend::ScratchDir, folded_path: PathBuf },
+    DotnetTrace { scratch: crate::backend::ScratchDir, nettrace_path: PathBuf },
 }
 
 pub trait WrappingSampler: Send + Sync {
@@ -25,7 +25,8 @@ pub trait WrappingSampler: Send + Sync {
         state: WrapState,
         wrapping_child: &mut Child,
         budget: Duration,
-    ) -> Result<Option<PathBuf>, CpuProfileError>;
+        limit_bytes: usize,
+    ) -> Result<Option<String>, CpuProfileError>;
 }
 
 pub fn wrapping_sampler_for(backend: CpuProfilerBackend) -> Box<dyn WrappingSampler> {
@@ -33,8 +34,8 @@ pub fn wrapping_sampler_for(backend: CpuProfilerBackend) -> Box<dyn WrappingSamp
         CpuProfilerBackend::Perf => Box::new(crate::backend::perf::PerfSampler),
         CpuProfilerBackend::PySpy => Box::new(crate::backend::pyspy::PySpySampler),
         CpuProfilerBackend::DotnetTrace => Box::new(crate::backend::dotnet_trace::DotnetTraceSampler),
-        CpuProfilerBackend::AsyncProfiler => {
-            unreachable!("AsyncProfiler is an arg-augmenting backend, not wrapping")
+        CpuProfilerBackend::AsyncProfiler | CpuProfilerBackend::PythonSiteSampler => {
+            unreachable!("AsyncProfiler and PythonSiteSampler are arg-augmenting backends, not wrapping")
         }
     }
 }
@@ -54,12 +55,7 @@ impl ProfileSession for WrappedProfileSession {
     fn finish(self: Box<Self>, wrapping_child: &mut Child) -> Result<(), CpuProfileError> {
         let WrappedProfileSession { sampler, state, component_id, limit_bytes } = *self;
         observer::report(&component_id, RunnableState::Stopping);
-        let collected = sampler
-            .collect(state, wrapping_child, FINISH_TIMEOUT)
-            .and_then(|folded_path| match folded_path {
-                Some(folded_path) => read_collected(&folded_path, limit_bytes).map(Some),
-                None => Ok(None),
-            });
+        let collected = sampler.collect(state, wrapping_child, FINISH_TIMEOUT, limit_bytes);
         match collected {
             Ok(Some(folded)) => {
                 observer::report_complete(&component_id, &folded);

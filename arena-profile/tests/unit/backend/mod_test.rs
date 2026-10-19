@@ -1,6 +1,6 @@
 use arena_profile::backend::{
-    binary_on_path, clear_stale_runfiles_manifest_env, map_spawn_error, sampled_nothing, scratch_path,
-    signal_interrupt,
+    binary_on_path, clear_stale_runfiles_manifest_env, map_spawn_error, sampled_nothing,
+    signal_interrupt, ScratchDir,
 };
 use arena_profile::{wait_bounded, CpuProfileError};
 use std::process::Command;
@@ -19,13 +19,6 @@ fn wait_bounded_child_outlives_budget_kills_and_returns_timed_out() {
     assert!(child.try_wait().unwrap().is_some());
 }
 
-#[test]
-fn scratch_path_called_twice_returns_distinct_paths() {
-    let first = scratch_path("prefix", "ext");
-    let second = scratch_path("prefix", "ext");
-
-    assert_ne!(first, second);
-}
 
 #[cfg(unix)]
 #[test]
@@ -160,4 +153,50 @@ fn sampled_nothing_missing_file_returns_false() {
     let _ = std::fs::remove_file(&path);
 
     assert!(!sampled_nothing(&path));
+}
+
+#[cfg(unix)]
+fn mode_of(path: &std::path::Path) -> u32 {
+    use std::os::unix::fs::MetadataExt;
+    std::fs::metadata(path).expect("metadata").mode() & 0o777
+}
+
+#[test]
+#[cfg(unix)]
+fn scratch_dir_created_file_is_private_inside_a_private_directory() {
+    let scratch = ScratchDir::create("arena-profile-scratch-test").expect("create scratch dir");
+
+    let (path, _file) = scratch.create_file("sitecustomize.py").expect("create file");
+
+    assert_eq!(mode_of(scratch.path()), 0o700);
+    assert_eq!(mode_of(&path), 0o600);
+}
+
+#[test]
+fn scratch_dir_create_file_twice_for_one_name_refuses_the_second() {
+    let scratch = ScratchDir::create("arena-profile-scratch-test").expect("create scratch dir");
+    let _first = scratch.create_file("output.folded").expect("create file");
+
+    let second = scratch.create_file("output.folded");
+
+    assert!(matches!(second, Err(CpuProfileError::Launch(_))), "a pre-existing name must be refused");
+}
+
+#[test]
+fn scratch_dir_two_runs_never_share_a_directory() {
+    let first = ScratchDir::create("arena-profile-scratch-test").expect("first");
+    let second = ScratchDir::create("arena-profile-scratch-test").expect("second");
+
+    assert_ne!(first.path(), second.path());
+}
+
+#[test]
+fn scratch_dir_dropped_removes_the_directory_and_its_contents() {
+    let scratch = ScratchDir::create("arena-profile-scratch-test").expect("create scratch dir");
+    let held = scratch.path().to_path_buf();
+    scratch.create_file("output.folded").expect("create file");
+
+    drop(scratch);
+
+    assert!(!held.exists(), "{} survived the guard", held.display());
 }

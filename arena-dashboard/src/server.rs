@@ -3,8 +3,9 @@ use std::convert::Infallible;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use axum::extract::State;
-use axum::http::{header, HeaderValue, StatusCode};
+use axum::extract::{Request, State};
+use axum::http::{header, HeaderValue, Method, StatusCode};
+use axum::middleware::{self, Next};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{Html, IntoResponse};
 use axum::routing::{get, post};
@@ -31,10 +32,20 @@ const BUNDLE_JS: &str = "";
 #[cfg(not(arena_embedded_web_assets))]
 const STYLES_CSS: &str = "";
 
+pub const CONTENT_SECURITY_POLICY: &str = "default-src 'self'; connect-src 'self'; img-src 'self' data:; \
+style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-src 'self'; \
+frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'";
+
+pub const CALLER_HEADER: &str = "x-arena-dashboard";
+pub const CALLER_HEADER_VALUE: &str = "arena";
+const LOOPBACK_HOSTS: [&str; 2] = ["127.0.0.1", "localhost"];
+
 const RECONNECT_INTERVAL: Duration = Duration::from_millis(250);
 const KEEP_ALIVE_INTERVAL: Duration = Duration::from_millis(500);
 pub const HISTORY_LIMIT_PER_ARENA: usize = 1000;
 pub const PLAYBOOK_LIMIT: usize = 1000;
+pub const ARENA_LIMIT: usize = 200;
+pub const CPU_PROFILE_LIMIT: usize = 200;
 
 pub struct ServerShutdown {
     tx: watch::Sender<bool>,
@@ -116,6 +127,51 @@ impl AppState {
     }
 }
 
+fn is_loopback_host(value: &str) -> bool {
+    let without_port = match value.rsplit_once(':') {
+        Some((host, port)) if port.chars().all(|c| c.is_ascii_digit()) => host,
+        _ => value,
+    };
+    let host = without_port.trim_start_matches('[').trim_end_matches(']');
+    LOOPBACK_HOSTS.contains(&host) || host == "::1"
+}
+
+pub fn addresses_this_server(request: &Request) -> bool {
+    let headers = request.headers();
+    let host_is_loopback = match headers.get(header::HOST).and_then(|h| h.to_str().ok()) {
+        Some(host) => is_loopback_host(host),
+        None => true,
+    };
+    if !host_is_loopback {
+        return false;
+    }
+    match headers.get(header::ORIGIN).and_then(|h| h.to_str().ok()) {
+        Some(origin) => origin
+            .split("//")
+            .nth(1)
+            .is_some_and(is_loopback_host),
+        None => true,
+    }
+}
+
+pub fn carries_caller_header(request: &Request) -> bool {
+    request
+        .headers()
+        .get(CALLER_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value == CALLER_HEADER_VALUE)
+}
+
+async fn guard_caller(request: Request, next: Next) -> axum::response::Response {
+    if !addresses_this_server(&request) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    if request.method() == Method::POST && !carries_caller_header(&request) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    next.run(request).await
+}
+
 pub fn app(state: AppState) -> Router {
     let router = Router::new()
         .route("/ingest", post(ingest_handler))
@@ -137,10 +193,16 @@ pub fn app(state: AppState) -> Router {
         .route("/bundle.js", get(bundle_handler))
         .route("/styles.css", get(styles_handler));
 
-    router.layer(SetResponseHeaderLayer::overriding(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("no-store"),
-    ))
+    router
+        .layer(middleware::from_fn(guard_caller))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::CONTENT_SECURITY_POLICY,
+            HeaderValue::from_static(CONTENT_SECURITY_POLICY),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("no-store"),
+        ))
 }
 
 async fn index_handler() -> impl IntoResponse {
@@ -228,13 +290,26 @@ async fn ingest_handler(State(state): State<AppState>, body: String) -> impl Int
             let mut last_state = state.last_state.lock().unwrap_or_else(|e| e.into_inner());
             match last_state.iter_mut().find(|(id, _)| *id == parsed_id) {
                 Some(entry) => entry.1 = body.clone(),
-                None => last_state.push((parsed_id.clone(), body.clone())),
+                None => {
+                    if last_state.len() >= ARENA_LIMIT {
+                        tracing::error!(
+                            limit = ARENA_LIMIT,
+                            arena = %parsed_id,
+                            "arena-dashboard is holding its limit of arenas; raise ARENA_LIMIT to hold more"
+                        );
+                        return StatusCode::INSUFFICIENT_STORAGE;
+                    }
+                    last_state.push((parsed_id.clone(), body.clone()))
+                }
             }
             drop(last_state);
 
             let mut history = state.history.lock().unwrap_or_else(|e| e.into_inner());
-            record_history(&mut history, &parsed_id, body.clone());
+            let recorded = record_history(&mut history, &parsed_id, body.clone());
             drop(history);
+            if !recorded {
+                return StatusCode::INSUFFICIENT_STORAGE;
+            }
 
             let _ = state.tx.send(body);
             StatusCode::ACCEPTED
@@ -316,7 +391,9 @@ async fn playbook_ingest_handler(
             .playbook_history
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        record_history(&mut playbook_history, &arena, recorded);
+        if !record_history(&mut playbook_history, &arena, recorded) {
+            return StatusCode::INSUFFICIENT_STORAGE;
+        }
     }
 
     let _ = state.tx.send(announcement);
@@ -354,6 +431,14 @@ async fn cpu_profile_ingest_handler(
         let record = match profiles.iter_mut().find(|(id, _)| *id == payload.component) {
             Some(entry) => &mut entry.1,
             None => {
+                if profiles.len() >= CPU_PROFILE_LIMIT {
+                    tracing::error!(
+                        limit = CPU_PROFILE_LIMIT,
+                        component = %payload.component,
+                        "arena-dashboard is holding its limit of cpu profiles; raise CPU_PROFILE_LIMIT to hold more"
+                    );
+                    return StatusCode::INSUFFICIENT_STORAGE;
+                }
                 profiles.push((payload.component.clone(), CpuProfileRecord::default()));
                 &mut profiles.last_mut().expect("just pushed").1
             }
@@ -472,16 +557,36 @@ async fn events(
         )
 }
 
-pub fn record_history(history: &mut Vec<(String, Vec<String>)>, arena_id: &str, body: String) {
+pub fn record_history(
+    history: &mut Vec<(String, Vec<String>)>,
+    arena_id: &str,
+    body: String,
+) -> bool {
     match history.iter_mut().find(|(id, _)| id == arena_id) {
         Some(entry) => {
-            entry.1.push(body);
-            if entry.1.len() > HISTORY_LIMIT_PER_ARENA {
-                let excess = entry.1.len() - HISTORY_LIMIT_PER_ARENA;
-                entry.1.drain(0..excess);
+            if entry.1.len() >= HISTORY_LIMIT_PER_ARENA {
+                tracing::error!(
+                    limit = HISTORY_LIMIT_PER_ARENA,
+                    arena = %arena_id,
+                    "arena-dashboard is holding its limit of reports for this arena; raise HISTORY_LIMIT_PER_ARENA to hold more"
+                );
+                return false;
             }
+            entry.1.push(body);
+            true
         }
-        None => history.push((arena_id.to_string(), vec![body])),
+        None => {
+            if history.len() >= ARENA_LIMIT {
+                tracing::error!(
+                    limit = ARENA_LIMIT,
+                    arena = %arena_id,
+                    "arena-dashboard is holding its limit of arenas; raise ARENA_LIMIT to hold more"
+                );
+                return false;
+            }
+            history.push((arena_id.to_string(), vec![body]));
+            true
+        }
     }
 }
 

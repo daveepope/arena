@@ -829,6 +829,7 @@ java_test(
     ] + select({
         ":linux_x86_64": ["@async_profiler_linux_x64//:lib/libasyncProfiler.so"],
         ":linux_aarch64": ["@async_profiler_linux_arm64//:lib/libasyncProfiler.so"],
+        "@platforms//os:macos": ["@async_profiler_macos//:lib/libasyncProfiler.dylib"],
         "//conditions:default": [],
     }),
     jvm_flags = ["-Djna.nosys=true"],

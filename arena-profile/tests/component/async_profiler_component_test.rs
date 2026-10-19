@@ -32,12 +32,12 @@ fn prepare_cpu_profile_real_async_profiler_agent_flag_against_jvm_busy_loop_repo
     };
     assert_eq!(shutdown_signal, ShutdownSignal::Terminate);
     assert!(
-        env.iter().any(|(key, value)| key == "JAVA_TOOL_OPTIONS" && value.contains("-agentpath:")),
+        env.iter().any(|entry| entry.key == "JAVA_TOOL_OPTIONS" && entry.value.contains("-agentpath:")),
         "the agent must travel in JAVA_TOOL_OPTIONS so a launcher script passes it on: {env:?}"
     );
 
     let mut jvm = Command::new("java")
-        .envs(env.iter().map(|(key, value)| (key.clone(), value.clone())))
+        .envs(env.iter().map(|entry| (entry.key.clone(), entry.value.clone())))
         .args(&args)
         .stdout(Stdio::null())
         .stderr(Stdio::null())

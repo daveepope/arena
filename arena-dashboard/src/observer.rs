@@ -65,7 +65,7 @@ impl HttpForwardingObserver {
                 }
                 match forwarded {
                     Forwarded::State(state) => {
-                        let _ = client.post(&ingest_url).json(&state).send();
+                        let _ = client.post(&ingest_url).header(crate::server::CALLER_HEADER, crate::server::CALLER_HEADER_VALUE).json(&state).send();
                     }
                     Forwarded::CpuProfile(event) => {
                         let payload = crate::ingest::CpuProfilePayload {
@@ -73,7 +73,7 @@ impl HttpForwardingObserver {
                             state: event.state.as_str().to_string(),
                             folded: event.folded,
                         };
-                        let _ = client.post(&cpu_profile_url).json(&payload).send();
+                        let _ = client.post(&cpu_profile_url).header(crate::server::CALLER_HEADER, crate::server::CALLER_HEADER_VALUE).json(&payload).send();
                     }
                     Forwarded::Playbook(event) => {
                         let Some(url) = playbook_url(
@@ -83,7 +83,12 @@ impl HttpForwardingObserver {
                         ) else {
                             continue;
                         };
-                        match client.post(url).json(&event).send() {
+                        match client
+                            .post(url)
+                            .header(crate::server::CALLER_HEADER, crate::server::CALLER_HEADER_VALUE)
+                            .json(&event)
+                            .send()
+                        {
                             Ok(response) if !response.status().is_success() => {
                                 tracing::warn!(
                                     status = %response.status(),

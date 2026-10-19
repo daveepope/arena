@@ -1,6 +1,7 @@
 use arena::component::RunnableComponent;
-use arena_executable_component::executable_component::ExecutableComponent;
-use arena_profile::ShutdownSignal;
+use arena_executable_component::executable_component::{merged_profile_env_value, ExecutableComponent};
+use arena_profile::{ProfileEnvVar, ShutdownSignal};
+use std::ffi::OsString;
 use std::process::Command;
 
 #[test]
@@ -83,4 +84,65 @@ async fn stop_never_started_component_returns_ok() {
         .expect("build executable component");
 
     assert!(component.stop().await.is_ok());
+}
+
+#[test]
+fn merged_profile_env_value_without_a_caller_value_returns_ours() {
+    let entry = ProfileEnvVar::path_joined("PYTHONPATH", "/scratch/arena");
+
+    let merged = merged_profile_env_value(&entry, None).expect("merge");
+
+    assert_eq!(merged, OsString::from("/scratch/arena"));
+}
+
+#[test]
+fn merged_profile_env_value_with_an_empty_caller_value_returns_ours() {
+    let entry = ProfileEnvVar::path_joined("PYTHONPATH", "/scratch/arena");
+
+    let merged = merged_profile_env_value(&entry, Some("")).expect("merge");
+
+    assert_eq!(merged, OsString::from("/scratch/arena"));
+}
+
+#[test]
+fn merged_profile_env_value_space_merge_keeps_the_caller_value_first() {
+    let entry = ProfileEnvVar::space_joined("JAVA_TOOL_OPTIONS", "-agentpath:/scratch/agent.so");
+
+    let merged = merged_profile_env_value(&entry, Some("-Xmx512m")).expect("merge");
+
+    assert_eq!(merged, OsString::from("-Xmx512m -agentpath:/scratch/agent.so"));
+}
+
+#[test]
+fn merged_profile_env_value_path_merge_appends_ours_behind_every_caller_entry() {
+    let entry = ProfileEnvVar::path_joined("PYTHONPATH", "/scratch/arena");
+    let caller = std::env::join_paths(["/app/src", "/app/deps"])
+        .expect("caller path list")
+        .into_string()
+        .expect("utf8");
+
+    let merged = merged_profile_env_value(&entry, Some(&caller)).expect("merge");
+
+    let entries: Vec<std::path::PathBuf> = std::env::split_paths(&merged).collect();
+    assert_eq!(
+        entries,
+        vec![
+            std::path::PathBuf::from("/app/src"),
+            std::path::PathBuf::from("/app/deps"),
+            std::path::PathBuf::from("/scratch/arena"),
+        ]
+    );
+}
+
+#[test]
+fn merged_profile_env_value_path_merge_never_joins_with_a_space() {
+    let entry = ProfileEnvVar::path_joined("PYTHONPATH", "/scratch/arena");
+
+    let merged = merged_profile_env_value(&entry, Some("/app/src"))
+        .expect("merge")
+        .into_string()
+        .expect("utf8");
+
+    assert!(!merged.contains(' '), "got: {merged}");
+    assert_eq!(std::env::split_paths(&merged).count(), 2);
 }

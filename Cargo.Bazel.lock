@@ -1,5 +1,5 @@
 {
-  "checksum": "e3ba66c3b1d4bae57cf88f2a0212b431711f30ad0232568e011d72da6fca21bc",
+  "checksum": "df7f63407b778d0c234fc2563d43357e9699c8798edfdeea41f61cceba045715",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -2157,6 +2157,10 @@
             {
               "id": "inferno 0.12.8",
               "target": "inferno"
+            },
+            {
+              "id": "rand 0.8.6",
+              "target": "rand"
             },
             {
               "id": "runfiles 0.2.0",

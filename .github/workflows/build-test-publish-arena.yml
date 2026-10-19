@@ -787,6 +787,9 @@ jobs:
       - name: Build and test
         run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
 
+      - name: Test cpu profilers
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=cpu_profile_test
+
   test_macos_arm64:
     name: Test unit macOS ARM64
     needs: [changes, master_merge_guard]
@@ -829,6 +832,9 @@ jobs:
 
       - name: Build and test
         run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
+
+      - name: Test cpu profilers
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=cpu_profile_test
 
   test_unit_windows:
     name: Test unit Windows

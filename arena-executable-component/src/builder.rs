@@ -216,6 +216,16 @@ fn current_dir_fault(identifier: &str) -> Result<PathBuf, Fault> {
     })
 }
 
+#[cfg(target_os = "macos")]
+fn python_cpu_profiler_backend() -> arena_profile::CpuProfilerBackend {
+    arena_profile::CpuProfilerBackend::PythonSiteSampler
+}
+
+#[cfg(not(target_os = "macos"))]
+fn python_cpu_profiler_backend() -> arena_profile::CpuProfilerBackend {
+    arena_profile::CpuProfilerBackend::PySpy
+}
+
 pub(crate) fn cpu_profiler_backend(
     identifier: &str,
     build_tool: Option<&BuildTool>,
@@ -225,7 +235,7 @@ pub(crate) fn cpu_profiler_backend(
         Some(BuildTool::Maven) | Some(BuildTool::Gradle) => {
             Ok(arena_profile::CpuProfilerBackend::AsyncProfiler)
         }
-        Some(BuildTool::Python) => Ok(arena_profile::CpuProfilerBackend::PySpy),
+        Some(BuildTool::Python) => Ok(python_cpu_profiler_backend()),
         Some(BuildTool::Dotnet) => Ok(arena_profile::CpuProfilerBackend::DotnetTrace),
         Some(BuildTool::Make) => Err(cpu_profile_unsupported(identifier, "BuildTool::Make")),
         Some(BuildTool::CMake) => Err(cpu_profile_unsupported(identifier, "BuildTool::CMake")),

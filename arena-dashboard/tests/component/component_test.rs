@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use arena_dashboard::{app, AppState, ServerShutdown};
+use arena_dashboard::{app, AppState, ServerShutdown, CALLER_HEADER, CALLER_HEADER_VALUE};
 use futures::StreamExt;
 
 async fn spawn_server() -> String {
@@ -47,6 +47,7 @@ async fn ingest_validstate_appearsonevents() {
     let body = r#"{"id":"test-arena","state":"arena_open","at":"2026-01-01T00:00:00.000Z"}"#;
     let post_response = client
         .post(format!("{base_url}/ingest"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .body(body)
         .send()
         .await
@@ -69,8 +70,10 @@ async fn events_connect_after_two_arenas_ingested_replays_in_insertion_order() {
 
     let first = r#"{"id":"arena-first","state":"arena_open","at":"2026-01-01T00:00:00.000Z"}"#;
     let second = r#"{"id":"arena-second","state":"arena_open","at":"2026-01-01T00:00:01.000Z"}"#;
-    client.post(format!("{base_url}/ingest")).body(first).send().await.expect("post first");
-    client.post(format!("{base_url}/ingest")).body(second).send().await.expect("post second");
+    client.post(format!("{base_url}/ingest"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE).body(first).send().await.expect("post first");
+    client.post(format!("{base_url}/ingest"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE).body(second).send().await.expect("post second");
 
     let events_response = client
         .get(format!("{base_url}/events"))
@@ -111,7 +114,8 @@ async fn events_connect_after_many_transitions_for_one_arena_replays_only_the_la
         let body = format!(
             r#"{{"id":"lifecycle-arena","state":"{state}","at":"2026-01-01T00:00:0{i}.000Z"}}"#
         );
-        client.post(format!("{base_url}/ingest")).body(body).send().await.expect("post ingest");
+        client.post(format!("{base_url}/ingest"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE).body(body).send().await.expect("post ingest");
     }
 
     let events_response = client
@@ -142,7 +146,8 @@ async fn clear_afteringest_broadcastsclearandemptiesreplay() {
     let client = reqwest::Client::new();
 
     let body = r#"{"id":"test-arena","state":"arena_open","at":"2026-01-01T00:00:00.000Z"}"#;
-    client.post(format!("{base_url}/ingest")).body(body).send().await.expect("post ingest");
+    client.post(format!("{base_url}/ingest"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE).body(body).send().await.expect("post ingest");
 
     let events_response = client
         .get(format!("{base_url}/events"))
@@ -158,7 +163,8 @@ async fn clear_afteringest_broadcastsclearandemptiesreplay() {
         .expect("sse chunk bytes");
     assert!(String::from_utf8_lossy(&replay_chunk).contains("test-arena"));
 
-    let clear_response = client.post(format!("{base_url}/clear")).send().await.expect("post clear");
+    let clear_response = client.post(format!("{base_url}/clear"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE).send().await.expect("post clear");
     assert_eq!(clear_response.status(), 204);
 
     let clear_chunk = tokio::time::timeout(Duration::from_secs(5), stream.next())
@@ -195,7 +201,8 @@ async fn shutdown_postendpoint_stopsserverfromaccepting() {
     let (base_url, _shutdown, _serve_task) = spawn_server_with_shutdown().await;
     let client = reqwest::Client::new();
 
-    let response = client.post(format!("{base_url}/shutdown")).send().await.expect("post shutdown");
+    let response = client.post(format!("{base_url}/shutdown"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE).send().await.expect("post shutdown");
     assert_eq!(response.status(), 202);
 
     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -215,6 +222,7 @@ async fn ingest_malformedbody_returnsbadrequest() {
 
     let response = client
         .post(format!("{base_url}/ingest"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .body("not json")
         .send()
         .await
@@ -294,6 +302,7 @@ async fn shutdown_witheventsclientconnected_endsservertask() {
 
     client
         .post(format!("{base_url}/shutdown"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .send()
         .await
         .expect("post shutdown");
@@ -315,6 +324,7 @@ async fn history_afterseveralingests_returnsallstatesinorder() {
         );
         let response = client
             .post(format!("{base_url}/ingest"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
             .body(body)
             .send()
             .await
@@ -348,12 +358,14 @@ async fn history_afterclear_returnsnoarenas() {
     let body = r#"{"id":"history-cleared-arena","state":"arena_open","at":"2026-01-01T00:00:00.000Z"}"#;
     client
         .post(format!("{base_url}/ingest"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .body(body)
         .send()
         .await
         .expect("post ingest");
     client
         .post(format!("{base_url}/clear"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .send()
         .await
         .expect("post clear");

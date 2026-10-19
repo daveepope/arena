@@ -180,6 +180,46 @@ genrule(
     visibility = ["//visibility:public"],
 )
 
+config_setting(
+    name = "linux_x86_64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "macos_x86_64",
+    constraint_values = [
+        "@platforms//os:macos",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "macos_aarch64",
+    constraint_values = [
+        "@platforms//os:macos",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+_CHROME_FILES = select({
+    ":linux_x86_64": [
+        "@chrome_for_testing_linux_x86_64//:chrome",
+        "@chrome_for_testing_linux_x86_64//:chrome_files",
+    ],
+    ":macos_x86_64": [
+        "@chrome_for_testing_macos_x86_64//:chrome",
+        "@chrome_for_testing_macos_x86_64//:chrome_files",
+    ],
+    ":macos_aarch64": [
+        "@chrome_for_testing_macos_aarch64//:chrome",
+        "@chrome_for_testing_macos_aarch64//:chrome_files",
+    ],
+    "//conditions:default": [],
+})
+
 _BROWSER_TEST_DATA = [
     "playwright.config.ts",
     "tsconfig.json",
@@ -187,25 +227,32 @@ _BROWSER_TEST_DATA = [
     ":node_modules/@playwright/test",
     "//arena-dashboard:demo_lifecycle",
     "//arena-dashboard:server",
-    "@chrome_for_testing_linux_x86_64//:chrome",
-    "@chrome_for_testing_linux_x86_64//:chrome_files",
-] + glob(["browser/**/*.ts"])
+] + glob(["browser/**/*.ts"]) + _CHROME_FILES
 
 _BROWSER_TEST_ENV = {
-    "ARENA_CHROME_BINARY": "$(rlocationpath @chrome_for_testing_linux_x86_64//:chrome)",
     "ARENA_DASHBOARD_SERVER_BIN": "$(rlocationpath //arena-dashboard:server)",
     "ARENA_DEMO_LIFECYCLE_BIN": "$(rlocationpath //arena-dashboard:demo_lifecycle)",
-}
+} | select({
+    ":linux_x86_64": {
+        "ARENA_CHROME_BINARY": "$(rlocationpath @chrome_for_testing_linux_x86_64//:chrome)",
+    },
+    ":macos_x86_64": {
+        "ARENA_CHROME_BINARY": "$(rlocationpath @chrome_for_testing_macos_x86_64//:chrome)",
+    },
+    ":macos_aarch64": {
+        "ARENA_CHROME_BINARY": "$(rlocationpath @chrome_for_testing_macos_aarch64//:chrome)",
+    },
+    "//conditions:default": {},
+})
 
-_BROWSER_TEST_NO_COPY_TO_BIN = [
-    "@chrome_for_testing_linux_x86_64//:chrome",
-    "@chrome_for_testing_linux_x86_64//:chrome_files",
-]
+_BROWSER_TEST_NO_COPY_TO_BIN = _CHROME_FILES
 
-_BROWSER_TEST_PLATFORM = [
-    "@platforms//cpu:x86_64",
-    "@platforms//os:linux",
-]
+_BROWSER_TEST_PLATFORM = select({
+    ":linux_x86_64": [],
+    ":macos_x86_64": [],
+    ":macos_aarch64": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
 
 playwright_bin.playwright_test(
     name = "browser_test",
@@ -219,7 +266,10 @@ playwright_bin.playwright_test(
     data = _BROWSER_TEST_DATA,
     env = _BROWSER_TEST_ENV,
     no_copy_to_bin = _BROWSER_TEST_NO_COPY_TO_BIN,
-    tags = ["component_test"],
+    tags = [
+        "component_test",
+        "cpu_profile_test",
+    ],
     target_compatible_with = _BROWSER_TEST_PLATFORM,
 )
 

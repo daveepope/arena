@@ -12,6 +12,7 @@ path = "src/lib.rs"
 [dependencies]
 arena = { workspace = true }
 inferno = { workspace = true }
+rand = { workspace = true }
 runfiles = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

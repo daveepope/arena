@@ -38,6 +38,8 @@ impl WrappingSampler for FakeWrappingSampler {
                     PathBuf::from(self.wrapped_program),
                     args,
                     WrapState::Perf {
+                        scratch: arena_profile::backend::ScratchDir::create("arena-profile-wrapped-test")
+                            .expect("scratch"),
                         data_path: PathBuf::from("/tmp/unused.data"),
                     },
                 ))
@@ -50,11 +52,13 @@ impl WrappingSampler for FakeWrappingSampler {
         _state: WrapState,
         _wrapping_child: &mut Child,
         _budget: Duration,
-    ) -> Result<Option<PathBuf>, CpuProfileError> {
+        limit_bytes: usize,
+    ) -> Result<Option<String>, CpuProfileError> {
         match &self.outcome {
             WrapOutcome::CollectFails => Err(CpuProfileError::Finish("collect failed".into())),
             WrapOutcome::CollectSucceeds => {
-                Ok(Some(write_sample_folded_stacks("wrapped-collect-succeeds")))
+                let path = write_sample_folded_stacks("wrapped-collect-succeeds");
+                arena_profile::profiler::read_collected(&path, limit_bytes).map(Some)
             }
             WrapOutcome::CollectFindsNoSamples => Ok(None),
             WrapOutcome::WrapFails(_) => unreachable!("collect() called after wrap() failed"),
@@ -96,9 +100,15 @@ fn wrapping_sampler_for_perf_and_pyspy_returns_sampler() {
 }
 
 #[test]
-#[should_panic(expected = "AsyncProfiler is an arg-augmenting backend")]
+#[should_panic(expected = "are arg-augmenting backends")]
 fn wrapping_sampler_for_async_profiler_panics_unreachable() {
     let _ = wrapping_sampler_for(CpuProfilerBackend::AsyncProfiler);
+}
+
+#[test]
+#[should_panic(expected = "are arg-augmenting backends")]
+fn wrapping_sampler_for_python_site_sampler_panics_unreachable() {
+    let _ = wrapping_sampler_for(CpuProfilerBackend::PythonSiteSampler);
 }
 
 #[test]

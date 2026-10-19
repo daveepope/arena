@@ -270,6 +270,8 @@ function ServerStatus({ status }: { status: ConnectionStatus }) {
   );
 }
 
+const CALLER_HEADERS = { "x-arena-dashboard": "arena" };
+
 const DETAIL_PANEL_WIDTH = 320;
 const DETAIL_PANEL_MAX_HEIGHT = 360;
 
@@ -302,6 +304,7 @@ function SelectedDetailPopover({
           <CpuProfileButton componentId={panel.title} profiler={profiler} variant="detail" />
         </div>
       )}
+
     </FloatingPanel>
   );
 }
@@ -475,7 +478,7 @@ export function App() {
   const handleClearServerState = async () => {
     setActionFeedback({ text: "Clearing...", isError: false });
     try {
-      const response = await fetch("/clear", { method: "POST" });
+      const response = await fetch("/clear", { method: "POST", headers: CALLER_HEADERS });
       showActionFeedback(response.ok ? "Cleared" : "Failed to clear", !response.ok);
     } catch {
       showActionFeedback("Failed to clear", true);
@@ -486,7 +489,7 @@ export function App() {
     setIsStopConfirmOpen(false);
     setActionFeedback({ text: "Stopping...", isError: false });
     try {
-      const response = await fetch("/shutdown", { method: "POST" });
+      const response = await fetch("/shutdown", { method: "POST", headers: CALLER_HEADERS });
       showActionFeedback(response.ok ? "Server stopped" : "Failed to stop server", !response.ok);
     } catch {
       showActionFeedback("Server stopped", false);

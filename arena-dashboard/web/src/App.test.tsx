@@ -506,7 +506,10 @@ describe("App", () => {
 
     expect(screen.getByRole("dialog")).toBeDefined();
     expect(screen.getByText("Stop the dashboard server?")).toBeDefined();
-    expect(fetch).not.toHaveBeenCalledWith("/shutdown", { method: "POST" });
+    expect(fetch).not.toHaveBeenCalledWith("/shutdown", {
+      method: "POST",
+      headers: { "x-arena-dashboard": "arena" },
+    });
   });
 
   it("confirming the dialog stops the server", async () => {
@@ -523,7 +526,10 @@ describe("App", () => {
       within(screen.getByRole("dialog")).getByText("Stop server").click();
     });
 
-    expect(fetch).toHaveBeenCalledWith("/shutdown", { method: "POST" });
+    expect(fetch).toHaveBeenCalledWith("/shutdown", {
+      method: "POST",
+      headers: { "x-arena-dashboard": "arena" },
+    });
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -542,7 +548,10 @@ describe("App", () => {
     });
 
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(fetch).not.toHaveBeenCalledWith("/shutdown", { method: "POST" });
+    expect(fetch).not.toHaveBeenCalledWith("/shutdown", {
+      method: "POST",
+      headers: { "x-arena-dashboard": "arena" },
+    });
   });
 
   it("escape key dismisses the confirmation dialog", () => {
@@ -560,7 +569,10 @@ describe("App", () => {
     });
 
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(fetch).not.toHaveBeenCalledWith("/shutdown", { method: "POST" });
+    expect(fetch).not.toHaveBeenCalledWith("/shutdown", {
+      method: "POST",
+      headers: { "x-arena-dashboard": "arena" },
+    });
   });
 
   it("selecting a subject renders the detail popover near the click position, not centered", () => {
@@ -677,7 +689,10 @@ describe("App", () => {
       screen.getByText("Clear server state").click();
     });
 
-    expect(fetch).toHaveBeenCalledWith("/clear", { method: "POST" });
+    expect(fetch).toHaveBeenCalledWith("/clear", {
+      method: "POST",
+      headers: { "x-arena-dashboard": "arena" },
+    });
   });
 
   it("clicking stop server posts to the shutdown endpoint once confirmed", async () => {
@@ -693,7 +708,10 @@ describe("App", () => {
       within(screen.getByRole("dialog")).getByText("Stop server").click();
     });
 
-    expect(fetch).toHaveBeenCalledWith("/shutdown", { method: "POST" });
+    expect(fetch).toHaveBeenCalledWith("/shutdown", {
+      method: "POST",
+      headers: { "x-arena-dashboard": "arena" },
+    });
   });
 
   it("clicking clear server state shows feedback once the request resolves", async () => {

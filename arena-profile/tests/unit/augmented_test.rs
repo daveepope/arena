@@ -4,7 +4,9 @@ mod recorded_profiles;
 use arena::lifecycle::RunnableState;
 use arena_profile::augmented::{augmenting_sampler_for, prepare_augmented, ArgAugmentingSampler, AugmentState, Augmentation};
 use arena_profile::DEFAULT_CPU_PROFILE_LIMIT_BYTES;
-use arena_profile::{CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch, ShutdownSignal};
+use arena_profile::{
+    CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch, ProfileEnvVar, ShutdownSignal,
+};
 use recorded_profiles::start_recording;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -34,8 +36,10 @@ impl ArgAugmentingSampler for FakeArgAugmentingSampler {
                 args.push(request.program.to_string_lossy().into_owned());
                 Ok(Augmentation {
                     args,
-                    env: vec![("JAVA_TOOL_OPTIONS".to_string(), "-agentpath:probe".to_string())],
+                    env: vec![ProfileEnvVar::space_joined("JAVA_TOOL_OPTIONS", "-agentpath:probe")],
                     state: AugmentState::AsyncProfiler {
+                        scratch: arena_profile::backend::ScratchDir::create("arena-profile-augmented-test")
+                            .expect("scratch"),
                         folded_path: PathBuf::from("/tmp/unused.collapsed"),
                     },
                 })
@@ -48,16 +52,22 @@ impl ArgAugmentingSampler for FakeArgAugmentingSampler {
         _state: AugmentState,
         _budget: Duration,
         _profiled_pid: u32,
-    ) -> Result<Option<PathBuf>, CpuProfileError> {
+        limit_bytes: usize,
+    ) -> Result<Option<String>, CpuProfileError> {
         match &self.outcome {
             AugmentOutcome::CollectFails => Err(CpuProfileError::Finish("collect failed".into())),
             AugmentOutcome::CollectSucceeds => {
-                Ok(Some(write_sample_folded_stacks("augmented-collect-succeeds")))
+                let path = write_sample_folded_stacks("augmented-collect-succeeds");
+                arena_profile::profiler::read_collected(&path, limit_bytes).map(Some)
             }
             AugmentOutcome::CollectFindsNoSamples => Ok(None),
             AugmentOutcome::AugmentFails => unreachable!("collect() called after augment() failed"),
         }
     }
+}
+
+fn async_profiler_scratch() -> arena_profile::backend::ScratchDir {
+    arena_profile::backend::ScratchDir::create("arena-profile-augmented-test").expect("scratch")
 }
 
 fn write_sample_folded_stacks(name: &str) -> PathBuf {
@@ -80,19 +90,19 @@ fn sample_request() -> LaunchRequest {
 
 #[test]
 fn augmenting_sampler_for_async_profiler_returns_sampler() {
-    let _ = augmenting_sampler_for(CpuProfilerBackend::AsyncProfiler);
+    let _ = augmenting_sampler_for(CpuProfilerBackend::AsyncProfiler, DEFAULT_CPU_PROFILE_LIMIT_BYTES);
 }
 
 #[test]
 #[should_panic(expected = "Perf/PySpy/DotnetTrace are wrapping backends")]
 fn augmenting_sampler_for_perf_panics_unreachable() {
-    let _ = augmenting_sampler_for(CpuProfilerBackend::Perf);
+    let _ = augmenting_sampler_for(CpuProfilerBackend::Perf, DEFAULT_CPU_PROFILE_LIMIT_BYTES);
 }
 
 #[test]
 #[should_panic(expected = "Perf/PySpy/DotnetTrace are wrapping backends")]
 fn augmenting_sampler_for_pyspy_panics_unreachable() {
-    let _ = augmenting_sampler_for(CpuProfilerBackend::PySpy);
+    let _ = augmenting_sampler_for(CpuProfilerBackend::PySpy, DEFAULT_CPU_PROFILE_LIMIT_BYTES);
 }
 
 #[test]
@@ -198,12 +208,16 @@ fn async_profiler_written(pattern: &PathBuf) -> PathBuf {
 #[test]
 fn async_profiler_collect_empty_output_reports_no_profile() {
     let folded_path = async_profiler_output("empty", "");
-    let sampler = augmenting_sampler_for(CpuProfilerBackend::AsyncProfiler);
+    let sampler = augmenting_sampler_for(CpuProfilerBackend::AsyncProfiler, DEFAULT_CPU_PROFILE_LIMIT_BYTES);
 
     let result = sampler.collect(
-        AugmentState::AsyncProfiler { folded_path: folded_path.clone() },
+        AugmentState::AsyncProfiler {
+            scratch: async_profiler_scratch(),
+            folded_path: folded_path.clone(),
+        },
         Duration::from_secs(5),
         std::process::id(),
+        DEFAULT_CPU_PROFILE_LIMIT_BYTES,
     );
 
     assert_eq!(result.unwrap(), None);
@@ -211,17 +225,21 @@ fn async_profiler_collect_empty_output_reports_no_profile() {
 }
 
 #[test]
-fn async_profiler_collect_sampled_output_returns_the_folded_path() {
+fn async_profiler_collect_sampled_output_returns_the_folded_stacks() {
     let folded_path = async_profiler_output("sampled", "main;run;compute 7\n");
-    let sampler = augmenting_sampler_for(CpuProfilerBackend::AsyncProfiler);
+    let sampler = augmenting_sampler_for(CpuProfilerBackend::AsyncProfiler, DEFAULT_CPU_PROFILE_LIMIT_BYTES);
 
     let result = sampler.collect(
-        AugmentState::AsyncProfiler { folded_path: folded_path.clone() },
+        AugmentState::AsyncProfiler {
+            scratch: async_profiler_scratch(),
+            folded_path: folded_path.clone(),
+        },
         Duration::from_secs(5),
         std::process::id(),
+        DEFAULT_CPU_PROFILE_LIMIT_BYTES,
     );
 
-    assert_eq!(result.unwrap(), Some(async_profiler_written(&folded_path)));
+    assert_eq!(result.unwrap(), Some("main;run;compute 7\n".to_string()));
     let _ = std::fs::remove_file(async_profiler_written(&folded_path));
 }
 
@@ -232,12 +250,13 @@ fn async_profiler_collect_missing_output_returns_finish_error() {
         std::process::id()
     ));
     let _ = std::fs::remove_file(&folded_path);
-    let sampler = augmenting_sampler_for(CpuProfilerBackend::AsyncProfiler);
+    let sampler = augmenting_sampler_for(CpuProfilerBackend::AsyncProfiler, DEFAULT_CPU_PROFILE_LIMIT_BYTES);
 
     let result = sampler.collect(
-        AugmentState::AsyncProfiler { folded_path },
+        AugmentState::AsyncProfiler { scratch: async_profiler_scratch(), folded_path },
         Duration::from_secs(5),
         std::process::id(),
+        DEFAULT_CPU_PROFILE_LIMIT_BYTES,
     );
 
     assert!(matches!(result, Err(CpuProfileError::Finish(_))));
@@ -275,12 +294,16 @@ fn augmented_finish_no_samples_reports_stopped_without_folded_stacks() {
 #[test]
 fn async_profiler_collect_output_of_another_process_is_not_accepted() {
     let pattern = async_profiler_output("other-process", "main;run;compute 7\n");
-    let sampler = augmenting_sampler_for(CpuProfilerBackend::AsyncProfiler);
+    let sampler = augmenting_sampler_for(CpuProfilerBackend::AsyncProfiler, DEFAULT_CPU_PROFILE_LIMIT_BYTES);
 
     let result = sampler.collect(
-        AugmentState::AsyncProfiler { folded_path: pattern.clone() },
+        AugmentState::AsyncProfiler {
+            scratch: async_profiler_scratch(),
+            folded_path: pattern.clone(),
+        },
         Duration::from_secs(5),
         std::process::id() + 1,
+        DEFAULT_CPU_PROFILE_LIMIT_BYTES,
     );
 
     assert!(matches!(result, Err(CpuProfileError::Finish(_))));

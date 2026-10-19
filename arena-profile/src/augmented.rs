@@ -1,6 +1,6 @@
 use crate::observer;
 use crate::profiler::{
-    read_collected, CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch, ProfileSession,
+    CpuProfileError, CpuProfilerBackend, LaunchRequest, PreparedLaunch, ProfileEnvVar, ProfileSession,
     ShutdownSignal, FINISH_TIMEOUT,
 };
 use arena::lifecycle::RunnableState;
@@ -9,7 +9,8 @@ use std::process::Child;
 use std::time::Duration;
 
 pub enum AugmentState {
-    AsyncProfiler { folded_path: PathBuf },
+    AsyncProfiler { scratch: crate::backend::ScratchDir, folded_path: PathBuf },
+    PythonSite { scratch: crate::backend::ScratchDir },
 }
 
 pub trait ArgAugmentingSampler: Send + Sync {
@@ -20,12 +21,19 @@ pub trait ArgAugmentingSampler: Send + Sync {
         state: AugmentState,
         budget: Duration,
         profiled_pid: u32,
-    ) -> Result<Option<PathBuf>, CpuProfileError>;
+        limit_bytes: usize,
+    ) -> Result<Option<String>, CpuProfileError>;
 }
 
-pub fn augmenting_sampler_for(backend: CpuProfilerBackend) -> Box<dyn ArgAugmentingSampler> {
+pub fn augmenting_sampler_for(
+    backend: CpuProfilerBackend,
+    limit_bytes: usize,
+) -> Box<dyn ArgAugmentingSampler> {
     match backend {
         CpuProfilerBackend::AsyncProfiler => Box::new(crate::backend::async_profiler::AsyncProfilerSampler),
+        CpuProfilerBackend::PythonSiteSampler => {
+            Box::new(crate::backend::python_site::PythonSiteSampler::new(limit_bytes))
+        }
         CpuProfilerBackend::Perf | CpuProfilerBackend::PySpy | CpuProfilerBackend::DotnetTrace => {
             unreachable!("Perf/PySpy/DotnetTrace are wrapping backends, not arg-augmenting")
         }
@@ -48,13 +56,14 @@ impl ProfileSession for AugmentedProfileSession {
         let AugmentedProfileSession { sampler, state, component_id, limit_bytes } = *self;
         let profiled_pid = augmented_process.id();
         observer::report(&component_id, RunnableState::Stopping);
-        let collected = crate::backend::wait_bounded(augmented_process, FINISH_TIMEOUT)
-            .map_err(|e| CpuProfileError::Finish(format!("profiled process did not exit cleanly: {e}")))
-            .and_then(|_status| sampler.collect(state, FINISH_TIMEOUT, profiled_pid))
-            .and_then(|folded_path| match folded_path {
-                Some(folded_path) => read_collected(&folded_path, limit_bytes).map(Some),
-                None => Ok(None),
-            });
+        let exited = crate::backend::wait_bounded(augmented_process, FINISH_TIMEOUT);
+        let collected = sampler.collect(state, FINISH_TIMEOUT, profiled_pid, limit_bytes);
+        let collected = match (exited, collected) {
+            (Err(e), Err(_)) => Err(CpuProfileError::Finish(format!(
+                "profiled process did not exit cleanly and no profile was flushed: {e}"
+            ))),
+            (_, collected) => collected,
+        };
         match collected {
             Ok(Some(folded)) => {
                 observer::report_complete(&component_id, &folded);
@@ -74,7 +83,7 @@ impl ProfileSession for AugmentedProfileSession {
 
 pub struct Augmentation {
     pub args: Vec<String>,
-    pub env: Vec<(String, String)>,
+    pub env: Vec<ProfileEnvVar>,
     pub state: AugmentState,
 }
 

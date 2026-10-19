@@ -1,5 +1,5 @@
 use super::{
-    resolve_binary, sampled_nothing, scratch_path, signal_interrupt, wait_bounded,
+    resolve_binary, sampled_nothing, signal_interrupt, wait_bounded, ScratchDir,
 };
 use crate::profiler::{CpuProfileError, LaunchRequest};
 use crate::wrapped::{WrapState, WrappingSampler};
@@ -34,10 +34,11 @@ impl WrappingSampler for PySpySampler {
         request: &LaunchRequest,
     ) -> Result<(PathBuf, Vec<String>, WrapState), CpuProfileError> {
         let py_spy = resolve_binary(PYSPY_RLOCATIONS, PYSPY_PATH_FALLBACK, PYSPY_PATH_FALLBACK, INSTALL_HINT)?;
-        let folded_path = scratch_path("arena-profile-pyspy", "folded");
+        let scratch = ScratchDir::create("arena-profile-pyspy")?;
+        let folded_path = scratch.file_path("profile.folded");
         let args = record_args(&folded_path, request);
 
-        Ok((PathBuf::from(py_spy), args, WrapState::PySpy { folded_path }))
+        Ok((PathBuf::from(py_spy), args, WrapState::PySpy { scratch, folded_path }))
     }
 
     fn collect(
@@ -45,8 +46,9 @@ impl WrappingSampler for PySpySampler {
         state: WrapState,
         wrapping_child: &mut Child,
         budget: Duration,
-    ) -> Result<Option<PathBuf>, CpuProfileError> {
-        let WrapState::PySpy { folded_path } = state else {
+        limit_bytes: usize,
+    ) -> Result<Option<String>, CpuProfileError> {
+        let WrapState::PySpy { scratch: _scratch, folded_path } = state else {
             unreachable!("PySpySampler::collect given a non-py-spy WrapState");
         };
 
@@ -70,11 +72,10 @@ impl WrappingSampler for PySpySampler {
             )));
         }
         if sampled_nothing(&folded_path) {
-            let _ = std::fs::remove_file(&folded_path);
             return Ok(None);
         }
 
-        Ok(Some(folded_path))
+        crate::profiler::read_collected(&folded_path, limit_bytes).map(Some)
     }
 }
 

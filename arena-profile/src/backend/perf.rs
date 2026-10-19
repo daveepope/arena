@@ -1,5 +1,5 @@
 use super::{
-    map_spawn_error, resolve_binary, sampled_nothing, scratch_path, signal_interrupt, wait_bounded,
+    map_spawn_error, resolve_binary, sampled_nothing, signal_interrupt, wait_bounded, ScratchDir,
 };
 use crate::profiler::{CpuProfileError, LaunchRequest};
 use crate::wrapped::{WrapState, WrappingSampler};
@@ -36,10 +36,11 @@ impl WrappingSampler for PerfSampler {
         request: &LaunchRequest,
     ) -> Result<(PathBuf, Vec<String>, WrapState), CpuProfileError> {
         let perf = resolve_binary(PERF_RLOCATIONS, PERF_BINARY, PERF_BINARY, INSTALL_HINT)?;
-        let data_path = scratch_path("arena-profile-perf", "data");
+        let scratch = ScratchDir::create("arena-profile-perf")?;
+        let data_path = scratch.file_path("perf.data");
         let args = record_args(&data_path, request);
 
-        Ok((PathBuf::from(perf), args, WrapState::Perf { data_path }))
+        Ok((PathBuf::from(perf), args, WrapState::Perf { scratch, data_path }))
     }
 
     fn collect(
@@ -47,8 +48,9 @@ impl WrappingSampler for PerfSampler {
         state: WrapState,
         wrapping_child: &mut Child,
         budget: Duration,
-    ) -> Result<Option<PathBuf>, CpuProfileError> {
-        let WrapState::Perf { data_path } = state else {
+        limit_bytes: usize,
+    ) -> Result<Option<String>, CpuProfileError> {
+        let WrapState::Perf { scratch, data_path } = state else {
             unreachable!("PerfSampler::collect given a non-perf WrapState");
         };
 
@@ -73,10 +75,7 @@ impl WrappingSampler for PerfSampler {
             buf
         });
 
-        let folded_path = scratch_path("arena-profile-perf-folded", "folded");
-        let mut folded_file = std::fs::File::create(&folded_path).map_err(|e| {
-            CpuProfileError::Finish(format!("failed to create folded stacks file: {e}"))
-        })?;
+        let (folded_path, mut folded_file) = scratch.create_file("profile.folded")?;
         let collapse_result = Folder::default().collapse(BufReader::new(script_stdout), &mut folded_file);
 
         let script_status = script_child
@@ -100,10 +99,9 @@ impl WrappingSampler for PerfSampler {
             .map_err(|e| CpuProfileError::Finish(format!("failed to flush folded stacks file: {e}")))?;
 
         if sampled_nothing(&folded_path) {
-            let _ = std::fs::remove_file(&folded_path);
             return Ok(None);
         }
 
-        Ok(Some(folded_path))
+        crate::profiler::read_collected(&folded_path, limit_bytes).map(Some)
     }
 }

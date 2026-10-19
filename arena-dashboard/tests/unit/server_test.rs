@@ -1,6 +1,9 @@
 use std::sync::{Arc, Mutex};
 
-use arena_dashboard::{app, live_event_stream, record_history, AppState, HISTORY_LIMIT_PER_ARENA};
+use arena_dashboard::{
+    app, live_event_stream, record_history, AppState, ARENA_LIMIT, CALLER_HEADER,
+    CALLER_HEADER_VALUE, CPU_PROFILE_LIMIT, HISTORY_LIMIT_PER_ARENA,
+};
 use futures::StreamExt;
 use tokio::sync::broadcast;
 
@@ -64,23 +67,6 @@ fn record_history_samearena_appendsinarrivalorder() {
     assert_eq!(history[0].1, vec!["first", "second", "third"]);
 }
 
-#[test]
-fn record_history_pastlimit_dropsoldestandkeepsnewest() {
-    let mut history: Vec<(String, Vec<String>)> = Vec::new();
-    let overflow = 5;
-
-    for i in 0..HISTORY_LIMIT_PER_ARENA + overflow {
-        record_history(&mut history, "arena-a", format!("state-{i}"));
-    }
-
-    let bodies = &history[0].1;
-    assert_eq!(bodies.len(), HISTORY_LIMIT_PER_ARENA);
-    assert_eq!(bodies[0], format!("state-{overflow}"));
-    assert_eq!(
-        bodies[bodies.len() - 1],
-        format!("state-{}", HISTORY_LIMIT_PER_ARENA + overflow - 1)
-    );
-}
 
 async fn serve_embedded_assets() -> String {
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
@@ -154,9 +140,29 @@ async fn serve_dashboard() -> (String, AppState) {
 
 const SAMPLE_FOLDED: &str = "main;handler;compute 42\nmain;handler;idle 8\n";
 
+async fn retained_arena_ids(base_url: &str) -> Vec<String> {
+    let arenas: Vec<serde_json::Value> = reqwest::get(format!("{base_url}/history"))
+        .await
+        .expect("get history")
+        .json()
+        .await
+        .expect("json body");
+    arenas
+        .iter()
+        .filter_map(|arena| arena["id"].as_str().map(|id| id.to_string()))
+        .collect()
+}
+
+fn arena_body(arena_id: &str) -> String {
+    format!(
+        r#"{{"id":"{arena_id}","state":"arena_started","at":"2026-01-01T00:00:00.000Z"}}"#
+    )
+}
+
 async fn post_cpu_profile(base_url: &str, body: serde_json::Value) -> reqwest::StatusCode {
     reqwest::Client::new()
         .post(format!("{base_url}/profile/cpu"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .json(&body)
         .send()
         .await
@@ -183,6 +189,7 @@ async fn post_cpu_profile_malformedbody_isrejected() {
 
     let status = reqwest::Client::new()
         .post(format!("{base_url}/profile/cpu"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .body("not json at all")
         .send()
         .await
@@ -321,6 +328,7 @@ async fn clear_stored_cpu_profile_discards_it() {
 
     let cleared = reqwest::Client::new()
         .post(format!("{base_url}/clear"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .send()
         .await
         .expect("post clear")
@@ -387,6 +395,7 @@ async fn post_playbook(
 ) -> reqwest::StatusCode {
     reqwest::Client::new()
         .post(format!("{base_url}/arena/{arena}/playbook/{playbook}"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .json(&body)
         .send()
         .await
@@ -424,6 +433,7 @@ async fn post_playbook_malformedbody_isrejected() {
 
     let status = reqwest::Client::new()
         .post(format!("{base_url}/arena/arena-orders/playbook/reset-orders"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .body("not json")
         .send()
         .await
@@ -533,6 +543,7 @@ async fn clear_heldplaybooks_areforgotten() {
 
     reqwest::Client::new()
         .post(format!("{base_url}/clear"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .send()
         .await
         .expect("clear");
@@ -603,6 +614,7 @@ fn arena_snapshot_body(arena_id: &str, state: &str) -> String {
 async fn post_ingest(base_url: &str, body: String) -> reqwest::StatusCode {
     reqwest::Client::new()
         .post(format!("{base_url}/ingest"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .body(body)
         .send()
         .await
@@ -709,6 +721,7 @@ async fn post_shutdown_isaccepted_andthehandlestopswaiting() {
 
     let status = reqwest::Client::new()
         .post(format!("{base_url}/shutdown"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .send()
         .await
         .expect("post shutdown")
@@ -896,6 +909,7 @@ async fn clear_recordedplaybooks_areforgotten() {
 
     reqwest::Client::new()
         .post(format!("{base_url}/clear"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
         .send()
         .await
         .expect("clear");
@@ -979,3 +993,152 @@ async fn get_cpu_profile_rendered_carriesanapplicationonlyranking() {
     assert!(!profile["runtime_frames"].as_array().expect("array").is_empty());
 }
 
+
+#[tokio::test]
+async fn post_clear_without_the_caller_header_is_refused() {
+    let (base_url, _state) = serve_dashboard().await;
+    let client = reqwest::Client::new();
+    client
+        .post(format!("{base_url}/ingest"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .body(arena_body("arena-1"))
+        .send()
+        .await
+        .expect("post ingest");
+
+    let status = client
+        .post(format!("{base_url}/clear"))
+        .send()
+        .await
+        .expect("post clear")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::FORBIDDEN);
+    assert_eq!(retained_arena_ids(&base_url).await, vec!["arena-1"]);
+}
+
+#[tokio::test]
+async fn post_shutdown_without_the_caller_header_is_refused() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = reqwest::Client::new()
+        .post(format!("{base_url}/shutdown"))
+        .send()
+        .await
+        .expect("post shutdown")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::FORBIDDEN);
+    assert!(retained_arena_ids(&base_url).await.is_empty());
+}
+
+#[tokio::test]
+async fn post_clear_from_another_origin_is_refused() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = reqwest::Client::new()
+        .post(format!("{base_url}/clear"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .header(reqwest::header::ORIGIN, "http://evil.example")
+        .send()
+        .await
+        .expect("post clear")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn get_history_for_another_host_is_refused() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = reqwest::Client::new()
+        .get(format!("{base_url}/history"))
+        .header(reqwest::header::HOST, "rebound.example")
+        .send()
+        .await
+        .expect("get history")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn post_ingest_beyond_the_arena_limit_is_refused_naming_the_limit() {
+    let (base_url, _state) = serve_dashboard().await;
+    let client = reqwest::Client::new();
+    for index in 0..ARENA_LIMIT {
+        let status = client
+            .post(format!("{base_url}/ingest"))
+            .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+            .body(arena_body(&format!("arena-{index}")))
+            .send()
+            .await
+            .expect("post ingest")
+            .status();
+        assert_eq!(status, reqwest::StatusCode::ACCEPTED);
+    }
+
+    let status = client
+        .post(format!("{base_url}/ingest"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .body(arena_body("one-too-many"))
+        .send()
+        .await
+        .expect("post ingest")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::INSUFFICIENT_STORAGE);
+    assert_eq!(retained_arena_ids(&base_url).await.len(), ARENA_LIMIT);
+}
+
+#[tokio::test]
+async fn post_cpu_profile_beyond_the_profile_limit_is_refused() {
+    let (base_url, _state) = serve_dashboard().await;
+    for index in 0..CPU_PROFILE_LIMIT {
+        let status = post_cpu_profile(
+            &base_url,
+            serde_json::json!({"component": format!("svc-{index}"), "state": "started"}),
+        )
+        .await;
+        assert_eq!(status, reqwest::StatusCode::ACCEPTED);
+    }
+
+    let status = post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "one-too-many", "state": "started"}),
+    )
+    .await;
+
+    assert_eq!(status, reqwest::StatusCode::INSUFFICIENT_STORAGE);
+}
+
+#[test]
+fn record_history_at_the_per_arena_limit_refuses_instead_of_dropping_the_oldest() {
+    let mut history = Vec::new();
+    for index in 0..HISTORY_LIMIT_PER_ARENA {
+        assert!(record_history(&mut history, "arena-1", format!("state-{index}")));
+    }
+
+    assert!(!record_history(&mut history, "arena-1", "one-too-many".to_string()));
+    assert_eq!(history[0].1.len(), HISTORY_LIMIT_PER_ARENA);
+    assert_eq!(history[0].1[0], "state-0");
+}
+
+#[tokio::test]
+async fn get_index_carries_a_content_security_policy_confining_the_page_to_this_server() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let response = reqwest::get(format!("{base_url}/")).await.expect("get index");
+
+    let policy = response
+        .headers()
+        .get(reqwest::header::CONTENT_SECURITY_POLICY)
+        .expect("a content security policy")
+        .to_str()
+        .expect("ascii")
+        .to_string();
+    assert!(policy.contains("default-src 'self'"), "got: {policy}");
+    assert!(policy.contains("frame-ancestors 'none'"), "got: {policy}");
+    assert!(policy.contains("object-src 'none'"), "got: {policy}");
+}

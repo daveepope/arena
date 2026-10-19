@@ -4,13 +4,30 @@ use crate::builder::ExecutableComponentBuilder;
 use arena::component::RunnableComponent;
 use arena::component::Component;
 use arena::healthcheck::ReadinessCheck;
-use arena_profile::{PreparedLaunch, ProfileSession, ShutdownSignal};
+use arena_profile::{EnvMerge, PreparedLaunch, ProfileEnvVar, ProfileSession, ShutdownSignal};
 use arena::lifecycle::{Fault, RunnableState};
 use async_trait::async_trait;
+use std::ffi::OsString;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::thread;
+
+pub fn merged_profile_env_value(
+    entry: &ProfileEnvVar,
+    caller_value: Option<&str>,
+) -> Result<OsString, String> {
+    let Some(caller_value) = caller_value.filter(|value| !value.is_empty()) else {
+        return Ok(OsString::from(&entry.value));
+    };
+    match entry.merge {
+        EnvMerge::Space => Ok(OsString::from(format!("{caller_value} {}", entry.value))),
+        EnvMerge::PathList => std::env::join_paths(
+            std::env::split_paths(caller_value).chain(std::iter::once(PathBuf::from(&entry.value))),
+        )
+        .map_err(|e| format!("{} could not be extended with the profiler path: {e}", entry.key)),
+    }
+}
 
 enum ActiveCpuProfile {
     Wrapped(Box<dyn ProfileSession>),
@@ -283,11 +300,13 @@ impl ExecutableComponent {
             cmd.env(key, value);
         }
 
-        for (key, value) in &profile_env {
-            match self.env_vars.iter().rfind(|(existing, _)| existing == key) {
-                Some((_, caller_value)) => cmd.env(key, format!("{caller_value} {value}")),
-                None => cmd.env(key, value),
-            };
+        for entry in &profile_env {
+            let caller_value = self
+                .env_vars
+                .iter()
+                .rfind(|(existing, _)| *existing == entry.key)
+                .map(|(_, value)| value.as_str());
+            cmd.env(&entry.key, merged_profile_env_value(entry, caller_value)?);
         }
 
         for arg in &spawn_args {

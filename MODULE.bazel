@@ -642,6 +642,10 @@ _ASYNC_PROFILER_BUILD_FILE_CONTENT = """
 exports_files(["bin/asprof", "lib/libasyncProfiler.so"])
 """
 
+_ASYNC_PROFILER_MACOS_BUILD_FILE_CONTENT = """
+exports_files(["bin/asprof", "lib/libasyncProfiler.dylib"])
+"""
+
 http_archive(
     name = "async_profiler_linux_x64",
     url = "https://github.com/async-profiler/async-profiler/releases/download/v{v}/async-profiler-{v}-linux-x64.tar.gz".format(v = _ASYNC_PROFILER_VERSION),
@@ -656,6 +660,14 @@ http_archive(
     sha256 = "64c41d1465d60097439c50d7e924b4946f1f62b1cbd21ce5b034fad09c0d6979",
     strip_prefix = "async-profiler-{}-linux-arm64".format(_ASYNC_PROFILER_VERSION),
     build_file_content = _ASYNC_PROFILER_BUILD_FILE_CONTENT,
+)
+
+http_archive(
+    name = "async_profiler_macos",
+    url = "https://github.com/async-profiler/async-profiler/releases/download/v{v}/async-profiler-{v}-macos.zip".format(v = _ASYNC_PROFILER_VERSION),
+    sha256 = "46d04ef81f532a065a0b3877e488aa706afa14aa2ea14433b323db9e6fda76dc",
+    strip_prefix = "async-profiler-{}-macos".format(_ASYNC_PROFILER_VERSION),
+    build_file_content = _ASYNC_PROFILER_MACOS_BUILD_FILE_CONTENT,
 )
 
 _CHROME_FOR_TESTING_VERSION = "155.0.8059.84"
@@ -674,4 +686,36 @@ filegroup(
 
 exports_files(["chrome"], visibility = ["//visibility:public"])
 """,
+)
+
+_CHROME_FOR_TESTING_MACOS_BUILD_FILE_CONTENT = """
+filegroup(
+    name = "chrome_files",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "chrome_launcher",
+    outs = ["chrome"],
+    cmd = "printf '#!/bin/sh\\nexec \\\"$$(dirname \\\"$$0\\\")/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing\\\" \\\"$$@\\\"\\n' > $@ && chmod +x $@",
+    executable = True,
+    visibility = ["//visibility:public"],
+)
+"""
+
+http_archive(
+    name = "chrome_for_testing_macos_x86_64",
+    url = "https://storage.googleapis.com/chrome-for-testing-public/{v}/mac-x64/chrome-mac-x64.zip".format(v = _CHROME_FOR_TESTING_VERSION),
+    sha256 = "d805a173118daa5f6f5cf464500789e1e00022a9a6aed8abfec821ab828fa862",
+    strip_prefix = "chrome-mac-x64",
+    build_file_content = _CHROME_FOR_TESTING_MACOS_BUILD_FILE_CONTENT,
+)
+
+http_archive(
+    name = "chrome_for_testing_macos_aarch64",
+    url = "https://storage.googleapis.com/chrome-for-testing-public/{v}/mac-arm64/chrome-mac-arm64.zip".format(v = _CHROME_FOR_TESTING_VERSION),
+    sha256 = "13b9e98ce56f5ce18e100a009f455c9285f399e7c9dc8a76fdf2f3a9755bb5f2",
+    strip_prefix = "chrome-mac-arm64",
+    build_file_content = _CHROME_FOR_TESTING_MACOS_BUILD_FILE_CONTENT,
 )

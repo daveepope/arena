@@ -20,7 +20,10 @@ test.afterAll(() => {
 async function postProfileState(page: Page, state: string, folded?: string): Promise<void> {
   const data: Record<string, string> = { component: PROFILED_COMPONENT, state };
   if (folded !== undefined) data.folded = folded;
-  const response = await page.request.post(`${stack!.url}/profile/cpu`, { data });
+  const response = await page.request.post(`${stack!.url}/profile/cpu`, {
+    data,
+    headers: { "x-arena-dashboard": "arena" },
+  });
   expect(response.status()).toBe(202);
 }
 
@@ -173,4 +176,22 @@ test("resetZoomRestoresTheWholeFlamegraph", async ({ page }) => {
   await flamegraphControl(page, "unzoom").click();
 
   await expect(flamegraphControl(page, "unzoom")).toBeHidden();
+});
+
+test("detailDialogForAProfiledComponentOffersTheSameReport", async ({ page }) => {
+  await postProfileState(page, "stopped", SAMPLE_FOLDED);
+  await expect(profilerLabel(page)).toHaveText("cpu profile report");
+
+  await page
+    .getByTestId(`arena-panel-${ORDERS_ARENA}`)
+    .locator(".react-flow__node", { hasText: PROFILED_COMPONENT })
+    .first()
+    .click();
+
+  const detail = page.getByTestId("detail-panel");
+  await expect(detail).toBeVisible();
+  await detail.getByTestId(`profiler-label-${PROFILED_COMPONENT}`).click();
+
+  await expect(page.getByTestId("cpu-profile-panel")).toBeVisible();
+  await expect(page.getByTestId("cpu-hotspot-compute")).toBeVisible();
 });
