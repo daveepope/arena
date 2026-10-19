@@ -52,10 +52,20 @@ fn payload_source_never_names_a_path_so_a_crafted_temp_dir_cannot_inject() {
 }
 
 #[test]
+fn payload_source_names_frames_without_requiring_a_recent_interpreter() {
+    let source = payload_source(DEFAULT_CPU_PROFILE_LIMIT_BYTES);
+
+    assert!(
+        source.contains("code.co_qualname if _QUALIFIED_NAMES else code.co_name"),
+        "an interpreter without co_qualname must still be profiled"
+    );
+}
+
+#[test]
 fn payload_source_refuses_an_interpreter_older_than_it_supports() {
     let source = payload_source(DEFAULT_CPU_PROFILE_LIMIT_BYTES);
 
-    assert!(source.contains("_REQUIRED_VERSION = (3, 11)"));
+    assert!(source.contains("_REQUIRED_VERSION = (3, 7)"));
     assert!(source.contains("if sys.version_info < _REQUIRED_VERSION:"));
 }
 

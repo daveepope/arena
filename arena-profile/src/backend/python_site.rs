@@ -102,8 +102,8 @@ impl ArgAugmentingSampler for PythonSiteSampler {
         if !folded_path.exists() {
             return Err(CpuProfileError::Finish(format!(
                 "the python sampler wrote no profile at {}, which happens when the component was \
-                 terminated before the sampler flushed, when another sitecustomize module took \
-                 precedence on PYTHONPATH, or when the interpreter is older than 3.11",
+                 terminated before the sampler flushed or when another sitecustomize module took \
+                 precedence on PYTHONPATH",
                 folded_path.display()
             )));
         }

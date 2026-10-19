@@ -12,13 +12,15 @@ _FIRST_FLUSH_SECONDS = __ARENA_FIRST_FLUSH_SECONDS__
 _FLUSH_CEILING_SECONDS = __ARENA_FLUSH_CEILING_SECONDS__
 _MAX_DISTINCT_STACKS = __ARENA_MAX_DISTINCT_STACKS__
 _MAX_BYTES = __ARENA_MAX_BYTES__
-_REQUIRED_VERSION = (3, 11)
+_REQUIRED_VERSION = (3, 7)
 _PRIVATE_MODE = 0o700
 
 _SELF = os.path.abspath(__file__)
 _DIRECTORY = os.path.dirname(_SELF)
 _OUTPUT = os.path.join(_DIRECTORY, "profile-%d.folded" % os.getpid())
 _STATUS = os.path.join(_DIRECTORY, "status-%d.txt" % os.getpid())
+
+_QUALIFIED_NAMES = hasattr((lambda: None).__code__, "co_qualname")
 
 _counts = collections.Counter()
 _flushes = 0
@@ -75,7 +77,8 @@ def _collapse(frame):
     while frame is not None:
         code = frame.f_code
         if code.co_filename != _SELF:
-            stack.append("%s (%s:%d)" % (code.co_qualname, code.co_filename, frame.f_lineno))
+            name = code.co_qualname if _QUALIFIED_NAMES else code.co_name
+            stack.append("%s (%s:%d)" % (name, code.co_filename, frame.f_lineno))
         frame = frame.f_back
     stack.reverse()
     return ";".join(stack)

@@ -334,3 +334,59 @@ fn prepare_cpu_profile_python_site_sampler_idle_component_reports_no_profile() {
     let _ = std::fs::remove_file(&subject);
     let _ = std::fs::remove_file(&marker);
 }
+
+#[test]
+fn python_site_payload_without_co_qualname_still_records_the_hot_function() {
+    let scratch = arena_profile::backend::ScratchDir::create("arena-profile-pysite-fallback")
+        .expect("create the private sampler directory");
+    let payload = arena_profile::backend::python_site::payload_source(DEFAULT_CPU_PROFILE_LIMIT_BYTES)
+        .replace(
+            "_QUALIFIED_NAMES = hasattr((lambda: None).__code__, \"co_qualname\")",
+            "_QUALIFIED_NAMES = False",
+        );
+    assert!(payload.contains("_QUALIFIED_NAMES = False"), "the fallback must be forced");
+    let (_path, mut file) = scratch.create_file("sitecustomize.py").expect("write the sampler");
+    std::io::Write::write_all(&mut file, payload.as_bytes()).expect("write the sampler source");
+
+    let subject = scratch.file_path("subject.py");
+    let source = [
+        "import glob, os, pathlib, time",
+        "class Burner:",
+        "    def hot(self):",
+        "        total = 0.0",
+        "        for index in range(4000000):",
+        "            total += (index % 7) * 1.5",
+        "        return total",
+        "Burner().hot()",
+        "sampler = os.environ['PYTHONPATH']",
+        "while not glob.glob(os.path.join(sampler, 'profile-*.folded')):",
+        "    time.sleep(0.01)",
+        "",
+    ]
+    .join("\n");
+    std::fs::write(&subject, source).expect("write the subject");
+
+    let status = Command::new(INTERPRETER)
+        .env("PYTHONPATH", scratch.path())
+        .arg(&subject)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .expect("run the subject under the fallback sampler");
+    assert!(status.success(), "the subject must exit cleanly, got {status}");
+
+    let written = std::fs::read_dir(scratch.path())
+        .expect("read the sampler directory")
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .find(|path| {
+            path.extension().and_then(|extension| extension.to_str()) == Some("folded")
+        })
+        .expect("the fallback sampler wrote no profile");
+    let folded = std::fs::read_to_string(&written).expect("read the folded stacks");
+
+    assert!(folded.contains("hot ("), "the hot method was not sampled, got: {folded}");
+    assert!(
+        !folded.contains("Burner.hot"),
+        "with co_qualname unavailable the frame must be named plainly, got: {folded}"
+    );
+}
