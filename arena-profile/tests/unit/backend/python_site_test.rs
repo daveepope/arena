@@ -1,7 +1,31 @@
+use arena_profile::augmented::{augmenting_sampler_for, AugmentState};
 use arena_profile::backend::python_site::{
     folded_name, payload_source, refusal_from_status, status_name,
 };
-use arena_profile::DEFAULT_CPU_PROFILE_LIMIT_BYTES;
+use arena_profile::backend::ScratchDir;
+use arena_profile::{CpuProfileError, CpuProfilerBackend, DEFAULT_CPU_PROFILE_LIMIT_BYTES};
+use std::time::Duration;
+
+const COLLECT_BUDGET: Duration = Duration::from_secs(5);
+
+fn sampler_directory_holding(pid: u32, folded: &str) -> ScratchDir {
+    let scratch =
+        ScratchDir::create("arena-profile-pysite-unit").expect("create the sampler directory");
+    let (_path, mut file) =
+        scratch.create_file(&folded_name(pid)).expect("create the folded profile");
+    std::io::Write::write_all(&mut file, folded.as_bytes()).expect("write the folded profile");
+    scratch
+}
+
+fn collect_from(scratch: ScratchDir, pid: u32) -> Result<Option<String>, CpuProfileError> {
+    augmenting_sampler_for(CpuProfilerBackend::PythonSiteSampler, DEFAULT_CPU_PROFILE_LIMIT_BYTES)
+        .collect(
+            AugmentState::PythonSite { scratch },
+            COLLECT_BUDGET,
+            pid,
+            DEFAULT_CPU_PROFILE_LIMIT_BYTES,
+        )
+}
 
 #[test]
 fn payload_source_leaves_no_placeholder_unfilled() {
@@ -142,4 +166,34 @@ fn payload_source_skips_the_samplers_own_flush_thread() {
         source.contains("if thread_id == own:"),
         "the sampler's own flush thread must not appear as a hotspot"
     );
+}
+
+#[test]
+fn collect_a_profile_the_sampler_left_empty_reports_no_profile() {
+    let pid = 4321;
+
+    let collected = collect_from(sampler_directory_holding(pid, ""), pid)
+        .expect("a component that sampled nothing must not fault");
+
+    assert_eq!(collected, None, "an empty profile must not be reported as one");
+}
+
+#[test]
+fn collect_a_profile_the_sampler_filled_reports_its_stacks() {
+    let pid = 4321;
+    let folded = "main;handler;compute 42\n";
+
+    let collected =
+        collect_from(sampler_directory_holding(pid, folded), pid).expect("collect the profile");
+
+    assert_eq!(collected.as_deref(), Some(folded));
+}
+
+#[test]
+fn collect_a_profile_belonging_to_another_process_faults() {
+    let pid = 4321;
+
+    let result = collect_from(sampler_directory_holding(pid, "main;handler 1\n"), pid + 1);
+
+    assert!(matches!(result, Err(CpuProfileError::Finish(_))), "got: {result:?}");
 }

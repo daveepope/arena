@@ -145,6 +145,7 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
   const select = useDashboardStore((s) => s.select);
 
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const measured = useRef(new Map<string, { width: number; height: number }>());
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
@@ -158,8 +159,14 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
     return () => canvas.removeEventListener("wheel", onWheel);
   }, []);
 
-  const applyNodeChanges = (changes: Parameters<typeof onNodesChange>[0]) =>
+  const applyNodeChanges = (changes: Parameters<typeof onNodesChange>[0]) => {
+    changes.forEach((change) => {
+      if (change.type === "dimensions" && change.dimensions !== undefined) {
+        measured.current.set(change.id, change.dimensions);
+      }
+    });
     onNodesChange(changes.filter((change) => change.type !== "remove"));
+  };
   const applyEdgeChanges = (changes: Parameters<typeof onEdgesChange>[0]) =>
     onEdgesChange(changes.filter((change) => change.type !== "remove"));
 
@@ -172,7 +179,13 @@ export function ArenaGraph({ arenaId }: { arenaId: string }) {
       const existing = new Map(current.map((n) => [n.id, n]));
       return layout.nodes.map((n) => {
         const prev = existing.get(n.id);
-        if (prev) return { ...prev, data: n as unknown as Record<string, unknown> };
+        if (prev) {
+          return {
+            ...prev,
+            measured: prev.measured ?? measured.current.get(n.id),
+            data: n as unknown as Record<string, unknown>,
+          };
+        }
         return {
           id: n.id,
           type: "arena",
