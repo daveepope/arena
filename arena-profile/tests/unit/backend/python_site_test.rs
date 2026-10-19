@@ -93,3 +93,43 @@ fn folded_and_status_names_are_scoped_to_one_process() {
     assert_eq!(folded_name(4321), "profile-4321.folded");
     assert_eq!(status_name(4321), "status-4321.txt");
 }
+
+#[test]
+fn payload_source_abandons_sampling_in_a_forked_child() {
+    let source = payload_source(DEFAULT_CPU_PROFILE_LIMIT_BYTES);
+
+    assert!(
+        source.contains("os.register_at_fork(after_in_child=_abandon_after_fork)"),
+        "a forked child inherits the parent's output path and must not write to it"
+    );
+    assert!(source.contains("def _abandon_after_fork():"));
+}
+
+#[test]
+fn payload_source_serialises_every_write_behind_one_lock() {
+    let source = payload_source(DEFAULT_CPU_PROFILE_LIMIT_BYTES);
+
+    assert!(source.contains("_writing = threading.Lock()"));
+    assert!(
+        source.contains("def _flush():\n    with _writing:"),
+        "the flush thread and the exit hook must not pick the same pending file"
+    );
+}
+
+#[test]
+fn payload_source_reports_a_handler_failure_rather_than_swallowing_it() {
+    let source = payload_source(DEFAULT_CPU_PROFILE_LIMIT_BYTES);
+
+    assert!(!source.contains("except BaseException"), "a KeyboardInterrupt must not be swallowed");
+    assert!(source.contains("_stop(\"the sampler could not record a stack: %s\" % error)"));
+}
+
+#[test]
+fn payload_source_skips_the_samplers_own_flush_thread() {
+    let source = payload_source(DEFAULT_CPU_PROFILE_LIMIT_BYTES);
+
+    assert!(
+        source.contains("if thread_id == own:"),
+        "the sampler's own flush thread must not appear as a hotspot"
+    );
+}

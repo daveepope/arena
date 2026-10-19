@@ -125,7 +125,11 @@ impl ExecutableComponent {
                     "finishing cpu profile",
                 );
                 let result = session.finish(&mut child);
+                let faulted = result.is_err();
                 let fault = self.on_cpu_profile_finished(result);
+                if faulted {
+                    let _ = child.kill();
+                }
                 let _ = child.wait();
                 fault
             }

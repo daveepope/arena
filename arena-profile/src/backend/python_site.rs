@@ -1,4 +1,4 @@
-use super::ScratchDir;
+use super::{sampled_nothing, ScratchDir};
 use crate::augmented::{ArgAugmentingSampler, AugmentState, Augmentation};
 use crate::profiler::{read_collected, CpuProfileError, LaunchRequest, ProfileEnvVar};
 use std::time::Duration;
@@ -25,7 +25,10 @@ pub fn payload_source(limit_bytes: usize) -> String {
         .replace("__ARENA_INTERVAL_SECONDS__", &format!("{SAMPLE_INTERVAL_SECONDS}"))
         .replace("__ARENA_FIRST_FLUSH_SECONDS__", &format!("{FIRST_FLUSH_SECONDS}"))
         .replace("__ARENA_FLUSH_CEILING_SECONDS__", &format!("{FLUSH_CEILING_SECONDS}"))
-        .replace("__ARENA_MAX_DISTINCT_STACKS__", &(limit_bytes / BYTES_PER_STACK_BUDGET).to_string())
+        .replace(
+            "__ARENA_MAX_DISTINCT_STACKS__",
+            &(limit_bytes / BYTES_PER_STACK_BUDGET).max(1).to_string(),
+        )
         .replace("__ARENA_MAX_BYTES__", &limit_bytes.to_string());
     debug_assert!(
         !source.contains("__ARENA_"),
@@ -103,6 +106,9 @@ impl ArgAugmentingSampler for PythonSiteSampler {
                  precedence on PYTHONPATH, or when the interpreter is older than 3.11",
                 folded_path.display()
             )));
+        }
+        if sampled_nothing(&folded_path) {
+            return Ok(None);
         }
         read_collected(&folded_path, limit_bytes).map(Some)
     }

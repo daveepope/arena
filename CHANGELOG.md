@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `arena-profile`: the python sampler refuses to arm on an interpreter older than 3.11 or in a directory that is not private to this user, flushes from its own thread rather than the signal handler so nothing it does can escape into the application, disarms before the final flush, restores a cpu timer another library had already armed, and denies the profile outright when it cannot record why it refused
+- `arena-profile`: the python sampler refuses to arm on an interpreter older than 3.11 or in a directory that is not private to this user, samples in the signal handler but flushes from its own serialised thread so nothing it does escapes into the application, skips its own flush thread, abandons sampling in a `fork()`ed child rather than writing over its parent's profile, reports no profile when it sampled nothing, disarms before the final flush, restores a cpu timer another library had already armed, and denies the profile outright when it cannot record why it refused
 - `arena-profile`: unit coverage that the generated sampler carries no unfilled placeholder, interpolates only numbers, never names a host path, and that a refusal status cannot be forged by appending to it; plus component coverage that losing `SIGPROF` mid-run faults instead of reporting a profile
 - `arena-profile`: `PythonSiteSampler`, a cpu profiler backend that samples inside the component's own interpreter through a generated `sitecustomize.py` on `PYTHONPATH`, selected for `BuildTool::Python` on macOS where py-spy needs root; it arms `SIGPROF` with `ITIMER_PROF`, collapses every thread's stack on each tick, flushes periodically so a SIGTERM loses at most one interval, caps distinct stacks and bytes against the existing cpu profile limit, and refuses rather than stealing a `SIGPROF` or timer another library already holds
 - `arena-profile`: the sampler payload is compiled into the crate and written out at run time, so it needs no vendored tool, no runfiles and no PATH lookup, and ships identically in the pip wheel, maven jar and nuget package
@@ -94,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `arena-executable-component`: a wrapping profiler whose finish fails has its recorder killed before the component is reaped, where teardown could block forever with the recorder still holding the traced process
 - `arena-profile`: a profile flushed before the component was torn down is read even when the process does not exit within the finish budget, where the previous ordering discarded it
 - CI: the .NET predeploy smoke test takes only the FFI library from the staged prebuilt directory, instead of everything in it, so the dashboard server binary now staged alongside it no longer breaks the macOS NuGet smoke jobs
 - `arena-profile`: a profile directory is removed on every exit path, including a teardown that times out before `collect` runs and a spawn that fails after the profiler was prepared, where the previous naming left files behind

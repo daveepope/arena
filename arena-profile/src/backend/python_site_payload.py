@@ -23,6 +23,8 @@ _STATUS = os.path.join(_DIRECTORY, "status-%d.txt" % os.getpid())
 _counts = collections.Counter()
 _flushes = 0
 _stopped = threading.Event()
+_writing = threading.Lock()
+_flusher_thread = None
 
 
 def _refuse(reason):
@@ -48,11 +50,11 @@ def _discard():
 
 
 def _disarm():
-    _stopped.set()
     try:
         signal.setitimer(signal.ITIMER_PROF, 0)
     except (OSError, ValueError):
         pass
+    _stopped.set()
 
 
 def _stop(reason):
@@ -96,6 +98,11 @@ def _write(body):
 
 
 def _flush():
+    with _writing:
+        _flush_held()
+
+
+def _flush_held():
     if signal.getsignal(signal.SIGPROF) is not _sample:
         _stop("another handler replaced SIGPROF while profiling")
         return
@@ -124,10 +131,18 @@ def _flush():
 
 def _sample(_signum, _frame):
     try:
-        for frame in sys._current_frames().values():
+        own = _flusher_thread
+        for thread_id, frame in sys._current_frames().items():
+            if thread_id == own:
+                continue
             _counts[_collapse(frame)] += 1
-    except BaseException:
-        _disarm()
+    except Exception as error:
+        _stop("the sampler could not record a stack: %s" % error)
+
+
+def _abandon_after_fork():
+    _counts.clear()
+    _stopped.set()
 
 
 def _flusher():
@@ -139,6 +154,8 @@ def _flusher():
 
 def _finalize():
     _disarm()
+    if not _counts:
+        return
     _flush()
 
 
@@ -159,8 +176,8 @@ def _arm():
     signal.signal(signal.SIGPROF, _sample)
     previous = signal.setitimer(signal.ITIMER_PROF, _INTERVAL_SECONDS, _INTERVAL_SECONDS)
     if previous != (0.0, 0.0):
-        signal.setitimer(signal.ITIMER_PROF, previous[0], previous[1])
         signal.signal(signal.SIGPROF, held)
+        signal.setitimer(signal.ITIMER_PROF, previous[0], previous[1])
         _refuse("the process cpu timer was already armed as %r" % (previous,))
         return False
     return True
@@ -168,5 +185,10 @@ def _arm():
 
 if threading.current_thread() is threading.main_thread():
     if _arm():
-        threading.Thread(target=_flusher, name="arena-cpu-profile-flush", daemon=True).start()
+        _flusher_started = threading.Thread(
+            target=_flusher, name="arena-cpu-profile-flush", daemon=True
+        )
+        _flusher_started.start()
+        _flusher_thread = _flusher_started.ident
+        os.register_at_fork(after_in_child=_abandon_after_fork)
         atexit.register(_finalize)

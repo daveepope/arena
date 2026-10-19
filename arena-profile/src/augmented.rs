@@ -59,8 +59,9 @@ impl ProfileSession for AugmentedProfileSession {
         let exited = crate::backend::wait_bounded(augmented_process, FINISH_TIMEOUT);
         let collected = sampler.collect(state, FINISH_TIMEOUT, profiled_pid, limit_bytes);
         let collected = match (exited, collected) {
-            (Err(e), Err(_)) => Err(CpuProfileError::Finish(format!(
-                "profiled process did not exit cleanly and no profile was flushed: {e}"
+            (Err(e), Err(collect_error)) => Err(CpuProfileError::Finish(format!(
+                "profiled process did not exit cleanly ({e}) and no profile was collected: \
+                 {collect_error}"
             ))),
             (_, collected) => collected,
         };
