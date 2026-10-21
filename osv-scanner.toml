@@ -17,3 +17,15 @@ reason = "rustls-webpki 0.101.7 name-constraint parsing bug, pulled in via tiber
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0099"
 reason = "rustls-webpki 0.101.7 CRL-parsing bug, pulled in via tiberius 0.12.3 (arena-mssql). Same tiberius chain as RUSTSEC-2026-0098; no fixed release exists upstream."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0382"
+reason = "rustls-webpki may accept certificate paths containing distrusted emSign intermediate public keys. Fixed in 0.103.16, which the workspace already uses directly; the remaining 0.101.7 copy is the tiberius 0.12.3 chain (arena-mssql) and has no fix on the 0.101 line. tiberius 0.13.0 drops the chain but forces rustls's aws-lc-rs provider and a cmake/C build on every platform, so that bump is deferred. Arena's MSSQL connections are to ephemeral, self-hosted containers on a local network path, not to public certificate authorities."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0346"
+reason = "rustls 0.21.12 `Debug` impls on client session values expose the TLS 1.2 master secret / TLS 1.3 resumption PSK. Fixed in 0.23.46, which the workspace already uses directly; the 0.21.12 copy is the tiberius 0.12.3 chain (arena-mssql) and cannot reach 0.23.x. tiberius 0.13.0 drops the chain but forces rustls's aws-lc-rs provider and a cmake/C build on every platform, so that bump is deferred. Arena implements no ClientSessionStore and never debug-formats session values."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0349"
+reason = "rustls 0.21.12 records the server-selected key exchange group before the server is authenticated, letting a network attacker downgrade later connections to a classical key exchange. Same tiberius 0.12.3 chain and same deferred-bump reasoning as RUSTSEC-2026-0346. Arena's MSSQL connections are to ephemeral, self-hosted containers on a local network path."

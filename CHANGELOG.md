@@ -5,6 +5,28 @@ All notable changes to Arena will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.2]
+
+### Security
+
+- Bumped `pyjwt` to 2.15.1, `urllib3` to 2.8.0, `anyio` to 4.14.2 and `certifi` to 2026.10.19 through `requirements.txt` floor constraints
+- Bumped `rustls` to 0.23.46, `rustls-webpki` to 0.103.16, `webpki-roots` to 1.0.10, `quinn-proto` to 0.11.19 and `aws-smithy-json` to 0.62.7
+- Pinned `zip` to 9.0.3, closing three archive-extraction advisories
+- Bumped `jackson-databind` and `jackson-core` to 2.22.3 across `MODULE.bazel`, the example Spring Boot app and the benches pom, and added `tools.jackson.core` 3.1.7
+- Bumped `lz4-java` to 1.11.4
+- Moved the example Spring Boot app to Spring Boot 4.1.1 on Tomcat 11.0.25 and pinned `netty-handler` 4.1.137.Final
+- Documented OSV-Scanner and cargo-audit exceptions for the `rustls` 0.21 and `rustls-webpki` 0.101 advisories with no reachable fix through the `tiberius` chain
+
+### Added
+
+- `bazel run //scripts:run_osv_scan` runs OSV-Scanner locally against the repo and its generated SBOMs
+
+### Fixed
+
+- Right-sized the `arena-container`, `arena-junit`, `arena-kafka`, `arena-postgres`, `arena-smtp` and `arena-temporal` component tests from `medium` to `small`
+- Dropped the Bazel disk cache on the Windows CI jobs, working around upstream Bazel issue 28408
+- Stopped over-subscribing test jobs on the macOS CI runners
+
 ## [7.0.1]
 
 ### Fixed

@@ -89,7 +89,7 @@ rust_test(
 rust_test(
     name = "component_test",
     srcs = ["tests/component_test.rs"],
-    size = "medium",
+    size = "small",
     edition = "2021",
     tags = ["component_test"],
     deps = all_crate_deps(

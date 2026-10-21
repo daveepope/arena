@@ -124,7 +124,7 @@ version = "1.1.12"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-smithy-json]]
-version = "0.62.5"
+version = "0.62.7"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-smithy-observability]]
@@ -136,19 +136,23 @@ version = "0.60.15"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-smithy-runtime]]
-version = "1.11.1"
+version = "1.11.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-smithy-runtime-api]]
-version = "1.12.0"
+version = "1.12.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-smithy-runtime-api-macros]]
 version = "1.0.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.aws-smithy-schema]]
+version = "0.1.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.aws-smithy-types]]
-version = "1.4.7"
+version = "1.9.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-smithy-xml]]
@@ -274,10 +278,6 @@ criteria = "safe-to-deploy"
 [[exemptions.criterion]]
 version = "0.8.2"
 criteria = "safe-to-run"
-
-[[exemptions.crossbeam-utils]]
-version = "0.8.21"
-criteria = "safe-to-deploy"
 
 [[exemptions.crypto-bigint]]
 version = "0.5.5"
@@ -600,7 +600,7 @@ version = "10.4.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.libc]]
-version = "0.2.185"
+version = "0.2.191"
 criteria = "safe-to-deploy"
 
 [[exemptions.libm]]
@@ -667,6 +667,10 @@ criteria = "safe-to-run"
 version = "0.14.0"
 criteria = "safe-to-run"
 
+[[exemptions.nix]]
+version = "0.31.3"
+criteria = "safe-to-deploy"
+
 [[exemptions.num]]
 version = "0.4.3"
 criteria = "safe-to-deploy"
@@ -677,10 +681,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.num-bigint-dig]]
 version = "0.8.6"
-criteria = "safe-to-deploy"
-
-[[exemptions.num-complex]]
-version = "0.4.6"
 criteria = "safe-to-deploy"
 
 [[exemptions.oauth2]]
@@ -832,7 +832,7 @@ version = "0.11.9"
 criteria = "safe-to-deploy"
 
 [[exemptions.quinn-proto]]
-version = "0.11.15"
+version = "0.11.19"
 criteria = "safe-to-deploy"
 
 [[exemptions.r-efi]]
@@ -845,6 +845,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.rand_core]]
 version = "0.10.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.rand_pcg]]
+version = "0.10.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.rcgen]]
@@ -924,7 +928,7 @@ version = "0.21.12"
 criteria = "safe-to-deploy"
 
 [[exemptions.rustls]]
-version = "0.23.43"
+version = "0.23.37"
 criteria = "safe-to-deploy"
 
 [[exemptions.rustls-native-certs]]
@@ -1175,12 +1179,12 @@ criteria = "safe-to-deploy"
 version = "0.1.31"
 criteria = "safe-to-deploy"
 
-[[exemptions.tracing-core]]
-version = "0.1.36"
-criteria = "safe-to-deploy"
-
 [[exemptions.tracing-subscriber]]
 version = "0.3.23"
+criteria = "safe-to-deploy"
+
+[[exemptions.typed-path]]
+version = "0.12.4"
 criteria = "safe-to-deploy"
 
 [[exemptions.typenum]]
@@ -1449,6 +1453,14 @@ criteria = "safe-to-deploy"
 
 [[exemptions.zerovec-derive]]
 version = "0.11.3"
+criteria = "safe-to-deploy"
+
+[[exemptions.zip]]
+version = "9.0.3"
+criteria = "safe-to-deploy"
+
+[[exemptions.zlib-rs]]
+version = "0.6.8"
 criteria = "safe-to-deploy"
 
 [[exemptions.zopfli]]

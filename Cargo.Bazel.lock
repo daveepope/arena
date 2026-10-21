@@ -1,5 +1,5 @@
 {
-  "checksum": "6a18758a04e870f4174b5290310a32d7e37e3dc5e30c218f9152ed77c7a81c9c",
+  "checksum": "2a9313c2c13197f7a7949d766f4024b4509a770265a7f49df712fd0462fc49a8",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -207,7 +207,7 @@
         "deps": {
           "common": [
             {
-              "id": "libc 0.2.185",
+              "id": "libc 0.2.191",
               "target": "libc"
             }
           ],
@@ -392,45 +392,6 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arbitrary 1.4.2": {
-      "name": "arbitrary",
-      "version": "1.4.2",
-      "package_url": "https://github.com/rust-fuzz/arbitrary/",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/arbitrary/1.4.2/download",
-          "sha256": "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "arbitrary",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "arbitrary",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "edition": "2021",
-        "version": "1.4.2"
-      },
-      "license": "MIT OR Apache-2.0",
-      "license_ids": [
-        "Apache-2.0",
-        "MIT"
-      ],
-      "license_file": "LICENSE-APACHE"
-    },
     "arc-swap 1.9.1": {
       "name": "arc-swap",
       "version": "1.9.1",
@@ -479,9 +440,9 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "arena 7.0.1": {
+    "arena 7.0.2": {
       "name": "arena",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -559,15 +520,15 @@
           ],
           "selects": {}
         },
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-container 7.0.1": {
+    "arena-container 7.0.2": {
       "name": "arena-container",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -604,7 +565,7 @@
         "deps": {
           "common": [
             {
-              "id": "arena-container 7.0.1",
+              "id": "arena-container 7.0.2",
               "target": "build_script_build"
             },
             {
@@ -644,7 +605,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -661,9 +622,9 @@
       "license_ids": [],
       "license_file": null
     },
-    "arena-containerized-component 7.0.1": {
+    "arena-containerized-component 7.0.2": {
       "name": "arena-containerized-component",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -733,15 +694,15 @@
           ],
           "selects": {}
         },
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-cryptography 7.0.1": {
+    "arena-cryptography 7.0.2": {
       "name": "arena-cryptography",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -773,15 +734,15 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-examples 7.0.1": {
+    "arena-examples 7.0.2": {
       "name": "arena-examples",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -883,15 +844,15 @@
           ],
           "selects": {}
         },
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-executable-component 7.0.1": {
+    "arena-executable-component 7.0.2": {
       "name": "arena-executable-component",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -953,15 +914,15 @@
           ],
           "selects": {}
         },
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-ffi 7.0.1": {
+    "arena-ffi 7.0.2": {
       "name": "arena-ffi",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1036,15 +997,15 @@
           ],
           "selects": {}
         },
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": null,
       "license_ids": [],
       "license_file": null
     },
-    "arena-ffi-bench 7.0.1": {
+    "arena-ffi-bench 7.0.2": {
       "name": "arena-ffi-bench",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [],
@@ -1063,15 +1024,15 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": null,
       "license_ids": [],
       "license_file": null
     },
-    "arena-host 7.0.1": {
+    "arena-host 7.0.2": {
       "name": "arena-host",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1094,15 +1055,15 @@
           "**"
         ],
         "edition": "2021",
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-http 7.0.1": {
+    "arena-http 7.0.2": {
       "name": "arena-http",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1180,15 +1141,15 @@
           ],
           "selects": {}
         },
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-kafka 7.0.1": {
+    "arena-kafka 7.0.2": {
       "name": "arena-kafka",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1262,15 +1223,15 @@
           ],
           "selects": {}
         },
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-localstack 7.0.1": {
+    "arena-localstack 7.0.2": {
       "name": "arena-localstack",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1319,7 +1280,7 @@
               "target": "aws_smithy_http_client"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -1351,7 +1312,7 @@
               "target": "tracing"
             },
             {
-              "id": "zip 2.4.2",
+              "id": "zip 9.0.3",
               "target": "zip"
             }
           ],
@@ -1376,15 +1337,15 @@
           ],
           "selects": {}
         },
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-mssql 7.0.1": {
+    "arena-mssql 7.0.2": {
       "name": "arena-mssql",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1454,15 +1415,15 @@
           ],
           "selects": {}
         },
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-oauth 7.0.1": {
+    "arena-oauth 7.0.2": {
       "name": "arena-oauth",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1519,7 +1480,7 @@
               "target": "rsa"
             },
             {
-              "id": "rustls 0.23.43",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -1564,15 +1525,15 @@
           ],
           "selects": {}
         },
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-oracledb 7.0.1": {
+    "arena-oracledb 7.0.2": {
       "name": "arena-oracledb",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1638,15 +1599,15 @@
           ],
           "selects": {}
         },
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-postgres 7.0.1": {
+    "arena-postgres 7.0.2": {
       "name": "arena-postgres",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1712,15 +1673,15 @@
           ],
           "selects": {}
         },
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-smtp 7.0.1": {
+    "arena-smtp 7.0.2": {
       "name": "arena-smtp",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1790,15 +1751,15 @@
           ],
           "selects": {}
         },
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
       "license_file": null
     },
-    "arena-temporal 7.0.1": {
+    "arena-temporal 7.0.2": {
       "name": "arena-temporal",
-      "version": "7.0.1",
+      "version": "7.0.2",
       "package_url": null,
       "repository": null,
       "targets": [
@@ -1876,7 +1837,7 @@
           ],
           "selects": {}
         },
-        "version": "7.0.1"
+        "version": "7.0.2"
       },
       "license": "todo",
       "license_ids": [],
@@ -2153,7 +2114,7 @@
             ],
             "cfg(unix)": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
@@ -2558,19 +2519,19 @@
               "target": "aws_smithy_http"
             },
             {
-              "id": "aws-smithy-json 0.62.5",
+              "id": "aws-smithy-json 0.62.7",
               "target": "aws_smithy_json"
             },
             {
-              "id": "aws-smithy-runtime 1.11.1",
+              "id": "aws-smithy-runtime 1.11.3",
               "target": "aws_smithy_runtime"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -2659,11 +2620,11 @@
               "target": "aws_smithy_async"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -2740,15 +2701,15 @@
               "target": "aws_smithy_http"
             },
             {
-              "id": "aws-smithy-runtime 1.11.1",
+              "id": "aws-smithy-runtime 1.11.3",
               "target": "aws_smithy_runtime"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -2860,7 +2821,7 @@
               "target": "aws_smithy_http"
             },
             {
-              "id": "aws-smithy-json 0.62.5",
+              "id": "aws-smithy-json 0.62.7",
               "target": "aws_smithy_json"
             },
             {
@@ -2868,15 +2829,15 @@
               "target": "aws_smithy_observability"
             },
             {
-              "id": "aws-smithy-runtime 1.11.1",
+              "id": "aws-smithy-runtime 1.11.3",
               "target": "aws_smithy_runtime"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -2979,7 +2940,7 @@
               "target": "aws_smithy_http"
             },
             {
-              "id": "aws-smithy-json 0.62.5",
+              "id": "aws-smithy-json 0.62.7",
               "target": "aws_smithy_json"
             },
             {
@@ -2987,15 +2948,15 @@
               "target": "aws_smithy_observability"
             },
             {
-              "id": "aws-smithy-runtime 1.11.1",
+              "id": "aws-smithy-runtime 1.11.3",
               "target": "aws_smithy_runtime"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -3094,7 +3055,7 @@
               "target": "aws_smithy_http"
             },
             {
-              "id": "aws-smithy-json 0.62.5",
+              "id": "aws-smithy-json 0.62.7",
               "target": "aws_smithy_json"
             },
             {
@@ -3102,15 +3063,15 @@
               "target": "aws_smithy_observability"
             },
             {
-              "id": "aws-smithy-runtime 1.11.1",
+              "id": "aws-smithy-runtime 1.11.3",
               "target": "aws_smithy_runtime"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -3202,7 +3163,7 @@
               "target": "aws_smithy_http"
             },
             {
-              "id": "aws-smithy-json 0.62.5",
+              "id": "aws-smithy-json 0.62.7",
               "target": "aws_smithy_json"
             },
             {
@@ -3214,15 +3175,15 @@
               "target": "aws_smithy_query"
             },
             {
-              "id": "aws-smithy-runtime 1.11.1",
+              "id": "aws-smithy-runtime 1.11.3",
               "target": "aws_smithy_runtime"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -3320,11 +3281,11 @@
               "target": "aws_smithy_http"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -3473,7 +3434,7 @@
         "deps": {
           "common": [
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -3539,11 +3500,11 @@
               "target": "aws_smithy_eventstream"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -3647,11 +3608,11 @@
               "target": "aws_smithy_async"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -3680,7 +3641,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "rustls 0.23.43",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -3719,14 +3680,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "aws-smithy-json 0.62.5": {
+    "aws-smithy-json 0.62.7": {
       "name": "aws-smithy-json",
-      "version": "0.62.5",
+      "version": "0.62.7",
       "package_url": "https://github.com/smithy-lang/smithy-rs",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/aws-smithy-json/0.62.5/download",
-          "sha256": "9648b0bb82a2eedd844052c6ad2a1a822d1f8e3adee5fbf668366717e428856a"
+          "url": "https://static.crates.io/crates/aws-smithy-json/0.62.7/download",
+          "sha256": "701a947f4797e52a911e114a898667c746c39feea467bbd1abd7b3721f702ffa"
         }
       },
       "targets": [
@@ -3751,14 +3712,22 @@
         "deps": {
           "common": [
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-runtime-api 1.12.3",
+              "target": "aws_smithy_runtime_api"
+            },
+            {
+              "id": "aws-smithy-schema 0.1.0",
+              "target": "aws_smithy_schema"
+            },
+            {
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             }
           ],
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.62.5"
+        "version": "0.62.7"
       },
       "license": "Apache-2.0",
       "license_ids": [
@@ -3798,7 +3767,7 @@
         "deps": {
           "common": [
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             }
           ],
@@ -3845,7 +3814,7 @@
         "deps": {
           "common": [
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -3864,14 +3833,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "aws-smithy-runtime 1.11.1": {
+    "aws-smithy-runtime 1.11.3": {
       "name": "aws-smithy-runtime",
-      "version": "1.11.1",
+      "version": "1.11.3",
       "package_url": "https://github.com/smithy-lang/smithy-rs",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/aws-smithy-runtime/1.11.1/download",
-          "sha256": "0504b1ab12debb5959e5165ee5fe97dd387e7aa7ea6a477bfd7635dfe769a4f5"
+          "url": "https://static.crates.io/crates/aws-smithy-runtime/1.11.3/download",
+          "sha256": "b8e6f5caf6fea86f8c2206541ab5857cfcda9013426cdbe8fa0098b9e2d32182"
         }
       },
       "targets": [
@@ -3915,11 +3884,15 @@
               "target": "aws_smithy_observability"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-schema 0.1.0",
+              "target": "aws_smithy_schema"
+            },
+            {
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -3974,7 +3947,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "1.11.1"
+        "version": "1.11.3"
       },
       "license": "Apache-2.0",
       "license_ids": [
@@ -3982,14 +3955,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "aws-smithy-runtime-api 1.12.0": {
+    "aws-smithy-runtime-api 1.12.3": {
       "name": "aws-smithy-runtime-api",
-      "version": "1.12.0",
+      "version": "1.12.3",
       "package_url": "https://github.com/smithy-lang/smithy-rs",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/aws-smithy-runtime-api/1.12.0/download",
-          "sha256": "b71a13df6ada0aafbf21a73bdfcdf9324cfa9df77d96b8446045be3cde61b42e"
+          "url": "https://static.crates.io/crates/aws-smithy-runtime-api/1.12.3/download",
+          "sha256": "9db177daa6ba8afb9ee1aefcf548c907abcf52065e394ee11a92780057fe0e8c"
         }
       },
       "targets": [
@@ -4028,7 +4001,7 @@
               "target": "aws_smithy_async"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -4074,7 +4047,7 @@
           ],
           "selects": {}
         },
-        "version": "1.12.0"
+        "version": "1.12.3"
       },
       "license": "Apache-2.0",
       "license_ids": [
@@ -4137,14 +4110,69 @@
       ],
       "license_file": "LICENSE"
     },
-    "aws-smithy-types 1.4.7": {
-      "name": "aws-smithy-types",
-      "version": "1.4.7",
+    "aws-smithy-schema 0.1.0": {
+      "name": "aws-smithy-schema",
+      "version": "0.1.0",
       "package_url": "https://github.com/smithy-lang/smithy-rs",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/aws-smithy-types/1.4.7/download",
-          "sha256": "9d73dbfbaa8e4bc57b9045137680b958d274823509a360abfd8e1d514d40c95c"
+          "url": "https://static.crates.io/crates/aws-smithy-schema/0.1.0/download",
+          "sha256": "7442cb268338f0eb8278140a107c046756aa01093d8ef5e99628d34ae09c94f5"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "aws_smithy_schema",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "aws_smithy_schema",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "aws-smithy-runtime-api 1.12.3",
+              "target": "aws_smithy_runtime_api"
+            },
+            {
+              "id": "aws-smithy-types 1.9.0",
+              "target": "aws_smithy_types"
+            },
+            {
+              "id": "http 1.4.0",
+              "target": "http"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.1.0"
+      },
+      "license": "Apache-2.0",
+      "license_ids": [
+        "Apache-2.0"
+      ],
+      "license_file": "LICENSE"
+    },
+    "aws-smithy-types 1.9.0": {
+      "name": "aws-smithy-types",
+      "version": "1.9.0",
+      "package_url": "https://github.com/smithy-lang/smithy-rs",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/aws-smithy-types/1.9.0/download",
+          "sha256": "55752025c39c0e094962fd73f1c57014b191f678612e517f219468e575af9822"
         }
       },
       "targets": [
@@ -4230,10 +4258,6 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "pin-utils 0.1.0",
-              "target": "pin_utils"
-            },
-            {
               "id": "ryu 1.0.23",
               "target": "ryu"
             },
@@ -4260,7 +4284,7 @@
           }
         },
         "edition": "2021",
-        "version": "1.4.7"
+        "version": "1.9.0"
       },
       "license": "Apache-2.0",
       "license_ids": [
@@ -4367,11 +4391,11 @@
               "target": "aws_smithy_async"
             },
             {
-              "id": "aws-smithy-runtime-api 1.12.0",
+              "id": "aws-smithy-runtime-api 1.12.3",
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.4.7",
+              "id": "aws-smithy-types 1.9.0",
               "target": "aws_smithy_types"
             },
             {
@@ -4814,7 +4838,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "rustls 0.23.43",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -5375,7 +5399,7 @@
               "target": "rand"
             },
             {
-              "id": "rustls 0.23.43",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -6003,25 +6027,25 @@
           "selects": {
             "aarch64-apple-darwin": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "aarch64-unknown-linux-gnu": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "x86_64-apple-darwin": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "x86_64-unknown-linux-gnu": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ]
@@ -6788,7 +6812,7 @@
               "target": "core_foundation_sys"
             },
             {
-              "id": "libc 0.2.185",
+              "id": "libc 0.2.191",
               "target": "libc"
             }
           ],
@@ -6847,7 +6871,7 @@
               "target": "core_foundation_sys"
             },
             {
-              "id": "libc 0.2.185",
+              "id": "libc 0.2.191",
               "target": "libc"
             }
           ],
@@ -6943,25 +6967,25 @@
           "selects": {
             "aarch64-linux-android": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(all(target_arch = \"aarch64\", target_os = \"linux\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(all(target_arch = \"aarch64\", target_vendor = \"apple\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(all(target_arch = \"loongarch64\", target_os = \"linux\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ]
@@ -7011,25 +7035,25 @@
           "selects": {
             "cfg(all(target_arch = \"aarch64\", target_os = \"android\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(all(target_arch = \"aarch64\", target_os = \"linux\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(all(target_arch = \"aarch64\", target_vendor = \"apple\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(all(target_arch = \"loongarch64\", target_os = \"linux\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ]
@@ -7360,77 +7384,6 @@
         "version": "0.8.2"
       },
       "license": "Apache-2.0 OR MIT",
-      "license_ids": [
-        "Apache-2.0",
-        "MIT"
-      ],
-      "license_file": "LICENSE-APACHE"
-    },
-    "crossbeam-utils 0.8.21": {
-      "name": "crossbeam-utils",
-      "version": "0.8.21",
-      "package_url": "https://github.com/crossbeam-rs/crossbeam",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/crossbeam-utils/0.8.21/download",
-          "sha256": "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "crossbeam_utils",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        },
-        {
-          "BuildScript": {
-            "crate_name": "build_script_build",
-            "crate_root": "build.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "crossbeam_utils",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "crossbeam-utils 0.8.21",
-              "target": "build_script_build"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2021",
-        "version": "0.8.21"
-      },
-      "build_script_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "compile_data_glob_excludes": [
-          "**/*.rs"
-        ],
-        "data_glob": [
-          "**"
-        ]
-      },
-      "license": "MIT OR Apache-2.0",
       "license_ids": [
         "Apache-2.0",
         "MIT"
@@ -8444,62 +8397,6 @@
         "MIT"
       ],
       "license_file": "LICENSE-Apache"
-    },
-    "derive_arbitrary 1.4.2": {
-      "name": "derive_arbitrary",
-      "version": "1.4.2",
-      "package_url": "https://github.com/rust-fuzz/arbitrary",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/derive_arbitrary/1.4.2/download",
-          "sha256": "1e567bd82dcff979e4b03460c307b3cdc9e96fde3d73bed1496d2bc75d9dd62a"
-        }
-      },
-      "targets": [
-        {
-          "ProcMacro": {
-            "crate_name": "derive_arbitrary",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "derive_arbitrary",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "deps": {
-          "common": [
-            {
-              "id": "proc-macro2 1.0.106",
-              "target": "proc_macro2"
-            },
-            {
-              "id": "quote 1.0.45",
-              "target": "quote"
-            },
-            {
-              "id": "syn 2.0.117",
-              "target": "syn"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2021",
-        "version": "1.4.2"
-      },
-      "license": "MIT OR Apache-2.0",
-      "license_ids": [
-        "Apache-2.0",
-        "MIT"
-      ],
-      "license_file": "LICENSE-APACHE"
     },
     "digest 0.10.7": {
       "name": "digest",
@@ -9560,25 +9457,25 @@
           "selects": {
             "cfg(target_os = \"hermit\")": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(target_os = \"wasi\")": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(unix)": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ]
@@ -9953,7 +9850,7 @@
             ],
             "cfg(unix)": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ]
@@ -10040,9 +9937,11 @@
         "crate_features": {
           "common": [
             "any_impl",
+            "any_zlib",
             "default",
             "miniz_oxide",
-            "rust_backend"
+            "rust_backend",
+            "zlib-rs"
           ],
           "selects": {}
         },
@@ -10055,6 +9954,10 @@
             {
               "id": "miniz_oxide 0.8.9",
               "target": "miniz_oxide"
+            },
+            {
+              "id": "zlib-rs 0.6.8",
+              "target": "zlib_rs"
             }
           ],
           "selects": {}
@@ -11092,7 +10995,7 @@
             ],
             "cfg(unix)": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ]
@@ -11169,7 +11072,7 @@
           "selects": {
             "cfg(all(any(target_os = \"linux\", target_os = \"android\"), not(any(all(target_os = \"linux\", target_env = \"\"), getrandom_backend = \"custom\", getrandom_backend = \"linux_raw\", getrandom_backend = \"rdrand\", getrandom_backend = \"rndr\"))))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
@@ -11187,43 +11090,43 @@
             ],
             "cfg(any(target_os = \"dragonfly\", target_os = \"freebsd\", target_os = \"hurd\", target_os = \"illumos\", target_os = \"cygwin\", all(target_os = \"horizon\", target_arch = \"arm\")))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(any(target_os = \"haiku\", target_os = \"redox\", target_os = \"nto\", target_os = \"aix\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(any(target_os = \"ios\", target_os = \"visionos\", target_os = \"watchos\", target_os = \"tvos\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(any(target_os = \"macos\", target_os = \"openbsd\", target_os = \"vita\", target_os = \"emscripten\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(target_os = \"netbsd\")": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(target_os = \"solaris\")": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(target_os = \"vxworks\")": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ]
@@ -11316,7 +11219,7 @@
           "selects": {
             "cfg(all(any(target_os = \"linux\", target_os = \"android\"), not(any(all(target_os = \"linux\", target_env = \"\"), getrandom_backend = \"custom\", getrandom_backend = \"linux_raw\", getrandom_backend = \"rdrand\", getrandom_backend = \"rndr\"))))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
@@ -11340,43 +11243,43 @@
             ],
             "cfg(any(target_os = \"dragonfly\", target_os = \"freebsd\", target_os = \"hurd\", target_os = \"illumos\", target_os = \"cygwin\", all(target_os = \"horizon\", target_arch = \"arm\")))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(any(target_os = \"haiku\", target_os = \"redox\", target_os = \"nto\", target_os = \"aix\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(any(target_os = \"ios\", target_os = \"visionos\", target_os = \"watchos\", target_os = \"tvos\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(any(target_os = \"macos\", target_os = \"openbsd\", target_os = \"vita\", target_os = \"emscripten\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(target_os = \"netbsd\")": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(target_os = \"solaris\")": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(target_os = \"vxworks\")": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ]
@@ -12721,7 +12624,7 @@
               "target": "hyper_util"
             },
             {
-              "id": "rustls 0.23.43",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -12741,7 +12644,7 @@
               "target": "tower_service"
             },
             {
-              "id": "webpki-roots 1.0.7",
+              "id": "webpki-roots 1.0.10",
               "target": "webpki_roots"
             }
           ],
@@ -12901,7 +12804,7 @@
               "target": "ipnet"
             },
             {
-              "id": "libc 0.2.185",
+              "id": "libc 0.2.191",
               "target": "libc"
             },
             {
@@ -14371,7 +14274,7 @@
           "selects": {
             "cfg(unix)": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
@@ -14665,14 +14568,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "libc 0.2.185": {
+    "libc 0.2.191": {
       "name": "libc",
-      "version": "0.2.185",
+      "version": "0.2.191",
       "package_url": "https://github.com/rust-lang/libc",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/libc/0.2.185/download",
-          "sha256": "52ff2c0fe9bc6cb6b14a0592c2ff4fa9ceb83eea9db979b0487cd054946a2b8f"
+          "url": "https://static.crates.io/crates/libc/0.2.191/download",
+          "sha256": "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
         }
       },
       "targets": [
@@ -14711,19 +14614,26 @@
             "default",
             "std"
           ],
-          "selects": {}
+          "selects": {
+            "aarch64-apple-darwin": [
+              "extra_traits"
+            ],
+            "x86_64-apple-darwin": [
+              "extra_traits"
+            ]
+          }
         },
         "deps": {
           "common": [
             {
-              "id": "libc 0.2.185",
+              "id": "libc 0.2.191",
               "target": "build_script_build"
             }
           ],
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.2.185"
+        "version": "0.2.191"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -15186,7 +15096,7 @@
         "deps": {
           "common": [
             {
-              "id": "libc 0.2.185",
+              "id": "libc 0.2.191",
               "target": "libc"
             },
             {
@@ -15606,7 +15516,7 @@
           "selects": {
             "cfg(any(unix, target_os = \"hermit\", target_os = \"wasi\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
@@ -15820,6 +15730,103 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
+    "nix 0.31.3": {
+      "name": "nix",
+      "version": "0.31.3",
+      "package_url": "https://github.com/nix-rust/nix",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/nix/0.31.3/download",
+          "sha256": "cf20d2fde8ff38632c426f1165ed7436270b44f199fc55284c38276f9db47c3d"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "nix",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        },
+        {
+          "BuildScript": {
+            "crate_name": "build_script_build",
+            "crate_root": "build.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "nix",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "fs"
+          ],
+          "selects": {}
+        },
+        "deps": {
+          "common": [
+            {
+              "id": "bitflags 2.11.1",
+              "target": "bitflags"
+            },
+            {
+              "id": "cfg-if 1.0.4",
+              "target": "cfg_if"
+            },
+            {
+              "id": "libc 0.2.191",
+              "target": "libc"
+            },
+            {
+              "id": "nix 0.31.3",
+              "target": "build_script_build"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.31.3"
+      },
+      "build_script_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "compile_data_glob_excludes": [
+          "**/*.rs"
+        ],
+        "data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "cfg_aliases 0.2.1",
+              "target": "cfg_aliases"
+            }
+          ],
+          "selects": {}
+        }
+      },
+      "license": "MIT",
+      "license_ids": [
+        "MIT"
+      ],
+      "license_file": "LICENSE"
+    },
     "nom 7.1.3": {
       "name": "nom",
       "version": "7.1.3",
@@ -15912,7 +15919,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.60.2",
                 "target": "windows_sys",
                 "alias": "windows"
               }
@@ -17229,7 +17236,7 @@
           "selects": {
             "cfg(unix)": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
@@ -17374,7 +17381,7 @@
             ],
             "cfg(unix)": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
@@ -19315,7 +19322,7 @@
               "target": "build_script_build"
             },
             {
-              "id": "quinn-proto 0.11.15",
+              "id": "quinn-proto 0.11.19",
               "target": "quinn_proto",
               "alias": "proto"
             },
@@ -19386,14 +19393,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "quinn-proto 0.11.15": {
+    "quinn-proto 0.11.19": {
       "name": "quinn-proto",
-      "version": "0.11.15",
+      "version": "0.11.19",
       "package_url": "https://github.com/quinn-rs/quinn",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/quinn-proto/0.11.15/download",
-          "sha256": "4fcb935c5bec503c2f0e306bdd3e58bb9029dcb14fa8d9ac76e3a5256ac0763e"
+          "url": "https://static.crates.io/crates/quinn-proto/0.11.19/download",
+          "sha256": "0e750cca55fe4f0439a15d0bb529da9651e79993e8e72c61a899a36d462befbe"
         }
       },
       "targets": [
@@ -19426,8 +19433,12 @@
               "target": "lru_slab"
             },
             {
-              "id": "rand 0.9.4",
+              "id": "rand 0.10.1",
               "target": "rand"
+            },
+            {
+              "id": "rand_pcg 0.10.2",
+              "target": "rand_pcg"
             },
             {
               "id": "rustc-hash 2.1.2",
@@ -19453,7 +19464,7 @@
           "selects": {
             "cfg(all(target_family = \"wasm\", target_os = \"unknown\"))": [
               {
-                "id": "getrandom 0.3.4",
+                "id": "getrandom 0.4.2",
                 "target": "getrandom"
               },
               {
@@ -19472,7 +19483,7 @@
           }
         },
         "edition": "2021",
-        "version": "0.11.15"
+        "version": "0.11.19"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -19525,7 +19536,7 @@
         "deps": {
           "common": [
             {
-              "id": "libc 0.2.185",
+              "id": "libc 0.2.191",
               "target": "libc"
             },
             {
@@ -19799,25 +19810,25 @@
           "selects": {
             "aarch64-apple-darwin": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "aarch64-unknown-linux-gnu": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "x86_64-apple-darwin": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "x86_64-unknown-linux-gnu": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ]
@@ -20220,6 +20231,54 @@
         ],
         "edition": "2024",
         "version": "0.10.1"
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
+    "rand_pcg 0.10.2": {
+      "name": "rand_pcg",
+      "version": "0.10.2",
+      "package_url": "https://github.com/rust-random/rngs",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/rand_pcg/0.10.2/download",
+          "sha256": "caa0f4137e1c0a72f4c651489402276c8e8e1cf081f3b0ba156d2cbeef09e86a"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "rand_pcg",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "rand_pcg",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "rand_core 0.10.1",
+              "target": "rand_core"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2024",
+        "version": "0.10.2"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -20864,7 +20923,7 @@
               "target": "hyper_rustls"
             },
             {
-              "id": "rustls 0.23.43",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -20896,7 +20955,7 @@
               "target": "url"
             },
             {
-              "id": "webpki-roots 1.0.7",
+              "id": "webpki-roots 1.0.10",
               "target": "webpki_roots"
             }
           ],
@@ -21106,13 +21165,13 @@
             ],
             "cfg(all(all(target_arch = \"aarch64\", target_endian = \"little\"), target_vendor = \"apple\", any(target_os = \"ios\", target_os = \"macos\", target_os = \"tvos\", target_os = \"visionos\", target_os = \"watchos\")))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(all(any(all(target_arch = \"aarch64\", target_endian = \"little\"), all(target_arch = \"arm\", target_endian = \"little\")), any(target_os = \"android\", target_os = \"linux\")))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ]
@@ -21686,7 +21745,7 @@
                 "alias": "libc_errno"
               },
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
@@ -21709,7 +21768,7 @@
                 "alias": "libc_errno"
               },
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
@@ -21720,7 +21779,7 @@
                 "alias": "libc_errno"
               },
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ],
@@ -21731,7 +21790,7 @@
                 "alias": "libc_errno"
               },
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ]
@@ -21864,14 +21923,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "rustls 0.23.43": {
+    "rustls 0.23.46": {
       "name": "rustls",
-      "version": "0.23.43",
+      "version": "0.23.46",
       "package_url": "https://github.com/rustls/rustls",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/rustls/0.23.43/download",
-          "sha256": "0283386ce02abc0151e1761d08802dfe86c173b0b494af5cbc086574e453da06"
+          "url": "https://static.crates.io/crates/rustls/0.23.46/download",
+          "sha256": "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
         }
       },
       "targets": [
@@ -21930,7 +21989,7 @@
               "target": "ring"
             },
             {
-              "id": "rustls 0.23.43",
+              "id": "rustls 0.23.46",
               "target": "build_script_build"
             },
             {
@@ -21939,7 +21998,7 @@
               "alias": "pki_types"
             },
             {
-              "id": "rustls-webpki 0.103.13",
+              "id": "rustls-webpki 0.103.16",
               "target": "webpki"
             },
             {
@@ -21954,7 +22013,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.23.43"
+        "version": "0.23.46"
       },
       "build_script_attrs": {
         "compile_data_glob": [
@@ -22285,14 +22344,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "rustls-webpki 0.103.13": {
+    "rustls-webpki 0.103.16": {
       "name": "rustls-webpki",
-      "version": "0.103.13",
+      "version": "0.103.16",
       "package_url": "https://github.com/rustls/webpki",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/rustls-webpki/0.103.13/download",
-          "sha256": "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
+          "url": "https://static.crates.io/crates/rustls-webpki/0.103.16/download",
+          "sha256": "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281"
         }
       },
       "targets": [
@@ -22341,7 +22400,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.103.13"
+        "version": "0.103.16"
       },
       "license": "ISC",
       "license_ids": [
@@ -22902,7 +22961,7 @@
               "target": "core_foundation_sys"
             },
             {
-              "id": "libc 0.2.185",
+              "id": "libc 0.2.191",
               "target": "libc"
             },
             {
@@ -22975,7 +23034,7 @@
               "target": "core_foundation_sys"
             },
             {
-              "id": "libc 0.2.185",
+              "id": "libc 0.2.191",
               "target": "libc"
             },
             {
@@ -23040,7 +23099,7 @@
               "target": "core_foundation_sys"
             },
             {
-              "id": "libc 0.2.185",
+              "id": "libc 0.2.191",
               "target": "libc"
             }
           ],
@@ -24016,7 +24075,7 @@
               "target": "errno"
             },
             {
-              "id": "libc 0.2.185",
+              "id": "libc 0.2.191",
               "target": "libc"
             }
           ],
@@ -24443,13 +24502,13 @@
           "selects": {
             "cfg(any(unix, target_os = \"wasi\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.60.2",
                 "target": "windows_sys"
               }
             ]
@@ -25109,7 +25168,7 @@
             ],
             "cfg(unix)": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
@@ -26320,7 +26379,7 @@
           "selects": {
             "aarch64-apple-darwin": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               },
               {
@@ -26330,7 +26389,7 @@
             ],
             "aarch64-unknown-linux-gnu": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               },
               {
@@ -26340,7 +26399,7 @@
             ],
             "x86_64-apple-darwin": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               },
               {
@@ -26356,7 +26415,7 @@
             ],
             "x86_64-unknown-linux-gnu": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               },
               {
@@ -26670,7 +26729,7 @@
         "deps": {
           "common": [
             {
-              "id": "rustls 0.23.43",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -27765,6 +27824,52 @@
       ],
       "license_file": "LICENSE"
     },
+    "typed-path 0.12.4": {
+      "name": "typed-path",
+      "version": "0.12.4",
+      "package_url": "https://github.com/chipsenkbeil/typed-path",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/typed-path/0.12.4/download",
+          "sha256": "54ec2755506471f54baf5e4bb5499d8e510cc1caf271270e778a736bd2d7336c"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "typed_path",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "typed_path",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "default",
+            "std"
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.12.4"
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
     "typenum 1.20.0": {
       "name": "typenum",
       "version": "1.20.0",
@@ -28134,7 +28239,7 @@
               "target": "percent_encoding"
             },
             {
-              "id": "rustls 0.23.43",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -29615,14 +29720,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "webpki-roots 1.0.7": {
+    "webpki-roots 1.0.10": {
       "name": "webpki-roots",
-      "version": "1.0.7",
+      "version": "1.0.10",
       "package_url": "https://github.com/rustls/webpki-roots",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/webpki-roots/1.0.7/download",
-          "sha256": "52f5ee44c96cf55f1b349600768e3ece3a8f26010c05265ab73f945bb1a2eb9d"
+          "url": "https://static.crates.io/crates/webpki-roots/1.0.10/download",
+          "sha256": "1c1c8e20c8a38fc7d65abfe74eb7280e4aa667e8eec8bc84996d2874810748d9"
         }
       },
       "targets": [
@@ -29655,7 +29760,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "1.0.7"
+        "version": "1.0.10"
       },
       "license": "CDLA-Permissive-2.0",
       "license_ids": [
@@ -29706,7 +29811,7 @@
           "selects": {
             "aarch64-apple-darwin": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               },
               {
@@ -29716,13 +29821,13 @@
             ],
             "aarch64-unknown-linux-gnu": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ],
             "x86_64-apple-darwin": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               },
               {
@@ -29732,7 +29837,7 @@
             ],
             "x86_64-unknown-linux-gnu": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ]
@@ -29945,7 +30050,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ]
@@ -30377,6 +30482,19 @@
         "compile_data_glob": [
           "**"
         ],
+        "crate_features": {
+          "common": [
+            "Win32",
+            "Win32_Foundation",
+            "Win32_Storage",
+            "Win32_Storage_FileSystem",
+            "Win32_System",
+            "Win32_System_Console",
+            "Win32_System_SystemInformation",
+            "default"
+          ],
+          "selects": {}
+        },
         "deps": {
           "common": [
             {
@@ -30425,6 +30543,24 @@
         "compile_data_glob": [
           "**"
         ],
+        "crate_features": {
+          "common": [
+            "Win32",
+            "Win32_Foundation",
+            "Win32_Networking",
+            "Win32_Networking_WinSock",
+            "Win32_Security",
+            "Win32_Storage",
+            "Win32_Storage_FileSystem",
+            "Win32_System",
+            "Win32_System_Console",
+            "Win32_System_IO",
+            "Win32_System_Threading",
+            "Win32_System_WindowsProgramming",
+            "default"
+          ],
+          "selects": {}
+        },
         "deps": {
           "common": [
             {
@@ -32628,7 +32764,7 @@
             ],
             "cfg(any(target_os = \"freebsd\", target_os = \"netbsd\"))": [
               {
-                "id": "libc 0.2.185",
+                "id": "libc 0.2.191",
                 "target": "libc"
               }
             ]
@@ -33432,14 +33568,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "zip 2.4.2": {
+    "zip 9.0.3": {
       "name": "zip",
-      "version": "2.4.2",
-      "package_url": "https://github.com/zip-rs/zip2.git",
+      "version": "9.0.3",
+      "package_url": "https://github.com/zip-rs/zip2",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/zip/2.4.2/download",
-          "sha256": "fabe6324e908f85a1c52063ce7aa26b68dcb7eb6dbc83a2d148403c9bc3eba50"
+          "url": "https://static.crates.io/crates/zip/9.0.3/download",
+          "sha256": "c2d98561b612a84ae525331a7a094429ef8a5772514ed507ff6db5f54badc971"
         }
       },
       "targets": [
@@ -33447,18 +33583,6 @@
           "Library": {
             "crate_name": "zip",
             "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        },
-        {
-          "BuildScript": {
-            "crate_name": "build_script_build",
-            "crate_root": "src/build.rs",
             "srcs": {
               "allow_empty": true,
               "include": [
@@ -33478,9 +33602,8 @@
             "_deflate-any",
             "deflate",
             "deflate-flate2",
-            "deflate-zopfli",
-            "flate2",
-            "zopfli"
+            "deflate-flate2-zlib-rs",
+            "deflate-zopfli"
           ],
           "selects": {}
         },
@@ -33503,12 +33626,8 @@
               "target": "memchr"
             },
             {
-              "id": "thiserror 2.0.18",
-              "target": "thiserror"
-            },
-            {
-              "id": "zip 2.4.2",
-              "target": "build_script_build"
+              "id": "typed-path 0.12.4",
+              "target": "typed_path"
             },
             {
               "id": "zopfli 0.8.3",
@@ -33516,46 +33635,65 @@
             }
           ],
           "selects": {
-            "cfg(any(all(target_arch = \"arm\", target_pointer_width = \"32\"), target_arch = \"mips\", target_arch = \"powerpc\"))": [
+            "cfg(any(target_os = \"macos\", target_os = \"freebsd\", target_os = \"openbsd\", target_os = \"netbsd\", target_os = \"dragonfly\"))": [
               {
-                "id": "crossbeam-utils 0.8.21",
-                "target": "crossbeam_utils"
-              }
-            ],
-            "cfg(fuzzing)": [
-              {
-                "id": "arbitrary 1.4.2",
-                "target": "arbitrary"
+                "id": "nix 0.31.3",
+                "target": "nix"
               }
             ]
           }
         },
-        "edition": "2021",
-        "proc_macro_deps": {
-          "common": [
-            {
-              "id": "displaydoc 0.2.5",
-              "target": "displaydoc"
-            }
-          ],
-          "selects": {}
-        },
-        "version": "2.4.2"
-      },
-      "build_script_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "compile_data_glob_excludes": [
-          "**/*.rs"
-        ],
-        "data_glob": [
-          "**"
-        ]
+        "edition": "2024",
+        "version": "9.0.3"
       },
       "license": "MIT",
       "license_ids": [
         "MIT"
+      ],
+      "license_file": "LICENSE"
+    },
+    "zlib-rs 0.6.8": {
+      "name": "zlib-rs",
+      "version": "0.6.8",
+      "package_url": "https://github.com/trifectatechfoundation/zlib-rs",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/zlib-rs/0.6.8/download",
+          "sha256": "b268e58e7c693d7c271f93ffc4ba3b380412554231c85bf61ca7af91042a4112"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "zlib_rs",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "zlib_rs",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "rust-allocator",
+            "std"
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.6.8"
+      },
+      "license": "Zlib",
+      "license_ids": [
+        "Zlib"
       ],
       "license_file": "LICENSE"
     },
@@ -33942,24 +34080,24 @@
   },
   "binary_crates": [],
   "workspace_members": {
-    "arena 7.0.1": "arena",
-    "arena-container 7.0.1": "arena-container",
-    "arena-containerized-component 7.0.1": "arena-containerized-component",
-    "arena-cryptography 7.0.1": "arena-cryptography",
-    "arena-examples 7.0.1": "examples",
-    "arena-executable-component 7.0.1": "arena-executable-component",
-    "arena-ffi 7.0.1": "arena-ffi",
-    "arena-ffi-bench 7.0.1": "tools/arena-ffi-bench",
-    "arena-host 7.0.1": "arena-host",
-    "arena-http 7.0.1": "arena-http",
-    "arena-kafka 7.0.1": "arena-kafka",
-    "arena-localstack 7.0.1": "arena-localstack",
-    "arena-mssql 7.0.1": "arena-mssql",
-    "arena-oauth 7.0.1": "arena-oauth",
-    "arena-oracledb 7.0.1": "arena-oracledb",
-    "arena-postgres 7.0.1": "arena-postgres",
-    "arena-smtp 7.0.1": "arena-smtp",
-    "arena-temporal 7.0.1": "arena-temporal"
+    "arena 7.0.2": "arena",
+    "arena-container 7.0.2": "arena-container",
+    "arena-containerized-component 7.0.2": "arena-containerized-component",
+    "arena-cryptography 7.0.2": "arena-cryptography",
+    "arena-examples 7.0.2": "examples",
+    "arena-executable-component 7.0.2": "arena-executable-component",
+    "arena-ffi 7.0.2": "arena-ffi",
+    "arena-ffi-bench 7.0.2": "tools/arena-ffi-bench",
+    "arena-host 7.0.2": "arena-host",
+    "arena-http 7.0.2": "arena-http",
+    "arena-kafka 7.0.2": "arena-kafka",
+    "arena-localstack 7.0.2": "arena-localstack",
+    "arena-mssql 7.0.2": "arena-mssql",
+    "arena-oauth 7.0.2": "arena-oauth",
+    "arena-oracledb 7.0.2": "arena-oracledb",
+    "arena-postgres 7.0.2": "arena-postgres",
+    "arena-smtp 7.0.2": "arena-smtp",
+    "arena-temporal 7.0.2": "arena-temporal"
   },
   "conditions": {
     "aarch64-apple-darwin": [
@@ -34022,7 +34160,6 @@
       "x86_64-unknown-linux-gnu"
     ],
     "cfg(any())": [],
-    "cfg(any(all(target_arch = \"arm\", target_pointer_width = \"32\"), target_arch = \"mips\", target_arch = \"powerpc\"))": [],
     "cfg(any(target_arch = \"aarch64\", target_arch = \"x86_64\", target_arch = \"x86\"))": [
       "aarch64-apple-darwin",
       "aarch64-unknown-linux-gnu",
@@ -34045,6 +34182,10 @@
     "cfg(any(target_os = \"freebsd\", target_os = \"netbsd\"))": [],
     "cfg(any(target_os = \"haiku\", target_os = \"redox\", target_os = \"nto\", target_os = \"aix\"))": [],
     "cfg(any(target_os = \"ios\", target_os = \"visionos\", target_os = \"watchos\", target_os = \"tvos\"))": [],
+    "cfg(any(target_os = \"macos\", target_os = \"freebsd\", target_os = \"openbsd\", target_os = \"netbsd\", target_os = \"dragonfly\"))": [
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin"
+    ],
     "cfg(any(target_os = \"macos\", target_os = \"openbsd\", target_os = \"vita\", target_os = \"emscripten\"))": [
       "aarch64-apple-darwin",
       "x86_64-apple-darwin"
@@ -34070,7 +34211,6 @@
     ],
     "cfg(aws_sdk_unstable)": [],
     "cfg(curve25519_dalek_backend = \"fiat\")": [],
-    "cfg(fuzzing)": [],
     "cfg(not(all(target_family = \"wasm\", target_os = \"unknown\")))": [
       "aarch64-apple-darwin",
       "aarch64-unknown-linux-gnu",
@@ -34145,7 +34285,7 @@
     "aws-sdk-lambda 1.122.0",
     "aws-sdk-sqs 1.98.0",
     "aws-smithy-http-client 1.1.12",
-    "aws-smithy-types 1.4.7",
+    "aws-smithy-types 1.9.0",
     "axum 0.8.9",
     "axum-server 0.8.0",
     "base64 0.22.1",
@@ -34162,7 +34302,7 @@
     "reqwest 0.12.28",
     "rsa 0.9.10",
     "rskafka 0.6.0",
-    "rustls 0.23.43",
+    "rustls 0.23.46",
     "serde 1.0.228",
     "serde_json 1.0.149",
     "serde_urlencoded 0.7.1",
@@ -34176,7 +34316,7 @@
     "tonic-health 0.14.6",
     "tracing 0.1.44",
     "tracing-subscriber 0.3.23",
-    "zip 2.4.2"
+    "zip 9.0.3"
   ],
   "direct_dev_deps": [
     "criterion 0.8.2",

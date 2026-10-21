@@ -33,6 +33,39 @@ alias(
     }),
 )
 
+config_setting(
+    name = "osv_scanner_linux_x86_64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "osv_scanner_macos_x86_64",
+    constraint_values = [
+        "@platforms//os:macos",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "osv_scanner_macos_aarch64",
+    constraint_values = [
+        "@platforms//os:macos",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+alias(
+    name = "osv_scanner_bin",
+    actual = select({
+        ":osv_scanner_linux_x86_64": "@osv_scanner_linux_x86_64//file",
+        ":osv_scanner_macos_x86_64": "@osv_scanner_macos_x86_64//file",
+        ":osv_scanner_macos_aarch64": "@osv_scanner_macos_arm64//file",
+    }),
+)
+
 py_binary(
     name = "sync_agent_rules",
     srcs = ["sync_agent_rules.py"],
@@ -314,5 +347,23 @@ py_test(
     ],
     main = "check_dependency_release_age_test.py",
     python_version = "PY3",
+    visibility = ["//visibility:public"],
+)
+
+py_library(
+    name = "run_osv_scan_lib",
+    srcs = ["run_osv_scan.py"],
+    deps = ["@bazel_tools//tools/python/runfiles"],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "run_osv_scan",
+    srcs = ["run_osv_scan.py"],
+    data = [":osv_scanner_bin"],
+    main = "run_osv_scan.py",
+    deps = [":run_osv_scan_lib"],
+    imports = ["."],
     visibility = ["//visibility:public"],
 )

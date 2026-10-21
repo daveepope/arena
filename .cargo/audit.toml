@@ -20,4 +20,27 @@ ignore = [
 
     # rustls-pemfile 1.0.4 unmaintained warning, same tiberius 0.12.3 chain as above.
     "RUSTSEC-2025-0134",
+
+    # rustls 0.21.12 `Debug` impls on client session values expose the TLS 1.2
+    # master secret / TLS 1.3 resumption PSK, and a pre-authentication record of
+    # the server-selected key exchange group allows a downgrade to classical key
+    # exchange. Both are fixed in rustls 0.23.46, which the workspace already
+    # uses directly; the 0.21.12 copy is the same tiberius 0.12.3 chain as above
+    # and cannot reach 0.23.x. tiberius 0.13.0 does drop this chain, but its
+    # rustls feature forces the aws-lc-rs provider, adding a cmake/C build on
+    # every platform, so that bump is deferred. Arena implements no
+    # ClientSessionStore and never debug-formats session values, and MSSQL
+    # connections are to ephemeral local containers. Note these IDs also cover
+    # rustls 0.23.x, so re-check that the direct pin stays at or above 0.23.46.
+    "RUSTSEC-2026-0346",
+    "RUSTSEC-2026-0349",
+
+    # rustls-webpki may accept certificate paths containing distrusted emSign
+    # intermediate public keys. Fixed in 0.103.16, which the workspace already
+    # uses directly; the remaining 0.101.7 copy is the same tiberius 0.12.3
+    # chain as above and has no fix on the 0.101 line. Arena's MSSQL
+    # connections are to ephemeral local containers, not to public certificate
+    # authorities. Note this ID also covers rustls-webpki 0.103.x, so re-check
+    # that the direct pin stays at or above 0.103.16.
+    "RUSTSEC-2026-0382",
 ]

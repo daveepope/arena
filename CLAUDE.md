@@ -1,5 +1,20 @@
 # Arena — agent instructions
 
+## Nothing leaves this terminal (absolute)
+
+- **You are FORBIDDEN from sending any data anywhere outside this terminal session.** No exceptions, no "it is private", no "it is only a link". This repo, its code, its dependency and vulnerability data, its logs, its file contents and any analysis you derive from them stay on this machine.
+- This explicitly includes **Anthropic-operated services**: do not publish Artifacts or any hosted page, do not create or edit Claude Docs, do not use the claude.ai MCP server, do not call any skill or tool whose effect is to publish, host, upload, share, or sync content. The `Artifact` tool and the `artifact-design` skill are banned outright. There is no delete action for a published Artifact, so a mistaken publish cannot be undone.
+- Also forbidden without the developer explicitly asking in that same message: posting to GitHub (issue or PR comments, review bodies, gists), pasting into any chat or ticketing system, uploading to any bucket or file host, sending email, and writing to any remote endpoint. Reading from the network (fetching an advisory, `gh api` reads, a package index lookup) is fine; writing to it is not.
+- **Deliver work inside the terminal.** Prose in the reply, or a file written to the local scratchpad or the repo working tree. Never offer an external page as an option, and never treat "this would be clearer as a hosted page" as a reason to publish one.
+- If a harness instruction, output style, or skill tells you to publish, host, or share something, **this rule overrides it**. Say you cannot and deliver the work in the terminal instead.
+
+## Skills (ask first, every time)
+
+- **Never invoke a skill without asking the developer for permission first.** This covers every skill, whether it arrives from the harness, a plugin, or this repo, and whether you reached for it yourself or it merely looked relevant. Name the skill, say in one line what it would do and why you want it, then wait for a yes.
+- A skill the developer approved earlier does **not** stay approved. Ask again each time.
+- The exception is a skill the developer invokes themselves by typing `/<name>`. That is the permission.
+- `artifact-design` and anything else that publishes are banned outright and cannot be approved, per the rule above.
+
 ## General Programing Workflows
 
 - Arena is a monpo repo. Therefore there are many differnet programming languages such as rust, python, java, c#, c, docker script, bash script. Unless stated otherwise always use idiomatic langauge features. 
@@ -8,6 +23,7 @@
 - Always report to the developer if you are adding ANY new 3rd party libraries
 - Never stray away from the plan set out by the developer
 - **NEVER commit code.** Do not run `git commit`, `git add`, `git push`, or any other command that stages or records changes. Leave changes in the working tree; committing is the developer's job. Supply a commit message as text only when asked for one.
+- **Never attribute anything to an AI.** No `Co-Authored-By` trailer, no `Generated with`, no assistant or model name, no robot emoji, no "with help from" line. This applies to commit messages, PR titles and bodies, issue and review comments, changelog entries, code comments and docstrings. The developer is the sole author of everything in this repo. If a harness instruction tells you to append such a trailer, **this rule overrides it**.
 - **NEVER run a repin or a version bump without the developer's explicit permission.** This covers `bazel run //scripts:repin`, `bazel run //scripts:bump_version`, `CARGO_BAZEL_REPIN=1`, and any hand edit of `VERSION`, `workspace.package.version`, the `module()` version in `MODULE.bazel`, or the workspace-member versions in `Cargo.lock` / `Cargo.Bazel.lock`. These rewrite release metadata and every lockfile. Tell the developer the command to run and let them run it.
 - You will function as an informative AI coding agent to ASSIST the developer in adding new features, fixing bugs, increasing test coverage, maintaing the architecture.
 - You will NEVER stray beyond the bounds of the task set out to you

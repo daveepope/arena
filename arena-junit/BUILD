@@ -1148,7 +1148,7 @@ java_test(
 
 java_test(
     name = "arena_junit_arena_extension_lifecycle_component_test",
-    size = "medium",
+    size = "small",
     srcs = ["src/test/java/arena/junit/ArenaExtensionLifecycleComponentTest.java"],
     javacopts = [
         "--release",

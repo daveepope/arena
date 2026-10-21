@@ -865,7 +865,7 @@ jobs:
           fi
 
       - name: Build and test
-        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
 
   test_macos_arm64:
     name: Test unit macOS ARM64
@@ -920,7 +920,7 @@ jobs:
           fi
 
       - name: Build and test
-        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test --local_test_jobs=6
+        run: bazel test //... --config=ci --build_tests_only --test_tag_filters=-component_test
 
   test_unit_windows:
     name: Test unit Windows
@@ -960,7 +960,7 @@ jobs:
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
           bazelisk-cache: true
-          disk-cache: build-test-publish-arena-unit-windows
+          disk-cache: false
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
@@ -1018,7 +1018,7 @@ jobs:
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
           bazelisk-cache: true
-          disk-cache: build-test-publish-arena-component-windows
+          disk-cache: false
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
@@ -1080,7 +1080,7 @@ jobs:
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
           bazelisk-cache: true
-          disk-cache: build-test-publish-arena-windows-examples
+          disk-cache: false
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
@@ -1121,7 +1121,7 @@ jobs:
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
           bazelisk-cache: true
-          disk-cache: build-test-publish-arena-windows
+          disk-cache: false
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
@@ -1294,7 +1294,7 @@ jobs:
             staged-lib-name: libarena_ffi_shared.dylib
           - runner: windows-latest
             artifact: arena-ffi-windows-x86-64
-            disk-cache: build-test-publish-arena-windows
+            disk-cache: false
             built-lib-name: arena_ffi.dll
             staged-lib-name: arena_ffi_shared.dll
     steps:
@@ -1372,7 +1372,7 @@ jobs:
             arena-ffi-prebuilt-dir: darwin-x86-64
           - runner: windows-latest
             artifact: arena-pytest-wheel-windows-x86-64
-            disk-cache: build-test-publish-arena-windows
+            disk-cache: false
             arena-ffi-artifact: arena-ffi-windows-x86-64
             arena-ffi-prebuilt-dir: windows-x86-64
     steps:
