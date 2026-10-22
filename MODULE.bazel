@@ -75,6 +75,20 @@ http_file(
     urls = ["https://github.com/google/osv-scanner/releases/download/v{v}/osv-scanner_darwin_arm64".format(v = _OSV_SCANNER_VERSION)],
 )
 
+http_file(
+    name = "osv_scanner_linux_arm64",
+    executable = True,
+    sha256 = "2c71403eb443d05891c4f268c3ad771cf4f16e5443463fd7851ef8f454d3c7e4",
+    urls = ["https://github.com/google/osv-scanner/releases/download/v{v}/osv-scanner_linux_arm64".format(v = _OSV_SCANNER_VERSION)],
+)
+
+http_file(
+    name = "osv_scanner_windows_x86_64",
+    executable = True,
+    sha256 = "e0ed7644118b717b028c249ee9d3515024e55e8510747ca08906eb96765354d6",
+    urls = ["https://github.com/google/osv-scanner/releases/download/v{v}/osv-scanner_windows_amd64.exe".format(v = _OSV_SCANNER_VERSION)],
+)
+
 http_archive(
     name = "apache_maven",
     build_file_content = """exports_files(["bin/mvn"])

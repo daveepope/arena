@@ -152,7 +152,7 @@ version = "0.1.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-smithy-types]]
-version = "1.9.0"
+version = "1.8.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-smithy-xml]]
@@ -1184,7 +1184,7 @@ version = "0.3.23"
 criteria = "safe-to-deploy"
 
 [[exemptions.typed-path]]
-version = "0.12.4"
+version = "0.12.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.typenum]]

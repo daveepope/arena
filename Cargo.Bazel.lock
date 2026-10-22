@@ -1,5 +1,5 @@
 {
-  "checksum": "2a9313c2c13197f7a7949d766f4024b4509a770265a7f49df712fd0462fc49a8",
+  "checksum": "9f47fb887872655a82a2f0b2034edac7e10b97b1e2843ffbf5c284cadb876569",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -1280,7 +1280,7 @@
               "target": "aws_smithy_http_client"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -2531,7 +2531,7 @@
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -2624,7 +2624,7 @@
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -2709,7 +2709,7 @@
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -2837,7 +2837,7 @@
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -2956,7 +2956,7 @@
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3071,7 +3071,7 @@
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3183,7 +3183,7 @@
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3285,7 +3285,7 @@
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3434,7 +3434,7 @@
         "deps": {
           "common": [
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3504,7 +3504,7 @@
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3612,7 +3612,7 @@
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3720,7 +3720,7 @@
               "target": "aws_smithy_schema"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             }
           ],
@@ -3814,7 +3814,7 @@
         "deps": {
           "common": [
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -3892,7 +3892,7 @@
               "target": "aws_smithy_schema"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -4001,7 +4001,7 @@
               "target": "aws_smithy_async"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -4146,7 +4146,7 @@
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -4165,14 +4165,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "aws-smithy-types 1.9.0": {
+    "aws-smithy-types 1.8.1": {
       "name": "aws-smithy-types",
-      "version": "1.9.0",
+      "version": "1.8.1",
       "package_url": "https://github.com/smithy-lang/smithy-rs",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/aws-smithy-types/1.9.0/download",
-          "sha256": "55752025c39c0e094962fd73f1c57014b191f678612e517f219468e575af9822"
+          "url": "https://static.crates.io/crates/aws-smithy-types/1.8.1/download",
+          "sha256": "69bb407740a197147da48238ecc94498493c9e85445732360cec180296ca45f1"
         }
       },
       "targets": [
@@ -4258,6 +4258,10 @@
               "target": "pin_project_lite"
             },
             {
+              "id": "pin-utils 0.1.0",
+              "target": "pin_utils"
+            },
+            {
               "id": "ryu 1.0.23",
               "target": "ryu"
             },
@@ -4284,7 +4288,7 @@
           }
         },
         "edition": "2021",
-        "version": "1.9.0"
+        "version": "1.8.1"
       },
       "license": "Apache-2.0",
       "license_ids": [
@@ -4395,7 +4399,7 @@
               "target": "aws_smithy_runtime_api"
             },
             {
-              "id": "aws-smithy-types 1.9.0",
+              "id": "aws-smithy-types 1.8.1",
               "target": "aws_smithy_types"
             },
             {
@@ -9475,7 +9479,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.52.0",
+                "id": "windows-sys 0.61.2",
                 "target": "windows_sys"
               }
             ]
@@ -15919,7 +15923,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.60.2",
+                "id": "windows-sys 0.61.2",
                 "target": "windows_sys",
                 "alias": "windows"
               }
@@ -21779,7 +21783,7 @@
                 "alias": "libc_errno"
               },
               {
-                "id": "windows-sys 0.52.0",
+                "id": "windows-sys 0.61.2",
                 "target": "windows_sys"
               }
             ],
@@ -24508,7 +24512,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.60.2",
+                "id": "windows-sys 0.61.2",
                 "target": "windows_sys"
               }
             ]
@@ -27824,14 +27828,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "typed-path 0.12.4": {
+    "typed-path 0.12.3": {
       "name": "typed-path",
-      "version": "0.12.4",
+      "version": "0.12.3",
       "package_url": "https://github.com/chipsenkbeil/typed-path",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/typed-path/0.12.4/download",
-          "sha256": "54ec2755506471f54baf5e4bb5499d8e510cc1caf271270e778a736bd2d7336c"
+          "url": "https://static.crates.io/crates/typed-path/0.12.3/download",
+          "sha256": "8e28f89b80c87b8fb0cf04ab448d5dd0dd0ade2f8891bae878de66a75a28600e"
         }
       },
       "targets": [
@@ -27861,7 +27865,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.12.4"
+        "version": "0.12.3"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -30050,7 +30054,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.52.0",
+                "id": "windows-sys 0.61.2",
                 "target": "windows_sys"
               }
             ]
@@ -30482,19 +30486,6 @@
         "compile_data_glob": [
           "**"
         ],
-        "crate_features": {
-          "common": [
-            "Win32",
-            "Win32_Foundation",
-            "Win32_Storage",
-            "Win32_Storage_FileSystem",
-            "Win32_System",
-            "Win32_System_Console",
-            "Win32_System_SystemInformation",
-            "default"
-          ],
-          "selects": {}
-        },
         "deps": {
           "common": [
             {
@@ -30543,24 +30534,6 @@
         "compile_data_glob": [
           "**"
         ],
-        "crate_features": {
-          "common": [
-            "Win32",
-            "Win32_Foundation",
-            "Win32_Networking",
-            "Win32_Networking_WinSock",
-            "Win32_Security",
-            "Win32_Storage",
-            "Win32_Storage_FileSystem",
-            "Win32_System",
-            "Win32_System_Console",
-            "Win32_System_IO",
-            "Win32_System_Threading",
-            "Win32_System_WindowsProgramming",
-            "default"
-          ],
-          "selects": {}
-        },
         "deps": {
           "common": [
             {
@@ -33626,7 +33599,7 @@
               "target": "memchr"
             },
             {
-              "id": "typed-path 0.12.4",
+              "id": "typed-path 0.12.3",
               "target": "typed_path"
             },
             {
@@ -34285,7 +34258,7 @@
     "aws-sdk-lambda 1.122.0",
     "aws-sdk-sqs 1.98.0",
     "aws-smithy-http-client 1.1.12",
-    "aws-smithy-types 1.9.0",
+    "aws-smithy-types 1.8.1",
     "axum 0.8.9",
     "axum-server 0.8.0",
     "base64 0.22.1",
