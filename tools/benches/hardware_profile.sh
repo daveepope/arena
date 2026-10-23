@@ -26,9 +26,9 @@ print_hardware_profile() {
   mem_mts="$(dmidecode -t memory 2>/dev/null | awk -F: '/Configured Memory Speed/ { gsub(/[^0-9]/, "", $2); if ($2 != "") { print $2; exit } }')"
   [ -n "$mem_mts" ] || mem_mts=unavailable
 
-  echo "cpu_cores=$cores"
-  echo "cpu_threads=$threads"
-  echo "cpu_max_mhz=$max_mhz"
-  echo "mem_total_gib=$mem_gib"
-  echo "mem_speed_mts=$mem_mts"
+  echo "cpu_cores=${cores//$'\r'/}"
+  echo "cpu_threads=${threads//$'\r'/}"
+  echo "cpu_max_mhz=${max_mhz//$'\r'/}"
+  echo "mem_total_gib=${mem_gib//$'\r'/}"
+  echo "mem_speed_mts=${mem_mts//$'\r'/}"
 }

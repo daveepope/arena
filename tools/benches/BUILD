@@ -16,4 +16,5 @@ sh_test(
     size = "small",
     srcs = ["hardware_profile_test.sh"],
     data = ["hardware_profile.sh"],
+    deps = ["@bazel_tools//tools/bash/runfiles"],
 )
