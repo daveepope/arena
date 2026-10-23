@@ -1,5 +1,5 @@
 {
-  "checksum": "9f47fb887872655a82a2f0b2034edac7e10b97b1e2843ffbf5c284cadb876569",
+  "checksum": "4ae611742cb543f621dd5e13176d2dddd1ec77ede6b126861b40d601c9fc34db",
   "crates": {
     "adler2 2.0.1": {
       "name": "adler2",
@@ -500,7 +500,7 @@
               "target": "serde_json"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -585,7 +585,7 @@
               "target": "testcontainers_modules"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -661,7 +661,7 @@
               "target": "tar"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -807,7 +807,7 @@
               "target": "serde_json"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -894,7 +894,7 @@
               "target": "mockall"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -973,7 +973,7 @@
               "target": "serde_json"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -1112,7 +1112,7 @@
               "target": "testcontainers_modules"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -1194,7 +1194,7 @@
               "target": "testcontainers_modules"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -1304,7 +1304,7 @@
               "target": "testcontainers_modules"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -1382,7 +1382,7 @@
               "target": "tiberius"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -1496,7 +1496,7 @@
               "target": "serde_urlencoded"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -1570,7 +1570,7 @@
               "target": "testcontainers_modules"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -1653,7 +1653,7 @@
         "deps_dev": {
           "common": [
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -1718,7 +1718,7 @@
               "target": "testcontainers_modules"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -1796,7 +1796,7 @@
               "target": "testcontainers_modules"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -2091,7 +2091,7 @@
               "target": "rustc_hash"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -2555,7 +2555,7 @@
               "target": "time"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -3387,7 +3387,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             }
           ],
@@ -3653,7 +3653,7 @@
               "target": "rustls_pki_types"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -3936,7 +3936,7 @@
               "target": "pin_utils"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -4023,7 +4023,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -4270,7 +4270,7 @@
               "target": "time"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -4570,7 +4570,7 @@
               "target": "sync_wrapper"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -4850,7 +4850,7 @@
               "target": "rustls_pki_types"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -5435,7 +5435,7 @@
               "target": "time"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -9479,7 +9479,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ]
@@ -10226,7 +10226,7 @@
               "target": "build_script_build"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             }
           ],
@@ -11436,7 +11436,7 @@
               "target": "slab"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -12481,7 +12481,7 @@
               "target": "smallvec"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -12548,7 +12548,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -12636,7 +12636,7 @@
               "target": "rustls_native_certs"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -12709,7 +12709,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -12824,7 +12824,7 @@
               "target": "socket2"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -12910,7 +12910,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -15923,7 +15923,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.60.2",
                 "target": "windows_sys",
                 "alias": "windows"
               }
@@ -18378,7 +18378,7 @@
               "target": "log"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -19344,7 +19344,7 @@
               "target": "thiserror"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -20994,7 +20994,7 @@
                 "target": "pin_project_lite"
               },
               {
-                "id": "tokio 1.52.1",
+                "id": "tokio 1.53.3",
                 "target": "tokio"
               },
               {
@@ -21515,7 +21515,7 @@
               "target": "thiserror"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -21783,7 +21783,7 @@
                 "alias": "libc_errno"
               },
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ],
@@ -24512,7 +24512,7 @@
             ],
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.60.2",
                 "target": "windows_sys"
               }
             ]
@@ -25348,7 +25348,7 @@
               "target": "thiserror"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -26306,14 +26306,14 @@
       ],
       "license_file": "LICENSE-APACHE.md"
     },
-    "tokio 1.52.1": {
+    "tokio 1.53.3": {
       "name": "tokio",
-      "version": "1.52.1",
+      "version": "1.53.3",
       "package_url": "https://github.com/tokio-rs/tokio",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/tokio/1.52.1/download",
-          "sha256": "b67dee974fe86fd92cc45b7a95fdd2f99a36a6d7b0d431a231178d3d670bbcc6"
+          "url": "https://static.crates.io/crates/tokio/1.53.3/download",
+          "sha256": "ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e"
         }
       },
       "targets": [
@@ -26439,7 +26439,7 @@
           ],
           "selects": {}
         },
-        "version": "1.52.1"
+        "version": "1.53.3"
       },
       "license": "MIT",
       "license_ids": [
@@ -26593,7 +26593,7 @@
               "target": "rand"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -26678,7 +26678,7 @@
               "target": "rustls"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             }
           ],
@@ -26737,7 +26737,7 @@
               "target": "rustls"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             }
           ],
@@ -26803,7 +26803,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -26884,7 +26884,7 @@
               "target": "pin_project_lite"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             }
           ],
@@ -26998,7 +26998,7 @@
               "target": "sync_wrapper"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -27078,7 +27078,7 @@
               "target": "prost"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -27242,7 +27242,7 @@
               "target": "sync_wrapper"
             },
             {
-              "id": "tokio 1.52.1",
+              "id": "tokio 1.53.3",
               "target": "tokio"
             },
             {
@@ -30054,7 +30054,7 @@
           "selects": {
             "cfg(windows)": [
               {
-                "id": "windows-sys 0.61.2",
+                "id": "windows-sys 0.52.0",
                 "target": "windows_sys"
               }
             ]
@@ -30486,6 +30486,19 @@
         "compile_data_glob": [
           "**"
         ],
+        "crate_features": {
+          "common": [
+            "Win32",
+            "Win32_Foundation",
+            "Win32_Storage",
+            "Win32_Storage_FileSystem",
+            "Win32_System",
+            "Win32_System_Console",
+            "Win32_System_SystemInformation",
+            "default"
+          ],
+          "selects": {}
+        },
         "deps": {
           "common": [
             {
@@ -30534,6 +30547,24 @@
         "compile_data_glob": [
           "**"
         ],
+        "crate_features": {
+          "common": [
+            "Win32",
+            "Win32_Foundation",
+            "Win32_Networking",
+            "Win32_Networking_WinSock",
+            "Win32_Security",
+            "Win32_Storage",
+            "Win32_Storage_FileSystem",
+            "Win32_System",
+            "Win32_System_Console",
+            "Win32_System_IO",
+            "Win32_System_Threading",
+            "Win32_System_WindowsProgramming",
+            "default"
+          ],
+          "selects": {}
+        },
         "deps": {
           "common": [
             {
@@ -34282,7 +34313,7 @@
     "tar 0.4.46",
     "testcontainers-modules 0.15.0",
     "tiberius 0.12.3",
-    "tokio 1.52.1",
+    "tokio 1.53.3",
     "tokio-postgres 0.7.18",
     "tokio-util 0.7.18",
     "tonic 0.14.6",

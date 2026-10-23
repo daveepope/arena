@@ -19,6 +19,10 @@ id = "RUSTSEC-2026-0099"
 reason = "rustls-webpki 0.101.7 CRL-parsing bug, pulled in via tiberius 0.12.3 (arena-mssql). Same tiberius chain as RUSTSEC-2026-0098; no fixed release exists upstream."
 
 [[IgnoredVulns]]
+id = "RUSTSEC-2026-0385"
+reason = "TEMPORARY, remove in the release after 7.0.2. ctutils 0.4.2 generates non-constant-time masks on some platforms, a timing side-channel reached only through digest -> hmac -> aws-sigv4 -> the AWS SDK in arena-localstack, which signs requests to ephemeral local containers rather than to an attacker-observable network path. A fix exists in 0.4.4, but it was published on 2026-10-22 and so sits inside the 3-day ARENA_MIN_RELEASE_AGE_DAYS floor; 7.0.2 ships the other 248 alert fixes now rather than waiting. Bump ctutils and delete this entry once 0.4.4 is older than three days."
+
+[[IgnoredVulns]]
 id = "RUSTSEC-2026-0382"
 reason = "rustls-webpki may accept certificate paths containing distrusted emSign intermediate public keys. Fixed in 0.103.16, which the workspace already uses directly; the remaining 0.101.7 copy is the tiberius 0.12.3 chain (arena-mssql) and has no fix on the 0.101 line. tiberius 0.13.0 drops the chain but forces rustls's aws-lc-rs provider and a cmake/C build on every platform, so that bump is deferred. Arena's MSSQL connections are to ephemeral, self-hosted containers on a local network path, not to public certificate authorities."
 

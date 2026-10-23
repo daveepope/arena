@@ -1018,7 +1018,7 @@ jobs:
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
           bazelisk-cache: true
-          disk-cache: build-test-publish-arena-component-windows
+          disk-cache: false
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache
@@ -1080,7 +1080,7 @@ jobs:
         uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4
         with:
           bazelisk-cache: true
-          disk-cache: build-test-publish-arena-windows-examples
+          disk-cache: false
           repository-cache: true
 
       - name: Configure BuildBuddy remote cache

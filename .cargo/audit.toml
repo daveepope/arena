@@ -43,4 +43,15 @@ ignore = [
     # authorities. Note this ID also covers rustls-webpki 0.103.x, so re-check
     # that the direct pin stays at or above 0.103.16.
     "RUSTSEC-2026-0382",
+
+    # TEMPORARY, remove in the release after 7.0.2.
+    # ctutils 0.4.2 generates non-constant-time masks on some platforms, a
+    # timing side-channel reached only through digest -> hmac -> aws-sigv4 ->
+    # the AWS SDK in arena-localstack, which signs requests to ephemeral local
+    # containers rather than to an attacker-observable network path. A fix
+    # exists in 0.4.4, but it was published on 2026-10-22 and so sits inside
+    # the 3-day ARENA_MIN_RELEASE_AGE_DAYS floor; 7.0.2 ships the other 248
+    # alert fixes now rather than waiting. Bump ctutils and delete this entry
+    # once 0.4.4 is older than three days.
+    "RUSTSEC-2026-0385",
 ]

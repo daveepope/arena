@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumped `jackson-databind` and `jackson-core` to 2.22.3 across `MODULE.bazel`, the example Spring Boot app and the benches pom, and added `tools.jackson.core` 3.1.7
 - Bumped `lz4-java` to 1.11.4
 - Moved the example Spring Boot app to Spring Boot 4.1.1 on Tomcat 11.0.25 and pinned `netty-handler` 4.1.137.Final
+- Bumped `tokio` to 1.53.3, closing RUSTSEC-2026-0386
 - Documented OSV-Scanner and cargo-audit exceptions for the `rustls` 0.21 and `rustls-webpki` 0.101 advisories with no reachable fix through the `tiberius` chain
+- Deferred the `ctutils` RUSTSEC-2026-0385 fix behind a temporary exception, since 0.4.4 is newer than the 3-day release-age floor; to be removed in the next release
 
 ### Added
 
