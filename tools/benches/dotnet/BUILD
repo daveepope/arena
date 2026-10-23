@@ -6,4 +6,5 @@ sh_binary(
         "bench.csproj",
     ],
     tags = ["manual"],
+    visibility = ["//tools/benches:__pkg__"],
 )
