@@ -145,6 +145,54 @@ async fn build_components_async_exec_variant_dispatches_to_builder() {
     assert_eq!(components.len(), 1);
 }
 
+fn exec_component_config_with_cpu_profilers(profiled: &str) -> MatchConfig {
+    serde_json::from_str(&format!(
+        r#"{{
+            "components": [
+                {{"type": "exec", "identifier": "exec", "executable_path": "/bin/true", "build_tool": "python"}}
+            ],
+            "cpu_profiled_components": [{profiled}]
+        }}"#
+    ))
+    .expect("valid cpu profiled match config")
+}
+
+#[test]
+fn match_config_cpu_profiled_components_absent_deserializes_to_none() {
+    let config = exec_component_config();
+
+    assert!(config.cpu_profiled_components.is_none());
+}
+
+#[test]
+fn match_config_cpu_profiled_components_present_deserializes_every_id() {
+    let config = exec_component_config_with_cpu_profilers(r#""svc", "worker""#);
+
+    assert_eq!(
+        config.cpu_profiled_components,
+        Some(vec!["svc".to_string(), "worker".to_string()])
+    );
+}
+
+#[tokio::test]
+async fn build_match_async_cpu_profiled_component_not_in_the_arena_faults_on_start() {
+    let config = exec_component_config_with_cpu_profilers(r#""does-not-exist""#);
+
+    let mut a_match = build_match_async(&config).await.expect("match builds");
+    let ctx = arena::lifecycle::ArenaLifecyclePublisher::new("ffi-profiled", Vec::new());
+    let faults = a_match
+        .start(&ctx)
+        .await
+        .err()
+        .expect("unknown profiled component must fault");
+
+    assert!(
+        faults[0].message.contains("does-not-exist"),
+        "got: {}",
+        faults[0].message
+    );
+}
+
 #[tokio::test]
 async fn build_match_async_full_config_registers_playbook_with_overrides() {
     let config = full_match_config_with_playbook();

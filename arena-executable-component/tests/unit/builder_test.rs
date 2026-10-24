@@ -100,3 +100,69 @@ fn build_make_in_empty_source_dir_returns_fault() {
     let _ = std::fs::remove_dir_all(&source);
     assert!(fault.message.contains("build failed") || fault.message.contains("failed to run make"));
 }
+
+#[test]
+fn attach_cpu_profiler_supported_build_tool_returns_ok() {
+    for build_tool in [
+        BuildTool::Cargo,
+        BuildTool::Maven,
+        BuildTool::Gradle,
+        BuildTool::Python,
+        BuildTool::Dotnet,
+    ] {
+        let mut component = ExecutableComponent::builder("exec-cpu-profile-supported")
+            .with_build_tool(build_tool)
+            .with_executable_path("/bin/true")
+            .build()
+            .expect("build executable component");
+
+        assert!(component.attach_cpu_profiler(None).is_ok());
+    }
+}
+
+#[test]
+fn attach_cpu_profiler_unsupported_build_tool_returns_fault_naming_the_tool() {
+    for (build_tool, expected) in [
+        (BuildTool::Make, "BuildTool::Make"),
+        (BuildTool::CMake, "BuildTool::CMake"),
+        (
+            BuildTool::Custom {
+                command: "make-it-so".to_string(),
+                args: Vec::new(),
+            },
+            "BuildTool::Custom(\"make-it-so\")",
+        ),
+    ] {
+        let mut component = ExecutableComponent::builder("exec-cpu-profile-unsupported")
+            .with_build_tool(build_tool)
+            .with_executable_path("/bin/true")
+            .build()
+            .expect("build executable component");
+
+        let fault = component
+            .attach_cpu_profiler(None)
+            .err()
+            .expect("unsupported build tool must fault");
+
+        assert!(fault.id.contains("exec-cpu-profile-unsupported"));
+        assert!(fault.message.contains("cpu profiling is not supported for"));
+        assert!(fault.message.contains(expected));
+    }
+}
+
+#[test]
+fn attach_cpu_profiler_without_build_tool_returns_fault() {
+    let mut component = ExecutableComponent::builder("exec-cpu-profile-no-build-tool")
+        .with_executable_path("/bin/true")
+        .build()
+        .expect("build executable component");
+
+    let fault = component
+        .attach_cpu_profiler(None)
+        .err()
+        .expect("missing build tool must fault");
+
+    assert!(fault
+        .message
+        .contains("requires a build_tool of Cargo, Maven, Gradle, Python, or Dotnet"));
+}

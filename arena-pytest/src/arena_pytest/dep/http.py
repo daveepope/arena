@@ -149,6 +149,7 @@ class HttpDependencyBuilder:
         self._config: Dict[str, Any] = {
             "type": "http",
             "identifier": _build_identifier("arena-http", name),
+            "component_ids": [],
         }
         self._children: List[Any] = []
 
@@ -178,6 +179,10 @@ class HttpDependencyBuilder:
 
     def with_child_dependencies(self, children: List[Any]) -> "HttpDependencyBuilder":
         self._children.extend(children)
+        return self
+
+    def with_component_id(self, component_id: str) -> "HttpDependencyBuilder":
+        self._config["component_ids"].append(component_id)
         return self
 
     def build(self) -> "HttpDependency":

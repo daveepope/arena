@@ -32,6 +32,7 @@ import requests
 
 from arena_pytest import (
     ArenaLogLevel,
+    BuildTool,
     ClosedArena,
     Custom,
     EventRuleSpec,
@@ -55,7 +56,7 @@ from arena_pytest import (
 from arena_config import (
     CALIBRATION_CONTAINER_NAME,
     CALIBRATION_HOST_PORT,
-    CLOSED_ARENA_NAME,
+    RUNTIME,
     COMPONENT_NAME_EXECUTABLE,
     DEP_NAME_CALIBRATION_HTTP,
     DEP_NAME_MSSQL,
@@ -106,6 +107,8 @@ from playbooks import (
     ResetWeatherDbPlaybook,
     SeedValidationReadingPlaybook,
 )
+FASTAPI_ARENA_NAME = RUNTIME.container_name("example-fastapi-python-arena")
+
 WEB_APP_PORT = EXEC_WEB_APP_PORT
 EVENT_BUS_NAME = "example-api-events"
 EVENT_SOURCE = "readings.api"
@@ -221,12 +224,54 @@ def closed_arena() -> ClosedArena:
     mssql_startup_sql = [open(mssql_schema_path, encoding="utf-8").read()]
     oracle_startup_sql = [open(oracle_schema_path, encoding="utf-8").read()]
 
+    exe = _find_fastapi_executable()
+    if not exe:
+        pytest.fail(
+            "example-readings-fastapi-web-app not found (build //examples:example-readings-fastapi-web-app)"
+        )
+
+    mssql_cs = MSSQL_CONNECTION_STRING_LOCAL
+    oracle_cs = ORACLE_CONNECTION_STRING_LOCAL
+    pg_cs = (
+        f"host=localhost port={POSTGRES_PORT} user={POSTGRES_DB_USER} "
+        f"password={POSTGRES_DB_PASS} dbname={POSTGRES_DB_NAME}"
+    )
+    ls_ep = f"http://127.0.0.1:{LOCALSTACK_HOST_PORT}"
+
+    fastapi_component = (
+        ExecutableComponentBuilder(COMPONENT_NAME_EXECUTABLE)
+        .with_executable_path(exe)
+        .with_build_tool(BuildTool.PYTHON)
+        .with_env_var("WEB_APP_PORT", str(WEB_APP_PORT))
+        .with_env_var("POSTGRES_CONNECTION_STRING", pg_cs)
+        .with_env_var("CALIBRATION_URL", f"http://127.0.0.1:{CALIBRATION_HOST_PORT}")
+        .with_env_var("MSSQL_CONNECTION_STRING", mssql_cs)
+        .with_env_var("ORACLE_CONNECTION_STRING", oracle_cs)
+        .with_env_var("TEMPORAL_TARGET", f"127.0.0.1:{TEMPORAL_GRPC_PORT}")
+        .with_env_var("SMTP_HOST", "127.0.0.1")
+        .with_env_var("SMTP_PORT", str(SMTP_HOST_PORT))
+        .with_env_var("OAUTH_ISSUER_URL", OAUTH_ISSUER)
+        .with_env_var("OAUTH_TLS_CA_FILE", str(oauth_ca_file))
+        .with_env_var("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
+        .with_env_var("AWS_ENDPOINT_URL", ls_ep)
+        .with_env_var("AWS_DEFAULT_REGION", REGION)
+        .with_env_var("AWS_ACCESS_KEY_ID", DUMMY_CREDS["aws_access_key_id"])
+        .with_env_var("AWS_SECRET_ACCESS_KEY", DUMMY_CREDS["aws_secret_access_key"])
+        .with_env_var("EVENT_BUS_NAME", EVENT_BUS_NAME)
+        .with_env_var("EVENT_SOURCE", EVENT_SOURCE)
+        .with_readiness_check(
+            HttpReadinessCheck.create(), f"http://127.0.0.1:{WEB_APP_PORT}/health", 30_000
+        )
+        .build()
+    )
+
     oauth = (
         OauthDependencyBuilder(DEP_NAME_OAUTH)
         .with_port(OAUTH_PORT)
         .with_listen_ip("0.0.0.0")
         .with_server_tls_pem(ca_pem, server_key_pem)
         .with_metadata_base_url(OAUTH_ISSUER)
+        .with_component_id(fastapi_component.identifier)
         .build()
     )
     _OAUTH = oauth
@@ -240,6 +285,7 @@ def closed_arena() -> ClosedArena:
         .with_database_username(POSTGRES_DB_USER)
         .with_database_password(POSTGRES_DB_PASS)
         .with_startup_sql_scripts(startup_sql)
+        .with_component_id(fastapi_component.identifier)
         .build()
     )
 
@@ -251,6 +297,7 @@ def closed_arena() -> ClosedArena:
         .with_database_username(MSSQL_DB_USER)
         .with_database_password(MSSQL_DB_PASS)
         .with_startup_sql_scripts(mssql_startup_sql)
+        .with_component_id(fastapi_component.identifier)
         .build()
     )
 
@@ -264,6 +311,7 @@ def closed_arena() -> ClosedArena:
         .with_startup_sql_scripts(oracle_startup_sql)
         # Oracle container start times are inconsistent across CI runners, so a longer timeout is required.
         .with_sql_readiness_timeout(timedelta(minutes=2))
+        .with_component_id(fastapi_component.identifier)
         .build()
     )
 
@@ -271,6 +319,7 @@ def closed_arena() -> ClosedArena:
         HttpDependencyBuilder(DEP_NAME_CALIBRATION_HTTP)
         .with_container_name(CALIBRATION_CONTAINER_NAME)
         .with_port(CALIBRATION_HOST_PORT)
+        .with_component_id(fastapi_component.identifier)
         .build()
     )
 
@@ -280,6 +329,7 @@ def closed_arena() -> ClosedArena:
         .with_image("1.8.0")
         .with_port(TEMPORAL_GRPC_PORT)
         .with_ui_port(TEMPORAL_UI_PORT)
+        .with_component_id(fastapi_component.identifier)
         .build()
     )
 
@@ -289,6 +339,7 @@ def closed_arena() -> ClosedArena:
         .with_port(SMTP_HOST_PORT)
         .with_ui_port(SMTP_UI_PORT)
         .with_starttls()
+        .with_component_id(fastapi_component.identifier)
         .build()
     )
 
@@ -312,46 +363,7 @@ def closed_arena() -> ClosedArena:
                 ],
             )
         )
-        .build()
-    )
-
-    exe = _find_fastapi_executable()
-    if not exe:
-        pytest.fail(
-            "example-readings-fastapi-web-app not found (build //examples:example-readings-fastapi-web-app)"
-        )
-
-    mssql_cs = MSSQL_CONNECTION_STRING_LOCAL
-    oracle_cs = ORACLE_CONNECTION_STRING_LOCAL
-    pg_cs = (
-        f"host=localhost port={POSTGRES_PORT} user={POSTGRES_DB_USER} "
-        f"password={POSTGRES_DB_PASS} dbname={POSTGRES_DB_NAME}"
-    )
-    ls_ep = f"http://127.0.0.1:{LOCALSTACK_HOST_PORT}"
-
-    fastapi_component = (
-        ExecutableComponentBuilder(COMPONENT_NAME_EXECUTABLE)
-        .with_executable_path(exe)
-        .with_env_var("WEB_APP_PORT", str(WEB_APP_PORT))
-        .with_env_var("POSTGRES_CONNECTION_STRING", pg_cs)
-        .with_env_var("CALIBRATION_URL", f"http://127.0.0.1:{CALIBRATION_HOST_PORT}")
-        .with_env_var("MSSQL_CONNECTION_STRING", mssql_cs)
-        .with_env_var("ORACLE_CONNECTION_STRING", oracle_cs)
-        .with_env_var("TEMPORAL_TARGET", f"127.0.0.1:{TEMPORAL_GRPC_PORT}")
-        .with_env_var("SMTP_HOST", "127.0.0.1")
-        .with_env_var("SMTP_PORT", str(SMTP_HOST_PORT))
-        .with_env_var("OAUTH_ISSUER_URL", OAUTH_ISSUER)
-        .with_env_var("OAUTH_TLS_CA_FILE", str(oauth_ca_file))
-        .with_env_var("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
-        .with_env_var("AWS_ENDPOINT_URL", ls_ep)
-        .with_env_var("AWS_DEFAULT_REGION", REGION)
-        .with_env_var("AWS_ACCESS_KEY_ID", DUMMY_CREDS["aws_access_key_id"])
-        .with_env_var("AWS_SECRET_ACCESS_KEY", DUMMY_CREDS["aws_secret_access_key"])
-        .with_env_var("EVENT_BUS_NAME", EVENT_BUS_NAME)
-        .with_env_var("EVENT_SOURCE", EVENT_SOURCE)
-        .with_readiness_check(
-            HttpReadinessCheck.create(), f"http://127.0.0.1:{WEB_APP_PORT}/health", 30_000
-        )
+        .with_component_id(fastapi_component.identifier)
         .build()
     )
 
@@ -382,12 +394,19 @@ def closed_arena() -> ClosedArena:
         .build()
     )
 
-    return ClosedArena(
-        CLOSED_ARENA_NAME,
+    closed = ClosedArena(
+        FASTAPI_ARENA_NAME,
         [a_match],
         log_level=ArenaLogLevel.INFO,
         logger=_LOG
     )
+    if os.environ.get("ARENA_VISUALIZE") == "1":
+        closed = (
+            closed.with_lifecycle_dashboard()
+            .with_cpu_profiler(fastapi_component.identifier)
+            .done()
+        )
+    return closed
 
 
 @pytest.fixture(scope="session")
@@ -406,6 +425,7 @@ oauth_signer = oauth_signer_fixture(lambda: _OAUTH)
 @pytest.fixture(scope="session")
 async def api_client(oauth_signer, base_url) -> ApiClient:
     import requests
+
 
     session = requests.Session()
     token = await oauth_signer.sign(Custom(), claims_with_scope(OAUTH_ISSUER, "readings"))

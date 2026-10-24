@@ -14,11 +14,12 @@ public sealed class TemporalDependency : IArenaDependency
     public string? Image { get; }
     public string? ImageName { get; }
     public string? ContainerName { get; }
+    public IReadOnlyList<string> ComponentIds { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
     private readonly IReadOnlyList<IArenaDependency> _children;
 
-    internal TemporalDependency(string identifier, int port, int uiPort, string? image, string? imageName, string? containerName, IReadOnlyList<IArenaDependency> children)
+    internal TemporalDependency(string identifier, int port, int uiPort, string? image, string? imageName, string? containerName, IReadOnlyList<string> componentIds, IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -26,6 +27,7 @@ public sealed class TemporalDependency : IArenaDependency
         Image = string.IsNullOrEmpty(image) ? null : image;
         ImageName = string.IsNullOrEmpty(imageName) ? null : imageName;
         ContainerName = string.IsNullOrEmpty(containerName) ? null : containerName;
+        ComponentIds = componentIds;
         _children = children;
     }
 
@@ -44,6 +46,7 @@ public sealed class TemporalDependencyBuilder
     private string? _image;
     private string? _imageName;
     private string? _containerName;
+    private readonly List<string> _componentIds = new();
     private readonly List<IArenaDependency> _children = new();
 
     public TemporalDependencyBuilder(string name)
@@ -81,6 +84,12 @@ public sealed class TemporalDependencyBuilder
         return this;
     }
 
+    public TemporalDependencyBuilder WithComponentId(string componentId)
+    {
+        _componentIds.Add(componentId);
+        return this;
+    }
+
     public TemporalDependencyBuilder AddChildDependency(IArenaDependency child)
     {
         _children.Add(child);
@@ -102,7 +111,7 @@ public sealed class TemporalDependencyBuilder
     public TemporalDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-temporal", _name);
-        var built = new TemporalDependency(identifier, _port, _uiPort, _image, _imageName, _containerName, _children);
+        var built = new TemporalDependency(identifier, _port, _uiPort, _image, _imageName, _containerName, _componentIds, _children);
         built.ExpirySeconds = _expirySeconds;
         return built;
     }

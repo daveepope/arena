@@ -4,6 +4,7 @@ import arena.junit.support.ArenaIdentifiers;
 import arena.junit.support.ArenaJson;
 import arena.junit.support.ChildrenFfi;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,6 +62,11 @@ public final class SmtpDependencyBuilder {
 
   public SmtpDependencyBuilder withImplicitTls() {
     config.put("tls_mode", "implicit");
+    return this;
+  }
+
+  public SmtpDependencyBuilder withComponentId(String componentId) {
+    ((ArrayNode) config.withArray("component_ids")).add(componentId);
     return this;
   }
 

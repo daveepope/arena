@@ -143,6 +143,11 @@ public final class LocalstackDependencyBuilder {
     return n;
   }
 
+  public LocalstackDependencyBuilder withComponentId(String componentId) {
+    ((ArrayNode) config.withArray("component_ids")).add(componentId);
+    return this;
+  }
+
   public LocalstackDependencyBuilder addChildDependency(ArenaRunnableDependency child) {
     this.children.add(child);
     return this;

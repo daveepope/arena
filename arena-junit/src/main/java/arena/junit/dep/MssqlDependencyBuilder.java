@@ -79,6 +79,11 @@ public final class MssqlDependencyBuilder {
     return this;
   }
 
+  public MssqlDependencyBuilder withComponentId(String componentId) {
+    ((ArrayNode) config.withArray("component_ids")).add(componentId);
+    return this;
+  }
+
   public MssqlDependencyBuilder addChildDependency(ArenaRunnableDependency child) {
     this.children.add(child);
     return this;

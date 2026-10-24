@@ -1,0 +1,1169 @@
+use std::sync::{Arc, Mutex};
+
+use arena_dashboard::{
+    app, live_event_stream, record_history, AppState, ARENA_LIMIT, CALLER_HEADER,
+    CALLER_HEADER_VALUE, CPU_PROFILE_LIMIT, HISTORY_LIMIT_PER_ARENA,
+};
+use futures::StreamExt;
+use tokio::sync::broadcast;
+
+#[tokio::test]
+async fn live_event_stream_lagged_resyncs_to_latest_state() {
+    let (tx, rx) = broadcast::channel::<String>(4);
+    let last_state: Arc<Mutex<Vec<(String, String)>>> = Arc::new(Mutex::new(Vec::new()));
+
+    for i in 0..10 {
+        let document = format!(
+            r#"{{"id":"lag-arena","state":"state-{i}","at":"2026-01-01T00:00:00.000Z"}}"#
+        );
+        last_state.lock().unwrap().clear();
+        last_state.lock().unwrap().push(("lag-arena".to_string(), document.clone()));
+        let _ = tx.send(document);
+    }
+
+    let mut stream = Box::pin(live_event_stream(rx, Arc::clone(&last_state)));
+    let event = stream.next().await.expect("stream yields an event").expect("ok event");
+    let data = format!("{event:?}");
+
+    assert!(data.contains("state-9"), "expected resync to latest state, got: {data}");
+}
+
+#[tokio::test]
+async fn live_event_stream_not_lagged_delivers_each_message() {
+    let (tx, rx) = broadcast::channel::<String>(4);
+    let last_state: Arc<Mutex<Vec<(String, String)>>> = Arc::new(Mutex::new(Vec::new()));
+
+    let _ = tx.send("first".to_string());
+    let _ = tx.send("second".to_string());
+
+    let mut stream = Box::pin(live_event_stream(rx, last_state));
+    let first = stream.next().await.expect("stream yields an event").expect("ok event");
+    let second = stream.next().await.expect("stream yields an event").expect("ok event");
+
+    assert!(format!("{first:?}").contains("first"));
+    assert!(format!("{second:?}").contains("second"));
+}
+
+#[test]
+fn record_history_newarena_startsitsownlist() {
+    let mut history: Vec<(String, Vec<String>)> = Vec::new();
+
+    record_history(&mut history, "arena-a", "first".to_string());
+    record_history(&mut history, "arena-b", "other".to_string());
+
+    assert_eq!(history.len(), 2);
+    assert_eq!(history[0], ("arena-a".to_string(), vec!["first".to_string()]));
+    assert_eq!(history[1], ("arena-b".to_string(), vec!["other".to_string()]));
+}
+
+#[test]
+fn record_history_samearena_appendsinarrivalorder() {
+    let mut history: Vec<(String, Vec<String>)> = Vec::new();
+
+    record_history(&mut history, "arena-a", "first".to_string());
+    record_history(&mut history, "arena-a", "second".to_string());
+    record_history(&mut history, "arena-a", "third".to_string());
+
+    assert_eq!(history[0].1, vec!["first", "second", "third"]);
+}
+
+
+async fn serve_embedded_assets() -> String {
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind ephemeral port");
+    let addr = listener.local_addr().expect("local addr");
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, app(AppState::new())).await;
+    });
+    format!("http://{addr}")
+}
+
+#[tokio::test]
+async fn app_indexrequest_servesembeddeddocument() {
+    let base_url = serve_embedded_assets().await;
+
+    let response = reqwest::get(format!("{base_url}/"))
+        .await
+        .expect("request index");
+    assert!(response.status().is_success());
+    let body = response.text().await.expect("index body");
+
+    assert!(body.contains("<div id=\"root\">"), "got: {body}");
+    assert!(body.contains("bundle.js"), "got: {body}");
+    assert!(
+        !body.contains("no web assets embedded"),
+        "served the unembedded placeholder instead of the real document: {body}"
+    );
+}
+
+#[tokio::test]
+async fn app_assetrequests_serveembeddedcontentwithtype() {
+    let base_url = serve_embedded_assets().await;
+
+    for (path, expected_type) in [
+        ("/bundle.js", "text/javascript"),
+        ("/styles.css", "text/css"),
+    ] {
+        let response = reqwest::get(format!("{base_url}{path}"))
+            .await
+            .unwrap_or_else(|e| panic!("request {path}: {e}"));
+        assert!(response.status().is_success(), "{path} was not served");
+        let content_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or_default()
+            .to_string();
+        let body = response.text().await.expect("asset body");
+
+        assert!(
+            content_type.starts_with(expected_type),
+            "{path} content type was {content_type}"
+        );
+        assert!(!body.is_empty(), "{path} was served empty");
+    }
+}
+
+async fn serve_dashboard() -> (String, AppState) {
+    let state = AppState::new();
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind ephemeral port");
+    let addr = listener.local_addr().expect("local addr");
+    let served = state.clone();
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, app(served)).await;
+    });
+    (format!("http://{addr}"), state)
+}
+
+const SAMPLE_FOLDED: &str = "main;handler;compute 42\nmain;handler;idle 8\n";
+
+async fn retained_arena_ids(base_url: &str) -> Vec<String> {
+    let arenas: Vec<serde_json::Value> = reqwest::get(format!("{base_url}/history"))
+        .await
+        .expect("get history")
+        .json()
+        .await
+        .expect("json body");
+    arenas
+        .iter()
+        .filter_map(|arena| arena["id"].as_str().map(|id| id.to_string()))
+        .collect()
+}
+
+fn arena_body(arena_id: &str) -> String {
+    format!(
+        r#"{{"id":"{arena_id}","state":"arena_started","at":"2026-01-01T00:00:00.000Z"}}"#
+    )
+}
+
+async fn post_cpu_profile(base_url: &str, body: serde_json::Value) -> reqwest::StatusCode {
+    reqwest::Client::new()
+        .post(format!("{base_url}/profile/cpu"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .json(&body)
+        .send()
+        .await
+        .expect("post cpu profile")
+        .status()
+}
+
+#[tokio::test]
+async fn post_cpu_profile_statewithoutfolded_isaccepted() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc", "state": "started"}),
+    )
+    .await;
+
+    assert_eq!(status, reqwest::StatusCode::ACCEPTED);
+}
+
+#[tokio::test]
+async fn post_cpu_profile_malformedbody_isrejected() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = reqwest::Client::new()
+        .post(format!("{base_url}/profile/cpu"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .body("not json at all")
+        .send()
+        .await
+        .expect("post cpu profile")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn get_cpu_profile_unknowncomponent_returnsnotfound() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let response = reqwest::get(format!("{base_url}/profile/cpu/never-profiled"))
+        .await
+        .expect("get cpu profile");
+
+    assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn get_cpu_profile_statereportedbutnosamples_returnsnotfound() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-pending", "state": "started"}),
+    )
+    .await;
+
+    let response = reqwest::get(format!("{base_url}/profile/cpu/svc-pending"))
+        .await
+        .expect("get cpu profile");
+
+    assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn get_cpu_profile_foldedstacksposted_returnssvgandhotspots() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-done", "state": "stopped", "folded": SAMPLE_FOLDED}),
+    )
+    .await;
+
+    let body: serde_json::Value = reqwest::get(format!("{base_url}/profile/cpu/svc-done"))
+        .await
+        .expect("get cpu profile")
+        .json()
+        .await
+        .expect("json body");
+
+    assert!(body["svg"].as_str().expect("svg string").contains("<svg"));
+    let hotspots = body["hotspots"].as_array().expect("hotspots array");
+    assert_eq!(hotspots.len(), 2);
+    assert_eq!(hotspots[0]["function"], "compute");
+    assert_eq!(hotspots[0]["severity"], "critical");
+}
+
+#[tokio::test]
+async fn get_cpu_profile_unrenderablestacks_returnsunprocessable() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-empty", "state": "stopped", "folded": ""}),
+    )
+    .await;
+
+    let response = reqwest::get(format!("{base_url}/profile/cpu/svc-empty"))
+        .await
+        .expect("get cpu profile");
+
+    assert_eq!(response.status(), reqwest::StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn post_cpu_profile_samecomponenttwice_replacestheearliersamples() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-twice", "state": "stopped", "folded": "main;first 10\n"}),
+    )
+    .await;
+    let first: serde_json::Value = reqwest::get(format!("{base_url}/profile/cpu/svc-twice"))
+        .await
+        .expect("get first")
+        .json()
+        .await
+        .expect("json");
+    assert_eq!(first["hotspots"][0]["function"], "first");
+
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-twice", "state": "stopped", "folded": "main;second 10\n"}),
+    )
+    .await;
+
+    let second: serde_json::Value = reqwest::get(format!("{base_url}/profile/cpu/svc-twice"))
+        .await
+        .expect("get second")
+        .json()
+        .await
+        .expect("json");
+    assert_eq!(second["hotspots"][0]["function"], "second");
+}
+
+#[tokio::test]
+async fn post_cpu_profile_anytransition_broadcastsatypedcpuprofileevent() {
+    let (base_url, state) = serve_dashboard().await;
+    let mut subscriber = state.subscribe();
+
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-broadcast", "state": "started"}),
+    )
+    .await;
+
+    let message = tokio::time::timeout(std::time::Duration::from_secs(5), subscriber.recv())
+        .await
+        .expect("broadcast arrives")
+        .expect("broadcast message");
+    let event: serde_json::Value = serde_json::from_str(&message).expect("json event");
+    assert_eq!(event["type"], "cpu_profile");
+    assert_eq!(event["component"], "svc-broadcast");
+    assert_eq!(event["state"], "started");
+}
+
+#[tokio::test]
+async fn clear_stored_cpu_profile_discards_it() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-cleared", "state": "stopped", "folded": SAMPLE_FOLDED}),
+    )
+    .await;
+
+    let cleared = reqwest::Client::new()
+        .post(format!("{base_url}/clear"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .send()
+        .await
+        .expect("post clear")
+        .status();
+    let response = reqwest::get(format!("{base_url}/profile/cpu/svc-cleared"))
+        .await
+        .expect("get cpu profile");
+
+    assert_eq!(cleared, reqwest::StatusCode::NO_CONTENT);
+    assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn get_cpu_profile_rendered_declares_json_content_type() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-typed", "state": "stopped", "folded": SAMPLE_FOLDED}),
+    )
+    .await;
+
+    let rendered = reqwest::get(format!("{base_url}/profile/cpu/svc-typed"))
+        .await
+        .expect("get cpu profile");
+    let rendered_type = rendered.headers()[reqwest::header::CONTENT_TYPE].clone();
+    let cached = reqwest::get(format!("{base_url}/profile/cpu/svc-typed"))
+        .await
+        .expect("get cached cpu profile");
+
+    assert_eq!(rendered_type, "application/json");
+    assert_eq!(
+        cached.headers()[reqwest::header::CONTENT_TYPE],
+        "application/json"
+    );
+}
+
+#[tokio::test]
+async fn get_cpu_profile_laterrunsamplednothing_returnsnotfound() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-restarted", "state": "stopped", "folded": SAMPLE_FOLDED}),
+    )
+    .await;
+
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc-restarted", "state": "stopped"}),
+    )
+    .await;
+
+    let response = reqwest::get(format!("{base_url}/profile/cpu/svc-restarted"))
+        .await
+        .expect("get cpu profile");
+
+    assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+}
+
+async fn post_playbook(
+    base_url: &str,
+    arena: &str,
+    playbook: &str,
+    body: serde_json::Value,
+) -> reqwest::StatusCode {
+    reqwest::Client::new()
+        .post(format!("{base_url}/arena/{arena}/playbook/{playbook}"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .json(&body)
+        .send()
+        .await
+        .expect("post playbook")
+        .status()
+}
+
+#[tokio::test]
+async fn post_playbook_validpayload_isaccepted() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = post_playbook(
+        &base_url,
+        "arena-orders",
+        "reset-orders",
+        serde_json::json!({
+            "arena_id": "arena-orders",
+            "id": "reset-orders",
+            "playbook_type": "managed",
+            "runs": 1,
+            "kind": "scoped",
+            "at": "2026-10-18T00:00:00.000Z",
+            "state": "running",
+            "faults": []
+        }),
+    )
+    .await;
+
+    assert_eq!(status, reqwest::StatusCode::ACCEPTED);
+}
+
+#[tokio::test]
+async fn post_playbook_malformedbody_isrejected() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = reqwest::Client::new()
+        .post(format!("{base_url}/arena/arena-orders/playbook/reset-orders"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .body("not json")
+        .send()
+        .await
+        .expect("post playbook")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn post_playbook_twoarenassameplaybookid_arekeptapart() {
+    let (base_url, state) = serve_dashboard().await;
+    let body = |arena: &str| {
+        serde_json::json!({
+            "arena_id": arena,
+            "id": "reset-orders",
+            "playbook_type": "managed",
+            "runs": 1,
+            "kind": "scoped",
+            "at": "2026-10-18T00:00:00.000Z",
+            "state": "running",
+            "faults": []
+        })
+    };
+
+    post_playbook(&base_url, "arena-orders", "reset-orders", body("arena-orders")).await;
+    post_playbook(&base_url, "arena-catalog", "reset-orders", body("arena-catalog")).await;
+
+    assert_eq!(state.playbook_count(), 2);
+}
+
+#[tokio::test]
+async fn post_playbook_pathdisagreeingwithbody_isrejected() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = post_playbook(
+        &base_url,
+        "arena-orders",
+        "reset-orders",
+        serde_json::json!({
+            "arena_id": "arena-catalog",
+            "id": "reset-orders",
+            "playbook_type": "managed",
+            "runs": 1,
+            "kind": "scoped",
+            "at": "2026-10-18T00:00:00.000Z",
+            "state": "running",
+            "faults": []
+        }),
+    )
+    .await;
+
+    assert_eq!(status, reqwest::StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn post_playbook_faults_reachthebrowserinfull() {
+    let (base_url, state) = serve_dashboard().await;
+    let mut events = state.subscribe();
+
+    post_playbook(
+        &base_url,
+        "arena-orders",
+        "reset-orders",
+        serde_json::json!({
+            "arena_id": "arena-orders",
+            "id": "reset-orders",
+            "playbook_type": "managed",
+            "runs": 1,
+            "kind": "scoped",
+            "at": "2026-10-18T00:00:00.000Z",
+            "state": "faulted",
+            "faults": [{
+                "id": "reset-orders",
+                "subject": "playbook",
+                "message": "seed data rejected",
+                "at": "2026-10-18T00:00:00.000Z"
+            }]
+        }),
+    )
+    .await;
+
+    let announcement = events.recv().await.expect("announcement");
+    assert!(announcement.contains("seed data rejected"), "got: {announcement}");
+}
+
+#[tokio::test]
+async fn clear_heldplaybooks_areforgotten() {
+    let (base_url, state) = serve_dashboard().await;
+    post_playbook(
+        &base_url,
+        "arena-orders",
+        "reset-orders",
+        serde_json::json!({
+            "arena_id": "arena-orders",
+            "id": "reset-orders",
+            "playbook_type": "managed",
+            "runs": 1,
+            "kind": "scoped",
+            "at": "2026-10-18T00:00:00.000Z",
+            "state": "running",
+            "faults": []
+        }),
+    )
+    .await;
+    assert_eq!(state.playbook_count(), 1);
+
+    reqwest::Client::new()
+        .post(format!("{base_url}/clear"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .send()
+        .await
+        .expect("clear");
+
+    assert_eq!(state.playbook_count(), 0);
+}
+
+#[tokio::test]
+async fn post_playbook_beyondthelimit_isrefusedratherthangrowing() {
+    let (base_url, state) = serve_dashboard().await;
+    for index in 0..arena_dashboard::server::PLAYBOOK_LIMIT {
+        let playbook = format!("playbook-{index}");
+        post_playbook(
+            &base_url,
+            "arena-orders",
+            &playbook,
+            serde_json::json!({
+                "arena_id": "arena-orders",
+                "id": playbook,
+                "playbook_type": "managed",
+                "runs": 1,
+                "kind": "scoped",
+                "at": "2026-10-18T00:00:00.000Z",
+                "state": "running",
+                "faults": []
+            }),
+        )
+        .await;
+    }
+
+    let status = post_playbook(
+        &base_url,
+        "arena-orders",
+        "one-too-many",
+        serde_json::json!({
+            "arena_id": "arena-orders",
+            "id": "one-too-many",
+            "playbook_type": "managed",
+            "runs": 1,
+            "kind": "scoped",
+            "at": "2026-10-18T00:00:00.000Z",
+            "state": "running",
+            "faults": []
+        }),
+    )
+    .await;
+
+    assert_eq!(status, reqwest::StatusCode::INSUFFICIENT_STORAGE);
+    assert_eq!(
+        state.playbook_count(),
+        arena_dashboard::server::PLAYBOOK_LIMIT
+    );
+}
+
+
+fn arena_snapshot_body(arena_id: &str, state: &str) -> String {
+    serde_json::json!({
+        "id": arena_id,
+        "state": state,
+        "at": "2026-10-18T00:00:00.000Z",
+        "dependencies": [],
+        "components": [],
+        "faults": []
+    })
+    .to_string()
+}
+
+async fn post_ingest(base_url: &str, body: String) -> reqwest::StatusCode {
+    reqwest::Client::new()
+        .post(format!("{base_url}/ingest"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .body(body)
+        .send()
+        .await
+        .expect("post ingest")
+        .status()
+}
+
+#[tokio::test]
+async fn post_ingest_arenasnapshot_isstoredandreturnedbyhistory() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+
+    assert_eq!(status, reqwest::StatusCode::ACCEPTED);
+    let history: serde_json::Value = reqwest::get(format!("{base_url}/history"))
+        .await
+        .expect("get history")
+        .json()
+        .await
+        .expect("json body");
+    assert_eq!(history[0]["id"], "arena-tea-party");
+    assert_eq!(history[0]["states"][0]["state"], "arena_open");
+}
+
+#[tokio::test]
+async fn post_ingest_malformedbody_isrejectedandnothingisstored() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = post_ingest(&base_url, "not json".to_string()).await;
+
+    assert_eq!(status, reqwest::StatusCode::BAD_REQUEST);
+    let history: serde_json::Value = reqwest::get(format!("{base_url}/history"))
+        .await
+        .expect("get history")
+        .json()
+        .await
+        .expect("json body");
+    assert_eq!(history, serde_json::json!([]));
+}
+
+#[tokio::test]
+async fn post_ingest_everysnapshotforanarena_isrecordedinorder() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_starting")).await;
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+
+    let history: serde_json::Value = reqwest::get(format!("{base_url}/history"))
+        .await
+        .expect("get history")
+        .json()
+        .await
+        .expect("json body");
+    assert_eq!(history[0]["states"][0]["state"], "arena_starting");
+    assert_eq!(history[0]["states"][1]["state"], "arena_open");
+}
+
+#[tokio::test]
+async fn get_history_separatearenas_arereportedseparately() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+    post_ingest(&base_url, arena_snapshot_body("arena-rabbit-hole", "arena_open")).await;
+
+    let history: serde_json::Value = reqwest::get(format!("{base_url}/history"))
+        .await
+        .expect("get history")
+        .json()
+        .await
+        .expect("json body");
+    let ids: Vec<&str> = history
+        .as_array()
+        .expect("array")
+        .iter()
+        .map(|arena| arena["id"].as_str().expect("id"))
+        .collect();
+    assert_eq!(ids, vec!["arena-tea-party", "arena-rabbit-hole"]);
+}
+
+#[tokio::test]
+async fn get_events_alreadyingestedsnapshot_isreplayedtoanewsubscriber() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+
+    let mut stream = reqwest::get(format!("{base_url}/events"))
+        .await
+        .expect("get events")
+        .bytes_stream();
+
+    let mut seen = String::new();
+    while let Some(chunk) = futures::StreamExt::next(&mut stream).await {
+        seen.push_str(&String::from_utf8_lossy(&chunk.expect("chunk")));
+        if seen.contains("arena-tea-party") {
+            break;
+        }
+    }
+    assert!(seen.contains("arena-tea-party"), "got: {seen}");
+}
+
+#[tokio::test]
+async fn post_shutdown_isaccepted_andthehandlestopswaiting() {
+    let (base_url, state) = serve_dashboard().await;
+    let shutdown = state.shutdown_handle();
+
+    let status = reqwest::Client::new()
+        .post(format!("{base_url}/shutdown"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .send()
+        .await
+        .expect("post shutdown")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::ACCEPTED);
+    shutdown.wait().await;
+}
+
+#[tokio::test]
+async fn wait_alreadytriggered_returnsimmediately() {
+    let (_base_url, state) = serve_dashboard().await;
+    let shutdown = state.shutdown_handle();
+    shutdown.trigger();
+
+    shutdown.wait().await;
+    shutdown.wait().await;
+}
+
+fn playbook_body(arena: &str, playbook: &str, kind: &str, state: &str, at: &str) -> serde_json::Value {
+    serde_json::json!({
+        "arena_id": arena,
+        "id": playbook,
+        "playbook_type": "managed",
+        "runs": 2,
+        "kind": kind,
+        "at": at,
+        "state": state,
+        "faults": []
+    })
+}
+
+async fn history_for(base_url: &str, arena: &str) -> serde_json::Value {
+    let history: serde_json::Value = reqwest::get(format!("{base_url}/history"))
+        .await
+        .expect("get history")
+        .json()
+        .await
+        .expect("json body");
+    history
+        .as_array()
+        .expect("array")
+        .iter()
+        .find(|entry| entry["id"] == arena)
+        .cloned()
+        .unwrap_or(serde_json::Value::Null)
+}
+
+#[tokio::test]
+async fn get_history_everyplaybookreport_isreplayableinorder() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+    for state in ["registered", "running", "stopped"] {
+        post_playbook(
+            &base_url,
+            "arena-tea-party",
+            "reset-tea-party-db",
+            playbook_body(
+                "arena-tea-party",
+                "reset-tea-party-db",
+                "scoped",
+                state,
+                "2026-10-18T00:00:00.000Z",
+            ),
+        )
+        .await;
+    }
+
+    let arena = history_for(&base_url, "arena-tea-party").await;
+
+    let states: Vec<&str> = arena["playbooks"]
+        .as_array()
+        .expect("playbooks array")
+        .iter()
+        .map(|entry| entry["state"].as_str().expect("state"))
+        .collect();
+    assert_eq!(states, vec!["registered", "running", "stopped"]);
+}
+
+#[tokio::test]
+async fn post_playbook_playbooktype_reachesthestreamandthehistory() {
+    let (base_url, state) = serve_dashboard().await;
+    let mut events = state.subscribe();
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+
+    post_playbook(
+        &base_url,
+        "arena-tea-party",
+        "seed-reference-data",
+        serde_json::json!({
+            "arena_id": "arena-tea-party",
+            "id": "seed-reference-data",
+            "playbook_type": "unmanaged",
+            "runs": 1,
+            "kind": "scoped",
+            "at": "2026-10-18T00:00:00.000Z",
+            "state": "running",
+            "faults": []
+        }),
+    )
+    .await;
+
+    let mut announcement = events.recv().await.expect("announcement");
+    while !announcement.contains("playbook") {
+        announcement = events.recv().await.expect("announcement");
+    }
+    assert!(
+        announcement.contains(r#""playbook_type":"unmanaged""#),
+        "got: {announcement}"
+    );
+    assert!(announcement.contains(r#""runs":1"#), "got: {announcement}");
+    let arena = history_for(&base_url, "arena-tea-party").await;
+    assert_eq!(arena["playbooks"][0]["playbook_type"], "unmanaged");
+}
+
+#[tokio::test]
+async fn get_history_playbookreport_carriesitskindandmoment() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+    post_playbook(
+        &base_url,
+        "arena-tea-party",
+        "apply-schema",
+        playbook_body(
+            "arena-tea-party",
+            "apply-schema",
+            "startup",
+            "running",
+            "2026-10-18T12:00:00.000Z",
+        ),
+    )
+    .await;
+
+    let arena = history_for(&base_url, "arena-tea-party").await;
+
+    assert_eq!(arena["playbooks"][0]["kind"], "startup");
+    assert_eq!(arena["playbooks"][0]["runs"], 2);
+    assert_eq!(arena["playbooks"][0]["at"], "2026-10-18T12:00:00.000Z");
+    assert_eq!(arena["playbooks"][0]["playbook"], "apply-schema");
+}
+
+#[tokio::test]
+async fn get_history_anotherarenasplaybooks_arenotincluded() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+    post_ingest(&base_url, arena_snapshot_body("arena-rabbit-hole", "arena_open")).await;
+    post_playbook(
+        &base_url,
+        "arena-rabbit-hole",
+        "reset-rabbit-hole",
+        playbook_body(
+            "arena-rabbit-hole",
+            "reset-rabbit-hole",
+            "scoped",
+            "running",
+            "2026-10-18T00:00:00.000Z",
+        ),
+    )
+    .await;
+
+    let tea_party = history_for(&base_url, "arena-tea-party").await;
+    let rabbit_hole = history_for(&base_url, "arena-rabbit-hole").await;
+
+    assert_eq!(tea_party["playbooks"], serde_json::json!([]));
+    assert_eq!(rabbit_hole["playbooks"].as_array().expect("array").len(), 1);
+}
+
+#[tokio::test]
+async fn clear_recordedplaybooks_areforgotten() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+    post_playbook(
+        &base_url,
+        "arena-tea-party",
+        "reset-tea-party-db",
+        playbook_body(
+            "arena-tea-party",
+            "reset-tea-party-db",
+            "scoped",
+            "running",
+            "2026-10-18T00:00:00.000Z",
+        ),
+    )
+    .await;
+
+    reqwest::Client::new()
+        .post(format!("{base_url}/clear"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .send()
+        .await
+        .expect("clear");
+    post_ingest(&base_url, arena_snapshot_body("arena-tea-party", "arena_open")).await;
+
+    let arena = history_for(&base_url, "arena-tea-party").await;
+    assert_eq!(arena["playbooks"], serde_json::json!([]));
+}
+
+#[tokio::test]
+async fn get_profiles_heldstate_isreturnedforareloadingpage() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({
+            "component": "svc",
+            "state": "stopped",
+            "folded": "main;handler;compute 42\n"
+        }),
+    )
+    .await;
+
+    let held: serde_json::Value = reqwest::get(format!("{base_url}/profiles"))
+        .await
+        .expect("get profiles")
+        .json()
+        .await
+        .expect("json body");
+
+    assert_eq!(held[0]["component"], "svc");
+    assert_eq!(held[0]["state"], "stopped");
+    assert_eq!(held[0]["report"], true);
+}
+
+#[tokio::test]
+async fn get_profiles_statewithoutsamples_reportsnoreport() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "svc", "state": "started"}),
+    )
+    .await;
+
+    let held: serde_json::Value = reqwest::get(format!("{base_url}/profiles"))
+        .await
+        .expect("get profiles")
+        .json()
+        .await
+        .expect("json body");
+
+    assert_eq!(held[0]["state"], "started");
+    assert_eq!(held[0]["report"], false);
+}
+
+#[tokio::test]
+async fn get_profiles_faultedprofiler_carriesitsreason() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({
+            "component": "svc",
+            "state": "faulted",
+            "reason": "py-spy recorded no samples for this component",
+        }),
+    )
+    .await;
+
+    let held: serde_json::Value = reqwest::get(format!("{base_url}/profiles"))
+        .await
+        .expect("get profiles")
+        .json()
+        .await
+        .expect("json body");
+
+    assert_eq!(held[0]["state"], "faulted");
+    assert_eq!(held[0]["report"], false);
+    assert_eq!(held[0]["reason"], "py-spy recorded no samples for this component");
+}
+
+#[tokio::test]
+async fn get_cpu_profile_rendered_carriesanapplicationonlyranking() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({
+            "component": "svc",
+            "state": "stopped",
+            "folded": "main;handler;compute 40\nmain;UNMANAGED_CODE_TIME 400\n"
+        }),
+    )
+    .await;
+
+    let profile: serde_json::Value = reqwest::get(format!("{base_url}/profile/cpu/svc"))
+        .await
+        .expect("get profile")
+        .json()
+        .await
+        .expect("json body");
+
+    assert_eq!(profile["hotspots"].as_array().expect("array").len(), 2);
+    let application = profile["application_hotspots"].as_array().expect("array");
+    assert_eq!(application.len(), 2);
+    assert_eq!(application[0]["function"], "main");
+    assert_eq!(application[0]["self_count"], 400);
+    assert_eq!(application[1]["function"], "compute");
+    assert!(!profile["runtime_frames"].as_array().expect("array").is_empty());
+}
+
+
+#[tokio::test]
+async fn post_clear_without_the_caller_header_is_refused() {
+    let (base_url, _state) = serve_dashboard().await;
+    let client = reqwest::Client::new();
+    client
+        .post(format!("{base_url}/ingest"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .body(arena_body("arena-1"))
+        .send()
+        .await
+        .expect("post ingest");
+
+    let status = client
+        .post(format!("{base_url}/clear"))
+        .send()
+        .await
+        .expect("post clear")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::FORBIDDEN);
+    assert_eq!(retained_arena_ids(&base_url).await, vec!["arena-1"]);
+}
+
+#[tokio::test]
+async fn post_shutdown_without_the_caller_header_is_refused() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = reqwest::Client::new()
+        .post(format!("{base_url}/shutdown"))
+        .send()
+        .await
+        .expect("post shutdown")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::FORBIDDEN);
+    assert!(retained_arena_ids(&base_url).await.is_empty());
+}
+
+#[tokio::test]
+async fn post_clear_from_another_origin_is_refused() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = reqwest::Client::new()
+        .post(format!("{base_url}/clear"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .header(reqwest::header::ORIGIN, "http://evil.example")
+        .send()
+        .await
+        .expect("post clear")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn get_history_for_another_host_is_refused() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let status = reqwest::Client::new()
+        .get(format!("{base_url}/history"))
+        .header(reqwest::header::HOST, "rebound.example")
+        .send()
+        .await
+        .expect("get history")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn post_ingest_beyond_the_arena_limit_is_refused_naming_the_limit() {
+    let (base_url, _state) = serve_dashboard().await;
+    let client = reqwest::Client::new();
+    for index in 0..ARENA_LIMIT {
+        let status = client
+            .post(format!("{base_url}/ingest"))
+            .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+            .body(arena_body(&format!("arena-{index}")))
+            .send()
+            .await
+            .expect("post ingest")
+            .status();
+        assert_eq!(status, reqwest::StatusCode::ACCEPTED);
+    }
+
+    let status = client
+        .post(format!("{base_url}/ingest"))
+        .header(CALLER_HEADER, CALLER_HEADER_VALUE)
+        .body(arena_body("one-too-many"))
+        .send()
+        .await
+        .expect("post ingest")
+        .status();
+
+    assert_eq!(status, reqwest::StatusCode::INSUFFICIENT_STORAGE);
+    assert_eq!(retained_arena_ids(&base_url).await.len(), ARENA_LIMIT);
+}
+
+#[tokio::test]
+async fn post_cpu_profile_beyond_the_profile_limit_is_refused() {
+    let (base_url, _state) = serve_dashboard().await;
+    for index in 0..CPU_PROFILE_LIMIT {
+        let status = post_cpu_profile(
+            &base_url,
+            serde_json::json!({"component": format!("svc-{index}"), "state": "started"}),
+        )
+        .await;
+        assert_eq!(status, reqwest::StatusCode::ACCEPTED);
+    }
+
+    let status = post_cpu_profile(
+        &base_url,
+        serde_json::json!({"component": "one-too-many", "state": "started"}),
+    )
+    .await;
+
+    assert_eq!(status, reqwest::StatusCode::INSUFFICIENT_STORAGE);
+}
+
+#[test]
+fn record_history_at_the_per_arena_limit_refuses_instead_of_dropping_the_oldest() {
+    let mut history = Vec::new();
+    for index in 0..HISTORY_LIMIT_PER_ARENA {
+        assert!(record_history(&mut history, "arena-1", format!("state-{index}")));
+    }
+
+    assert!(!record_history(&mut history, "arena-1", "one-too-many".to_string()));
+    assert_eq!(history[0].1.len(), HISTORY_LIMIT_PER_ARENA);
+    assert_eq!(history[0].1[0], "state-0");
+}
+
+#[tokio::test]
+async fn get_index_carries_a_content_security_policy_confining_the_page_to_this_server() {
+    let (base_url, _state) = serve_dashboard().await;
+
+    let response = reqwest::get(format!("{base_url}/")).await.expect("get index");
+
+    let policy = response
+        .headers()
+        .get(reqwest::header::CONTENT_SECURITY_POLICY)
+        .expect("a content security policy")
+        .to_str()
+        .expect("ascii")
+        .to_string();
+    assert!(policy.contains("default-src 'self'"), "got: {policy}");
+    assert!(policy.contains("frame-ancestors 'none'"), "got: {policy}");
+    assert!(policy.contains("object-src 'none'"), "got: {policy}");
+}

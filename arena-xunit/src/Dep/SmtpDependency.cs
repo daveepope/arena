@@ -15,11 +15,12 @@ public sealed class SmtpDependency : IArenaDependency
     public string? ImageName { get; }
     public string? Image { get; }
     public string? ContainerName { get; }
+    public IReadOnlyList<string> ComponentIds { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
     private readonly IReadOnlyList<IArenaDependency> _children;
 
-    internal SmtpDependency(string identifier, int port, int uiPort, string? tlsMode, string? imageName, string? image, string? containerName, IReadOnlyList<IArenaDependency> children)
+    internal SmtpDependency(string identifier, int port, int uiPort, string? tlsMode, string? imageName, string? image, string? containerName, IReadOnlyList<string> componentIds, IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -28,6 +29,7 @@ public sealed class SmtpDependency : IArenaDependency
         ImageName = string.IsNullOrEmpty(imageName) ? null : imageName;
         Image = string.IsNullOrEmpty(image) ? null : image;
         ContainerName = string.IsNullOrEmpty(containerName) ? null : containerName;
+        ComponentIds = componentIds;
         _children = children;
     }
 
@@ -47,6 +49,7 @@ public sealed class SmtpDependencyBuilder
     private string? _imageName;
     private string? _image;
     private string? _containerName;
+    private readonly List<string> _componentIds = new();
     private readonly List<IArenaDependency> _children = new();
 
     public SmtpDependencyBuilder(string name)
@@ -96,6 +99,12 @@ public sealed class SmtpDependencyBuilder
         return this;
     }
 
+    public SmtpDependencyBuilder WithComponentId(string componentId)
+    {
+        _componentIds.Add(componentId);
+        return this;
+    }
+
     public SmtpDependencyBuilder AddChildDependency(IArenaDependency child)
     {
         _children.Add(child);
@@ -117,7 +126,7 @@ public sealed class SmtpDependencyBuilder
     public SmtpDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-smtp", _name);
-        var built = new SmtpDependency(identifier, _port, _uiPort, _tlsMode, _imageName, _image, _containerName, _children);
+        var built = new SmtpDependency(identifier, _port, _uiPort, _tlsMode, _imageName, _image, _containerName, _componentIds, _children);
         built.ExpirySeconds = _expirySeconds;
         return built;
     }

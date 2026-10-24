@@ -52,6 +52,8 @@ pub struct OauthFfiDependencyConfig {
     pub transport: Option<OauthFfiInboundTransport>,
     #[serde(default)]
     pub issuers: Vec<OauthFfiIssuerConfig>,
+    #[serde(default)]
+    pub component_ids: Vec<String>,
 }
 
 pub fn build_oauth_dependency_from_config(
@@ -122,6 +124,9 @@ pub fn build_oauth_dependency_from_config(
                 builder.with_issuer(issuer_config)
             }
         };
+    }
+    for component_id in &config.component_ids {
+        builder = builder.with_component_id(component_id);
     }
     Ok(Box::new(builder.build().map_err(|fault| fault.to_string())?))
 }

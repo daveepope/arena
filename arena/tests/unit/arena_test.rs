@@ -48,9 +48,11 @@ async fn open_happy_path_emits_states_in_order() {
         vec![
             ArenaLifecycleState::ArenaStarting,
             ArenaLifecycleState::DependenciesStarting,
+            ArenaLifecycleState::DependenciesStarting,
             ArenaLifecycleState::DependenciesStarted,
             ArenaLifecycleState::PlaybooksRunning,
             ArenaLifecycleState::PlaybooksComplete,
+            ArenaLifecycleState::ComponentsStarting,
             ArenaLifecycleState::ComponentsStarting,
             ArenaLifecycleState::ComponentsStarted,
             ArenaLifecycleState::ArenaOpen,
@@ -563,6 +565,7 @@ struct BareMatch {
     start_faults: Vec<arena::lifecycle::Fault>,
     panic_on_start: bool,
     panic_on_force_stop: bool,
+    panic_on_run_playbook: bool,
 }
 
 fn bare_match() -> BareMatch {
@@ -570,6 +573,7 @@ fn bare_match() -> BareMatch {
         start_faults: Vec::new(),
         panic_on_start: false,
         panic_on_force_stop: false,
+        panic_on_run_playbook: false,
     }
 }
 
@@ -577,7 +581,7 @@ fn bare_match() -> BareMatch {
 impl MatchTrait for BareMatch {
     async fn start(
         &mut self,
-        _ctx: &arena::lifecycle::LifecycleContext,
+        _ctx: &arena::lifecycle::ArenaLifecyclePublisher,
     ) -> Result<(), Vec<arena::lifecycle::Fault>> {
         if self.panic_on_start {
             panic!("match start failed");
@@ -591,7 +595,7 @@ impl MatchTrait for BareMatch {
 
     async fn stop(
         &mut self,
-        _ctx: &arena::lifecycle::LifecycleContext,
+        _ctx: &arena::lifecycle::ArenaLifecyclePublisher,
     ) -> Result<(), Vec<arena::lifecycle::Fault>> {
         Ok(())
     }
@@ -601,6 +605,16 @@ impl MatchTrait for BareMatch {
             panic!("match forced teardown failed");
         }
         Vec::new()
+    }
+
+    async fn run_playbook(
+        &self,
+        _identifier: &str,
+    ) -> Option<Result<Box<dyn arena::playbook::ActivePlaybook>, arena::lifecycle::Fault>> {
+        if self.panic_on_run_playbook {
+            panic!("match run_playbook failed");
+        }
+        None
     }
 }
 
@@ -654,6 +668,52 @@ async fn open_match_force_stop_panics_records_arena_fault() {
 }
 
 #[tokio::test]
+async fn open_run_playbook_panics_returns_playbook_fault() {
+    let mut faulting = bare_match();
+    faulting.panic_on_run_playbook = true;
+    let (closed, _recorder) = arena_with(vec![Box::new(faulting)]);
+    let open = closed.open().await.expect("arena should open");
+
+    let result = open
+        .run_playbook("anything")
+        .await
+        .expect("the faulting match should attempt the lookup");
+
+    let Err(fault) = result else {
+        panic!("panicking playbook lookup should return a fault");
+    };
+    assert_eq!(fault.subject, arena::lifecycle::Subject::Playbook);
+    assert_eq!(fault.message, "failed to run");
+    assert!(fault.faults.iter().any(|c| c.message.contains("match run_playbook failed")));
+
+    let _closed = open.close().await.expect("arena should close");
+}
+
+#[tokio::test]
+async fn open_run_playbook_panic_propagates_through_real_match_and_playbook() {
+    let real = Match::new("real-match", vec![], vec![])
+        .register_playbook(probe_playbook("pb-1").behaving(Behaviour::PanicStart).into_playbook(), false);
+    let (closed, _recorder) = arena_with(vec![Box::new(real)]);
+    let open = closed.open().await.expect("arena should open");
+
+    let result = open
+        .run_playbook("pb-1")
+        .await
+        .expect("the registered playbook should be found");
+
+    let Err(fault) = result else {
+        panic!("a panicking playbook run should surface as a fault, not a successful ActivePlaybook");
+    };
+    assert_eq!(fault.subject, arena::lifecycle::Subject::Playbook);
+    assert_eq!(fault.message, "failed to run");
+    assert!(fault.faults.iter().any(|c| c.message.contains("playbook 'pb-1' run failed")));
+
+    // the panic must not have poisoned the arena: an unrelated lookup and a normal close still work.
+    assert!(open.run_playbook("missing").await.is_none());
+    let _closed = open.close().await.expect("arena should still close cleanly after a playbook panic");
+}
+
+#[tokio::test]
 async fn close_match_stop_faults_are_recorded_on_the_arena() {
     struct StopFaultingMatch;
 
@@ -661,14 +721,14 @@ async fn close_match_stop_faults_are_recorded_on_the_arena() {
     impl MatchTrait for StopFaultingMatch {
         async fn start(
             &mut self,
-            _ctx: &arena::lifecycle::LifecycleContext,
+            _ctx: &arena::lifecycle::ArenaLifecyclePublisher,
         ) -> Result<(), Vec<arena::lifecycle::Fault>> {
             Ok(())
         }
 
         async fn stop(
             &mut self,
-            _ctx: &arena::lifecycle::LifecycleContext,
+            _ctx: &arena::lifecycle::ArenaLifecyclePublisher,
         ) -> Result<(), Vec<arena::lifecycle::Fault>> {
             Err(vec![arena::lifecycle::Fault::dependency(
                 "dep-1",
@@ -694,14 +754,14 @@ async fn close_match_stop_panics_is_recorded_on_the_arena() {
     impl MatchTrait for PanickingStopMatch {
         async fn start(
             &mut self,
-            _ctx: &arena::lifecycle::LifecycleContext,
+            _ctx: &arena::lifecycle::ArenaLifecyclePublisher,
         ) -> Result<(), Vec<arena::lifecycle::Fault>> {
             Ok(())
         }
 
         async fn stop(
             &mut self,
-            _ctx: &arena::lifecycle::LifecycleContext,
+            _ctx: &arena::lifecycle::ArenaLifecyclePublisher,
         ) -> Result<(), Vec<arena::lifecycle::Fault>> {
             panic!("match stop failed");
         }
@@ -1185,3 +1245,36 @@ async fn state_closed_arena_after_close_returns_the_terminal_state() {
     assert_eq!(state.state, ArenaLifecycleState::ArenaClosed);
     assert_eq!(state.dependencies[0].state, RunnableState::Stopped);
 }
+
+#[tokio::test]
+async fn open_two_matches_every_snapshot_carries_both_matches_subjects() {
+    let first = Match::new(
+        "first",
+        vec![probe_dependency("postgres-1").into_dependency()],
+        vec![],
+    );
+    let second = Match::new(
+        "second",
+        vec![probe_dependency("kafka-1").into_dependency()],
+        vec![],
+    );
+    let (closed, recorder) = arena_with(vec![Box::new(first), Box::new(second)]);
+
+    let open = closed.open().await.expect("arena should open");
+    open.close().await.expect("arena should close");
+
+    for snapshot in recorder.snapshots() {
+        let ids: Vec<&str> = snapshot
+            .dependencies
+            .iter()
+            .map(|dep| dep.id.as_str())
+            .collect();
+        assert_eq!(
+            ids,
+            vec!["postgres-1", "kafka-1"],
+            "a snapshot at {} lost a match's subjects",
+            snapshot.state
+        );
+    }
+}
+

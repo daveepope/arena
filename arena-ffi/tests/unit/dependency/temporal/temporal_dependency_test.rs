@@ -9,6 +9,7 @@ fn minimal_temporal_config() -> TemporalDependencyConfig {
         port: None,
         ui_port: None,
         container_name: None,
+        component_ids: Vec::new(),
     }
 }
 

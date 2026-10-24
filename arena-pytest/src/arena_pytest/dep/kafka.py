@@ -22,6 +22,7 @@ class KafkaDependencyBuilder:
             "type": "kafka",
             "identifier": _build_identifier("arena-kafka", name),
             "topics": [],
+            "component_ids": [],
         }
         self._children: List[Any] = []
 
@@ -55,6 +56,10 @@ class KafkaDependencyBuilder:
 
     def with_child_dependencies(self, children: List[Any]) -> "KafkaDependencyBuilder":
         self._children.extend(children)
+        return self
+
+    def with_component_id(self, component_id: str) -> "KafkaDependencyBuilder":
+        self._config["component_ids"].append(component_id)
         return self
 
     def build(self) -> "KafkaDependency":

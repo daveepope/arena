@@ -5,6 +5,22 @@ load("@rules_java//java:defs.bzl", "java_binary", "java_library", "java_test")
 load("@rules_dotnet//dotnet:defs.bzl", "csharp_library", "csharp_binary", "csharp_test", "import_library")
 load("@crates//:defs.bzl", "all_crate_deps")
 
+config_setting(
+    name = "linux_x86_64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "linux_aarch64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
 import_library(
     name = "xunit_assert_lib",
     library_name = "xunit.assert",
@@ -619,13 +635,18 @@ py_test(
         "tests/pytest-shared",
     ],
     data = [
+        "//arena-dashboard:server",
         "//arena-ffi:arena_ffi_shared",
         "//examples:example-readings-fastapi-web-app",
         "//examples:instrument_reading_db_schema",
         "//examples:arena_config",
         "//examples:validation_db_schema",
         "//examples:weather_db_schema",
-    ],
+    ] + select({
+        "@platforms//os:linux": ["@profiling_tools//:py-spy__py-spy"],
+        "@platforms//os:macos": ["@profiling_tools//:py-spy__py-spy"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":pytest_shared",
         "//arena-pytest:arena_pytest_lib",
@@ -653,6 +674,7 @@ py_test(
         "tests/pytest-shared",
     ],
     data = [
+        "//arena-dashboard:server",
         "//arena-ffi:arena_ffi_shared",
         "//examples:example-readings-fastapi-web-app",
         "//examples:instrument_reading_db_schema",
@@ -795,15 +817,21 @@ java_test(
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
         "--include-engine=junit-platform-suite",
-        "--select-class=arena.examples.component.ComponentTestSuite",
+        "--select-class=arena.examples.component.JavaSpringBootComponentTestSuite",
     ],
     data = [
         ":example-readings-spring-boot-web-app",
+        "//arena-dashboard:server",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
         ":validation_db_schema",
         ":weather_db_schema",
-    ],
+    ] + select({
+        ":linux_x86_64": ["@async_profiler_linux_x64//:lib/libasyncProfiler.so"],
+        ":linux_aarch64": ["@async_profiler_linux_arm64//:lib/libasyncProfiler.so"],
+        "@platforms//os:macos": ["@async_profiler_macos//:lib/libasyncProfiler.dylib"],
+        "//conditions:default": [],
+    }),
     jvm_flags = ["-Djna.nosys=true"],
     runtime_deps = [
         ":example_spring_boot_component_test_logging_resources",
@@ -845,10 +873,11 @@ java_test(
     main_class = "org.junit.platform.console.ConsoleLauncher",
     args = [
         "--include-engine=junit-platform-suite",
-        "--select-class=arena.examples.component.ChainedComponentTestSuite",
+        "--select-class=arena.examples.component.JavaSpringBootChainedComponentTestSuite",
     ],
     data = [
         ":example-readings-spring-boot-web-app",
+        "//arena-dashboard:server",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
         ":validation_db_schema",
@@ -1021,12 +1050,14 @@ csharp_test(
     srcs = glob(["tests/example-aspnet-xunit-component-test/**/*.cs"]),
     data = [
         ":example-readings-aspnet-web-app",
+        "//arena-dashboard:server",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
         ":arena_config",
         ":validation_db_schema",
         ":weather_db_schema",
         "//arena-xunit:xunit_core_netstandard",
+        "//tools/dotnet_trace:dotnet_trace_tool",
     ],
     deps = [
         ":xunit_shared",
@@ -1068,6 +1099,7 @@ csharp_test(
     srcs = glob(["tests/example-aspnet-xunit-chained-component-test/**/*.cs"]),
     data = [
         ":example-readings-aspnet-web-app",
+        "//arena-dashboard:server",
         "//arena-ffi:arena_ffi_shared",
         ":instrument_reading_db_schema",
         ":arena_config",

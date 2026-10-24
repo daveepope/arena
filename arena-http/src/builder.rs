@@ -20,6 +20,7 @@ pub struct HttpDependencyBuilder {
     readiness_check: Option<Box<dyn ReadinessCheck>>,
     https: HttpsListenerSettings,
     trusted_certificate_pem: Option<String>,
+    component_ids: Vec<String>,
 }
 
 #[derive(Default)]
@@ -97,6 +98,7 @@ impl HttpDependencyBuilder {
             readiness_check: None,
             https: HttpsListenerSettings::default(),
             trusted_certificate_pem: None,
+            component_ids: Vec::new(),
         }
     }
 
@@ -176,6 +178,11 @@ impl HttpDependencyBuilder {
         self
     }
 
+    pub fn with_component_id(mut self, component_id: impl Into<String>) -> Self {
+        self.component_ids.push(component_id.into());
+        self
+    }
+
     pub fn build(self) -> Result<HttpDependency, Fault> {
         let https = self.https;
         let container_cli_cfg = match &self.http_impl {
@@ -205,6 +212,7 @@ impl HttpDependencyBuilder {
             image_tag,
             self.container_name,
             self.trusted_certificate_pem,
+            self.component_ids,
         );
 
         if let Some(check) = self.readiness_check {

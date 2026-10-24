@@ -33,3 +33,7 @@ reason = "rustls 0.21.12 `Debug` impls on client session values expose the TLS 1
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0349"
 reason = "rustls 0.21.12 records the server-selected key exchange group before the server is authenticated, letting a network attacker downgrade later connections to a classical key exchange. Same tiberius 0.12.3 chain and same deferred-bump reasoning as RUSTSEC-2026-0346. Arena's MSSQL connections are to ephemeral, self-hosted containers on a local network path."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0387"
+reason = "crypto-bigint 0.5.5 has multiple timing-variability issues in operations intended to be constant time. Fixed in 0.7.6, which nothing in this tree can reach: the crate arrives only through jsonwebtoken's rust_crypto feature -> p256/p384 0.13 -> elliptic-curve 0.13.8, and jsonwebtoken 11.1.0, the latest release, still pins p256 ^0.13.2. The alternative is jsonwebtoken's aws_lc_rs backend, which forces a cmake/C build on every platform. Arena's use is local ECDSA keypair generation and JWT signing/verification against ephemeral test credentials in arena-oauth, not an operation an attacker can time. Remove this entry once jsonwebtoken adopts p256 0.14."

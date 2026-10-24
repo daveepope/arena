@@ -17,6 +17,7 @@ public sealed class PostgresDependency : IArenaDependency
     public string? Image { get; }
     public string? ContainerName { get; }
     public IReadOnlyList<string> StartupSqlScripts { get; }
+    public IReadOnlyList<string> ComponentIds { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
     private readonly IReadOnlyList<IArenaDependency> _children;
@@ -31,6 +32,7 @@ public sealed class PostgresDependency : IArenaDependency
         string? image,
         string? containerName,
         IReadOnlyList<string> startupSqlScripts,
+        IReadOnlyList<string> componentIds,
         IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
@@ -42,6 +44,7 @@ public sealed class PostgresDependency : IArenaDependency
         Image = image;
         ContainerName = containerName;
         StartupSqlScripts = startupSqlScripts;
+        ComponentIds = componentIds;
         _children = children;
     }
 
@@ -63,6 +66,7 @@ public sealed class PostgresDependencyBuilder
     private string? _image;
     private string? _containerName;
     private readonly List<string> _startupSqlScripts = new();
+    private readonly List<string> _componentIds = new();
     private readonly List<IArenaDependency> _children = new();
 
     public PostgresDependencyBuilder(string name)
@@ -118,6 +122,12 @@ public sealed class PostgresDependencyBuilder
         return this;
     }
 
+    public PostgresDependencyBuilder WithComponentId(string componentId)
+    {
+        _componentIds.Add(componentId);
+        return this;
+    }
+
     public PostgresDependencyBuilder AddChildDependency(IArenaDependency child)
     {
         _children.Add(child);
@@ -139,7 +149,7 @@ public sealed class PostgresDependencyBuilder
     public PostgresDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-postgres", _name);
-        var built = new PostgresDependency(identifier, _port, _databaseName, _databaseUsername, _databasePassword, _imageName, _image, _containerName, _startupSqlScripts, _children);
+        var built = new PostgresDependency(identifier, _port, _databaseName, _databaseUsername, _databasePassword, _imageName, _image, _containerName, _startupSqlScripts, _componentIds, _children);
         built.ExpirySeconds = _expirySeconds;
         return built;
     }

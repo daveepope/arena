@@ -4,6 +4,8 @@ load("@crates//:defs.bzl", "all_crate_deps")
 _ARENA_FFI_DEPS = all_crate_deps(normal = True) + [
     "//arena",
     "//arena-containerized-component:arena_containerized_component",
+    "//arena-dashboard:arena_dashboard",
+    "//arena-profile:arena_profile",
     "//arena-executable-component:arena_executable_component",
     "//arena-host:arena_host",
     "//arena-http:arena_http",
@@ -121,6 +123,7 @@ rust_test(
         normal = True,
         normal_dev = True,
     ) + [
+        "//arena",
         ":arena_ffi",
     ],
     proc_macro_deps = all_crate_deps(
@@ -661,6 +664,8 @@ rust_test(
         normal = True,
         normal_dev = True,
     ) + [
+        "//arena",
+        "//arena-profile:arena_profile",
         ":arena_ffi",
     ],
     proc_macro_deps = all_crate_deps(
@@ -683,6 +688,48 @@ rust_test(
         normal_dev = True,
     ) + [
         ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_dashboard_test",
+    srcs = [
+        "tests/unit/dashboard_test.rs",
+        "tests/unit/ffi_error_text.rs",
+    ],
+    crate_root = "tests/unit/dashboard_test.rs",
+    size = "small",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+    ],
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+)
+
+rust_test(
+    name = "ffi_dashboard_component_test",
+    srcs = ["tests/component/dashboard/dashboard_component_test.rs"],
+    size = "small",
+    data = ["//arena-dashboard:server"],
+    edition = "2021",
+    tags = ["component_test"],
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [
+        ":arena_ffi",
+        "//arena-dashboard:arena_dashboard",
+        "//arena-profile:arena_profile",
     ],
     proc_macro_deps = all_crate_deps(
         proc_macro = True,

@@ -117,4 +117,65 @@ public class ArenaPathsTest : IDisposable
         Assert.Null(exception);
         Assert.Null(ArenaPaths.ResolveViaDepsFile(_tempDir));
     }
+
+    [Fact]
+    public void PlatformDashboardExecutableNames_CurrentPlatform_ReturnsOneKnownName()
+    {
+        var names = ArenaPaths.PlatformDashboardExecutableNames();
+
+        Assert.Single(names);
+        Assert.Contains(
+            names[0],
+            new[]
+            {
+                "arena-dashboard-server.exe",
+                "arena-dashboard-server-macos",
+                "arena-dashboard-server-linux",
+            });
+    }
+
+    [Fact]
+    public void DirectoryHoldingDashboardExecutable_ExecutablePresent_ReturnsDirectory()
+    {
+        File.WriteAllText(
+            Path.Combine(_tempDir, ArenaPaths.PlatformDashboardExecutableNames()[0]), "");
+
+        Assert.Equal(_tempDir, ArenaPaths.DirectoryHoldingDashboardExecutable(_tempDir));
+    }
+
+    [Fact]
+    public void DirectoryHoldingDashboardExecutable_ExecutableAbsent_ReturnsNull()
+    {
+        Assert.Null(ArenaPaths.DirectoryHoldingDashboardExecutable(_tempDir));
+    }
+
+    [Fact]
+    public void DirectoryHoldingDashboardExecutable_DirectoryDoesNotExist_ReturnsNull()
+    {
+        var missingDir = Path.Combine(_tempDir, "does-not-exist");
+
+        Assert.Null(ArenaPaths.DirectoryHoldingDashboardExecutable(missingDir));
+    }
+
+    [Fact]
+    public void DirectoryHoldingDashboardExecutable_NullDirectory_ReturnsNull()
+    {
+        Assert.Null(ArenaPaths.DirectoryHoldingDashboardExecutable(null));
+    }
+
+    [Fact]
+    public void ResolveArenaSharedLibrary_CurrentEnvironment_ReturnsNullOrAnExistingFile()
+    {
+        var resolved = ArenaPaths.ResolveArenaSharedLibrary();
+
+        Assert.True(resolved is null || File.Exists(resolved), resolved);
+    }
+
+    [Fact]
+    public void ResolveDashboardSearchDirectory_CurrentEnvironment_ReturnsNullOrAnExistingDirectory()
+    {
+        var resolved = ArenaPaths.ResolveDashboardSearchDirectory();
+
+        Assert.True(resolved is null || Directory.Exists(resolved), resolved);
+    }
 }

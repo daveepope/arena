@@ -19,6 +19,7 @@ class OracleDependencyBuilder:
         self._config: Dict[str, Any] = {
             "type": "oracledb",
             "identifier": _build_identifier("arena-oracle", name),
+            "component_ids": [],
         }
         self._children: List[Any] = []
 
@@ -76,6 +77,10 @@ class OracleDependencyBuilder:
 
     def with_child_dependencies(self, children: List[Any]) -> "OracleDependencyBuilder":
         self._children.extend(children)
+        return self
+
+    def with_component_id(self, component_id: str) -> "OracleDependencyBuilder":
+        self._config["component_ids"].append(component_id)
         return self
 
     def build(self) -> "OracleDependency":

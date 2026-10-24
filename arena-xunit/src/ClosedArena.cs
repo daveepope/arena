@@ -11,6 +11,8 @@ namespace ArenaDotnet.Xunit;
 
 public sealed class ClosedArena
 {
+    private const int DefaultDashboardPort = 4873;
+
     private readonly string _name;
     private readonly Match _match;
     private readonly ArenaLogLevel _logLevel;
@@ -18,6 +20,12 @@ public sealed class ClosedArena
     private readonly ILoggerFactory? _loggerFactory;
     private readonly List<string>? _logDependencyIds;
     private readonly List<string>? _logComponentIds;
+    private readonly bool _lifecycleDashboard;
+    private readonly string? _dashboardUrl;
+    private readonly int _dashboardPort;
+    private readonly string? _dashboardSearchDir;
+    private readonly List<string> _cpuProfiledComponents;
+    private readonly long? _cpuProfileLimitBytes;
 
     public ClosedArena(string name, Match match)
         : this(name, match, ArenaLogLevel.Info, null, null, null)
@@ -47,6 +55,15 @@ public sealed class ClosedArena
 
     public ClosedArena(string name, Match match, ArenaLogLevel logLevel, ILogger? logger,
         ILoggerFactory? loggerFactory, List<string>? logDependencyIds, List<string>? logComponentIds)
+        : this(name, match, logLevel, logger, loggerFactory, logDependencyIds, logComponentIds,
+            false, null, DefaultDashboardPort, null, null, null)
+    {
+    }
+
+    private ClosedArena(string name, Match match, ArenaLogLevel logLevel, ILogger? logger,
+        ILoggerFactory? loggerFactory, List<string>? logDependencyIds, List<string>? logComponentIds,
+        bool lifecycleDashboard, string? dashboardUrl, int dashboardPort, string? dashboardSearchDir,
+        List<string>? cpuProfiledComponents, long? cpuProfileLimitBytes)
     {
         _name = name;
         _match = match;
@@ -55,11 +72,74 @@ public sealed class ClosedArena
         _loggerFactory = loggerFactory;
         _logDependencyIds = logDependencyIds;
         _logComponentIds = logComponentIds;
+        _lifecycleDashboard = lifecycleDashboard;
+        _dashboardUrl = dashboardUrl;
+        _dashboardPort = dashboardPort;
+        _dashboardSearchDir = dashboardSearchDir;
+        _cpuProfiledComponents = cpuProfiledComponents ?? new List<string>();
+        _cpuProfileLimitBytes = cpuProfileLimitBytes;
+    }
+
+    public LifecycleDashboardBuilder WithLifecycleDashboard() =>
+        new(WithLifecycleDashboardInternal(null, DefaultDashboardPort, null));
+
+    public LifecycleDashboardBuilder WithLifecycleDashboard(string url) =>
+        new(WithLifecycleDashboardInternal(url, DefaultDashboardPort, null));
+
+    public LifecycleDashboardBuilder WithLifecycleDashboard(int port, string? searchDir) =>
+        new(WithLifecycleDashboardInternal(null, port, searchDir));
+
+    private ClosedArena WithLifecycleDashboardInternal(string? url, int port, string? searchDir) =>
+        new(_name, _match, _logLevel, _logger, _loggerFactory, _logDependencyIds, _logComponentIds,
+            true, url, port, searchDir, _cpuProfiledComponents, _cpuProfileLimitBytes);
+
+    internal ClosedArena WithCpuProfiledComponent(string componentId)
+    {
+        var next = new List<string>(_cpuProfiledComponents) { componentId };
+        return new ClosedArena(_name, _match, _logLevel, _logger, _loggerFactory,
+            _logDependencyIds, _logComponentIds, _lifecycleDashboard, _dashboardUrl,
+            _dashboardPort, _dashboardSearchDir, next, _cpuProfileLimitBytes);
+    }
+
+    internal ClosedArena WithCpuProfileLimitBytes(long limitBytes) =>
+        new(_name, _match, _logLevel, _logger, _loggerFactory, _logDependencyIds, _logComponentIds,
+            _lifecycleDashboard, _dashboardUrl, _dashboardPort, _dashboardSearchDir,
+            _cpuProfiledComponents, limitBytes);
+
+    internal string MatchConfigForFfi()
+    {
+        if (_cpuProfiledComponents.Count == 0 && _cpuProfileLimitBytes == null)
+            return _match.ForFfi();
+        var config = Newtonsoft.Json.Linq.JObject.Parse(_match.ForFfi());
+        if (_cpuProfiledComponents.Count > 0)
+            config["cpu_profiled_components"] =
+                new Newtonsoft.Json.Linq.JArray(_cpuProfiledComponents);
+        if (_cpuProfileLimitBytes != null)
+            config["cpu_profile_limit_bytes"] = _cpuProfileLimitBytes.Value;
+        return config.ToString(Newtonsoft.Json.Formatting.None);
+    }
+
+    private ulong RegisterDashboard(ArenaLogRouting routing)
+    {
+        if (!_lifecycleDashboard)
+            return 0;
+        try
+        {
+            var searchDir = _dashboardSearchDir ?? Ffi.ArenaPaths.ResolveDashboardSearchDirectory();
+            var url = _dashboardUrl ?? ArenaBindings.DashboardEnsureRunning(_dashboardPort, searchDir);
+            return ArenaBindings.RegisterDashboardObserver(url);
+        }
+        catch (ArenaBindingError e)
+        {
+            routing.LoggerFor(ArenaLogRouting.RootLoggerName)
+                .LogWarning(e, "lifecycle dashboard unavailable, continuing without it");
+            return 0;
+        }
     }
 
     public System.Threading.Tasks.Task<OpenArena> OpenAsync()
     {
-        var json = _match.ForFfi();
+        var json = MatchConfigForFfi();
         ArenaBindings.SetDispatcherDependencyAllowJson(
             _logDependencyIds != null && _logDependencyIds.Count > 0
                 ? ArenaJson.Serialize(_logDependencyIds) : null);
@@ -83,6 +163,8 @@ public sealed class ClosedArena
             throw;
         }
 
+        ulong dashboardToken = RegisterDashboard(routing);
+
         ArenaShutdown.EnsureHooksRegistered();
 
         IntPtr handle;
@@ -92,12 +174,14 @@ public sealed class ClosedArena
         }
         catch (ArenaBindingError e)
         {
+            ArenaBindings.RemoveLifecycleObserver(dashboardToken);
             ArenaLifecycleObservers.Unregister(observerToken);
             ArenaLogTarget.Unregister(logToken);
             throw ArenaLifecycleError.From(e);
         }
         catch
         {
+            ArenaBindings.RemoveLifecycleObserver(dashboardToken);
             ArenaLifecycleObservers.Unregister(observerToken);
             ArenaLogTarget.Unregister(logToken);
             throw;
@@ -111,13 +195,14 @@ public sealed class ClosedArena
         catch
         {
             CloseArenaQuietly(handle);
+            ArenaBindings.RemoveLifecycleObserver(dashboardToken);
             ArenaLifecycleObservers.Unregister(observerToken);
             ArenaLogTarget.Unregister(logToken);
             throw;
         }
 
         return System.Threading.Tasks.Task.FromResult(
-            new OpenArena(handle, logToken, observerToken, routing, _match, playbooks));
+            new OpenArena(handle, logToken, observerToken, dashboardToken, routing, _match, playbooks));
     }
 
     private static void CloseArenaQuietly(IntPtr handle)

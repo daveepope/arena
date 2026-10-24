@@ -29,6 +29,8 @@ pub(crate) struct LocalstackDependencyConfig {
     pub event_buses: Option<Vec<EventBusSpecConfig>>,
     #[serde(default)]
     pub event_rules: Option<Vec<EventRuleSpecConfig>>,
+    #[serde(default)]
+    pub component_ids: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -159,6 +161,9 @@ pub(crate) fn build(
             builder = builder.with_expiry(expiry);
         }
         None => {}
+    }
+    for component_id in &config.component_ids {
+        builder = builder.with_component_id(component_id);
     }
 
     Ok(Box::new(builder.build()))

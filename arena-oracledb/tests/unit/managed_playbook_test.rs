@@ -1,3 +1,4 @@
+use arena::playbook::PlaybookState;
 use arena::lifecycle::{Fault, RunnableState, Subject};
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::playbook::Playbook as PlaybookTrait;
@@ -149,4 +150,32 @@ fn into_box_returns_boxed_trait_object_with_identifier() {
     let boxed: Box<dyn PlaybookTrait> = managed.into_box();
 
     assert_eq!(boxed.identifier(), "managed-3");
+}
+
+#[test]
+fn state_newly_built_playbook_is_registered() {
+    let playbook = ManagedOraclePlaybook::new("lifecycle-probe", "does-not-exist");
+
+    assert_eq!(playbook.state(), PlaybookState::Registered);
+    assert_eq!(playbook.faults(), Vec::new());
+}
+
+#[tokio::test]
+async fn run_missing_dependency_reports_the_playbook_faulted() {
+    let playbook = ManagedOraclePlaybook::new("lifecycle-probe", "does-not-exist");
+    let deps: Vec<Dependency> = Vec::new();
+
+    let _ = playbook.run(&deps).await;
+
+    assert_eq!(playbook.state(), PlaybookState::Faulted);
+}
+
+#[test]
+fn playbook_type_arena_provided_playbook_reports_managed() {
+    let playbook = ManagedOraclePlaybook::new("type-probe", "oracle-dep");
+
+    assert_eq!(
+        playbook.lifecycle().playbook_type(),
+        arena::playbook::PlaybookType::Managed
+    );
 }

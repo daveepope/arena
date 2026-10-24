@@ -66,7 +66,7 @@ fn builder_with_container_name_and_network_builds_ok() {
         .with_port(5555)
         .with_database_name("custom_db")
         .with_database_username("custom_user")
-        .with_database_password("custom_pass")
+        .with_database_password(arena_container::credential::new_password())
         .with_container_name("custom-container")
         .with_network("custom-network")
         .with_image_name("custom/image")
@@ -95,6 +95,26 @@ fn builder_with_container_tag_sets_image_tag() {
         .build();
 
     assert!(dep.identifier().contains("container-tag-alias"));
+}
+
+#[test]
+fn builder_with_component_id_populates_component_ids() {
+    let dep = PostgresDependency::builder("component-linked")
+        .with_impl(FakePostgresImpl { conn_str: None })
+        .with_component_id("parent-component")
+        .with_component_id("child-component")
+        .build();
+
+    assert_eq!(dep.component_ids(), ["parent-component", "child-component"]);
+}
+
+#[test]
+fn builder_without_component_id_defaults_to_empty() {
+    let dep = PostgresDependency::builder("no-component")
+        .with_impl(FakePostgresImpl { conn_str: None })
+        .build();
+
+    assert!(dep.component_ids().is_empty());
 }
 
 #[test]

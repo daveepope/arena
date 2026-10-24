@@ -14,11 +14,12 @@ public sealed class HttpDependency : IArenaDependency
     public string? ContainerName { get; }
     public string? ImageName { get; }
     public string? ImageTag { get; }
+    public IReadOnlyList<string> ComponentIds { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
     private readonly IReadOnlyList<IArenaDependency> _children;
 
-    internal HttpDependency(string identifier, int port, string? listenIp, string? containerName, string? imageName, string? imageTag, IReadOnlyList<IArenaDependency> children)
+    internal HttpDependency(string identifier, int port, string? listenIp, string? containerName, string? imageName, string? imageTag, IReadOnlyList<string> componentIds, IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
         Port = port;
@@ -26,6 +27,7 @@ public sealed class HttpDependency : IArenaDependency
         ContainerName = containerName;
         ImageName = imageName;
         ImageTag = imageTag;
+        ComponentIds = componentIds;
         _children = children;
     }
 
@@ -44,6 +46,7 @@ public sealed class HttpDependencyBuilder
     private string? _containerName;
     private string? _imageName;
     private string? _imageTag;
+    private readonly List<string> _componentIds = new();
     private readonly List<IArenaDependency> _children = new();
 
     public HttpDependencyBuilder(string name)
@@ -81,6 +84,12 @@ public sealed class HttpDependencyBuilder
         return this;
     }
 
+    public HttpDependencyBuilder WithComponentId(string componentId)
+    {
+        _componentIds.Add(componentId);
+        return this;
+    }
+
     public HttpDependencyBuilder AddChildDependency(IArenaDependency child)
     {
         _children.Add(child);
@@ -102,7 +111,7 @@ public sealed class HttpDependencyBuilder
     public HttpDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-http", _name);
-        var built = new HttpDependency(identifier, _port, _listenIp, _containerName, _imageName, _imageTag, _children);
+        var built = new HttpDependency(identifier, _port, _listenIp, _containerName, _imageName, _imageTag, _componentIds, _children);
         built.ExpirySeconds = _expirySeconds;
         return built;
     }

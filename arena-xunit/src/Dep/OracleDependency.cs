@@ -21,6 +21,7 @@ public sealed class OracleDependency : IArenaDependency
     public IReadOnlyList<string> StartupSqlScripts { get; }
     public string? SetupMode { get; }
     public long? SqlReadinessTimeoutMs { get; }
+    public IReadOnlyList<string> ComponentIds { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
     private readonly IReadOnlyList<IArenaDependency> _children;
@@ -38,6 +39,7 @@ public sealed class OracleDependency : IArenaDependency
         IReadOnlyList<string> startupSqlScripts,
         string? setupMode,
         long? sqlReadinessTimeoutMs,
+        IReadOnlyList<string> componentIds,
         IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
@@ -52,6 +54,7 @@ public sealed class OracleDependency : IArenaDependency
         StartupSqlScripts = startupSqlScripts;
         SetupMode = setupMode;
         SqlReadinessTimeoutMs = sqlReadinessTimeoutMs;
+        ComponentIds = componentIds;
         _children = children;
     }
 
@@ -76,6 +79,7 @@ public sealed class OracleDependencyBuilder
     private readonly List<string> _startupSqlScripts = new();
     private string? _setupMode;
     private long? _sqlReadinessTimeoutMs;
+    private readonly List<string> _componentIds = new();
     private readonly List<IArenaDependency> _children = new();
 
     public OracleDependencyBuilder(string name)
@@ -149,6 +153,12 @@ public sealed class OracleDependencyBuilder
         return this;
     }
 
+    public OracleDependencyBuilder WithComponentId(string componentId)
+    {
+        _componentIds.Add(componentId);
+        return this;
+    }
+
     public OracleDependencyBuilder AddChildDependency(IArenaDependency child)
     {
         _children.Add(child);
@@ -170,7 +180,7 @@ public sealed class OracleDependencyBuilder
     public OracleDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-oracle", _name);
-        var built = new OracleDependency(identifier, _port, _databaseName, _databaseUsername, _databasePassword, _adminPassword, _imageName, _image, _containerName, _startupSqlScripts, _setupMode, _sqlReadinessTimeoutMs, _children);
+        var built = new OracleDependency(identifier, _port, _databaseName, _databaseUsername, _databasePassword, _adminPassword, _imageName, _image, _containerName, _startupSqlScripts, _setupMode, _sqlReadinessTimeoutMs, _componentIds, _children);
         built.ExpirySeconds = _expirySeconds;
         return built;
     }

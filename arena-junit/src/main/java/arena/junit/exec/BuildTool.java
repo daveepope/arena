@@ -11,7 +11,8 @@ public enum BuildTool {
   GRADLE("gradle"),
   DOTNET("dotnet"),
   MAKE("make"),
-  CMAKE("cmake");
+  CMAKE("cmake"),
+  PYTHON("python");
 
   private final String value;
 

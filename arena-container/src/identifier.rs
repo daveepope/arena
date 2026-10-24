@@ -46,7 +46,7 @@ fn slugify(s: &str) -> String {
     out.trim_matches('-').to_string()
 }
 
-fn new_suffix() -> String {
+pub(crate) fn new_suffix() -> String {
     static SEED: OnceLock<u64> = OnceLock::new();
     static COUNTER: AtomicU64 = AtomicU64::new(0);
 

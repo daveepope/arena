@@ -148,8 +148,26 @@ public abstract class ArenaCollectionFixture : IDisposable
         var (logger, level) = ResolveLogger();
         var (dependencyIds, componentIds) = CollectLogIdentifiers();
         var closed = new ClosedArena(GetType().Name, match, level, logger, dependencyIds, componentIds);
+        closed = ApplyVisualize(GetType(), closed);
         var arena = closed.OpenAsync().GetAwaiter().GetResult();
         return new SharedArena(arena);
+    }
+
+    private static ClosedArena ApplyVisualize(Type fixtureType, ClosedArena closed)
+    {
+        var visualize = fixtureType.GetCustomAttribute<ArenaVisualizeAttribute>();
+        if (visualize == null)
+        {
+            return closed;
+        }
+
+        var dashboard = closed.WithLifecycleDashboard();
+        foreach (var componentId in visualize.CpuProfile)
+        {
+            dashboard = dashboard.WithCpuProfiler(componentId);
+        }
+
+        return dashboard.Done();
     }
 
     internal (List<string> DependencyIds, List<string> ComponentIds) CollectLogIdentifiers()

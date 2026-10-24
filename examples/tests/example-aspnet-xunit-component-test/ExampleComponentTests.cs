@@ -13,15 +13,15 @@ using Xunit;
 
 namespace ArenaExamples.ComponentTest;
 
-public class ExampleComponentTests : IClassFixture<ExampleFixture>
+public class ExampleComponentTests : IClassFixture<DotnetComponentTestSuite>
 {
     private static OpenArena Arena { get; set; } = null!;
 
-    private readonly ExampleFixture fixture;
+    private readonly DotnetComponentTestSuite fixture;
     private readonly ApiClient api;
     private readonly ApiClient api2;
 
-    public ExampleComponentTests(ExampleFixture fixture)
+    public ExampleComponentTests(DotnetComponentTestSuite fixture)
     {
         this.fixture = fixture;
         Arena = fixture.Arena;
@@ -94,7 +94,7 @@ public class ExampleComponentTests : IClassFixture<ExampleFixture>
     public async Task GetReadingsWithoutBearerToken_IsRejected()
     {
         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-        var response = await client.GetAsync($"http://127.0.0.1:{ExampleFixture.WebAppPort}/Readings");
+        var response = await client.GetAsync($"http://127.0.0.1:{DotnetComponentTestSuite.WebAppPort}/Readings");
         Assert.Equal(
             HttpStatusCode.Unauthorized,
             response.StatusCode);
@@ -103,10 +103,10 @@ public class ExampleComponentTests : IClassFixture<ExampleFixture>
     [Fact]
     public async Task GetReadingsWithTokenMissingRequiredScope_IsRejected()
     {
-        var token = fixture.Signer.Sign(ExampleFixture.OauthProvider(), ExampleFixture.ClaimsWithScope("other-scope"));
+        var token = fixture.Signer.Sign(DotnetComponentTestSuite.OauthProvider(), DotnetComponentTestSuite.ClaimsWithScope("other-scope"));
         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        var response = await client.GetAsync($"http://127.0.0.1:{ExampleFixture.WebAppPort}/Readings");
+        var response = await client.GetAsync($"http://127.0.0.1:{DotnetComponentTestSuite.WebAppPort}/Readings");
         Assert.Equal(
             HttpStatusCode.Forbidden,
             response.StatusCode);

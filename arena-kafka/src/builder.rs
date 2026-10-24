@@ -23,6 +23,7 @@ pub struct KafkaDependencyBuilder {
     network: Option<String>,
     readiness_check: Option<Box<dyn ReadinessCheck>>,
     topics: Vec<String>,
+    component_ids: Vec<String>,
 }
 
 impl KafkaDependencyBuilder {
@@ -48,6 +49,7 @@ impl KafkaDependencyBuilder {
             network: None,
             readiness_check: None,
             topics: Vec::new(),
+            component_ids: Vec::new(),
         }
     }
 
@@ -128,6 +130,11 @@ impl KafkaDependencyBuilder {
         self
     }
 
+    pub fn with_component_id(mut self, component_id: impl Into<String>) -> Self {
+        self.component_ids.push(component_id.into());
+        self
+    }
+
     pub fn build(self) -> KafkaDependency {
         let KafkaDependencyBuilder {
             identifier,
@@ -142,6 +149,7 @@ impl KafkaDependencyBuilder {
             expiry,
             readiness_check,
             topics,
+            component_ids,
         } = self;
 
         let (default_port, default_image_name, default_tag) = match flavor {
@@ -180,6 +188,7 @@ impl KafkaDependencyBuilder {
             image_tag,
             container_name,
             topics,
+            component_ids,
         );
 
         if let Some(check) = readiness_check {

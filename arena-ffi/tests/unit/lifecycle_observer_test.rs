@@ -159,3 +159,74 @@ fn arena_remove_lifecycle_observer_zero_token_keeps_registered_observers() {
         "a zero token must not remove a registered observer"
     );
 }
+
+fn wait_for_cpu_profile_post(
+    listener: &std::net::TcpListener,
+    budget: std::time::Duration,
+) -> bool {
+    listener
+        .set_nonblocking(true)
+        .expect("set listener non-blocking");
+    let deadline = std::time::Instant::now() + budget;
+    while std::time::Instant::now() < deadline {
+        match listener.accept() {
+            Ok((mut stream, _)) => {
+                use std::io::{Read, Write};
+                let mut buffer = [0u8; 2048];
+                let read = stream.read(&mut buffer).unwrap_or(0);
+                let _ = stream.write_all(b"HTTP/1.1 202 Accepted\r\ncontent-length: 0\r\n\r\n");
+                let request = String::from_utf8_lossy(&buffer[..read]).to_string();
+                if request.starts_with("POST /profile/cpu") {
+                    return true;
+                }
+            }
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            Err(_) => return false,
+        }
+    }
+    false
+}
+
+fn bind_capture_listener() -> (std::net::TcpListener, std::ffi::CString) {
+    let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("bind ephemeral port");
+    let port = listener.local_addr().expect("local addr").port();
+    let url = std::ffi::CString::new(format!("http://127.0.0.1:{port}")).expect("c string");
+    (listener, url)
+}
+
+#[test]
+fn arena_register_dashboard_observer_validurl_forwardscpuprofileeventsuntilremoved() {
+    let (forwarded, forwarded_url) = bind_capture_listener();
+    let token = arena_ffi::arena_register_dashboard_observer(forwarded_url.as_ptr());
+    assert_ne!(token, 0);
+
+    arena_profile::observer::report(
+        "ffi-profile-forwarded",
+        arena::lifecycle::RunnableState::Started,
+    );
+    assert!(
+        wait_for_cpu_profile_post(&forwarded, std::time::Duration::from_secs(5)),
+        "the dashboard observer did not post a cpu profile event"
+    );
+
+    arena_ffi::arena_remove_lifecycle_observer(token);
+
+    let (witness, witness_url) = bind_capture_listener();
+    let witness_token = arena_ffi::arena_register_dashboard_observer(witness_url.as_ptr());
+    arena_profile::observer::report(
+        "ffi-profile-after-remove",
+        arena::lifecycle::RunnableState::Started,
+    );
+    assert!(
+        wait_for_cpu_profile_post(&witness, std::time::Duration::from_secs(5)),
+        "the observer registered after the removal did not post the cpu profile event"
+    );
+    arena_ffi::arena_remove_lifecycle_observer(witness_token);
+
+    assert!(
+        !wait_for_cpu_profile_post(&forwarded, std::time::Duration::from_millis(250)),
+        "a cpu profile event was posted after the observer was removed"
+    );
+}

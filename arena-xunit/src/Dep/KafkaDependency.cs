@@ -20,6 +20,7 @@ public sealed class KafkaDependency : IArenaDependency
     public string? ImageName { get; }
     public string? ContainerName { get; }
     public IReadOnlyList<string>? Topics { get; }
+    public IReadOnlyList<string> ComponentIds { get; }
     public List<JToken>? Children => ChildrenWireFormat.Build(_children);
 
     private readonly IReadOnlyList<IArenaDependency> _children;
@@ -31,6 +32,7 @@ public sealed class KafkaDependency : IArenaDependency
         string? imageName,
         string? containerName,
         IReadOnlyList<string> topics,
+        IReadOnlyList<string> componentIds,
         IReadOnlyList<IArenaDependency> children)
     {
         Identifier = identifier;
@@ -39,6 +41,7 @@ public sealed class KafkaDependency : IArenaDependency
         ImageName = imageName;
         ContainerName = containerName;
         Topics = topics.Count > 0 ? topics : null;
+        ComponentIds = componentIds;
         _children = children;
     }
 
@@ -57,6 +60,7 @@ public sealed class KafkaDependencyBuilder
     private string? _imageName;
     private string? _containerName;
     private readonly List<string> _topics = new();
+    private readonly List<string> _componentIds = new();
     private readonly List<IArenaDependency> _children = new();
 
     public KafkaDependencyBuilder(string name)
@@ -94,6 +98,12 @@ public sealed class KafkaDependencyBuilder
         return this;
     }
 
+    public KafkaDependencyBuilder WithComponentId(string componentId)
+    {
+        _componentIds.Add(componentId);
+        return this;
+    }
+
     public KafkaDependencyBuilder AddChildDependency(IArenaDependency child)
     {
         _children.Add(child);
@@ -115,7 +125,7 @@ public sealed class KafkaDependencyBuilder
     public KafkaDependency Build()
     {
         var identifier = ArenaIdentifiers.Build("arena-kafka", _name);
-        var built = new KafkaDependency(identifier, _port, _flavor, _imageName, _containerName, new List<string>(_topics), _children);
+        var built = new KafkaDependency(identifier, _port, _flavor, _imageName, _containerName, new List<string>(_topics), _componentIds, _children);
         built.ExpirySeconds = _expirySeconds;
         return built;
     }

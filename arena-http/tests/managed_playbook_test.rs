@@ -1,3 +1,4 @@
+use arena::playbook::PlaybookState;
 use arena::dependency::{Dependency, RunnableDependency};
 use arena::lifecycle::Subject;
 use arena::playbook::Playbook as PlaybookTrait;
@@ -72,6 +73,10 @@ async fn run_dependency_present_applies_build_fn() {
 
     let active = playbook.run(&deps).await.expect("playbook should run");
     assert_eq!(active.identifier(), "managed-run");
+    assert_eq!(
+        active.lifecycle().playbook_type(),
+        arena::playbook::PlaybookType::Managed
+    );
 }
 
 #[tokio::test]
@@ -114,4 +119,32 @@ fn into_box_produces_trait_object() {
     let playbook = ManagedHttpPlaybook::new("boxed", "http-dep", |p| Ok(p));
     let boxed: Box<dyn PlaybookTrait> = playbook.into_box();
     assert_eq!(boxed.identifier(), "boxed");
+}
+
+#[test]
+fn state_newly_built_playbook_is_registered() {
+    let playbook = ManagedHttpPlaybook::new("lifecycle-probe", "does-not-exist", Ok);
+
+    assert_eq!(playbook.state(), PlaybookState::Registered);
+    assert_eq!(playbook.faults(), Vec::new());
+}
+
+#[tokio::test]
+async fn run_missing_dependency_reports_the_playbook_faulted() {
+    let playbook = ManagedHttpPlaybook::new("lifecycle-probe", "does-not-exist", Ok);
+    let deps: Vec<Dependency> = Vec::new();
+
+    let _ = playbook.run(&deps).await;
+
+    assert_eq!(playbook.state(), PlaybookState::Faulted);
+}
+
+#[test]
+fn playbook_type_arena_provided_playbook_reports_managed() {
+    let playbook = ManagedHttpPlaybook::new("type-probe", "http-dep", |p| Ok(p));
+
+    assert_eq!(
+        playbook.lifecycle().playbook_type(),
+        arena::playbook::PlaybookType::Managed
+    );
 }

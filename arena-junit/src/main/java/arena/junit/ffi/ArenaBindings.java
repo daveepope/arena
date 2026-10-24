@@ -18,6 +18,10 @@ public final class ArenaBindings {
 
   private ArenaBindings() {}
 
+  public static String dashboardSearchDirFromClasspath() {
+    return ArenaPaths.resolveDashboardSearchDir();
+  }
+
   public static ArenaNativeLib lib() {
     ArenaNativeLib lib = ArenaNativeHolder.LIB;
     if (lib == null) {
@@ -225,6 +229,35 @@ public final class ArenaBindings {
     }
     lib().arena_remove_lifecycle_observer(token);
     LIFECYCLE_OBSERVERS.remove(token);
+  }
+
+  public static String dashboardEnsureRunning(int port, String searchDir) {
+    if (port < 0 || port > 65535) {
+      throw new ArenaBindingError("dashboard port out of range (0-65535): " + port);
+    }
+    ArenaNativeLib lib = lib();
+    PointerByReference err = new PointerByReference();
+    Pointer raw = lib.arena_dashboard_ensure_running((short) port, searchDir, err);
+    if (raw == null || Pointer.nativeValue(raw) == 0) {
+      String msg = takeErr(err);
+      throw new ArenaBindingError(msg != null ? msg : "arena_dashboard_ensure_running returned null");
+    }
+    try {
+      return raw.getString(0, StandardCharsets.UTF_8.name());
+    } finally {
+      lib.arena_free_string(raw);
+    }
+  }
+
+  public static long registerDashboardObserver(String dashboardUrl) {
+    if (dashboardUrl == null || dashboardUrl.isEmpty()) {
+      throw new ArenaBindingError("dashboard url is null or empty");
+    }
+    long token = lib().arena_register_dashboard_observer(dashboardUrl);
+    if (token == 0L) {
+      throw new ArenaBindingError("arena_register_dashboard_observer rejected url");
+    }
+    return token;
   }
 
   public static ArenaStatus softReset(Pointer arena, String dependencyIdentifier) {

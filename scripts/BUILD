@@ -126,8 +126,12 @@ py_binary(
 py_binary(
     name = "repin",
     srcs = ["repin.py"],
+    data = [":osv_scanner_bin"],
     main = "repin.py",
-    deps = [":arena_version_lib"],
+    deps = [
+        ":arena_version_lib",
+        ":run_osv_scan_lib",
+    ],
     imports = ["."],
     visibility = ["//visibility:public"],
 )

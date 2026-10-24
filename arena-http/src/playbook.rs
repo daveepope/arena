@@ -3,6 +3,8 @@ pub mod response;
 pub mod stub;
 pub mod verify;
 
+use arena::playbook::PlaybookLifecycle;
+use std::sync::Arc;
 use crate::admin_client::admin_api_client;
 use crate::http_dependency::HttpDependency;
 use header_pattern::HeaderPattern;
@@ -76,6 +78,7 @@ impl Expectation {
 }
 
 pub struct Playbook {
+    lifecycle: Option<Arc<PlaybookLifecycle>>,
     identifier: String,
     admin_url: String,
     trusted_tls_certificate_pem: Option<String>,
@@ -89,6 +92,7 @@ impl Playbook {
             .admin_url()
             .expect("HttpDependency must be started before configuring a Playbook");
         Self {
+            lifecycle: None,
             identifier: format!("http-playbook:{}", dependency.identifier),
             admin_url,
             trusted_tls_certificate_pem: dependency.trusted_certificate_pem().map(str::to_string),
@@ -99,6 +103,11 @@ impl Playbook {
 
     pub fn with_identifier(mut self, identifier: impl Into<String>) -> Self {
         self.identifier = identifier.into();
+        self
+    }
+
+    pub fn with_lifecycle(mut self, lifecycle: Arc<PlaybookLifecycle>) -> Self {
+        self.lifecycle = Some(lifecycle);
         self
     }
 
@@ -165,6 +174,10 @@ impl Playbook {
         );
 
         ActivePlaybook {
+            lifecycle: self
+                .lifecycle
+                .clone()
+                .unwrap_or_else(|| PlaybookLifecycle::managed(self.identifier.clone())),
             identifier: self.identifier,
             admin_url: self.admin_url,
             trusted_tls_certificate_pem: self.trusted_tls_certificate_pem,
@@ -175,6 +188,7 @@ impl Playbook {
 }
 
 pub struct ActivePlaybook {
+    lifecycle: Arc<PlaybookLifecycle>,
     identifier: String,
     admin_url: String,
     trusted_tls_certificate_pem: Option<String>,
@@ -185,6 +199,10 @@ pub struct ActivePlaybook {
 impl arena::ActivePlaybook for ActivePlaybook {
     fn identifier(&self) -> &str {
         &self.identifier
+    }
+
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
+        &self.lifecycle
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -405,8 +423,8 @@ async fn fetch_scope_events_for(
         .collect()
 }
 
-impl Drop for ActivePlaybook {
-    fn drop(&mut self) {
+impl ActivePlaybook {
+    fn teardown(&mut self) {
         let already_unwinding = std::thread::panicking();
         let expectations = std::mem::take(&mut self.expectations);
         let registered = std::mem::take(&mut self.registered);
@@ -485,6 +503,24 @@ impl Drop for ActivePlaybook {
             Ok(Ok(())) => {}
             Ok(Err(msg)) => panic!("{msg}"),
             Err(_) => panic!("ActivePlaybook::drop: cleanup thread panicked"),
+        }
+    
+    }
+}
+
+impl Drop for ActivePlaybook {
+    fn drop(&mut self) {
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.teardown()));
+        match outcome {
+            Ok(()) => self.lifecycle.exit(),
+            Err(payload) => {
+                self.lifecycle.report_fault(arena::lifecycle::Fault::playbook(
+                    self.lifecycle.playbook_id(),
+                    "playbook teardown failed",
+                ));
+                self.lifecycle.exit();
+                std::panic::resume_unwind(payload);
+            }
         }
     }
 }

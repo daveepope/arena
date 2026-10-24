@@ -35,13 +35,12 @@ pub struct OracleDependencyBuilder {
     readiness_check: Option<Box<dyn ReadinessCheck>>,
     sql_readiness_timeout: Option<std::time::Duration>,
     setup_mode: OracleSetupMode,
+    component_ids: Vec<String>,
 }
 
 impl OracleDependencyBuilder {
     const DEFAULT_PORT: u16 = 1521;
     const DEFAULT_DATABASE_USERNAME: &'static str = "arena_user";
-    const DEFAULT_DATABASE_PASSWORD: &'static str = "ArenaOracle1!";
-    const DEFAULT_ADMIN_PASSWORD: &'static str = "ArenaOracleAdmin1!";
     const DEFAULT_IMAGE_NAME: &'static str = arena_container::default_images::ORACLE.image;
     const DEFAULT_IMAGE_TAG: &'static str = arena_container::default_images::ORACLE.tag;
 
@@ -64,6 +63,7 @@ impl OracleDependencyBuilder {
             readiness_check: None,
             sql_readiness_timeout: None,
             setup_mode: OracleSetupMode::Fast,
+            component_ids: Vec::new(),
         }
     }
 
@@ -169,6 +169,11 @@ impl OracleDependencyBuilder {
         self
     }
 
+    pub fn with_component_id(mut self, component_id: impl Into<String>) -> Self {
+        self.component_ids.push(component_id.into());
+        self
+    }
+
     pub fn build(self) -> Result<OracleDependency, Fault> {
         let oracle_impl = self
             .oracle_impl
@@ -197,10 +202,10 @@ impl OracleDependencyBuilder {
             .unwrap_or_else(|| Self::DEFAULT_DATABASE_USERNAME.to_string());
         let database_password = self
             .database_password
-            .unwrap_or_else(|| Self::DEFAULT_DATABASE_PASSWORD.to_string());
+            .unwrap_or_else(arena_container::credential::new_password);
         let admin_password = self
             .admin_password
-            .unwrap_or_else(|| Self::DEFAULT_ADMIN_PASSWORD.to_string());
+            .unwrap_or_else(arena_container::credential::new_password);
         let startup_sql_scripts = self.startup_sql_scripts;
         let dependencies = self.dependencies;
         let image_name = self
@@ -225,6 +230,7 @@ impl OracleDependencyBuilder {
             image_name,
             image_tag,
             container_name,
+            self.component_ids,
         );
 
         if let Some(check) = readiness_check {

@@ -73,3 +73,11 @@ fn readiness_failed_for_target_returns_target_and_cause() {
 fn reset_failed_no_input_returns_lifecycle_wording() {
     assert_eq!(message::reset_failed(), "failed to reset");
 }
+
+#[test]
+fn cpu_profile_capture_failed_returns_the_reason() {
+    assert_eq!(
+        message::cpu_profile_capture_failed("captured cpu profile is 99 bytes"),
+        "cpu profile capture failed: captured cpu profile is 99 bytes"
+    );
+}

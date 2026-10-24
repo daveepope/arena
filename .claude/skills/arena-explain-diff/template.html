@@ -1,0 +1,451 @@
+<title>__TITLE__</title>
+<style>
+  :root {
+    --bg: #faf9f7;
+    --surface: #ffffff;
+    --surface-2: #f1efe9;
+    --border: #ddd7ca;
+    --text: #2a2620;
+    --text-dim: #6b6456;
+    --accent: #8a5a3c;
+    --accent-2: #3c6e5a;
+    --bad: #a33a3a;
+    --good: #2e7d4f;
+    --code-bg: #2b2621;
+    --code-text: #f1ead9;
+    --shadow: rgba(40, 30, 10, 0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1c1a17;
+      --surface: #24211d;
+      --surface-2: #2c2822;
+      --border: #413c33;
+      --text: #ece6d8;
+      --text-dim: #aba396;
+      --accent: #d99a6c;
+      --accent-2: #7fc9a6;
+      --bad: #e07a7a;
+      --good: #7fcf9a;
+      --code-bg: #15130f;
+      --code-text: #ecdfc4;
+      --shadow: rgba(0, 0, 0, 0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1c1a17;
+    --surface: #24211d;
+    --surface-2: #2c2822;
+    --border: #413c33;
+    --text: #ece6d8;
+    --text-dim: #aba396;
+    --accent: #d99a6c;
+    --accent-2: #7fc9a6;
+    --bad: #e07a7a;
+    --good: #7fcf9a;
+    --code-bg: #15130f;
+    --code-text: #ecdfc4;
+    --shadow: rgba(0, 0, 0, 0.4);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 2rem 1.25rem 5rem; }
+  h1 { font-size: 1.7rem; margin-bottom: 0.3rem; }
+  .subtitle { color: var(--text-dim); margin-top: 0; margin-bottom: 1.75rem; }
+  h2 {
+    font-size: 1.25rem;
+    margin-top: 2.75rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 2px solid var(--border);
+  }
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 2rem;
+  }
+  .toc h2 { margin-top: 0; border-bottom: none; font-size: 1.05rem; }
+  .toc ol { margin: 0.5rem 0 0; padding-left: 1.3rem; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--surface-2);
+    border-radius: 0 8px 8px 0;
+    padding: 0.85rem 1rem;
+    margin: 1.1rem 0;
+  }
+  .callout.warn { border-left-color: var(--bad); }
+  .callout strong { color: var(--accent); }
+  .callout.warn strong { color: var(--bad); }
+
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    border-radius: 8px;
+    padding: 0.9rem 1rem;
+    overflow-x: auto;
+    white-space: pre;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.9em;
+  }
+  :not(pre) > code {
+    background: var(--surface-2);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+  }
+
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+    margin: 1.2rem 0;
+  }
+  .flow .box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.85rem;
+    box-shadow: 0 1px 3px var(--shadow);
+    flex: 1 1 140px;
+    min-width: 120px;
+  }
+  .flow .box .label { font-weight: 600; display: block; margin-bottom: 0.2rem; }
+  .flow .box .sub { color: var(--text-dim); font-size: 0.78rem; }
+  .flow .arrow { color: var(--accent); font-size: 1.1rem; flex: 0 0 auto; }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.8rem;
+    margin: 1.2rem 0;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+    box-shadow: 0 1px 3px var(--shadow);
+  }
+  .card .title { font-weight: 600; margin-bottom: 0.3rem; color: var(--accent); }
+  .card .desc { font-size: 0.85rem; color: var(--text-dim); }
+
+  .before-after {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+    margin: 1.2rem 0;
+  }
+  @media (max-width: 600px) { .before-after { grid-template-columns: 1fr; } }
+  .before-after .panel {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+    background: var(--surface);
+  }
+  .before-after .panel.bad h3 { color: var(--bad); }
+  .before-after .panel.good h3 { color: var(--good); }
+  .before-after h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+
+  table { width: 100%; border-collapse: collapse; margin: 1.1rem 0; font-size: 0.9rem; }
+  th, td { border: 1px solid var(--border); padding: 0.5rem 0.7rem; text-align: left; }
+  th { background: var(--surface-2); }
+
+  .quiz-q {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.1rem 1.2rem;
+    margin-bottom: 1.1rem;
+    box-shadow: 0 1px 3px var(--shadow);
+  }
+  .quiz-q .qtext { font-weight: 600; margin-bottom: 0.7rem; }
+  .quiz-q .opt {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 0.55rem 0.75rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    font-size: 0.92rem;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .quiz-q .opt:hover:not(:disabled) { border-color: var(--accent); }
+  .quiz-q .opt:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+  .quiz-q .opt:disabled { cursor: default; }
+  .quiz-q .opt.correct { background: color-mix(in srgb, var(--good) 20%, var(--surface)); border-color: var(--good); }
+  .quiz-q .opt.incorrect { background: color-mix(in srgb, var(--bad) 20%, var(--surface)); border-color: var(--bad); }
+  .quiz-q .feedback {
+    margin-top: 0.6rem;
+    padding: 0.7rem 0.85rem;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    display: none;
+  }
+  .quiz-q .feedback.show { display: block; }
+  .quiz-q .feedback.right { background: color-mix(in srgb, var(--good) 15%, var(--surface)); border: 1px solid var(--good); }
+  .quiz-q .feedback.wrong { background: color-mix(in srgb, var(--bad) 15%, var(--surface)); border: 1px solid var(--bad); }
+
+  #scorebar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.6rem 1rem;
+    margin-bottom: 1.2rem;
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 6px var(--shadow);
+  }
+  #verdict {
+    margin-top: 1.5rem;
+    padding: 1.1rem 1.2rem;
+    border-radius: 10px;
+    font-weight: 600;
+    display: none;
+    text-align: center;
+    font-size: 1.05rem;
+  }
+  #verdict.show { display: block; }
+  #verdict.pass { background: color-mix(in srgb, var(--good) 18%, var(--surface)); border: 1px solid var(--good); color: var(--good); }
+  #verdict.fail { background: color-mix(in srgb, var(--bad) 18%, var(--surface)); border: 1px solid var(--bad); color: var(--bad); }
+</style>
+
+<div class="wrap">
+  <h1>__TITLE__</h1>
+  <p class="subtitle">__SUBTITLE__</p>
+
+  <div class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#background">Background</a></li>
+      <li><a href="#intuition">Intuition</a></li>
+      <li><a href="#code">Code</a></li>
+      <li><a href="#quiz">Quiz</a></li>
+    </ol>
+  </div>
+
+  <h2 id="background">Background</h2>
+  __BACKGROUND_CONTENT__
+
+  <h2 id="intuition">Intuition</h2>
+  __INTUITION_CONTENT__
+
+  <h2 id="code">Code</h2>
+  __CODE_CONTENT__
+
+  <h2 id="quiz">Quiz</h2>
+  <p>__QUIZ_INTRO__</p>
+  <div id="scorebar">
+    <span id="progress">0 / 0 answered</span>
+    <span id="score">Score: 0</span>
+  </div>
+  <div id="quiz-root"></div>
+  <div id="verdict"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // Fill this array in. Every question needs the SAME number of options
+  // (4 is the convention used elsewhere in this template) so the
+  // slot-balancing below stays simple and correct. Do not add a
+  // hand-computed slot plan here -- the renderer below balances answer
+  // position automatically from questions.length and options.length.
+  //
+  // Quality bar for every question (see SKILL.md "Quiz quality rules" and
+  // "Fact-checking the quiz" before shipping):
+  //   - exactly one option per question has correct: true
+  //   - every distractor is a plausible, specific, real misunderstanding
+  //     (no joke answers, no "all/none of the above")
+  //   - keep every option's visible text comparable in length to the
+  //     others in that question -- the correct option must not be the
+  //     longest (or shortest) option in more than ~1/5 of all questions.
+  //     Check this explicitly (e.g. compare character counts across the
+  //     whole set) before finalizing, don't just eyeball it.
+  //   - re-verify every "correct" marking and every explanation against
+  //     the actual source/behavior one more time before shipping
+  var questions = [
+    /* QUESTIONS_ARRAY */
+    // {
+    //   q: "Question text?",
+    //   options: [
+    //     { text: "Plausible wrong answer A.", correct: false,
+    //       explain: "Why this is wrong, tied to the real behavior." },
+    //     { text: "The actually-correct answer.", correct: true,
+    //       explain: "Why this is right, with the relevant behavior/code path." },
+    //     { text: "Plausible wrong answer B.", correct: false,
+    //       explain: "Why this is wrong." },
+    //     { text: "Plausible wrong answer C.", correct: false,
+    //       explain: "Why this is wrong." }
+    //   ]
+    // },
+  ];
+
+  // Decodes the small set of HTML entities this template's prose uses, so
+  // aria-label (plain text for assistive tech) never exposes raw entity
+  // syntax like "&amp;" to a screen reader. Extend this list if a question
+  // option's text uses any entity not already covered.
+  function toPlainText(s) {
+    return s
+      .replace(/&amp;/g, "&")
+      .replace(/&gt;/g, ">")
+      .replace(/&lt;/g, "<")
+      .replace(/&mdash;/g, "—")
+      .replace(/&rarr;/g, "→")
+      .replace(/&hellip;/g, "…");
+  }
+
+  // Seeded per page (from the title text and question count) rather than
+  // a single fixed formula, so the arrangement can't be precomputed from
+  // this shared template alone -- it depends on content only this page
+  // has. Simple string hash -> mulberry32 PRNG; good enough for layout
+  // shuffling, not a security primitive.
+  function hashSeed(str) {
+    var h = 2166136261 >>> 0; // FNV-1a offset basis
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  function mulberry32(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  var pageSeed = hashSeed(document.title + "::" + questions.length);
+  var rand = mulberry32(pageSeed);
+
+  function shuffle(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(rand() * (i + 1));
+      var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+
+  // Balances the correct answer's position as evenly as the numbers
+  // allow, with no two consecutive questions sharing a slot: start from
+  // a round-robin base (qIndex % optionCount), then relabel slots with a
+  // page-seeded permutation. Relabeling a round-robin preserves both of
+  // its guarantees (base's own math) while making the actual physical
+  // slot per question unpredictable without this page's seed.
+  var slotPermutation = shuffle(
+    questions.length
+      ? Array.from({ length: questions[0].options.length }, function (_, i) { return i; })
+      : []
+  );
+  function targetSlotFor(qIndex, optionCount) {
+    return slotPermutation[qIndex % optionCount];
+  }
+
+  function buildQuestion(qObj, targetSlot) {
+    var correctOpt = qObj.options.filter(function (o) { return o.correct; })[0];
+    var wrongOpts = shuffle(qObj.options.filter(function (o) { return !o.correct; }));
+    var arranged = wrongOpts.slice();
+    arranged.splice(targetSlot, 0, correctOpt);
+    return { q: qObj.q, options: arranged };
+  }
+
+  var root = document.getElementById("quiz-root");
+  var answered = new Array(questions.length).fill(false);
+  var score = 0;
+
+  function updateBar() {
+    var count = answered.filter(Boolean).length;
+    document.getElementById("progress").textContent = count + " / " + questions.length + " answered";
+    document.getElementById("score").textContent = "Score: " + score;
+    if (count === questions.length && questions.length > 0) {
+      var verdict = document.getElementById("verdict");
+      var pct = score / questions.length;
+      verdict.className = "show " + (pct >= 0.7 ? "pass" : "fail");
+      verdict.textContent = pct >= 0.7
+        ? "Pass — " + score + " / " + questions.length + " correct."
+        : "Not quite — " + score + " / " + questions.length + " correct. Worth rereading the Code section above.";
+    }
+  }
+
+  questions.forEach(function (qObj, qIndex) {
+    var slot = targetSlotFor(qIndex, qObj.options.length);
+    var arrangedQ = buildQuestion(qObj, slot);
+    var card = document.createElement("div");
+    card.className = "quiz-q";
+
+    var qText = document.createElement("div");
+    qText.className = "qtext";
+    qText.textContent = (qIndex + 1) + ". " + arrangedQ.q;
+    card.appendChild(qText);
+
+    var feedback = document.createElement("div");
+    feedback.className = "feedback";
+
+    arrangedQ.options.forEach(function (opt) {
+      var btn = document.createElement("button");
+      btn.className = "opt";
+      btn.type = "button";
+      btn.innerHTML = opt.text;
+      btn.setAttribute("aria-label", toPlainText(opt.text));
+      btn.addEventListener("click", function () {
+        if (answered[qIndex]) return;
+        answered[qIndex] = true;
+
+        var allBtns = card.querySelectorAll(".opt");
+        allBtns.forEach(function (b) { b.disabled = true; });
+
+        if (opt.correct) {
+          btn.classList.add("correct");
+          score += 1;
+          feedback.className = "feedback show right";
+          feedback.innerHTML = "<strong>Correct.</strong> " + opt.explain;
+        } else {
+          btn.classList.add("incorrect");
+          arrangedQ.options.forEach(function (o, i) {
+            if (o.correct) { allBtns[i].classList.add("correct"); }
+          });
+          feedback.className = "feedback show wrong";
+          feedback.innerHTML = "<strong>Not quite.</strong> " + opt.explain;
+        }
+        updateBar();
+      });
+      card.appendChild(btn);
+    });
+
+    card.appendChild(feedback);
+    root.appendChild(card);
+  });
+
+  updateBar();
+})();
+</script>

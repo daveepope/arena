@@ -1,5 +1,5 @@
 use crate::executable_component::ExecutableComponent;
-use crate::platform::resolve_executable_extension;
+use crate::platform::resolve_configured_executable_path;
 use arena::healthcheck::ReadinessCheck;
 use arena::Component;
 use arena::Fault;
@@ -12,6 +12,7 @@ pub enum BuildTool {
     Dotnet,
     Make,
     CMake,
+    Python,
     Custom { command: String, args: Vec<String> },
 }
 
@@ -133,14 +134,16 @@ impl ExecutableComponentBuilder {
                     })?
             };
 
-            let output = Self::execute_build(&self.identifier, build_tool, &source_dir)?;
+            if !matches!(build_tool, BuildTool::Python) {
+                let output = Self::execute_build(&self.identifier, build_tool, &source_dir)?;
 
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(Fault::component(
-                    self.identifier.clone(),
-                    format!("build failed: {}", stderr),
-                ));
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(Fault::component(
+                        self.identifier.clone(),
+                        format!("build failed: {}", stderr),
+                    ));
+                }
             }
 
             tracing::debug!(
@@ -152,24 +155,8 @@ impl ExecutableComponentBuilder {
 
         let executable_path = match self.executable_path {
             Some(path) => {
-                let resolved = if path.is_absolute() {
-                    path
-                } else {
-                    let current_dir = current_dir_fault(&self.identifier)?;
-
-                    current_dir
-                        .ancestors()
-                        .find_map(|ancestor| {
-                            let candidate = ancestor.join(&path);
-                            if candidate.exists() {
-                                Some(candidate)
-                            } else {
-                                None
-                            }
-                        })
-                        .unwrap_or_else(|| current_dir.join(&path))
-                };
-                Some(resolve_executable_extension(resolved))
+                let current_dir = current_dir_fault(&self.identifier)?;
+                Some(resolve_configured_executable_path(path, &current_dir))
             }
             None => None,
         };
@@ -180,6 +167,7 @@ impl ExecutableComponentBuilder {
         component.env_vars = self.env_vars;
         component.runtime_args = self.runtime_args;
         component.readiness_checks = self.readiness_checks;
+        component.build_tool = self.build_tool;
         Ok(component)
     }
 
@@ -195,6 +183,12 @@ impl ExecutableComponentBuilder {
             BuildTool::Dotnet => ("dotnet", &["build", "--configuration", "Release"]),
             BuildTool::Make => ("make", &[]),
             BuildTool::CMake => ("cmake", &["--build", ".", "--config", "Release"]),
+            BuildTool::Python => {
+                return Err(Fault::component(
+                    identifier,
+                    "python executable components are launched directly, not built from source",
+                ));
+            }
             BuildTool::Custom { command, args } => {
                 return std::process::Command::new(command)
                     .args(args)
@@ -220,4 +214,45 @@ fn current_dir_fault(identifier: &str) -> Result<PathBuf, Fault> {
     std::env::current_dir().map_err(|e| {
         Fault::component(identifier, format!("failed to read current directory: {e}"))
     })
+}
+
+#[cfg(target_os = "macos")]
+fn python_cpu_profiler_backend() -> arena_profile::CpuProfilerBackend {
+    arena_profile::CpuProfilerBackend::PythonSiteSampler
+}
+
+#[cfg(not(target_os = "macos"))]
+fn python_cpu_profiler_backend() -> arena_profile::CpuProfilerBackend {
+    arena_profile::CpuProfilerBackend::PySpy
+}
+
+pub(crate) fn cpu_profiler_backend(
+    identifier: &str,
+    build_tool: Option<&BuildTool>,
+) -> Result<arena_profile::CpuProfilerBackend, Fault> {
+    match build_tool {
+        Some(BuildTool::Cargo) => Ok(arena_profile::CpuProfilerBackend::Perf),
+        Some(BuildTool::Maven) | Some(BuildTool::Gradle) => {
+            Ok(arena_profile::CpuProfilerBackend::AsyncProfiler)
+        }
+        Some(BuildTool::Python) => Ok(python_cpu_profiler_backend()),
+        Some(BuildTool::Dotnet) => Ok(arena_profile::CpuProfilerBackend::DotnetTrace),
+        Some(BuildTool::Make) => Err(cpu_profile_unsupported(identifier, "BuildTool::Make")),
+        Some(BuildTool::CMake) => Err(cpu_profile_unsupported(identifier, "BuildTool::CMake")),
+        Some(BuildTool::Custom { command, .. }) => Err(cpu_profile_unsupported(
+            identifier,
+            &format!("BuildTool::Custom(\"{command}\")"),
+        )),
+        None => Err(Fault::component(
+            identifier,
+            "cpu profiling requires a build_tool of Cargo, Maven, Gradle, Python, or Dotnet",
+        )),
+    }
+}
+
+fn cpu_profile_unsupported(identifier: &str, build_tool: &str) -> Fault {
+    Fault::component(
+        identifier,
+        format!("cpu profiling is not supported for {build_tool}"),
+    )
 }

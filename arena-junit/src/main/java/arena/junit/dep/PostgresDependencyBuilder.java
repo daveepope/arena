@@ -74,6 +74,11 @@ public final class PostgresDependencyBuilder {
     return this;
   }
 
+  public PostgresDependencyBuilder withComponentId(String componentId) {
+    ((ArrayNode) config.withArray("component_ids")).add(componentId);
+    return this;
+  }
+
   public PostgresDependencyBuilder addChildDependency(ArenaRunnableDependency child) {
     this.children.add(child);
     return this;

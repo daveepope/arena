@@ -22,6 +22,10 @@ final class PostgresDependencyBuilderSerializationTest {
     }
   }
 
+  private static String generatedPassword() {
+    return "pw" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+  }
+
   @Test
   void build_minimalName_serializesTypeAndIdentifier() {
     ObjectNode config = new PostgresDependencyBuilder("pg").build().forFfi();
@@ -32,6 +36,7 @@ final class PostgresDependencyBuilderSerializationTest {
 
   @Test
   void withOverrides_allFields_serializesConfiguredFields() {
+    String password = generatedPassword();
     ObjectNode config =
         new PostgresDependencyBuilder("pg")
             .withImage("16-alpine")
@@ -39,7 +44,7 @@ final class PostgresDependencyBuilderSerializationTest {
             .withPort(15432)
             .withDatabaseName("arena")
             .withDatabaseUsername("arena_user")
-            .withDatabasePassword("secret")
+            .withDatabasePassword(password)
             .withContainerName("pg-box")
             .build()
             .forFfi();
@@ -48,7 +53,7 @@ final class PostgresDependencyBuilderSerializationTest {
     assertEquals(15432, config.path("port").asInt());
     assertEquals("arena", config.path("database_name").asText());
     assertEquals("arena_user", config.path("database_username").asText());
-    assertEquals("secret", config.path("database_password").asText());
+    assertEquals(password, config.path("database_password").asText());
     assertEquals("pg-box", config.path("container_name").asText());
   }
 
@@ -78,5 +83,19 @@ final class PostgresDependencyBuilderSerializationTest {
   void identifier_returnsConfiguredIdentifier() {
     PostgresDependency dep = new PostgresDependencyBuilder("pg").build();
     assertTrue(dep.identifier().startsWith("arena-postgres-pg-"));
+  }
+
+  @Test
+  void withComponentId_repeatable_serializesComponentIdsArray() {
+    ObjectNode config =
+        new PostgresDependencyBuilder("pg")
+            .withComponentId("service-a")
+            .withComponentId("service-b")
+            .build()
+            .forFfi();
+    ArrayNode componentIds = (ArrayNode) config.path("component_ids");
+    assertEquals(2, componentIds.size());
+    assertEquals("service-a", componentIds.get(0).asText());
+    assertEquals("service-b", componentIds.get(1).asText());
   }
 }

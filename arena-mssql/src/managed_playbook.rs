@@ -1,19 +1,25 @@
 use arena::dependency::{find_dependency, Dependency};
 use arena::lifecycle::Fault;
-use arena::playbook::{ActivePlaybook, Playbook as PlaybookTrait};
+use arena::playbook::{
+    ActivePlaybook, ManagedPlaybook, Playbook as PlaybookTrait, PlaybookLifecycle,
+};
+use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::mssql_dependency::MssqlDependency;
 
 pub struct ManagedMssqlPlaybook {
+    managed: ManagedPlaybook,
     identifier: String,
     dependency_identifier: String,
 }
 
 impl ManagedMssqlPlaybook {
     pub fn new(identifier: impl Into<String>, dependency_identifier: impl Into<String>) -> Self {
+        let identifier = identifier.into();
         Self {
-            identifier: identifier.into(),
+            managed: ManagedPlaybook::new(identifier.clone()),
+            identifier,
             dependency_identifier: dependency_identifier.into(),
         }
     }
@@ -29,7 +35,20 @@ impl PlaybookTrait for ManagedMssqlPlaybook {
         &self.identifier
     }
 
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
+        self.managed.lifecycle()
+    }
+
     async fn run(&self, dependencies: &[Dependency]) -> Result<Box<dyn ActivePlaybook>, Fault> {
+        self.managed.apply(self.run_inner(dependencies)).await
+    }
+}
+
+impl ManagedMssqlPlaybook {
+    async fn run_inner(
+        &self,
+        dependencies: &[Dependency],
+    ) -> Result<Box<dyn ActivePlaybook>, Fault> {
         let mssql = find_dependency(dependencies, &self.dependency_identifier)
             .and_then(|d| d.as_any().downcast_ref::<MssqlDependency>())
             .ok_or_else(|| {
@@ -52,7 +71,8 @@ impl PlaybookTrait for ManagedMssqlPlaybook {
             ));
         }
 
-        let playbook = mssql.playbook().with_identifier(&self.identifier);
+        let playbook = mssql.playbook().with_identifier(&self.identifier)
+            .with_lifecycle(Arc::clone(self.managed.lifecycle()));
         Ok(Box::new(playbook.run().await))
     }
 }

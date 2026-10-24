@@ -1,6 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
 
+use arena::dependency::RunnableDependency;
 use arena_oauth::{IssuerConfig, OauthDependency, Provider};
 use rsa::pkcs8::{EncodePrivateKey, LineEnding};
 use rsa::RsaPrivateKey;
@@ -225,4 +226,22 @@ fn build_with_server_tls_pem_exposes_that_certificate() {
         .build().expect("build oauth dependency");
 
     assert_eq!(dep.server_tls_certificate_pem(), Some(pair.0.as_str()));
+}
+
+#[test]
+fn builder_with_component_id_populates_component_ids() {
+    let dep = OauthDependency::builder("component-linked")
+        .with_component_id("parent-component")
+        .with_component_id("child-component")
+        .build().expect("build oauth dependency");
+
+    assert_eq!(dep.component_ids(), ["parent-component", "child-component"]);
+}
+
+#[test]
+fn builder_without_component_id_defaults_to_empty() {
+    let dep = OauthDependency::builder("no-component")
+        .build().expect("build oauth dependency");
+
+    assert!(dep.component_ids().is_empty());
 }

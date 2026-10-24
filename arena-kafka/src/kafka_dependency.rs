@@ -48,6 +48,7 @@ pub struct KafkaDependency {
     topics: Vec<String>,
     state: RunnableState,
     faults: Vec<Fault>,
+    component_ids: Vec<String>,
 }
 
 impl KafkaDependency {
@@ -60,6 +61,7 @@ impl KafkaDependency {
         image_tag: String,
         container_name: Option<String>,
         topics: Vec<String>,
+        component_ids: Vec<String>,
     ) -> Self {
         KafkaDependency {
             identifier,
@@ -76,6 +78,7 @@ impl KafkaDependency {
             topics,
             state: RunnableState::NotStarted,
             faults: Vec::new(),
+            component_ids,
         }
     }
 
@@ -339,6 +342,10 @@ impl RunnableDependency for KafkaDependency {
 
     fn children(&self) -> &[Dependency] {
         self.dependencies.as_deref().unwrap_or(&[])
+    }
+
+    fn component_ids(&self) -> &[String] {
+        &self.component_ids
     }
 
     fn children_mut(&mut self) -> &mut [Dependency] {

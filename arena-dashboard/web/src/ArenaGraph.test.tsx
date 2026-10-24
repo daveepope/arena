@@ -1,0 +1,249 @@
+import "./testSetup";
+
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { ArenaGraph } from "./ArenaGraph";
+import { useDashboardStore } from "./store";
+import type { ArenaState } from "./types";
+
+function lastProfile() {
+  const profiles = useDashboardStore.getState().profiles;
+  return profiles.length === 0 ? null : profiles[profiles.length - 1];
+}
+
+
+function lastDetail() {
+  const details = useDashboardStore.getState().details;
+  return details.length === 0 ? null : details[details.length - 1];
+}
+
+
+function arenaState(overrides: Partial<ArenaState> = {}): ArenaState {
+  return {
+    id: "arena-1",
+    state: "arena_open",
+    at: "2026-01-01T00:00:00.000Z",
+    dependencies: [],
+    components: [],
+    faults: [],
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  useDashboardStore.setState({
+    arenas: new Map(),
+    details: [],
+    cpuProfiles: new Map(),
+    profiles: [],
+  });
+});
+
+function componentSubject(id: string) {
+  return { id, state: "stopped", faults: [], children: [] };
+}
+
+describe("ArenaGraph", () => {
+  it("canvas renders a thin line grid behind the topology", () => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState());
+    });
+    const { container } = render(<ArenaGraph arenaId="arena-1" />);
+
+    const pattern = container.querySelector(".react-flow__background-pattern");
+    expect(pattern?.classList.contains("lines")).toBe(true);
+    expect(pattern?.getAttribute("stroke-width")).toBe("0.5");
+    const canvas = container.querySelector(".react-flow__background") as SVGElement;
+    expect(canvas.style.getPropertyValue("--xy-background-pattern-color-props")).toBe(
+      "rgba(226, 232, 240, 0.1)",
+    );
+  });
+
+  it("shows a waiting placeholder before any snapshot arrives", () => {
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    expect(screen.getByText("waiting for events...")).toBeDefined();
+  });
+
+  it("renders a node for each visible subject once a snapshot is ingested", () => {
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    act(() => {
+      useDashboardStore.getState().ingest(
+        arenaState({
+          dependencies: [{ id: "postgres", state: "started", faults: [], children: [] }],
+          components: [{ id: "api", state: "started", faults: [], children: [] }],
+        })
+      );
+    });
+
+    expect(screen.getByText("postgres")).toBeDefined();
+    expect(screen.getByText("api")).toBeDefined();
+  });
+
+  it("nested child subjects render as their own nodes beneath their parent", () => {
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    act(() => {
+      useDashboardStore.getState().ingest(
+        arenaState({
+          dependencies: [
+            {
+              id: "postgres",
+              state: "started",
+              faults: [],
+              children: [{ id: "postgres-replica", state: "started", faults: [], children: [] }],
+            },
+          ],
+          components: [{ id: "api", state: "started", faults: [], children: [], component_ids: [] }],
+        })
+      );
+    });
+
+    expect(screen.getByText("postgres")).toBeDefined();
+    expect(screen.getByText("postgres-replica")).toBeDefined();
+    expect(screen.getByText("api")).toBeDefined();
+  });
+
+  it("clicking a node sets the store selection to that subject's detail", () => {
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    act(() => {
+      useDashboardStore.getState().ingest(
+        arenaState({ dependencies: [{ id: "postgres", state: "started", faults: [], children: [] }] })
+      );
+    });
+
+    fireEvent.click(screen.getByText("postgres"));
+
+    expect(lastDetail()?.title).toBe("postgres");
+  });
+
+  it("clicking the arena panel button sets the store selection to the arena's own detail", () => {
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState());
+    });
+
+    fireEvent.click(screen.getByText(/arena-1.*state: arena_open/));
+
+    expect(lastDetail()?.title).toContain("arena-1");
+  });
+
+  it("not_started subjects are not visible as rendered node text", () => {
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    act(() => {
+      useDashboardStore.getState().ingest(
+        arenaState({ dependencies: [{ id: "oracle", state: "not_started", faults: [], children: [] }] })
+      );
+    });
+
+    const node = screen.getByText("oracle").closest(".pointer-events-none");
+    expect(node).not.toBeNull();
+  });
+});
+
+describe("ArenaGraph profiler label", () => {
+  it("component without a profiler shows no label", () => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+    });
+
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    expect(screen.queryByTestId("profiler-label-svc")).toBeNull();
+  });
+
+  it("sampling profiler shows its state and cannot be opened", () => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+      useDashboardStore.getState().ingestCpuProfile("svc", "started", false);
+    });
+
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    const label = screen.getByTestId("profiler-label-svc") as HTMLButtonElement;
+    expect(label.textContent).toBe("cpu profiler started");
+    expect(label.disabled).toBe(true);
+  });
+
+  it("available profiler opens the profile view for that component", () => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+      useDashboardStore.getState().ingestCpuProfile("svc", "stopped", true);
+    });
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    fireEvent.click(screen.getByTestId("profiler-label-svc"));
+
+    expect(lastProfile()?.componentId).toBe("svc");
+  });
+
+  it("opening the profile view does not also select the node", () => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+      useDashboardStore.getState().ingestCpuProfile("svc", "stopped", true);
+    });
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    fireEvent.click(screen.getByTestId("profiler-label-svc"));
+
+    expect(lastDetail()).toBeNull();
+  });
+
+  it("stoppedProfilerWithoutAReportCannotBeOpened", () => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+      useDashboardStore.getState().ingestCpuProfile("svc", "stopped", false);
+    });
+
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    const label = screen.getByTestId("profiler-label-svc") as HTMLButtonElement;
+    expect(label.textContent).toBe("cpu profiler stopped");
+    expect(label.disabled).toBe(true);
+  });
+
+  it.each([["recenter-graph"], ["zoom-in-graph"], ["zoom-out-graph"], ["zoom-hint-graph"]])(
+    "%s controlIsOfferedOnTheCanvas",
+    (testId) => {
+      act(() => {
+        useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+      });
+
+      render(<ArenaGraph arenaId="arena-1" />);
+
+      expect(screen.getByTestId(testId)).toBeDefined();
+    },
+  );
+
+  it("recenterButtonIsOfferedOnTheCanvas", () => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+    });
+
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    expect(screen.getByTestId("recenter-graph")).toBeDefined();
+  });
+  it.each([
+    ["ctrlKey", { ctrlKey: true }, true],
+    ["metaKey", { metaKey: true }, true],
+    ["noModifier", {}, false],
+  ])("wheelWith%sCancelsThePagesOwnZoom", (_name, modifier, isCancelled) => {
+    act(() => {
+      useDashboardStore.getState().ingest(arenaState({ components: [componentSubject("svc")] }));
+    });
+    render(<ArenaGraph arenaId="arena-1" />);
+
+    const event = new WheelEvent("wheel", { deltaY: -120, cancelable: true, bubbles: true, ...modifier });
+    act(() => {
+      screen.getByTestId("arena-canvas").dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(isCancelled);
+  });
+});

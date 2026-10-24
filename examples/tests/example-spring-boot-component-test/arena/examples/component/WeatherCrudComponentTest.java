@@ -9,13 +9,13 @@ import arena.junit.Playbook;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
 
-@Arena(ComponentTestSuite.class)
+@Arena(JavaSpringBootComponentTestSuite.class)
 final class WeatherCrudComponentTest {
 
   @Test
   @Playbook(ResetWeatherDbPlaybook.class)
   void createWeatherReportListsViaHttp() throws Exception {
-    ApiClient client = ComponentTestSuite.apiClient();
+    ApiClient client = JavaSpringBootComponentTestSuite.apiClient();
     long createdId = client.createWeatherReport(1.5, 63.2, 1013.25);
     boolean found = false;
     for (JsonNode row : client.getWeatherReports()) {
@@ -32,7 +32,7 @@ final class WeatherCrudComponentTest {
   @Test
   @Playbook(ResetWeatherDbPlaybook.class)
   void createMultipleWeatherReportsAreListed() throws Exception {
-    ApiClient client = ComponentTestSuite.apiClient();
+    ApiClient client = JavaSpringBootComponentTestSuite.apiClient();
     long id1 = client.createWeatherReport(0, 40, 1000);
     long id2 = client.createWeatherReport(2.2, 80, 990.5);
     boolean found1 = false;

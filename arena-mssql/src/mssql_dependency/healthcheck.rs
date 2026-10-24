@@ -60,8 +60,8 @@ async fn run_with_retry(
     loop {
         if start.elapsed() >= overall {
             return Err(format!(
-                "[MssqlDependency-{}] mssql did not become ready within {:?}. connection_string={:?}, attempts={}",
-                identifier, overall, connection_string, attempt
+                "[MssqlDependency-{}] mssql did not become ready within {:?}, attempts={}",
+                identifier, overall, attempt
             ));
         }
 

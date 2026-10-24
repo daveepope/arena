@@ -9,10 +9,12 @@ from pathlib import Path
 from arena_version import (
     require_cargo,
     audit_arena_ffi_binary,
+    record_bazel_lockfiles,
     regenerate_windows_pip_locks,
     repin_all_lockfiles,
     vet_rust_dependencies,
 )
+from run_osv_scan import main as run_osv_scan
 
 
 def _repo_root() -> Path:
@@ -33,7 +35,15 @@ def main() -> int:
     )
     audit_arena_ffi_binary(root)
     vet_rust_dependencies(root)
+    print("scanning repinned lockfiles for known CVEs (Rust, JS, Python, Maven, .NET)")
+    scan_status = run_osv_scan()
+    if scan_status != 0:
+        raise RuntimeError(
+            f"osv-scanner found vulnerabilities (exit code {scan_status}); see output above"
+        )
     regenerate_windows_pip_locks(root)
+    record_bazel_lockfiles(root)
+    print("recorded Cargo.lock and MODULE.bazel.lock against the final Bazel resolution")
     return 0
 
 

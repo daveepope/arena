@@ -1,7 +1,10 @@
+use arena::playbook::PlaybookLifecycle;
+use std::sync::Arc;
 use crate::mssql_dependency::mssql_container_impl::connect;
 use crate::mssql_dependency::MssqlDependency;
 
 pub struct Playbook {
+    lifecycle: Option<Arc<PlaybookLifecycle>>,
     connection_string: String,
     identifier: String,
     managed_tables: Vec<(String, String)>,
@@ -14,6 +17,7 @@ impl Playbook {
             .expect("MssqlDependency must be started before configuring a Playbook")
             .to_string();
         Self {
+            lifecycle: None,
             connection_string,
             identifier: format!("mssql-playbook:{}", dependency.identifier),
             managed_tables: dependency.managed_tables().to_vec(),
@@ -22,6 +26,11 @@ impl Playbook {
 
     pub fn with_identifier(mut self, identifier: impl Into<String>) -> Self {
         self.identifier = identifier.into();
+        self
+    }
+
+    pub fn with_lifecycle(mut self, lifecycle: Arc<PlaybookLifecycle>) -> Self {
+        self.lifecycle = Some(lifecycle);
         self
     }
 
@@ -45,6 +54,10 @@ impl Playbook {
         );
 
         ActivePlaybook {
+            lifecycle: self
+                .lifecycle
+                .clone()
+                .unwrap_or_else(|| PlaybookLifecycle::managed(self.identifier.clone())),
             connection_string: self.connection_string,
             identifier: self.identifier,
             managed_tables: tables,
@@ -93,6 +106,7 @@ fn reset_on_drop(
 }
 
 pub struct ActivePlaybook {
+    lifecycle: Arc<PlaybookLifecycle>,
     connection_string: String,
     identifier: String,
     managed_tables: Vec<(String, String)>,
@@ -101,6 +115,10 @@ pub struct ActivePlaybook {
 impl arena::ActivePlaybook for ActivePlaybook {
     fn identifier(&self) -> &str {
         &self.identifier
+    }
+
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
+        &self.lifecycle
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -155,8 +173,8 @@ impl ActivePlaybook {
     }
 }
 
-impl Drop for ActivePlaybook {
-    fn drop(&mut self) {
+impl ActivePlaybook {
+    fn teardown(&mut self) {
         let identifier = std::mem::take(&mut self.identifier);
         let connection_string = std::mem::take(&mut self.connection_string);
         let managed_tables = std::mem::take(&mut self.managed_tables);
@@ -166,6 +184,24 @@ impl Drop for ActivePlaybook {
         }
 
         reset_on_drop(identifier, connection_string, managed_tables);
+    
+    }
+}
+
+impl Drop for ActivePlaybook {
+    fn drop(&mut self) {
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.teardown()));
+        match outcome {
+            Ok(()) => self.lifecycle.exit(),
+            Err(payload) => {
+                self.lifecycle.report_fault(arena::lifecycle::Fault::playbook(
+                    self.lifecycle.playbook_id(),
+                    "playbook teardown failed",
+                ));
+                self.lifecycle.exit();
+                std::panic::resume_unwind(payload);
+            }
+        }
     }
 }
 

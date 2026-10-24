@@ -62,6 +62,7 @@ pub struct LocalstackDependencyBuilder {
     lambdas: Vec<LambdaSpec>,
     event_buses: Vec<EventBusSpec>,
     event_rules: Vec<EventRuleSpec>,
+    component_ids: Vec<String>,
 }
 
 impl LocalstackDependencyBuilder {
@@ -86,6 +87,7 @@ impl LocalstackDependencyBuilder {
             lambdas: Vec::new(),
             event_buses: Vec::new(),
             event_rules: Vec::new(),
+            component_ids: Vec::new(),
         }
     }
 
@@ -206,6 +208,11 @@ impl LocalstackDependencyBuilder {
         self
     }
 
+    pub fn with_component_id(mut self, component_id: impl Into<String>) -> Self {
+        self.component_ids.push(component_id.into());
+        self
+    }
+
     pub fn build(self) -> LocalstackDependency {
         let LocalstackDependencyBuilder {
             identifier,
@@ -223,6 +230,7 @@ impl LocalstackDependencyBuilder {
             lambdas,
             event_buses,
             event_rules,
+            component_ids,
         } = self;
 
         let mut localstack_impl = localstack_impl.unwrap_or_else(|| {
@@ -247,6 +255,7 @@ impl LocalstackDependencyBuilder {
             lambdas,
             event_buses,
             event_rules,
+            component_ids,
         );
 
         if let Some(check) = readiness_check {

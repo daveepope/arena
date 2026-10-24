@@ -196,7 +196,7 @@ fn with_container_name_and_network_are_accepted() {
 #[test]
 fn with_admin_password_overrides_default() {
     let _dep = OracleDependency::builder("custom-admin-password")
-        .with_admin_password("SuperSecret1!")
+        .with_admin_password(arena_container::credential::new_password())
         .build().expect("build oracle dependency");
 }
 
@@ -313,4 +313,22 @@ fn build_without_expiry_disables_expiry() {
         .build().expect("build oracle dependency");
 
     assert_eq!(*recorder.expiry.lock().unwrap(), Some(None));
+}
+
+#[test]
+fn builder_with_component_id_populates_component_ids() {
+    let dep = OracleDependency::builder("component-linked")
+        .with_component_id("parent-component")
+        .with_component_id("child-component")
+        .build().expect("build oracle dependency");
+
+    assert_eq!(dep.component_ids(), ["parent-component", "child-component"]);
+}
+
+#[test]
+fn builder_without_component_id_defaults_to_empty() {
+    let dep = OracleDependency::builder("no-component")
+        .build().expect("build oracle dependency");
+
+    assert!(dep.component_ids().is_empty());
 }

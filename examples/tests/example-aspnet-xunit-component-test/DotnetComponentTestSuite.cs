@@ -11,19 +11,20 @@ using Microsoft.Extensions.Logging;
 
 namespace ArenaExamples.ComponentTest;
 
-public sealed class ChainedExampleFixture : ArenaCollectionFixture
+[ArenaVisualize]
+public sealed class DotnetComponentTestSuite : ArenaCollectionFixture
 {
-    public const string QueueName = "readings-events-chained-queue";
-    private const string EventBusName = "example-api-chained-events";
+    public const string QueueName = "readings-events-queue";
+    private const string EventBusName = "example-api-events";
     private const string EventSource = "readings.api";
-    private const string EventRuleName = "readings-event-chained-rule";
+    private const string EventRuleName = "readings-event-rule";
     private const string Region = "us-east-1";
 
     private const string PostgresHost = "127.0.0.1";
     private const string MssqlHost = "127.0.0.1";
 
     public static int WebAppPort { get; } = EphemeralTestRuntime.AllocatePort();
-    public static int WebAppChildPort { get; } = EphemeralTestRuntime.AllocatePort();
+    public static int WebApp2Port { get; } = EphemeralTestRuntime.AllocatePort();
     public static int PostgresPort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int MssqlPort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int OraclePort { get; } = EphemeralTestRuntime.AllocatePort();
@@ -34,11 +35,13 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
     public static int SmtpPort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int SmtpUiPort { get; } = EphemeralTestRuntime.AllocatePort();
     public static int OauthPort { get; } = EphemeralTestRuntime.AllocatePort();
+    private const string OauthCognitoPoolId = "us-east-1_exampleUsers";
+    public static string OauthProviderIssuer { get; } = $"https://127.0.0.1:{OauthPort}/{OauthCognitoPoolId}";
 
-    [ArenaLogger(Level = ArenaLogLevel.Debug)]
+    [ArenaLogger(Level = ArenaLogLevel.Info)]
     private static readonly ILogger Log =
         LoggerFactory.Create(builder => builder.SetMinimumLevel(LogLevel.Debug).AddConsole())
-            .CreateLogger(nameof(ChainedExampleFixture));
+            .CreateLogger(nameof(DotnetComponentTestSuite));
 
     private static readonly OauthLoopbackTlsPemPair OauthPem = OauthLoopbackTls.OauthLoopbackTlsPemPair();
 
@@ -53,28 +56,38 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
     private static readonly string OracleDbPassword = "pw_" + EphemeralTestRuntime.RandomToken(12);
     private static readonly string OracleAdminPassword = "pw_" + EphemeralTestRuntime.RandomToken(12);
 
+    [ArenaComponent(Logs = false)]
+    private static readonly ExecutableComponent WebApp = BuildWebApp("example-api-web-app", WebAppPort);
+
+    [ArenaComponent(Logs = false)]
+    private static readonly ExecutableComponent WebApp2 = BuildWebApp("example-api-second-web-app", WebApp2Port);
+
+    [ArenaDependency]
     private static readonly PostgresDependency Postgres =
-        new PostgresDependencyBuilder("test-chained-postgres")
+        new PostgresDependencyBuilder("test-postgres")
             .WithPort(PostgresPort)
             .WithDatabaseName(PostgresDbName)
             .WithDatabaseUsername(PostgresDbUser)
             .WithDatabasePassword(PostgresDbPassword)
             .WithStartupSqlScripts(new[] { ResolveSchemaScript("instrument_reading_db_schema.sql") })
+            .WithComponentId(WebApp.Identifier)
+            .WithComponentId(WebApp2.Identifier)
             .Build();
 
     [ArenaDependency]
     private static readonly MssqlDependency Mssql =
-        new MssqlDependencyBuilder("test-chained-mssql")
+        new MssqlDependencyBuilder("test-mssql")
             .WithPort(MssqlPort)
             .WithDatabaseName(MssqlDbName)
             .WithDatabaseUsername(MssqlDbUser)
             .WithDatabasePassword(MssqlDbPassword)
             .WithStartupSqlScripts(new[] { ResolveSchemaScript("validation_db_schema.sql") })
+            .WithComponentId(WebApp.Identifier)
             .Build();
 
     [ArenaDependency]
     private static readonly OracleDependency Oracle =
-        new OracleDependencyBuilder("test-chained-oracle")
+        new OracleDependencyBuilder("test-oracle")
             .WithPort(OraclePort)
             .WithDatabaseUsername(OracleDbUser)
             .WithDatabasePassword(OracleDbPassword)
@@ -82,11 +95,13 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
             .WithStartupSqlScripts(new[] { ResolveSchemaScript("weather_db_schema.sql") })
             // Oracle container start times are inconsistent across CI runners, so a longer timeout is required.
             .WithSqlReadinessTimeout(TimeSpan.FromMinutes(2))
+            .WithComponentId(WebApp.Identifier)
+            .WithComponentId(WebApp2.Identifier)
             .Build();
 
     [ArenaDependency]
     private static readonly LocalstackDependency Localstack =
-        new LocalstackDependencyBuilder("test-chained-localstack")
+        new LocalstackDependencyBuilder("test-localstack")
             .WithPort(LocalstackPort)
             .WithServices("sqs", "events")
             .WithQueue(QueueName)
@@ -101,59 +116,75 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
                     EventRuleTargetBuilder.SqsQueue("target-queue", QueueName),
                 },
             })
+            .WithComponentId(WebApp.Identifier)
             .Build();
 
     [ArenaDependency]
     private static readonly TemporalDependency Temporal =
-        new TemporalDependencyBuilder("test-chained-temporal")
+        new TemporalDependencyBuilder("test-temporal")
             .WithPort(TemporalPort)
             .WithUiPort(TemporalUiPort)
-            .AddChildDependency(Postgres)
+            .WithComponentId(WebApp.Identifier)
+            .WithComponentId(WebApp2.Identifier)
             .Build();
 
     [ArenaDependency]
     private static readonly OauthDependency Oauth =
-        new OauthDependencyBuilder("test-chained-oauth")
+        new OauthDependencyBuilder("test-oauth")
             .WithPort(OauthPort)
             .WithServerTlsPem(OauthPem.CertificatePem, OauthPem.PrivateKeyPem)
             .WithMetadataBaseUrl($"https://127.0.0.1:{OauthPort}")
+            .WithIssuerCognito(OauthCognitoPoolId)
+            .WithComponentId(WebApp.Identifier)
+            .WithComponentId(WebApp2.Identifier)
             .Build();
 
     [ArenaDependency]
     private static readonly SmtpDependency Smtp =
-        new SmtpDependencyBuilder("test-chained-smtp").WithPort(SmtpPort).WithUiPort(SmtpUiPort).WithStarttls().Build();
+        new SmtpDependencyBuilder("test-smtp")
+            .WithPort(SmtpPort)
+            .WithUiPort(SmtpUiPort)
+            .WithStarttls()
+            .WithComponentId(WebApp.Identifier)
+            .WithComponentId(WebApp2.Identifier)
+            .Build();
 
     [ArenaDependency]
     private static readonly HttpDependency Calibration =
-        new HttpDependencyBuilder("test-chained-calibration").WithPort(CalibrationPort).Build();
+        new HttpDependencyBuilder("test-calibration")
+            .WithPort(CalibrationPort)
+            .WithComponentId(WebApp.Identifier)
+            .WithComponentId(WebApp2.Identifier)
+            .Build();
 
     [ArenaPlaybook(ExecOnDependencyStart = true)]
     private static readonly Playbooks.CalibrationHappyPathPlaybook CalibrationHappyPath =
         new(Calibration.Identifier);
 
-    [ArenaPlaybook(ExecOnDependencyStart = true)]
-    private static readonly Playbooks.EventsPurgePlaybook EventsPurge =
-        new(Localstack.Identifier);
+    [ArenaPlaybook(ExecOnDependencyStart = false)]
+    private static readonly Playbooks.CalibrationOutagePlaybook CalibrationOutage =
+        new(Calibration.Identifier);
 
     [ArenaPlaybook(ExecOnDependencyStart = false)]
-    private static readonly Playbooks.ResetReadingsDbPlaybook ResetReadingsDb =
-        new(Postgres.Identifier);
+    private static readonly Playbooks.CalibrationFlakyPlaybook CalibrationFlaky =
+        new(Calibration.Identifier);
+
+    [ArenaPlaybook(ExecOnDependencyStart = false)]
+    private static readonly Playbooks.ResetValidationDbPlaybook ResetValidationDb =
+        new(Mssql.Identifier);
 
     [ArenaPlaybook(ExecOnDependencyStart = false)]
     private static readonly Playbooks.ResetWeatherDbPlaybook ResetWeatherDb =
         new(Oracle.Identifier);
 
-    private static readonly ExecutableComponent WebAppChild =
-        BuildWebApp("example-api-chained-web-app-child", WebAppChildPort, Array.Empty<IArenaComponent>());
+    [ArenaPlaybook(ExecOnDependencyStart = true)]
+    private static readonly Playbooks.EventsPurgePlaybook EventsPurge =
+        new(Localstack.Identifier);
 
-    [ArenaComponent(Logs = false)]
-    private static readonly ExecutableComponent WebApp =
-        BuildWebApp("example-api-chained-web-app", WebAppPort, new IArenaComponent[] { WebAppChild });
-
-    private static ExecutableComponent BuildWebApp(string name, int port, IEnumerable<IArenaComponent> children)
-    {
-        var builder = new ExecutableComponentBuilder(name)
+    private static ExecutableComponent BuildWebApp(string name, int port) =>
+        new ExecutableComponentBuilder(name)
             .WithExecutablePath(ResolveWebAppExecutablePath())
+            .WithBuildTool(BuildTool.Dotnet)
             .WithEnvVar("WEB_APP_PORT", port.ToString())
             .WithEnvVar("CALIBRATION_URL", $"http://127.0.0.1:{CalibrationPort}")
             .WithEnvVar("POSTGRES_HOST", PostgresHost)
@@ -189,35 +220,33 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
             .WithEnvVar("EVENT_SOURCE", EventSource)
             .WithEnvVar("OAUTH_URL", $"https://127.0.0.1:{OauthPort}")
             .WithEnvVar("OAUTH_ISSUER", $"https://127.0.0.1:{OauthPort}")
-            .WithEnvVar("OAUTH_ISSUER_URL", $"https://127.0.0.1:{OauthPort}")
+            .WithEnvVar("OAUTH_ISSUER_URL", OauthProviderIssuer)
             .WithEnvVar("OAUTH_TLS_CA_FILE", ResolveOauthCaCertFilePath())
             .WithEnvVar("OAUTH_CLIENT_ID", "test-client")
             .WithEnvVar("OAUTH_CLIENT_SECRET", "test-secret")
+            .WithEnvVar("OAUTH_REQUIRED_ACCESS_TOKEN_SCOPES", "readings")
             .WithEnvVar("LD_LIBRARY_PATH", ResolveTemporalNativeLibDir())
-            .WithReadinessCheck(HttpReadinessCheck.Create(), $"http://127.0.0.1:{port}/health");
-        foreach (var child in children)
-        {
-            builder.AddChildComponent(child);
-        }
-        return builder.Build();
-    }
+            .WithReadinessCheck(HttpReadinessCheck.Create(), $"http://127.0.0.1:{port}/health")
+            .Build();
 
     public ApiClient ApiClient { get; }
     public ApiClient ApiClient2 { get; }
 
-    public ChainedExampleFixture() : base()
+    public DotnetComponentTestSuite() : base()
     {
-        var authToken = Signer.Sign(new Provider.Custom(), ClaimsWithScope("readings"));
+        var authToken = Signer.Sign(OauthProvider(), ClaimsWithScope("readings"));
         ApiClient = new ApiClient($"http://127.0.0.1:{WebAppPort}", authToken);
-        ApiClient2 = new ApiClient($"http://127.0.0.1:{WebAppChildPort}", authToken);
+        ApiClient2 = new ApiClient($"http://127.0.0.1:{WebApp2Port}", authToken);
     }
+
+    public static Provider OauthProvider() => new Provider.Cognito(OauthCognitoPoolId);
 
     public static string ClaimsWithScope(string scope)
     {
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         return JsonSerializer.Serialize(new
         {
-            iss = $"https://127.0.0.1:{OauthPort}",
+            iss = OauthProviderIssuer,
             sub = "arena-examples",
             scope,
             iat = now,
@@ -227,7 +256,7 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
 
     private static string ResolveOauthCaCertFilePath()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"arena-example-chained-oauth-ca-{Environment.ProcessId}.pem");
+        var path = Path.Combine(Path.GetTempPath(), $"arena-example-oauth-ca-{Environment.ProcessId}.pem");
         File.WriteAllText(path, OauthPem.CertificatePem);
         return path;
     }
@@ -237,7 +266,7 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
         var runfilesRoot = Environment.GetEnvironmentVariable("RUNFILES_DIR");
         if (string.IsNullOrEmpty(runfilesRoot))
         {
-            var assemblyDir = Path.GetDirectoryName(typeof(ChainedExampleFixture).Assembly.Location);
+            var assemblyDir = Path.GetDirectoryName(typeof(DotnetComponentTestSuite).Assembly.Location);
             var parent = !string.IsNullOrEmpty(assemblyDir) ? Directory.GetParent(assemblyDir!)?.FullName : null;
             if (!string.IsNullOrEmpty(parent) && parent!.Contains(".runfiles"))
                 runfilesRoot = parent;
@@ -274,6 +303,9 @@ public sealed class ChainedExampleFixture : ArenaCollectionFixture
         if (matches.Length == 1)
             return matches[0];
 
+        // Bazel runfiles trees commonly expose the same file under more than one path
+        // (e.g. a canonical repo-mapped path and an `external/` alias); only treat this
+        // as ambiguous if the matches actually have different contents.
         var distinctContents = new HashSet<string>();
         foreach (var match in matches)
             distinctContents.Add(Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(match))));

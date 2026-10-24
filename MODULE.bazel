@@ -1,12 +1,12 @@
 module(
     name = "arena",
-    version = "7.0.2",
+    version = "7.1.0",
 )
 
 arena_version_ext = use_extension("//tools:arena_version.bzl", "arena_version")
 use_repo(arena_version_ext, "arena_version")
 
-bazel_dep(name = "rules_python", version = "0.34.0")
+bazel_dep(name = "rules_python", version = "1.4.1")
 bazel_dep(name = "rules_rust", version = "0.71.0")
 single_version_override(
     module_name = "rules_rust",
@@ -20,10 +20,38 @@ single_version_override(
 )
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "rules_java", version = "9.0.0")
-bazel_dep(name = "rules_jvm_external", version = "6.6")
+bazel_dep(name = "rules_jvm_external", version = "6.7")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 bazel_dep(name = "rules_dotnet", version = "0.20.0")
 bazel_dep(name = "rules_pkg", version = "1.0.1")
+
+bazel_dep(name = "aspect_rules_js", version = "2.9.3")
+bazel_dep(name = "aspect_rules_ts", version = "3.10.1")
+bazel_dep(name = "rules_nodejs", version = "6.7.6", dev_dependency = True)
+
+node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)
+node.toolchain(node_version = "24.20.0")
+
+typescript = use_extension("@aspect_rules_ts//ts:extensions.bzl", "typescript")
+typescript.deps(version = "7.0.2")
+use_repo(typescript, "npm_typescript")
+
+pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm")
+pnpm.pnpm(name = "pnpm")
+use_repo(pnpm, "pnpm", "pnpm__links")
+
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm", dev_dependency = True)
+npm.npm_translate_lock(
+    name = "npm",
+    data = ["//arena-dashboard/web:package.json"],
+    lifecycle_hooks = {
+        "*": [],
+    },
+    pnpm_lock = "//arena-dashboard/web:pnpm-lock.yaml",
+    update_pnpm_lock = True,
+    verify_node_modules_ignored = "//:.bazelignore",
+)
+use_repo(npm, "npm")
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
@@ -332,6 +360,14 @@ nuget_archive(
     version = "8.0.1",
 )
 
+# dotnet-trace CPU profiler tool
+nuget_archive(
+    name = "dotnet_trace",
+    id = "dotnet-trace",
+    sources = ["https://api.nuget.org/v3/index.json"],
+    version = "8.0.547301",
+)
+
 nuget_archive(
     name = "ms_logging_console",
     id = "Microsoft.Extensions.Logging.Console",
@@ -589,4 +625,111 @@ nuget_archive(
     id = "NexusRpc",
     sources = ["https://api.nuget.org/v3/index.json"],
     version = "0.3.0",
+)
+# py-spy is a binary-only crate (no library target), so it cannot be a normal
+# workspace Cargo.toml dependency of arena-profile; crate.from_specs vendors
+# and builds its binary from source independently of the Cargo.lock graph.
+crate.spec(
+    package = "py-spy",
+    version = "=0.4.2",
+    repositories = ["profiling_tools"],
+)
+crate.spec(
+    package = "remoteprocess",
+    version = "=0.5.3",
+    repositories = ["profiling_tools"],
+)
+crate.annotation(
+    crate = "py-spy",
+    repositories = ["profiling_tools"],
+    gen_all_binaries = True,
+)
+crate.from_specs(name = "profiling_tools")
+use_repo(crate, "profiling_tools")
+
+# async-profiler ships prebuilt release tarballs (not a Cargo crate), vendored
+# here with a checksum-pinned download so no host install is required. The
+# archive has no Bazel BUILD file of its own, so one is supplied inline
+# exposing the asprof launcher and its native agent library.
+_ASYNC_PROFILER_VERSION = "4.5"
+_ASYNC_PROFILER_BUILD_FILE_CONTENT = """
+exports_files(["bin/asprof", "lib/libasyncProfiler.so"])
+"""
+
+_ASYNC_PROFILER_MACOS_BUILD_FILE_CONTENT = """
+exports_files(["bin/asprof", "lib/libasyncProfiler.dylib"])
+"""
+
+http_archive(
+    name = "async_profiler_linux_x64",
+    url = "https://github.com/async-profiler/async-profiler/releases/download/v{v}/async-profiler-{v}-linux-x64.tar.gz".format(v = _ASYNC_PROFILER_VERSION),
+    sha256 = "89546fbb9ee0fc5496c7edd4099b0709489bc78b0d8057ccbb4b801f6b032b62",
+    strip_prefix = "async-profiler-{}-linux-x64".format(_ASYNC_PROFILER_VERSION),
+    build_file_content = _ASYNC_PROFILER_BUILD_FILE_CONTENT,
+)
+
+http_archive(
+    name = "async_profiler_linux_arm64",
+    url = "https://github.com/async-profiler/async-profiler/releases/download/v{v}/async-profiler-{v}-linux-arm64.tar.gz".format(v = _ASYNC_PROFILER_VERSION),
+    sha256 = "64c41d1465d60097439c50d7e924b4946f1f62b1cbd21ce5b034fad09c0d6979",
+    strip_prefix = "async-profiler-{}-linux-arm64".format(_ASYNC_PROFILER_VERSION),
+    build_file_content = _ASYNC_PROFILER_BUILD_FILE_CONTENT,
+)
+
+http_archive(
+    name = "async_profiler_macos",
+    url = "https://github.com/async-profiler/async-profiler/releases/download/v{v}/async-profiler-{v}-macos.zip".format(v = _ASYNC_PROFILER_VERSION),
+    sha256 = "46d04ef81f532a065a0b3877e488aa706afa14aa2ea14433b323db9e6fda76dc",
+    strip_prefix = "async-profiler-{}-macos".format(_ASYNC_PROFILER_VERSION),
+    build_file_content = _ASYNC_PROFILER_MACOS_BUILD_FILE_CONTENT,
+)
+
+_CHROME_FOR_TESTING_VERSION = "155.0.8059.84"
+
+http_archive(
+    name = "chrome_for_testing_linux_x86_64",
+    url = "https://storage.googleapis.com/chrome-for-testing-public/{v}/linux64/chrome-linux64.zip".format(v = _CHROME_FOR_TESTING_VERSION),
+    sha256 = "cf0f049892dea22e6a6db26d47ed0d7776b7158edcbec4634086633df8bafcbc",
+    strip_prefix = "chrome-linux64",
+    build_file_content = """
+filegroup(
+    name = "chrome_files",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+exports_files(["chrome"], visibility = ["//visibility:public"])
+""",
+)
+
+_CHROME_FOR_TESTING_MACOS_BUILD_FILE_CONTENT = """
+filegroup(
+    name = "chrome_files",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "chrome_launcher",
+    outs = ["chrome"],
+    cmd = "printf '#!/bin/sh\\nexec \\\"$$(dirname \\\"$$0\\\")/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing\\\" \\\"$$@\\\"\\n' > $@ && chmod +x $@",
+    executable = True,
+    visibility = ["//visibility:public"],
+)
+"""
+
+http_archive(
+    name = "chrome_for_testing_macos_x86_64",
+    url = "https://storage.googleapis.com/chrome-for-testing-public/{v}/mac-x64/chrome-mac-x64.zip".format(v = _CHROME_FOR_TESTING_VERSION),
+    sha256 = "d805a173118daa5f6f5cf464500789e1e00022a9a6aed8abfec821ab828fa862",
+    strip_prefix = "chrome-mac-x64",
+    build_file_content = _CHROME_FOR_TESTING_MACOS_BUILD_FILE_CONTENT,
+)
+
+http_archive(
+    name = "chrome_for_testing_macos_aarch64",
+    url = "https://storage.googleapis.com/chrome-for-testing-public/{v}/mac-arm64/chrome-mac-arm64.zip".format(v = _CHROME_FOR_TESTING_VERSION),
+    sha256 = "13b9e98ce56f5ce18e100a009f455c9285f399e7c9dc8a76fdf2f3a9755bb5f2",
+    strip_prefix = "chrome-mac-arm64",
+    build_file_content = _CHROME_FOR_TESTING_MACOS_BUILD_FILE_CONTENT,
 )

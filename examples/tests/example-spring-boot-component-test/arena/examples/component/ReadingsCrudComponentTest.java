@@ -18,7 +18,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
-@Arena(ComponentTestSuite.class)
+@Arena(JavaSpringBootComponentTestSuite.class)
 @ArenaOauthSigner
 final class ReadingsCrudComponentTest {
 
@@ -26,16 +26,16 @@ final class ReadingsCrudComponentTest {
   @Playbook(ResetValidationDbPlaybook.class)
   void createReadingPublishesEventAndListsViaHttp() throws Exception {
     int createdId =
-        ComponentTestSuite.apiClient()
+        JavaSpringBootComponentTestSuite.apiClient()
             .createReading(
-                "Readings API User", 77, "sqs happy path", ComponentTestSuite.readingsDeviceId);
-    JsonNode detail = ComponentTestSuite.waitReadingCreatedOnQueue(createdId);
+                "Readings API User", 77, "sqs happy path", JavaSpringBootComponentTestSuite.readingsDeviceId);
+    JsonNode detail = JavaSpringBootComponentTestSuite.waitReadingCreatedOnQueue(createdId);
     assertEquals(createdId, detail.path("id").asInt());
     assertEquals("Readings API User", detail.path("user_name").asText());
     assertEquals(77, detail.path("value").asInt());
     assertEquals("sqs happy path", detail.path("comment").asText());
 
-    JsonNode found = ComponentTestSuite.apiClient().findReadingById(createdId);
+    JsonNode found = JavaSpringBootComponentTestSuite.apiClient().findReadingById(createdId);
     assertEquals("Readings API User", found.path("user_name").asText());
     assertEquals(77, found.path("value").asInt());
   }
@@ -43,11 +43,11 @@ final class ReadingsCrudComponentTest {
   @Test
   @Playbook(ResetValidationDbPlaybook.class)
   void createMultipleReadingsAreListed() throws Exception {
-    ApiClient client = ComponentTestSuite.apiClient();
-    int id1 = client.createReading("Bending", 1, "", ComponentTestSuite.readingsDeviceId);
+    ApiClient client = JavaSpringBootComponentTestSuite.apiClient();
+    int id1 = client.createReading("Bending", 1, "", JavaSpringBootComponentTestSuite.readingsDeviceId);
     int id2 =
         client.createReading(
-            "joe", 2, "We're going to need a bigger ship", ComponentTestSuite.readingsDeviceId);
+            "joe", 2, "We're going to need a bigger ship", JavaSpringBootComponentTestSuite.readingsDeviceId);
     assertTrue(client.listReadingIds().contains(id1));
     assertTrue(client.listReadingIds().contains(id2));
   }
@@ -56,17 +56,17 @@ final class ReadingsCrudComponentTest {
   @Playbook(ResetValidationDbPlaybook.class)
   void createReadingWithValidationDbScopedPlaybook() throws Exception {
     int createdId =
-        ComponentTestSuite.apiClient()
+        JavaSpringBootComponentTestSuite.apiClient()
             .createReading(
-                "Validation DB Scoped", 7, "mssql scope", ComponentTestSuite.readingsDeviceId);
-    assertTrue(ComponentTestSuite.apiClient().listReadingIds().contains(createdId));
+                "Validation DB Scoped", 7, "mssql scope", JavaSpringBootComponentTestSuite.readingsDeviceId);
+    assertTrue(JavaSpringBootComponentTestSuite.apiClient().listReadingIds().contains(createdId));
   }
 
   @Test
   @Playbook(ResetValidationDbPlaybook.class)
   @Playbook(SeedValidationReadingPlaybook.class)
   void seedValidationReadingPlaybook_rowVisibleBeforeTestBody() throws Exception {
-    assertEquals(1, ComponentTestSuite.seededValidationRowCount());
+    assertEquals(1, JavaSpringBootComponentTestSuite.seededValidationRowCount());
   }
 
   @Test
@@ -75,7 +75,7 @@ final class ReadingsCrudComponentTest {
     HttpResponse<String> response =
         client.send(
             HttpRequest.newBuilder()
-                .uri(URI.create(ComponentTestSuite.webAppBaseUrl() + "/readings"))
+                .uri(URI.create(JavaSpringBootComponentTestSuite.webAppBaseUrl() + "/readings"))
                 .GET()
                 .timeout(Duration.ofSeconds(10))
                 .build(),
@@ -91,12 +91,12 @@ final class ReadingsCrudComponentTest {
   @Test
   void getReadingsWithTokenMissingRequiredScope_isRejected(OauthSigner signer) throws Exception {
     String token =
-        signer.sign(ComponentTestSuite.oauthProvider(), ComponentTestSuite.claimsWithScope("other-scope"));
+        signer.sign(JavaSpringBootComponentTestSuite.oauthProvider(), JavaSpringBootComponentTestSuite.claimsWithScope("other-scope"));
     HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     HttpResponse<String> response =
         client.send(
             HttpRequest.newBuilder()
-                .uri(URI.create(ComponentTestSuite.webAppBaseUrl() + "/readings"))
+                .uri(URI.create(JavaSpringBootComponentTestSuite.webAppBaseUrl() + "/readings"))
                 .header("Authorization", "Bearer " + token)
                 .GET()
                 .timeout(Duration.ofSeconds(10))

@@ -103,4 +103,26 @@ public class KafkaDependencyBuilderSerializationTest
         Assert.Single(dep.Topics!);
         Assert.Equal("orders", dep.Topics![0]);
     }
+
+    [Fact]
+    public void Build_WithComponentIds_ExposesAndSerializesThemInOrder()
+    {
+        var dep = new KafkaDependencyBuilder("test")
+            .WithComponentId("parent-component")
+            .WithComponentId("child-component")
+            .Build();
+
+        Assert.Equal(new[] { "parent-component", "child-component" }, dep.ComponentIds);
+        Assert.Equal(
+            new[] { "parent-component", "child-component" },
+            JObject.Parse(dep.ForFfi())["component_ids"]!.Select(id => (string?)id));
+    }
+
+    [Fact]
+    public void Build_WithoutComponentIds_ExposesAnEmptyList()
+    {
+        var dep = new KafkaDependencyBuilder("test").Build();
+
+        Assert.Empty(dep.ComponentIds);
+    }
 }

@@ -21,21 +21,27 @@ _ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS_BY_RID = {
     "win-x64": glob(["prebuilt/windows-x86-64/**"], allow_empty = True),
 }
 
+_ARENA_XUNIT_PREBUILT_FFI_LIBRARY_BY_RID = {
+    "linux-x64": glob(["prebuilt/linux-x86-64/libarena_ffi_shared.so"], allow_empty = True),
+    "osx-arm64": glob(["prebuilt/darwin-aarch64/libarena_ffi_shared.dylib"], allow_empty = True),
+    "osx-x64": glob(["prebuilt/darwin-x86-64/libarena_ffi_shared.dylib"], allow_empty = True),
+}
+
 filegroup(
     name = "prebuilt_native_libs_linux_x64",
-    srcs = _ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS_BY_RID["linux-x64"],
+    srcs = _ARENA_XUNIT_PREBUILT_FFI_LIBRARY_BY_RID["linux-x64"],
     visibility = _PREDEPLOY_SMOKE_DOTNET_VISIBILITY,
 )
 
 filegroup(
     name = "prebuilt_native_libs_osx_arm64",
-    srcs = _ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS_BY_RID["osx-arm64"],
+    srcs = _ARENA_XUNIT_PREBUILT_FFI_LIBRARY_BY_RID["osx-arm64"],
     visibility = _PREDEPLOY_SMOKE_DOTNET_VISIBILITY,
 )
 
 filegroup(
     name = "prebuilt_native_libs_osx_x64",
-    srcs = _ARENA_XUNIT_PREBUILT_RELEASE_NATIVE_LIBS_BY_RID["osx-x64"],
+    srcs = _ARENA_XUNIT_PREBUILT_FFI_LIBRARY_BY_RID["osx-x64"],
     visibility = _PREDEPLOY_SMOKE_DOTNET_VISIBILITY,
 )
 

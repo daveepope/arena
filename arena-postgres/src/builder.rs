@@ -19,6 +19,7 @@ pub struct PostgresDependencyBuilder {
     network: Option<String>,
     expiry: Option<Duration>,
     readiness_check: Option<Box<dyn ReadinessCheck>>,
+    component_ids: Vec<String>,
 }
 
 impl PostgresDependencyBuilder {
@@ -43,6 +44,7 @@ impl PostgresDependencyBuilder {
             network: None,
             expiry: Some(arena_container::expiry::DEFAULT_EXPIRY),
             readiness_check: None,
+            component_ids: Vec::new(),
         }
     }
 
@@ -133,6 +135,11 @@ impl PostgresDependencyBuilder {
         self.with_image_tag(image_tag)
     }
 
+    pub fn with_component_id(mut self, component_id: impl Into<String>) -> Self {
+        self.component_ids.push(component_id.into());
+        self
+    }
+
     pub fn build(self) -> PostgresDependency {
         let mut postgres_impl = self
             .postgres_impl
@@ -172,6 +179,7 @@ impl PostgresDependencyBuilder {
             image_name,
             image_tag,
             container_name,
+            self.component_ids,
         );
 
         if let Some(check) = readiness_check {

@@ -25,6 +25,10 @@ pub struct MatchConfig {
     pub dependencies: Option<Vec<DependencyNode>>,
     pub components: Option<Vec<ComponentNode>>,
     pub playbooks: Option<Vec<managed_playbook::ManagedPlaybookConfig>>,
+    #[serde(default)]
+    pub cpu_profiled_components: Option<Vec<String>>,
+    #[serde(default)]
+    pub cpu_profile_limit_bytes: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -76,6 +80,13 @@ pub async fn build_match_async(config: &MatchConfig) -> Result<Box<dyn MatchTrai
     let components = build_components_async(config).await?;
 
     let mut a_match = Match::new(match_name, dependencies, components);
+    if let Some(cpu_profiled) = &config.cpu_profiled_components {
+        a_match = a_match.with_cpu_profiled_components(cpu_profiled.clone());
+    }
+    if let Some(limit_bytes) = config.cpu_profile_limit_bytes {
+        a_match = a_match
+            .with_cpu_profile_limit_bytes(usize::try_from(limit_bytes).unwrap_or(usize::MAX));
+    }
     for playbook_cfg in config.playbooks.as_deref().unwrap_or(&[]) {
         let exec_on_dependency_start = playbook_cfg.exec_on_dependency_start;
         let boxed = managed_playbook::build(playbook_cfg.clone());

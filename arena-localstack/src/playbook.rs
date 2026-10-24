@@ -1,7 +1,10 @@
+use arena::playbook::PlaybookLifecycle;
+use std::sync::Arc;
 use crate::localstack_dependency::resource_creator::ResourceCreator;
 use crate::localstack_dependency::LocalstackDependency;
 
 pub struct Playbook {
+    lifecycle: Option<Arc<PlaybookLifecycle>>,
     endpoint: String,
     identifier: String,
     queue_urls: Vec<(String, String)>,
@@ -14,6 +17,7 @@ impl Playbook {
             .expect("LocalstackDependency must be started before configuring a Playbook")
             .to_string();
         Self {
+            lifecycle: None,
             endpoint,
             identifier: format!("localstack-playbook:{}", dependency.identifier),
             queue_urls: dependency.queue_urls_snapshot(),
@@ -22,6 +26,11 @@ impl Playbook {
 
     pub fn with_identifier(mut self, identifier: impl Into<String>) -> Self {
         self.identifier = identifier.into();
+        self
+    }
+
+    pub fn with_lifecycle(mut self, lifecycle: Arc<PlaybookLifecycle>) -> Self {
+        self.lifecycle = Some(lifecycle);
         self
     }
 
@@ -37,6 +46,10 @@ impl Playbook {
         );
 
         ActivePlaybook {
+            lifecycle: self
+                .lifecycle
+                .clone()
+                .unwrap_or_else(|| PlaybookLifecycle::managed(self.identifier.clone())),
             endpoint: self.endpoint,
             identifier: self.identifier,
             queue_urls: self.queue_urls,
@@ -79,6 +92,7 @@ fn purge_on_drop(identifier: String, endpoint: String, queue_urls: Vec<(String, 
 }
 
 pub struct ActivePlaybook {
+    lifecycle: Arc<PlaybookLifecycle>,
     endpoint: String,
     identifier: String,
     queue_urls: Vec<(String, String)>,
@@ -87,6 +101,10 @@ pub struct ActivePlaybook {
 impl arena::ActivePlaybook for ActivePlaybook {
     fn identifier(&self) -> &str {
         &self.identifier
+    }
+
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
+        &self.lifecycle
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -111,8 +129,8 @@ impl ActivePlaybook {
     }
 }
 
-impl Drop for ActivePlaybook {
-    fn drop(&mut self) {
+impl ActivePlaybook {
+    fn teardown(&mut self) {
         let identifier = std::mem::take(&mut self.identifier);
         let endpoint = std::mem::take(&mut self.endpoint);
         let queue_urls = std::mem::take(&mut self.queue_urls);
@@ -122,6 +140,24 @@ impl Drop for ActivePlaybook {
         }
 
         purge_on_drop(identifier, endpoint, queue_urls);
+    
+    }
+}
+
+impl Drop for ActivePlaybook {
+    fn drop(&mut self) {
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.teardown()));
+        match outcome {
+            Ok(()) => self.lifecycle.exit(),
+            Err(payload) => {
+                self.lifecycle.report_fault(arena::lifecycle::Fault::playbook(
+                    self.lifecycle.playbook_id(),
+                    "playbook teardown failed",
+                ));
+                self.lifecycle.exit();
+                std::panic::resume_unwind(payload);
+            }
+        }
     }
 }
 

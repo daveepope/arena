@@ -26,6 +26,10 @@ internal static class ArenaNativeLib
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_find_available_port_fn(int rangeStart, int rangeEnd, int strategy, out int portOut, out IntPtr errOut);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate IntPtr arena_dashboard_ensure_running_fn(ushort port, string? searchDirUtf8, out IntPtr errOut);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate ulong arena_register_dashboard_observer_fn(string dashboardUrlUtf8);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int arena_set_log_level_fn(int level);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate ulong arena_add_log_target_fn(ArenaLogCallback callback, IntPtr userData);
@@ -68,6 +72,8 @@ internal static class ArenaNativeLib
     private static arena_soft_reset_fn? _arena_soft_reset;
     private static arena_hard_reset_fn? _arena_hard_reset;
     private static arena_find_available_port_fn? _arena_find_available_port;
+    private static arena_dashboard_ensure_running_fn? _arena_dashboard_ensure_running;
+    private static arena_register_dashboard_observer_fn? _arena_register_dashboard_observer;
     private static arena_set_log_level_fn? _arena_set_log_level;
     private static arena_add_log_target_fn? _arena_add_log_target;
     private static arena_remove_log_target_fn? _arena_remove_log_target;
@@ -126,6 +132,8 @@ internal static class ArenaNativeLib
             LoadFunction(out _arena_soft_reset, "arena_soft_reset");
             LoadFunction(out _arena_hard_reset, "arena_hard_reset");
             LoadFunction(out _arena_find_available_port, "arena_find_available_port");
+            LoadFunction(out _arena_dashboard_ensure_running, "arena_dashboard_ensure_running");
+            LoadFunction(out _arena_register_dashboard_observer, "arena_register_dashboard_observer");
             LoadFunction(out _arena_set_log_level, "arena_set_log_level");
             LoadFunction(out _arena_add_log_target, "arena_add_log_target");
             LoadFunction(out _arena_remove_log_target, "arena_remove_log_target");
@@ -238,6 +246,12 @@ internal static class ArenaNativeLib
 
     internal static int arena_find_available_port(int rangeStart, int rangeEnd, int strategy, out int portOut, out IntPtr errOut) =>
         _arena_find_available_port!.Invoke(rangeStart, rangeEnd, strategy, out portOut, out errOut);
+
+    internal static IntPtr arena_dashboard_ensure_running(ushort port, string? searchDirUtf8, out IntPtr errOut) =>
+        _arena_dashboard_ensure_running!.Invoke(port, searchDirUtf8, out errOut);
+
+    internal static ulong arena_register_dashboard_observer(string dashboardUrlUtf8) =>
+        _arena_register_dashboard_observer!.Invoke(dashboardUrlUtf8);
 
     internal static int arena_set_log_level(int level) =>
         _arena_set_log_level!.Invoke(level);

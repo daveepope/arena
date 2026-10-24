@@ -10,3 +10,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("ArenaDotnet.Xunit.UnitTest")]
 [assembly: InternalsVisibleTo("xunit_unit_test_bin")]
 [assembly: InternalsVisibleTo("xunit_unit_test_plain")]
+[assembly: InternalsVisibleTo("component_test")]

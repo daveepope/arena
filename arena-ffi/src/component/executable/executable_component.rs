@@ -41,7 +41,8 @@ pub fn build(config: &ExecutableComponentConfig) -> Result<Component, String> {
         builder = builder.with_source_path(source_path);
     }
     if let Some(build_tool) = &config.build_tool {
-        builder = builder.with_build_tool(build_tool_from_config(build_tool)?);
+        let bt = build_tool_from_config(build_tool)?;
+        builder = builder.with_build_tool(bt);
     }
     if let Some(env_vars) = &config.env_vars {
         for (k, v) in env_vars {
@@ -105,6 +106,7 @@ fn build_tool_from_config(spec: &BuildToolConfig) -> Result<BuildTool, String> {
             "dotnet" => Ok(BuildTool::Dotnet),
             "make" => Ok(BuildTool::Make),
             "cmake" => Ok(BuildTool::CMake),
+            "python" => Ok(BuildTool::Python),
             other => Err(format!("unknown build_tool '{other}'")),
         },
         BuildToolConfig::Custom { command, args } => Ok(BuildTool::Custom {

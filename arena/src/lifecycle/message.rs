@@ -28,6 +28,10 @@ pub fn stop_did_not_complete() -> String {
     "stop did not complete".to_string()
 }
 
+pub fn cpu_profile_capture_failed(reason: &str) -> String {
+    format!("cpu profile capture failed: {reason}")
+}
+
 pub fn child_start_failed(subject: Subject) -> String {
     format!("child {} failed to start", subject.as_str())
 }

@@ -48,10 +48,12 @@ class OpenArena:
         ffi: ArenaNativeLib,
         handle: int,
         dispatcher_logging_target_token: int = 0,
+        lifecycle_observer_tokens: tuple[int, ...] = (),
     ):
         self._ffi = ffi
         self._handle = handle
         self._dispatcher_logging_target_token = dispatcher_logging_target_token
+        self._lifecycle_observer_tokens = lifecycle_observer_tokens
 
     def handle(self) -> int:
         return self._handle
@@ -64,8 +66,10 @@ class OpenArena:
             return
         handle = self._handle
         token = self._dispatcher_logging_target_token
+        observer_tokens = self._lifecycle_observer_tokens
         self._handle = 0
         self._dispatcher_logging_target_token = 0
+        self._lifecycle_observer_tokens = ()
         try:
             await asyncio.to_thread(
                 close_arena,
@@ -76,6 +80,11 @@ class OpenArena:
             )
         except ArenaBindingError as e:
             raise as_lifecycle_error(e) from None
+        finally:
+            for observer_token in observer_tokens:
+                await asyncio.to_thread(
+                    unregister_lifecycle_observer, self._ffi, observer_token
+                )
 
     async def state(self) -> ArenaState:
         document = await asyncio.to_thread(

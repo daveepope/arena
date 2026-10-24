@@ -129,7 +129,7 @@ fn build_with_all_metadata_options_does_not_panic() {
     let dep = MssqlDependency::builder("builder-metadata")
         .with_port(5555)
         .with_database_username("custom_user")
-        .with_database_password("custom_pw")
+        .with_database_password(arena_container::credential::new_password())
         .with_image_name("custom/image")
         .with_image_tag("custom-tag")
         .with_container_name("custom-container")
@@ -211,4 +211,22 @@ fn build_without_expiry_disables_expiry() {
     let _dep = MssqlDependency::builder("orders").with_impl(recorder.clone()).without_expiry().build();
 
     assert_eq!(*recorder.expiry.lock().unwrap(), Some(None));
+}
+
+#[test]
+fn builder_with_component_id_populates_component_ids() {
+    let dep = MssqlDependency::builder("component-linked")
+        .with_component_id("parent-component")
+        .with_component_id("child-component")
+        .build();
+
+    assert_eq!(dep.component_ids(), ["parent-component", "child-component"]);
+}
+
+#[test]
+fn builder_without_component_id_defaults_to_empty() {
+    let dep = MssqlDependency::builder("no-component")
+        .build();
+
+    assert!(dep.component_ids().is_empty());
 }

@@ -64,6 +64,11 @@ public final class OauthDependencyBuilder {
     return this;
   }
 
+  public OauthDependencyBuilder withComponentId(String componentId) {
+    ((ArrayNode) config.withArray("component_ids")).add(componentId);
+    return this;
+  }
+
   public OauthDependencyBuilder addChildDependency(ArenaRunnableDependency child) {
     this.children.add(child);
     return this;

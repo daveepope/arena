@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using ArenaDotnet.Xunit.Dep;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -19,6 +20,16 @@ public class ArenaCollectionFixtureTest
     }
 
     private class NoAttributesFixture : ArenaCollectionFixture
+    {
+    }
+
+    [ArenaVisualize]
+    private class VisualizeAnnotatedFixture : ArenaCollectionFixture
+    {
+    }
+
+    [ArenaVisualize(CpuProfile = new[] { "svc", "worker" })]
+    private class VisualizeProfiledFixture : ArenaCollectionFixture
     {
     }
 
@@ -209,5 +220,50 @@ public class ArenaCollectionFixtureTest
         var dependency = fixture.GetDependency<OauthDependency>();
 
         Assert.Equal(BaseOauthDependencyFixture.Oauth.Identifier, dependency.Identifier);
+    }
+
+    private static MethodInfo ApplyVisualizeMethod() =>
+        typeof(ArenaCollectionFixture).GetMethod("ApplyVisualize", BindingFlags.NonPublic | BindingFlags.Static)!;
+
+    [Fact]
+    public void ApplyVisualize_AttributeAbsent_ReturnsSameClosedArena()
+    {
+        var closed = new ClosedArena("no-visualize", new MatchBuilder("no-visualize-match").Build());
+
+        var result = ApplyVisualizeMethod().Invoke(null, new object[] { typeof(NoAttributesFixture), closed });
+
+        Assert.Same(closed, result);
+    }
+
+    [Fact]
+    public void ApplyVisualize_CpuProfileListed_ReturnsArenaCarryingEveryProfiledComponent()
+    {
+        var closed = new ClosedArena("with-profiler", new MatchBuilder("with-profiler-match").Build());
+
+        var result = (ClosedArena)ApplyVisualizeMethod()
+            .Invoke(null, new object[] { typeof(VisualizeProfiledFixture), closed })!;
+
+        Assert.Contains("\"cpu_profiled_components\":[\"svc\",\"worker\"]", result.MatchConfigForFfi());
+    }
+
+    [Fact]
+    public void ApplyVisualize_AttributeWithoutCpuProfile_LeavesTheArenaUnprofiled()
+    {
+        var closed = new ClosedArena("no-profiler", new MatchBuilder("no-profiler-match").Build());
+
+        var result = (ClosedArena)ApplyVisualizeMethod()
+            .Invoke(null, new object[] { typeof(VisualizeAnnotatedFixture), closed })!;
+
+        Assert.DoesNotContain("cpu_profiled_components", result.MatchConfigForFfi());
+    }
+
+    [Fact]
+    public void ApplyVisualize_AttributePresent_ReturnsDifferentClosedArenaWithDashboardEnabled()
+    {
+        var closed = new ClosedArena("with-visualize", new MatchBuilder("with-visualize-match").Build());
+
+        var result = ApplyVisualizeMethod().Invoke(null, new object[] { typeof(VisualizeAnnotatedFixture), closed });
+
+        Assert.NotSame(closed, result);
     }
 }

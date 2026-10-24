@@ -5,7 +5,13 @@ use arena::dependency::{Dependency, RunnableDependency};
 use arena::lifecycle::{
     ArenaLifecycleObserver, ArenaLifecycleState, ArenaState, Fault, RunnableState,
 };
-use arena::playbook::{ActivePlaybook, Playbook};
+use arena::lifecycle::bus::{EventBus, Observer, Publisher};
+use arena::playbook::PlaybookState;
+use arena::playbook::lifecycle::{PlaybookKind, PlaybookType, CHANNEL as PLAYBOOK_CHANNEL};
+use arena::playbook::{
+    ActivePlaybook, Playbook, PlaybookEvent, PlaybookLifecycle, UnmanagedPlaybook,
+};
+use chrono::{DateTime, Utc};
 use async_trait::async_trait;
 use std::any::Any;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -26,6 +32,7 @@ pub enum Behaviour {
     ResistTeardown,
     FaultSilently,
     ReportStoppedWithoutStopping,
+    RefuseCpuProfiler,
 }
 
 #[derive(Default)]
@@ -34,6 +41,8 @@ pub struct CallCounts {
     stop: AtomicUsize,
     force_stop: AtomicUsize,
     release: AtomicUsize,
+    cpu_profiler_attach: AtomicUsize,
+    cpu_profile_limit_bytes: AtomicUsize,
 }
 
 impl CallCounts {
@@ -52,6 +61,14 @@ impl CallCounts {
     pub fn releases(&self) -> usize {
         self.release.load(Ordering::SeqCst)
     }
+
+    pub fn cpu_profiler_attaches(&self) -> usize {
+        self.cpu_profiler_attach.load(Ordering::SeqCst)
+    }
+
+    pub fn cpu_profile_limit_bytes(&self) -> usize {
+        self.cpu_profile_limit_bytes.load(Ordering::SeqCst)
+    }
 }
 
 pub struct ProbeDependency {
@@ -62,6 +79,7 @@ pub struct ProbeDependency {
     behaviour: Behaviour,
     counts: Arc<CallCounts>,
     order: Arc<Mutex<Vec<String>>>,
+    component_ids: Vec<String>,
 }
 
 pub fn probe_dependency(identifier: &str) -> ProbeDependency {
@@ -73,6 +91,7 @@ pub fn probe_dependency(identifier: &str) -> ProbeDependency {
         behaviour: Behaviour::Healthy,
         counts: Arc::new(CallCounts::default()),
         order: Arc::new(Mutex::new(Vec::new())),
+        component_ids: Vec::new(),
     }
 }
 
@@ -89,6 +108,11 @@ impl ProbeDependency {
 
     pub fn with_child(mut self, child: Dependency) -> Self {
         self.children.push(child);
+        self
+    }
+
+    pub fn with_component_id(mut self, component_id: impl Into<String>) -> Self {
+        self.component_ids.push(component_id.into());
         self
     }
 
@@ -239,6 +263,10 @@ impl RunnableDependency for ProbeDependency {
         &mut self.children
     }
 
+    fn component_ids(&self) -> &[String] {
+        &self.component_ids
+    }
+
     async fn soft_reset(&self) -> Result<(), Fault> {
         self.reset_outcome()
     }
@@ -304,6 +332,20 @@ impl ProbeComponent {
 
 #[async_trait]
 impl RunnableComponent for ProbeComponent {
+    fn attach_cpu_profiler(&mut self, limit_bytes: Option<usize>) -> Result<(), Fault> {
+        self.counts.cpu_profiler_attach.fetch_add(1, Ordering::SeqCst);
+        self.counts
+            .cpu_profile_limit_bytes
+            .store(limit_bytes.unwrap_or(0), Ordering::SeqCst);
+        if self.behaviour == Behaviour::RefuseCpuProfiler {
+            return Err(Fault::component(
+                self.identifier.clone(),
+                "cpu profiling is not supported for BuildTool::Make",
+            ));
+        }
+        Ok(())
+    }
+
     fn identifier(&self) -> &str {
         &self.identifier
     }
@@ -408,6 +450,14 @@ impl RunnableComponent for ProbeComponent {
 
 pub struct ProbeActivePlaybook {
     identifier: String,
+    lifecycle: Arc<PlaybookLifecycle>,
+}
+
+pub fn probe_active_playbook(lifecycle: &Arc<PlaybookLifecycle>) -> Box<dyn ActivePlaybook> {
+    Box::new(ProbeActivePlaybook {
+        identifier: lifecycle.playbook_id().to_string(),
+        lifecycle: Arc::clone(lifecycle),
+    })
 }
 
 impl ActivePlaybook for ProbeActivePlaybook {
@@ -418,17 +468,29 @@ impl ActivePlaybook for ProbeActivePlaybook {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
+        &self.lifecycle
+    }
+}
+
+impl Drop for ProbeActivePlaybook {
+    fn drop(&mut self) {
+        self.lifecycle.exit();
+    }
 }
 
 pub struct ProbePlaybook {
     identifier: String,
     behaviour: Behaviour,
+    unmanaged: UnmanagedPlaybook,
 }
 
 pub fn probe_playbook(identifier: &str) -> ProbePlaybook {
     ProbePlaybook {
         identifier: identifier.to_string(),
         behaviour: Behaviour::Healthy,
+        unmanaged: UnmanagedPlaybook::new(identifier),
     }
 }
 
@@ -441,6 +503,14 @@ impl ProbePlaybook {
     pub fn into_playbook(self) -> Box<dyn Playbook> {
         Box::new(self)
     }
+
+    async fn apply_probe(&self) -> Result<Box<dyn ActivePlaybook>, Fault> {
+        match self.behaviour {
+            Behaviour::PanicStart => panic!("playbook '{}' run failed", self.identifier),
+            Behaviour::FailStart => Err(Fault::playbook(&self.identifier, "seed data rejected")),
+            _ => Ok(probe_active_playbook(self.unmanaged.lifecycle())),
+        }
+    }
 }
 
 #[async_trait]
@@ -449,14 +519,12 @@ impl Playbook for ProbePlaybook {
         &self.identifier
     }
 
+    fn lifecycle(&self) -> &Arc<PlaybookLifecycle> {
+        self.unmanaged.lifecycle()
+    }
+
     async fn run(&self, _dependencies: &[Dependency]) -> Result<Box<dyn ActivePlaybook>, Fault> {
-        match self.behaviour {
-            Behaviour::PanicStart => panic!("playbook '{}' run failed", self.identifier),
-            Behaviour::FailStart => Err(Fault::playbook(&self.identifier, "seed data rejected")),
-            _ => Ok(Box::new(ProbeActivePlaybook {
-                identifier: self.identifier.clone(),
-            })),
-        }
+        self.unmanaged.apply(self.apply_probe()).await
     }
 }
 
@@ -666,4 +734,102 @@ where
             scope,
         });
     }
+}
+
+pub struct RecordingPlaybookObserver {
+    events: Mutex<Vec<PlaybookEvent>>,
+}
+
+impl RecordingPlaybookObserver {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {
+            events: Mutex::new(Vec::new()),
+        })
+    }
+
+    pub fn events(&self) -> Vec<PlaybookEvent> {
+        self.events.lock().expect("events lock").clone()
+    }
+
+    pub fn states(&self) -> Vec<PlaybookState> {
+        self.events().iter().map(|event| event.state).collect()
+    }
+
+    pub fn states_for(&self, playbook_id: &str) -> Vec<PlaybookState> {
+        self.for_playbook(playbook_id)
+            .iter()
+            .map(|event| event.state)
+            .collect()
+    }
+
+    pub fn faults_for(&self, playbook_id: &str) -> Vec<Fault> {
+        self.for_playbook(playbook_id)
+            .iter()
+            .flat_map(|event| event.faults.clone())
+            .collect()
+    }
+
+    pub fn types_for(&self, playbook_id: &str) -> Vec<PlaybookType> {
+        self.for_playbook(playbook_id)
+            .iter()
+            .map(|event| event.playbook_type)
+            .collect()
+    }
+
+    pub fn runs_for(&self, playbook_id: &str) -> Vec<usize> {
+        self.for_playbook(playbook_id)
+            .iter()
+            .map(|event| event.runs)
+            .collect()
+    }
+
+    pub fn kinds_for(&self, playbook_id: &str) -> Vec<PlaybookKind> {
+        self.for_playbook(playbook_id)
+            .iter()
+            .map(|event| event.kind)
+            .collect()
+    }
+
+    pub fn timestamps_for(&self, playbook_id: &str) -> Vec<DateTime<Utc>> {
+        self.for_playbook(playbook_id)
+            .iter()
+            .map(|event| event.at)
+            .collect()
+    }
+
+    pub fn arena_ids(&self) -> Vec<String> {
+        self.events()
+            .iter()
+            .map(|event| event.arena_id.clone())
+            .collect()
+    }
+
+    fn for_playbook(&self, playbook_id: &str) -> Vec<PlaybookEvent> {
+        self.events()
+            .into_iter()
+            .filter(|event| event.id == playbook_id)
+            .collect()
+    }
+}
+
+impl Observer<PlaybookEvent> for RecordingPlaybookObserver {
+    fn on_event(&self, event: &PlaybookEvent) {
+        self.events.lock().expect("events lock").push(event.clone());
+    }
+}
+
+pub fn observe_playbooks(
+    lifecycle: &Arc<PlaybookLifecycle>,
+    arena_id: &str,
+    kind: PlaybookKind,
+) -> Arc<RecordingPlaybookObserver> {
+    let observer = RecordingPlaybookObserver::new();
+    let bus: Arc<EventBus<PlaybookEvent>> = Arc::new(EventBus::new(PLAYBOOK_CHANNEL));
+    bus.register_observer(observer.clone());
+    lifecycle.attach(
+        arena_id,
+        kind,
+        Arc::clone(&bus) as Arc<dyn Publisher<PlaybookEvent>>,
+    );
+    observer
 }

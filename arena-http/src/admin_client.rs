@@ -19,6 +19,9 @@ pub(crate) fn admin_api_client(
                  Pass the server certificate with with_trusted_certificate_pem(...)"
             ));
         }
+        // Loopback only, so the stub's self signed cert has nothing to verify against.
+        // Note that reqwest follows redirects by default, so a redirect off loopback would
+        // skip verification too.
         b = b.danger_accept_invalid_certs(true);
     }
 

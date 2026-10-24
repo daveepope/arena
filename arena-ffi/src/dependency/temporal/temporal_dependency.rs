@@ -17,6 +17,8 @@ pub struct TemporalDependencyConfig {
     pub ui_port: Option<u16>,
     #[serde(default)]
     pub container_name: Option<String>,
+    #[serde(default)]
+    pub component_ids: Vec<String>,
 }
 
 pub fn build(config: &TemporalDependencyConfig, network: Option<&str>) -> Result<Dependency, String> {
@@ -47,6 +49,9 @@ pub fn build(config: &TemporalDependencyConfig, network: Option<&str>) -> Result
             builder = builder.with_expiry(expiry);
         }
         None => {}
+    }
+    for component_id in &config.component_ids {
+        builder = builder.with_component_id(component_id);
     }
 
     Ok(Box::new(builder.build()))

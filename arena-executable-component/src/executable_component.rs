@@ -4,12 +4,40 @@ use crate::builder::ExecutableComponentBuilder;
 use arena::component::RunnableComponent;
 use arena::component::Component;
 use arena::healthcheck::ReadinessCheck;
+use arena_profile::{EnvMerge, PreparedLaunch, ProfileEnvVar, ProfileSession, ShutdownSignal};
 use arena::lifecycle::{Fault, RunnableState};
 use async_trait::async_trait;
+use std::ffi::OsString;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::thread;
+
+pub fn merged_profile_env_value(
+    entry: &ProfileEnvVar,
+    caller_value: Option<&str>,
+) -> Result<OsString, String> {
+    let Some(caller_value) = caller_value.filter(|value| !value.is_empty()) else {
+        return Ok(OsString::from(&entry.value));
+    };
+    match entry.merge {
+        EnvMerge::Space => Ok(OsString::from(format!("{caller_value} {}", entry.value))),
+        EnvMerge::PathList => std::env::join_paths(
+            std::env::split_paths(caller_value).chain(std::iter::once(PathBuf::from(&entry.value))),
+        )
+        .map_err(|e| format!("{} could not be extended with the profiler path: {e}", entry.key)),
+    }
+}
+
+enum ActiveCpuProfile {
+    Wrapped(Box<dyn ProfileSession>),
+    ArgAugmented(Box<dyn ProfileSession>, ShutdownSignal),
+}
+
+pub(crate) struct CpuProfileConfig {
+    pub(crate) backend: arena_profile::CpuProfilerBackend,
+    pub(crate) limit_bytes: usize,
+}
 
 pub struct ExecutableComponent {
     pub(crate) identifier: String,
@@ -20,6 +48,9 @@ pub struct ExecutableComponent {
     pub(crate) process_handle: Option<Child>,
     pub(crate) stopped: bool,
     pub(crate) readiness_checks: Vec<(Box<dyn ReadinessCheck>, String, u64)>,
+    pub(crate) build_tool: Option<crate::builder::BuildTool>,
+    pub(crate) cpu_profile: Option<CpuProfileConfig>,
+    active_cpu_profile: Option<ActiveCpuProfile>,
     pub(crate) state: RunnableState,
     pub(crate) faults: Vec<Fault>,
 }
@@ -35,6 +66,9 @@ impl ExecutableComponent {
             process_handle: None,
             stopped: false,
             readiness_checks: Vec::new(),
+            build_tool: None,
+            cpu_profile: None,
+            active_cpu_profile: None,
             state: RunnableState::NotStarted,
             faults: Vec::new(),
         }
@@ -79,20 +113,60 @@ impl ExecutableComponent {
         fault
     }
 
-    fn terminate_process(&mut self) {
-        if let Some(mut child) = self.process_handle.take() {
-            tracing::debug!(
-                component = %self.identifier,
-                pid = child.id(),
-                phase = "terminate_begin",
-                "terminating child process",
-            );
-            let _ = child.kill();
-            let _ = child.wait();
+    fn terminate_process(&mut self) -> Option<Fault> {
+        let Some(mut child) = self.process_handle.take() else {
+            return None;
+        };
+        match self.active_cpu_profile.take() {
+            Some(ActiveCpuProfile::Wrapped(session)) => {
+                tracing::debug!(
+                    component = %self.identifier,
+                    phase = "cpu_profile_finish_begin",
+                    "finishing cpu profile",
+                );
+                let result = session.finish(&mut child);
+                let faulted = result.is_err();
+                let fault = self.on_cpu_profile_finished(result);
+                if faulted {
+                    let _ = child.kill();
+                }
+                let _ = child.wait();
+                fault
+            }
+            Some(ActiveCpuProfile::ArgAugmented(session, shutdown_signal)) => {
+                tracing::debug!(
+                    component = %self.identifier,
+                    pid = child.id(),
+                    phase = "kill_begin",
+                    "stopping child process",
+                );
+                Self::graceful_then_force_kill(&mut child, shutdown_signal, &self.identifier);
+
+                tracing::debug!(
+                    component = %self.identifier,
+                    phase = "cpu_profile_finish_begin",
+                    "finishing cpu profile",
+                );
+                let result = session.finish(&mut child);
+                let fault = self.on_cpu_profile_finished(result);
+                let _ = child.wait();
+                fault
+            }
+            None => {
+                tracing::debug!(
+                    component = %self.identifier,
+                    pid = child.id(),
+                    phase = "kill_begin",
+                    "killing child process",
+                );
+                let _ = child.kill();
+                let _ = child.wait();
+                None
+            }
         }
     }
 
-    fn log_line(identifier: &str, line: &str) {
+    pub fn log_line(identifier: &str, line: &str) {
         if line.contains(" ERROR ") {
             tracing::error!(component = %identifier, "{}", line);
         } else if line.contains(" WARN ") {
@@ -117,27 +191,130 @@ impl ExecutableComponent {
         });
     }
 
+    pub fn signal_terminate(child: &mut Child) -> std::io::Result<()> {
+        if child.try_wait()?.is_some() {
+            return Ok(());
+        }
+        let status = Command::new("kill").args(["-TERM", &child.id().to_string()]).status()?;
+        if !status.success() {
+            if child.try_wait()?.is_some() {
+                return Ok(());
+            }
+            return Err(std::io::Error::other(format!(
+                "kill -TERM {} exited with {status}",
+                child.id()
+            )));
+        }
+        Ok(())
+    }
+
+    fn on_cpu_profile_finished(
+        &mut self,
+        result: Result<(), arena_profile::CpuProfileError>,
+    ) -> Option<Fault> {
+        match result {
+            Ok(()) => {
+                tracing::debug!(
+                    component = %self.identifier,
+                    phase = "cpu_profile_finish_done",
+                    "cpu profile samples captured",
+                );
+                None
+            }
+            Err(e) => {
+                tracing::error!(
+                    component = %self.identifier,
+                    error = %e,
+                    phase = "cpu_profile_finish_failed",
+                    "cpu profile finish failed",
+                );
+                Some(Fault::component(
+                    &self.identifier,
+                    message::cpu_profile_capture_failed(&e.to_string()),
+                ))
+            }
+        }
+    }
+
+    pub fn graceful_then_force_kill(child: &mut Child, signal: ShutdownSignal, identifier: &str) {
+        match signal {
+            ShutdownSignal::Kill => {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+            ShutdownSignal::Terminate => {
+                if let Err(e) = Self::signal_terminate(child) {
+                    tracing::warn!(component = %identifier, error = %e, "SIGTERM failed, forcing kill");
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return;
+                }
+                if let Err(e) = arena_profile::wait_bounded(child, arena_profile::FINISH_TIMEOUT) {
+                    tracing::warn!(component = %identifier, error = %e, "graceful shutdown exceeded budget, forced kill");
+                }
+            }
+        }
+    }
+
     fn spawn_process(&mut self) -> Result<(), String> {
         let executable_path = self
             .executable_path
             .as_ref()
             .ok_or_else(|| "executable_path not configured".to_string())?;
 
+        let base_args: Vec<String> = self.runtime_args.iter().map(|(_, v)| v.clone()).collect();
+
+        let (spawn_program, spawn_args, profile_env, active_profile) = if let Some(cfg) = self.cpu_profile.as_ref() {
+            let request = arena_profile::LaunchRequest {
+                program: executable_path.clone(),
+                args: base_args,
+            };
+            let prepared = arena_profile::prepare_cpu_profile(
+                cfg.backend,
+                request,
+                self.identifier.clone(),
+                cfg.limit_bytes,
+            )
+                .map_err(|e| format!("cpu profiler preparation failed: {}", e))?;
+            match prepared {
+                PreparedLaunch::Wrapped { program, args, session } => {
+                    (program, args, Vec::new(), Some(ActiveCpuProfile::Wrapped(session)))
+                }
+                PreparedLaunch::ArgsAugmented { args, env, shutdown_signal, session } => (
+                    executable_path.clone(),
+                    args,
+                    env,
+                    Some(ActiveCpuProfile::ArgAugmented(session, shutdown_signal)),
+                ),
+            }
+        } else {
+            (executable_path.clone(), base_args, Vec::new(), None)
+        };
+
         tracing::debug!(
             component = %self.identifier,
-            executable_path = ?executable_path,
+            spawn_program = ?spawn_program,
             phase = "spawn_begin",
             "spawning child process",
         );
 
-        let mut cmd = Command::new(executable_path);
+        let mut cmd = Command::new(&spawn_program);
 
         for (key, value) in &self.env_vars {
             cmd.env(key, value);
         }
 
-        for (_key, value) in &self.runtime_args {
-            cmd.arg(value);
+        for entry in &profile_env {
+            let caller_value = self
+                .env_vars
+                .iter()
+                .rfind(|(existing, _)| *existing == entry.key)
+                .map(|(_, value)| value.as_str());
+            cmd.env(&entry.key, merged_profile_env_value(entry, caller_value)?);
+        }
+
+        for arg in &spawn_args {
+            cmd.arg(arg);
         }
 
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
@@ -146,13 +323,20 @@ impl ExecutableComponent {
             .spawn()
             .map_err(|e| format!("failed to spawn process: {}", e))?;
 
-        let pid = child.id();
         tracing::debug!(
             component = %self.identifier,
-            pid,
+            pid = child.id(),
             phase = "spawned",
             "child process spawned",
         );
+
+        if let Some(active) = active_profile.as_ref() {
+            match active {
+                ActiveCpuProfile::Wrapped(session) => session.sampling(),
+                ActiveCpuProfile::ArgAugmented(session, _) => session.sampling(),
+            }
+        }
+        self.active_cpu_profile = active_profile;
 
         if let Some(stdout) = child.stdout.take() {
             Self::spawn_output_reader(stdout, self.identifier.clone());
@@ -170,6 +354,16 @@ impl ExecutableComponent {
 
 #[async_trait]
 impl RunnableComponent for ExecutableComponent {
+    fn attach_cpu_profiler(&mut self, limit_bytes: Option<usize>) -> Result<(), Fault> {
+        let backend =
+            crate::builder::cpu_profiler_backend(&self.identifier, self.build_tool.as_ref())?;
+        self.cpu_profile = Some(CpuProfileConfig {
+            backend,
+            limit_bytes: limit_bytes.unwrap_or(arena_profile::DEFAULT_CPU_PROFILE_LIMIT_BYTES),
+        });
+        Ok(())
+    }
+
     fn identifier(&self) -> &str {
         &self.identifier
     }
@@ -233,7 +427,7 @@ impl RunnableComponent for ExecutableComponent {
             "stopping",
         );
 
-        self.terminate_process();
+        let profile_fault = self.terminate_process();
 
         tracing::debug!(
             component = %self.identifier,
@@ -242,6 +436,7 @@ impl RunnableComponent for ExecutableComponent {
         );
 
         let mut causes = Vec::new();
+        causes.extend(profile_fault);
         for child in self.children.iter_mut().flatten().rev() {
             if let Err(fault) = arena::component::stop_child(child).await {
                 causes.push(fault);
@@ -263,7 +458,9 @@ impl RunnableComponent for ExecutableComponent {
     }
 
     fn release(&mut self) {
-        self.terminate_process();
+        if let Some(fault) = self.terminate_process() {
+            self.faults.push(fault);
+        }
         self.stopped = true;
         for child in self.children.iter_mut().flatten().rev() {
             arena::component::release_child(child);
@@ -272,7 +469,9 @@ impl RunnableComponent for ExecutableComponent {
     }
 
     async fn force_stop(&mut self) {
-        self.terminate_process();
+        if let Some(fault) = self.terminate_process() {
+            self.faults.push(fault);
+        }
         self.stopped = true;
 
         for child in self.children.iter_mut().flatten().rev() {

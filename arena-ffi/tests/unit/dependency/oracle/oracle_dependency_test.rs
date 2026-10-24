@@ -24,6 +24,7 @@ fn minimal_oracle_config() -> OracleDependencyConfig {
         startup_sql_scripts: None,
         setup_mode: None,
         sql_readiness_timeout_ms: None,
+        component_ids: Vec::new(),
     }
 }
 

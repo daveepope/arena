@@ -1,14 +1,14 @@
 #[path = "subjects.rs"]
 mod subjects;
 
-use arena::lifecycle::{ArenaLifecycleState, LifecycleContext, RunnableState};
+use arena::lifecycle::{ArenaLifecycleState, ArenaLifecyclePublisher, RunnableState};
 use arena::matches::{Match, MatchTrait};
 use std::sync::{Arc, Mutex};
 use subjects::{probe_component, probe_dependency, probe_playbook, Behaviour, StateRecorder};
 
-fn context() -> (LifecycleContext, Arc<StateRecorder>) {
+fn context() -> (ArenaLifecyclePublisher, Arc<StateRecorder>) {
     let recorder = Arc::new(StateRecorder::default());
-    let context = LifecycleContext::new("test-arena", vec![recorder.clone()]);
+    let context = ArenaLifecyclePublisher::new("test-arena", vec![recorder.clone()]);
     (context, recorder)
 }
 
@@ -49,13 +49,102 @@ async fn start_healthy_match_emits_every_start_state() {
         recorder.states(),
         vec![
             ArenaLifecycleState::DependenciesStarting,
+            ArenaLifecycleState::DependenciesStarting,
             ArenaLifecycleState::DependenciesStarted,
             ArenaLifecycleState::PlaybooksRunning,
             ArenaLifecycleState::PlaybooksComplete,
             ArenaLifecycleState::ComponentsStarting,
+            ArenaLifecycleState::ComponentsStarting,
             ArenaLifecycleState::ComponentsStarted,
         ]
     );
+}
+
+#[tokio::test]
+async fn start_two_dependencies_progress_snapshot_shows_one_complete_one_pending() {
+    let mut a_match = Match::new(
+        "healthy",
+        vec![
+            probe_dependency("dep-a").into_dependency(),
+            probe_dependency("dep-b").into_dependency(),
+        ],
+        vec![],
+    );
+    let (ctx, recorder) = context();
+
+    a_match.start(&ctx).await.expect("match should start");
+
+    let progress = recorder
+        .snapshots()
+        .into_iter()
+        .find(|s| {
+            s.state == ArenaLifecycleState::DependenciesStarting
+                && s.dependencies.iter().any(|d| d.state == RunnableState::Started)
+                && s.dependencies.iter().any(|d| d.state == RunnableState::NotStarted)
+        })
+        .expect("expected an interim progress snapshot with one dependency started and one still pending");
+
+    assert_eq!(progress.dependencies.len(), 2);
+    let started: Vec<&str> = progress
+        .dependencies
+        .iter()
+        .filter(|d| d.state == RunnableState::Started)
+        .map(|d| d.id.as_str())
+        .collect();
+    let pending: Vec<&str> = progress
+        .dependencies
+        .iter()
+        .filter(|d| d.state == RunnableState::NotStarted)
+        .map(|d| d.id.as_str())
+        .collect();
+    assert_eq!(started.len(), 1, "{progress}");
+    assert_eq!(pending.len(), 1, "{progress}");
+    assert!(["dep-a", "dep-b"].contains(&started[0]));
+    assert!(["dep-a", "dep-b"].contains(&pending[0]));
+    assert_ne!(started[0], pending[0]);
+}
+
+#[tokio::test]
+async fn stop_two_dependencies_progress_snapshot_shows_one_complete_one_pending() {
+    let mut a_match = Match::new(
+        "healthy",
+        vec![
+            probe_dependency("dep-a").into_dependency(),
+            probe_dependency("dep-b").into_dependency(),
+        ],
+        vec![],
+    );
+    let (ctx, recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    a_match.stop(&ctx).await.expect("match should stop");
+
+    let progress = recorder
+        .snapshots()
+        .into_iter()
+        .find(|s| {
+            s.state == ArenaLifecycleState::DependenciesStopping
+                && s.dependencies.iter().any(|d| d.state == RunnableState::Stopped)
+                && s.dependencies.iter().any(|d| d.state == RunnableState::Started)
+        })
+        .expect("expected an interim progress snapshot with one dependency stopped and one still started");
+
+    assert_eq!(progress.dependencies.len(), 2);
+    let stopped: Vec<&str> = progress
+        .dependencies
+        .iter()
+        .filter(|d| d.state == RunnableState::Stopped)
+        .map(|d| d.id.as_str())
+        .collect();
+    let still_started: Vec<&str> = progress
+        .dependencies
+        .iter()
+        .filter(|d| d.state == RunnableState::Started)
+        .map(|d| d.id.as_str())
+        .collect();
+    assert_eq!(stopped.len(), 1, "{progress}");
+    assert_eq!(still_started.len(), 1, "{progress}");
+    assert_ne!(stopped[0], still_started[0]);
 }
 
 #[tokio::test]
@@ -291,6 +380,31 @@ async fn dependency_states_nested_tree_mirrors_children() {
 }
 
 #[tokio::test]
+async fn dependency_states_undeclared_component_ids_defaults_to_empty() {
+    let a_match = Match::new("healthy", vec![probe_dependency("postgres-1").into_dependency()], vec![]);
+
+    let states = a_match.dependency_states();
+
+    assert!(states[0].component_ids.is_empty());
+}
+
+#[tokio::test]
+async fn dependency_states_declared_component_ids_carries_through_the_snapshot() {
+    let dependency = probe_dependency("postgres-1")
+        .with_component_id("parent-component")
+        .with_component_id("child-component")
+        .into_dependency();
+    let a_match = Match::new("healthy", vec![dependency], vec![]);
+
+    let states = a_match.dependency_states();
+
+    assert_eq!(
+        states[0].component_ids,
+        vec!["parent-component".to_string(), "child-component".to_string()]
+    );
+}
+
+#[tokio::test]
 async fn component_states_nested_tree_mirrors_children() {
     let child = probe_component("worker").into_component();
     let parent = probe_component("api").with_child(child).into_component();
@@ -408,6 +522,46 @@ async fn force_stop_all_panicking_subject_still_reaches_the_rest() {
         1,
         "a panicking forced teardown must not abandon the remaining subjects"
     );
+}
+
+#[tokio::test]
+async fn stop_two_same_level_dependencies_each_stop_exactly_once() {
+    let dep_a = probe_dependency("dep-a");
+    let counts_a = dep_a.counts();
+    let dep_b = probe_dependency("dep-b");
+    let counts_b = dep_b.counts();
+    let mut a_match = Match::new(
+        "healthy",
+        vec![dep_a.into_dependency(), dep_b.into_dependency()],
+        vec![],
+    );
+    let (ctx, _recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    a_match.stop(&ctx).await.expect("match should stop");
+
+    assert_eq!(counts_a.stops(), 1);
+    assert_eq!(counts_b.stops(), 1);
+}
+
+#[tokio::test]
+async fn stop_two_same_level_components_each_stop_exactly_once() {
+    let comp_a = probe_component("comp-a");
+    let counts_a = comp_a.counts();
+    let comp_b = probe_component("comp-b");
+    let counts_b = comp_b.counts();
+    let mut a_match = Match::new(
+        "healthy",
+        vec![],
+        vec![comp_a.into_component(), comp_b.into_component()],
+    );
+    let (ctx, _recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    a_match.stop(&ctx).await.expect("match should stop");
+
+    assert_eq!(counts_a.stops(), 1);
+    assert_eq!(counts_b.stops(), 1);
 }
 
 #[tokio::test]
@@ -825,3 +979,469 @@ async fn stop_faulting_dependency_logs_error_naming_the_cause() {
         event.fields
     );
 }
+
+#[tokio::test]
+async fn start_cpu_profiler_named_component_attaches_that_component() {
+    let component = probe_component("arena-executable-component-svc-ab12cd");
+    let counts = component.counts();
+    let mut a_match = Match::new("profiled", Vec::new(), vec![component.into_component()])
+        .with_cpu_profiled_components(vec!["svc".to_string()]);
+
+    a_match.start(&context().0).await.expect("match should start");
+
+    assert_eq!(counts.cpu_profiler_attaches(), 1);
+    assert_eq!(counts.starts(), 1);
+}
+
+#[tokio::test]
+async fn start_cpu_profiler_exact_identifier_attaches_that_component() {
+    let component = probe_component("arena-executable-component-svc-ab12cd");
+    let counts = component.counts();
+    let mut a_match = Match::new("profiled", Vec::new(), vec![component.into_component()])
+        .with_cpu_profiled_components(vec![
+            "arena-executable-component-svc-ab12cd".to_string()
+        ]);
+
+    a_match.start(&context().0).await.expect("match should start");
+
+    assert_eq!(counts.cpu_profiler_attaches(), 1);
+}
+
+#[tokio::test]
+async fn start_cpu_profiler_nested_child_attaches_the_child_not_the_parent() {
+    let child = probe_component("arena-executable-component-worker-ef34gh");
+    let child_counts = child.counts();
+    let parent = probe_component("arena-executable-component-svc-ab12cd")
+        .with_child(child.into_component());
+    let parent_counts = parent.counts();
+    let mut a_match = Match::new("profiled", Vec::new(), vec![parent.into_component()])
+        .with_cpu_profiled_components(vec!["worker".to_string()]);
+
+    a_match.start(&context().0).await.expect("match should start");
+
+    assert_eq!(child_counts.cpu_profiler_attaches(), 1);
+    assert_eq!(parent_counts.cpu_profiler_attaches(), 0);
+}
+
+#[tokio::test]
+async fn start_cpu_profiler_several_components_attaches_each_one() {
+    let first = probe_component("arena-executable-component-svc-ab12cd");
+    let second = probe_component("arena-executable-component-worker-ef34gh");
+    let first_counts = first.counts();
+    let second_counts = second.counts();
+    let mut a_match = Match::new(
+        "profiled",
+        Vec::new(),
+        vec![first.into_component(), second.into_component()],
+    )
+    .with_cpu_profiled_components(vec!["svc".to_string(), "worker".to_string()]);
+
+    a_match.start(&context().0).await.expect("match should start");
+
+    assert_eq!(first_counts.cpu_profiler_attaches(), 1);
+    assert_eq!(second_counts.cpu_profiler_attaches(), 1);
+}
+
+#[tokio::test]
+async fn start_cpu_profiler_unknown_component_faults_without_starting_components() {
+    let component = probe_component("arena-executable-component-svc-ab12cd");
+    let counts = component.counts();
+    let mut a_match = Match::new("profiled", Vec::new(), vec![component.into_component()])
+        .with_cpu_profiled_components(vec!["does-not-exist".to_string()]);
+
+    let faults = a_match
+        .start(&context().0)
+        .await
+        .err()
+        .expect("unknown component must fault");
+
+    assert_eq!(faults.len(), 1);
+    assert!(faults[0].message.contains("does-not-exist"), "got: {}", faults[0].message);
+    assert!(
+        faults[0].message.contains("not a component of this arena"),
+        "got: {}",
+        faults[0].message
+    );
+    assert_eq!(counts.starts(), 0);
+}
+
+#[tokio::test]
+async fn start_cpu_profiler_ambiguous_name_faults_naming_every_match() {
+    let mut a_match = Match::new(
+        "profiled",
+        Vec::new(),
+        vec![
+            probe_component("arena-executable-component-svc-ab12cd").into_component(),
+            probe_component("arena-executable-component-svc-ef34gh").into_component(),
+        ],
+    )
+    .with_cpu_profiled_components(vec!["svc".to_string()]);
+
+    let faults = a_match
+        .start(&context().0)
+        .await
+        .err()
+        .expect("ambiguous name must fault");
+
+    let message = faults[0].message.clone();
+    assert!(message.contains("matches 2 components"), "got: {message}");
+    assert!(message.contains("arena-executable-component-svc-ab12cd"), "got: {message}");
+    assert!(message.contains("arena-executable-component-svc-ef34gh"), "got: {message}");
+}
+
+#[tokio::test]
+async fn start_cpu_profiler_name_shared_by_two_components_faults() {
+    let shared_names = [
+        ("web-app", "arena-executable-component-web-app-ab12cd", "arena-executable-component-web-app-ef34gh"),
+        ("web-app", "arena-executable-component-web-app-ab12cd", "arena-executable-component-web-app-2-ef34gh"),
+        ("api", "arena-executable-component-api-gateway-ab12cd", "arena-executable-component-billing-api-ef34gh"),
+    ];
+
+    for (requested, first, second) in shared_names {
+        let mut a_match = Match::new(
+            "profiled",
+            Vec::new(),
+            vec![
+                probe_component(first).into_component(),
+                probe_component(second).into_component(),
+            ],
+        )
+        .with_cpu_profiled_components(vec![requested.to_string()]);
+
+        let faults = a_match
+            .start(&context().0)
+            .await
+            .err()
+            .unwrap_or_else(|| panic!("{requested} is shared by two components and must fault"));
+
+        let message = faults[0].message.clone();
+        assert!(message.contains("matches 2 components"), "got: {message}");
+        assert!(message.contains(first), "got: {message}");
+        assert!(message.contains(second), "got: {message}");
+    }
+}
+
+#[tokio::test]
+async fn start_cpu_profiler_component_refuses_attachment_faults_the_match() {
+    let mut a_match = Match::new(
+        "profiled",
+        Vec::new(),
+        vec![probe_component("arena-executable-component-svc-ab12cd")
+            .behaving(Behaviour::RefuseCpuProfiler)
+            .into_component()],
+    )
+    .with_cpu_profiled_components(vec!["svc".to_string()]);
+
+    let faults = a_match
+        .start(&context().0)
+        .await
+        .err()
+        .expect("refused attachment must fault");
+
+    assert!(
+        faults[0].message.contains("BuildTool::Make"),
+        "got: {}",
+        faults[0].message
+    );
+}
+
+#[tokio::test]
+async fn start_no_cpu_profilers_requested_attaches_nothing() {
+    let component = probe_component("arena-executable-component-svc-ab12cd");
+    let counts = component.counts();
+    let mut a_match = Match::new("plain", Vec::new(), vec![component.into_component()]);
+
+    a_match.start(&context().0).await.expect("match should start");
+
+    assert_eq!(counts.cpu_profiler_attaches(), 0);
+    assert_eq!(counts.starts(), 1);
+}
+
+#[tokio::test]
+async fn start_cpu_profile_limit_set_reaches_the_component() {
+    let component = probe_component("arena-executable-component-svc-ab12cd");
+    let counts = component.counts();
+    let mut a_match = Match::new("profiled", Vec::new(), vec![component.into_component()])
+        .with_cpu_profiled_components(vec!["svc".to_string()])
+        .with_cpu_profile_limit_bytes(1024);
+
+    a_match.start(&context().0).await.expect("match should start");
+
+    assert_eq!(counts.cpu_profile_limit_bytes(), 1024);
+}
+
+#[tokio::test]
+async fn start_cpu_profile_limit_unset_passes_no_limit_to_the_component() {
+    let component = probe_component("arena-executable-component-svc-ab12cd");
+    let counts = component.counts();
+    let mut a_match = Match::new("profiled", Vec::new(), vec![component.into_component()])
+        .with_cpu_profiled_components(vec!["svc".to_string()]);
+
+    a_match.start(&context().0).await.expect("match should start");
+
+    assert_eq!(counts.cpu_profiler_attaches(), 1);
+    assert_eq!(counts.cpu_profile_limit_bytes(), 0);
+}
+
+fn nested_dependency_in(snapshot: &arena::lifecycle::ArenaState, id: &str) -> usize {
+    snapshot
+        .dependencies
+        .iter()
+        .find(|dep| dep.id == id)
+        .map(|dep| dep.children.len())
+        .unwrap_or(0)
+}
+
+#[tokio::test]
+async fn stop_dependency_still_in_flight_keeps_what_it_last_reported() {
+    let mut a_match = Match::new(
+        "nested",
+        vec![
+            probe_dependency("white-rabbit-queue")
+                .with_child(probe_dependency("dormouse-cache").into_dependency())
+                .into_dependency(),
+            probe_dependency("queen-of-hearts-db")
+                .with_component_id("mad-hatter-api")
+                .with_child(probe_dependency("mad-hatter-service").into_dependency())
+                .into_dependency(),
+        ],
+        vec![],
+    );
+    let (ctx, recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    a_match.stop(&ctx).await.expect("match should stop");
+
+    let snapshots = recorder.snapshots();
+    let in_flight = snapshots
+        .iter()
+        .find(|snapshot| {
+            snapshot.state == ArenaLifecycleState::DependenciesStopping
+                && snapshot
+                    .dependencies
+                    .iter()
+                    .any(|dep| dep.id == "white-rabbit-queue" && dep.state == RunnableState::Stopped)
+                && snapshot
+                    .dependencies
+                    .iter()
+                    .any(|dep| dep.id == "queen-of-hearts-db" && dep.state != RunnableState::Stopped)
+        })
+        .expect("expected a progress snapshot with one dependency stopped and one still stopping");
+
+    let pending = in_flight
+        .dependencies
+        .iter()
+        .find(|dep| dep.id == "queen-of-hearts-db")
+        .expect("the stopping dependency is in the snapshot");
+    assert_eq!(pending.children.len(), 1);
+    assert_eq!(pending.children[0].id, "mad-hatter-service");
+    assert_eq!(pending.component_ids, vec!["mad-hatter-api".to_string()]);
+}
+
+#[tokio::test]
+async fn stop_dependency_that_faulted_before_the_stop_keeps_its_faults_while_in_flight() {
+    let mut a_match = Match::new(
+        "nested",
+        vec![
+            probe_dependency("white-rabbit-queue").into_dependency(),
+            probe_dependency("queen-of-hearts-db")
+                .behaving(Behaviour::FailStop)
+                .with_child(probe_dependency("mad-hatter-service").into_dependency())
+                .into_dependency(),
+        ],
+        vec![],
+    );
+    let (ctx, recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    let faults = a_match.stop(&ctx).await.expect_err("the stop should fault");
+
+    assert_eq!(faults.len(), 1);
+    for snapshot in recorder.snapshots() {
+        if snapshot.state != ArenaLifecycleState::DependenciesStopping {
+            continue;
+        }
+        assert_eq!(
+            nested_dependency_in(&snapshot, "queen-of-hearts-db"),
+            1,
+            "child missing from a snapshot at {}",
+            snapshot.state
+        );
+    }
+}
+
+#[tokio::test]
+async fn stop_three_level_dependency_keeps_the_whole_tree_while_in_flight() {
+    let mut a_match = Match::new(
+        "nested",
+        vec![
+            probe_dependency("white-rabbit-queue").into_dependency(),
+            probe_dependency("queen-of-hearts-db")
+                .with_child(
+                    probe_dependency("mad-hatter-service")
+                        .with_child(probe_dependency("dormouse-worker").into_dependency())
+                        .into_dependency(),
+                )
+                .into_dependency(),
+        ],
+        vec![],
+    );
+    let (ctx, recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    a_match.stop(&ctx).await.expect("match should stop");
+
+    for snapshot in recorder.snapshots() {
+        let Some(parent) = snapshot
+            .dependencies
+            .iter()
+            .find(|dep| dep.id == "queen-of-hearts-db")
+        else {
+            continue;
+        };
+        assert_eq!(parent.children.len(), 1, "at {}", snapshot.state);
+        assert_eq!(
+            parent.children[0].children.len(),
+            1,
+            "grandchild missing at {}",
+            snapshot.state
+        );
+    }
+}
+
+#[tokio::test]
+async fn start_dependency_still_in_flight_keeps_its_children_in_the_snapshot() {
+    let mut a_match = Match::new(
+        "nested",
+        vec![
+            probe_dependency("white-rabbit-queue").into_dependency(),
+            probe_dependency("queen-of-hearts-db")
+                .with_child(probe_dependency("mad-hatter-service").into_dependency())
+                .into_dependency(),
+        ],
+        vec![],
+    );
+    let (ctx, recorder) = context();
+
+    a_match.start(&ctx).await.expect("match should start");
+
+    for snapshot in recorder.snapshots() {
+        if snapshot.state != ArenaLifecycleState::DependenciesStarting {
+            continue;
+        }
+        assert_eq!(
+            nested_dependency_in(&snapshot, "queen-of-hearts-db"),
+            1,
+            "child missing from a snapshot at {}",
+            snapshot.state
+        );
+    }
+}
+
+#[tokio::test]
+async fn stop_nested_component_stays_in_every_progress_snapshot() {
+    let mut a_match = Match::new(
+        "nested",
+        vec![],
+        vec![
+            probe_component("dodo-service").into_component(),
+            probe_component("cheshire-api")
+                .with_child(probe_component("dormouse-worker").into_component())
+                .into_component(),
+        ],
+    );
+    let (ctx, recorder) = context();
+    a_match.start(&ctx).await.expect("match should start");
+
+    a_match.stop(&ctx).await.expect("match should stop");
+
+    for snapshot in recorder.snapshots() {
+        let Some(parent) = snapshot
+            .components
+            .iter()
+            .find(|comp| comp.id == "cheshire-api")
+        else {
+            continue;
+        };
+        assert_eq!(
+            parent.children.len(),
+            1,
+            "child missing from a snapshot at {}",
+            snapshot.state
+        );
+    }
+}
+
+fn seed_frames(ctx: &ArenaLifecyclePublisher, matches: [&mut Match; 2]) {
+    for a_match in matches {
+        let slot = ctx.reserve_match();
+        a_match.attach_report_slot(slot);
+        ctx.report_match(slot, a_match.dependency_states(), a_match.component_states());
+    }
+}
+
+#[tokio::test]
+async fn transition_two_matches_one_publisher_keeps_both_matches_subjects() {
+    let recorder = Arc::new(StateRecorder::default());
+    let ctx = ArenaLifecyclePublisher::new("test-arena", vec![recorder.clone()]);
+    let mut first = Match::new(
+        "first",
+        vec![probe_dependency("postgres-1").into_dependency()],
+        vec![],
+    );
+    let mut second = Match::new(
+        "second",
+        vec![probe_dependency("kafka-1").into_dependency()],
+        vec![],
+    );
+    seed_frames(&ctx, [&mut first, &mut second]);
+
+    first.start(&ctx).await.expect("first match should start");
+    second.start(&ctx).await.expect("second match should start");
+
+    for snapshot in recorder.snapshots() {
+        let ids: Vec<&str> = snapshot
+            .dependencies
+            .iter()
+            .map(|dep| dep.id.as_str())
+            .collect();
+        assert_eq!(
+            ids,
+            vec!["postgres-1", "kafka-1"],
+            "a snapshot at {} lost a match's subjects",
+            snapshot.state
+        );
+    }
+}
+
+#[tokio::test]
+async fn stop_two_matches_one_publisher_keeps_both_matches_subjects() {
+    let recorder = Arc::new(StateRecorder::default());
+    let ctx = ArenaLifecyclePublisher::new("test-arena", vec![recorder.clone()]);
+    let mut first = Match::new(
+        "first",
+        vec![probe_dependency("postgres-1").into_dependency()],
+        vec![],
+    );
+    let mut second = Match::new(
+        "second",
+        vec![probe_dependency("kafka-1").into_dependency()],
+        vec![],
+    );
+    seed_frames(&ctx, [&mut first, &mut second]);
+    first.start(&ctx).await.expect("first match should start");
+    second.start(&ctx).await.expect("second match should start");
+
+    first.stop(&ctx).await.expect("first match should stop");
+    second.stop(&ctx).await.expect("second match should stop");
+
+    for snapshot in recorder.snapshots() {
+        assert_eq!(
+            snapshot.dependencies.len(),
+            2,
+            "a snapshot at {} lost a match's subjects",
+            snapshot.state
+        );
+    }
+}
+

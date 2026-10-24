@@ -23,6 +23,7 @@ pub struct MssqlDependencyBuilder {
     readiness_check: Option<Box<dyn ReadinessCheck>>,
     connect_timeout: Option<Option<Duration>>,
     encryption: Option<MssqlEncryption>,
+    component_ids: Vec<String>,
 }
 
 impl MssqlDependencyBuilder {
@@ -51,6 +52,7 @@ impl MssqlDependencyBuilder {
             readiness_check: None,
             connect_timeout: None,
             encryption: None,
+            component_ids: Vec::new(),
         }
     }
 
@@ -156,6 +158,11 @@ impl MssqlDependencyBuilder {
         self
     }
 
+    pub fn with_component_id(mut self, component_id: impl Into<String>) -> Self {
+        self.component_ids.push(component_id.into());
+        self
+    }
+
     pub fn build(self) -> MssqlDependency {
         let encryption = self.encryption.unwrap_or_default();
         let mut mssql_impl = self
@@ -196,6 +203,7 @@ impl MssqlDependencyBuilder {
             image_name,
             image_tag,
             container_name,
+            self.component_ids,
         );
 
         if let Some(check) = readiness_check {

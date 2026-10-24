@@ -72,10 +72,10 @@ public final class ComponentTestSuite {
   private static final String OAUTH_ISSUER = RT.oauthIssuer;
   private static final String POSTGRES_DB_NAME = "readings_db";
   private static final String POSTGRES_DB_USER = "readings_user";
-  private static final String POSTGRES_DB_PASS = "readings_password";
+  private static final String POSTGRES_DB_PASS = "pw" + RT.runSuffix.substring(0, 12);
   private static final String MSSQL_DB_NAME = "validationDb";
   private static final String MSSQL_DB_USER = "sa";
-  private static final String MSSQL_DB_PASS = "yourStrong(!)Password";
+  private static final String MSSQL_DB_PASS = "pw" + RT.runSuffix.substring(0, 12) + "Aa1";
   private static final String KAFKA_TOPIC = "readings";
 
   private static final OauthLoopbackTls.PemPair OAUTH_PEM =

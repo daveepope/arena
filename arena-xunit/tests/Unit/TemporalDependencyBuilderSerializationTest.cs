@@ -1,3 +1,4 @@
+using System.Linq;
 using ArenaDotnet.Xunit.Dep;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -64,5 +65,27 @@ public class TemporalDependencyBuilderSerializationTest
     {
         var dep = new TemporalDependencyBuilder("test").Build();
         Assert.StartsWith("arena-temporal-", dep.Identifier);
+    }
+
+    [Fact]
+    public void Build_WithComponentIds_ExposesAndSerializesThemInOrder()
+    {
+        var dep = new TemporalDependencyBuilder("test")
+            .WithComponentId("parent-component")
+            .WithComponentId("child-component")
+            .Build();
+
+        Assert.Equal(new[] { "parent-component", "child-component" }, dep.ComponentIds);
+        Assert.Equal(
+            new[] { "parent-component", "child-component" },
+            JObject.Parse(dep.ForFfi())["component_ids"]!.Select(id => (string?)id));
+    }
+
+    [Fact]
+    public void Build_WithoutComponentIds_ExposesAnEmptyList()
+    {
+        var dep = new TemporalDependencyBuilder("test").Build();
+
+        Assert.Empty(dep.ComponentIds);
     }
 }

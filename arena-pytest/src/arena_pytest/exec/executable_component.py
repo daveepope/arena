@@ -14,6 +14,7 @@ class BuildTool(Enum):
     DOTNET = "dotnet"
     MAKE = "make"
     CMAKE = "cmake"
+    PYTHON = "python"
 
     @staticmethod
     def custom(command: str, args: List[str]) -> Dict[str, Any]:
@@ -93,6 +94,10 @@ class ExecutableComponent:
         self._config = config
         self._readiness_checks = readiness_checks or []
         self._children = children or []
+
+    @property
+    def identifier(self) -> str:
+        return self._config["identifier"]
 
     def _for_ffi(self) -> Dict[str, Any]:
         d = dict(self._config)

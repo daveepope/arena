@@ -47,6 +47,7 @@ pub struct HttpDependency {
     readiness_check: Box<dyn ReadinessCheck>,
     state: RunnableState,
     faults: Vec<Fault>,
+    component_ids: Vec<String>,
 }
 
 impl HttpDependency {
@@ -60,6 +61,7 @@ impl HttpDependency {
         image_tag: String,
         container_name: Option<String>,
         trusted_tls_certificate_pem: Option<String>,
+        component_ids: Vec<String>,
     ) -> Self {
         let readiness_check: Box<dyn ReadinessCheck> = Box::new(DefaultHttpReadinessCheck::new(
             trusted_tls_certificate_pem.clone(),
@@ -79,6 +81,7 @@ impl HttpDependency {
             readiness_check,
             state: RunnableState::NotStarted,
             faults: Vec::new(),
+            component_ids,
         }
     }
 
@@ -359,6 +362,10 @@ impl RunnableDependency for HttpDependency {
 
     fn children(&self) -> &[Dependency] {
         self.dependencies.as_deref().unwrap_or(&[])
+    }
+
+    fn component_ids(&self) -> &[String] {
+        &self.component_ids
     }
 
     fn children_mut(&mut self) -> &mut [Dependency] {

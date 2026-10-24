@@ -56,6 +56,7 @@ pub struct OauthDependencyBuilder {
     token_ttl_secs: Option<u64>,
     inbound_transport: InboundTransport,
     metadata_base_url: Option<String>,
+    component_ids: Vec<String>,
 }
 
 impl OauthDependencyBuilder {
@@ -73,6 +74,7 @@ impl OauthDependencyBuilder {
             token_ttl_secs: None,
             inbound_transport: InboundTransport::EphemeralTls,
             metadata_base_url: None,
+            component_ids: Vec::new(),
         }
     }
 
@@ -149,6 +151,11 @@ impl OauthDependencyBuilder {
         dependencies: Vec<Box<dyn RunnableDependency>>,
     ) -> Self {
         self.dependencies = Some(dependencies);
+        self
+    }
+
+    pub fn with_component_id(mut self, component_id: impl Into<String>) -> Self {
+        self.component_ids.push(component_id.into());
         self
     }
 
@@ -265,6 +272,7 @@ impl OauthDependencyBuilder {
             token_ttl_secs,
             tls_plan,
             self.metadata_base_url,
+            self.component_ids,
         ))
     }
 }

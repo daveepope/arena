@@ -13,7 +13,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.net.http.HttpResponse;
 import org.junit.jupiter.api.Test;
 
-@Arena(ComponentTestSuite.class)
+@Arena(JavaSpringBootComponentTestSuite.class)
 final class CalibrationOutageComponentTest {
 
   @Test
@@ -21,8 +21,8 @@ final class CalibrationOutageComponentTest {
   @Playbook(ResetValidationDbPlaybook.class)
   void postReadingReturns500WhenCalibrationOutagePlaybookActive() throws Exception {
     HttpResponse<String> response =
-        ComponentTestSuite.apiClient()
-            .postReadingRaw("Outage Test User", 99, null, ComponentTestSuite.readingsDeviceId);
+        JavaSpringBootComponentTestSuite.apiClient()
+            .postReadingRaw("Outage Test User", 99, null, JavaSpringBootComponentTestSuite.readingsDeviceId);
     assertEquals(500, response.statusCode(), response.body());
   }
 
@@ -30,10 +30,10 @@ final class CalibrationOutageComponentTest {
   @Playbook(ResetValidationDbPlaybook.class)
   void postReadingSucceedsAfterOutagePlaybookScope() throws Exception {
     int recoveredId =
-        ComponentTestSuite.apiClient()
+        JavaSpringBootComponentTestSuite.apiClient()
             .createReading(
-                "Recovery Test User", 17, "post-outage", ComponentTestSuite.readingsDeviceId);
-    JsonNode found = ComponentTestSuite.apiClient().findReadingById(recoveredId);
+                "Recovery Test User", 17, "post-outage", JavaSpringBootComponentTestSuite.readingsDeviceId);
+    JsonNode found = JavaSpringBootComponentTestSuite.apiClient().findReadingById(recoveredId);
     assertEquals("Recovery Test User", found.path("user_name").asText());
     assertEquals(17, found.path("value").asInt());
   }
@@ -43,8 +43,8 @@ final class CalibrationOutageComponentTest {
   @Playbook(ResetValidationDbPlaybook.class)
   void postReadingReturns500UnderStackedPlaybooks() throws Exception {
     HttpResponse<String> response =
-        ComponentTestSuite.apiClient()
-            .postReadingRaw("Stack Outage", 1, null, ComponentTestSuite.readingsDeviceId);
+        JavaSpringBootComponentTestSuite.apiClient()
+            .postReadingRaw("Stack Outage", 1, null, JavaSpringBootComponentTestSuite.readingsDeviceId);
     assertEquals(500, response.statusCode(), response.body());
   }
 
@@ -52,15 +52,15 @@ final class CalibrationOutageComponentTest {
   @Playbook(CalibrationApiFlakyPlaybook.class)
   @Playbook(ResetValidationDbPlaybook.class)
   void postReadingSucceedsAfterCalibrationFlakySequence() throws Exception {
-    ApiClient client = ComponentTestSuite.apiClient();
+    ApiClient client = JavaSpringBootComponentTestSuite.apiClient();
     assertEquals(
         500,
-        client.postReadingRaw("Flaky 1", 1, null, ComponentTestSuite.readingsDeviceId).statusCode());
+        client.postReadingRaw("Flaky 1", 1, null, JavaSpringBootComponentTestSuite.readingsDeviceId).statusCode());
     assertEquals(
         500,
-        client.postReadingRaw("Flaky 2", 2, null, ComponentTestSuite.readingsDeviceId).statusCode());
+        client.postReadingRaw("Flaky 2", 2, null, JavaSpringBootComponentTestSuite.readingsDeviceId).statusCode());
     int createdId =
-        client.createReading("Flaky 3", 3, "recovered", ComponentTestSuite.readingsDeviceId);
+        client.createReading("Flaky 3", 3, "recovered", JavaSpringBootComponentTestSuite.readingsDeviceId);
     assertTrue(client.listReadingIds().contains(createdId));
   }
 }

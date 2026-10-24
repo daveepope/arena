@@ -54,4 +54,15 @@ ignore = [
     # alert fixes now rather than waiting. Bump ctutils and delete this entry
     # once 0.4.4 is older than three days.
     "RUSTSEC-2026-0385",
+    # crypto-bigint 0.5.5 has multiple timing-variability issues in operations
+    # intended to be constant time. Fixed in 0.7.6, which nothing in this tree
+    # can reach: the crate arrives only through jsonwebtoken's rust_crypto
+    # feature -> p256/p384 0.13 -> elliptic-curve 0.13.8, and jsonwebtoken
+    # 11.1.0, the latest release, still pins p256 ^0.13.2. The alternative is
+    # jsonwebtoken's aws_lc_rs backend, which forces a cmake/C build on every
+    # platform. Arena's use is local ECDSA keypair generation and JWT
+    # signing/verification against ephemeral test credentials in arena-oauth,
+    # not an operation an attacker can time. Remove this entry once
+    # jsonwebtoken adopts p256 0.14.
+    "RUSTSEC-2026-0387",
 ]

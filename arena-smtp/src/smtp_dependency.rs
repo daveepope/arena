@@ -61,6 +61,7 @@ pub struct SmtpDependency {
     state: RunnableState,
     faults: Vec<Fault>,
     build_fault: Option<Fault>,
+    component_ids: Vec<String>,
 }
 
 impl SmtpDependency {
@@ -75,6 +76,7 @@ impl SmtpDependency {
         image_tag: String,
         container_name: Option<String>,
         tls_mode: Option<SmtpTlsMode>,
+        component_ids: Vec<String>,
     ) -> Self {
         let (active_tls, build_fault) = match tls_mode {
             None => (None, None),
@@ -116,6 +118,7 @@ impl SmtpDependency {
             state: RunnableState::NotStarted,
             faults: Vec::new(),
             build_fault,
+            component_ids,
         }
     }
 
@@ -365,6 +368,10 @@ impl RunnableDependency for SmtpDependency {
 
     fn children(&self) -> &[Dependency] {
         self.dependencies.as_deref().unwrap_or(&[])
+    }
+
+    fn component_ids(&self) -> &[String] {
+        &self.component_ids
     }
 
     fn children_mut(&mut self) -> &mut [Dependency] {

@@ -15,11 +15,21 @@ import java.util.List;
 public final class OpenArena {
   private Pointer handle;
   private volatile long dispatcherLoggingTargetToken;
+  private volatile long dashboardObserverToken;
   private final List<Match> matches;
 
   OpenArena(Pointer handle, long dispatcherLoggingTargetToken, List<Match> matches) {
+    this(handle, dispatcherLoggingTargetToken, 0L, matches);
+  }
+
+  OpenArena(
+      Pointer handle,
+      long dispatcherLoggingTargetToken,
+      long dashboardObserverToken,
+      List<Match> matches) {
     this.handle = handle;
     this.dispatcherLoggingTargetToken = dispatcherLoggingTargetToken;
+    this.dashboardObserverToken = dashboardObserverToken;
     this.matches = List.copyOf(matches);
   }
 
@@ -59,6 +69,7 @@ public final class OpenArena {
         ArenaBindings.unregisterDispatcherLoggingTarget(t);
         dispatcherLoggingTargetToken = 0L;
       }
+      removeDashboardObserver();
       return;
     }
     handle = null;
@@ -76,9 +87,18 @@ public final class OpenArena {
         ArenaBindings.unregisterDispatcherLoggingTarget(tok);
         dispatcherLoggingTargetToken = 0L;
       }
+      removeDashboardObserver();
     }
     if (stateDocument != null) {
       LifecycleLog.logClosingSummaryDocument(stateDocument);
+    }
+  }
+
+  private void removeDashboardObserver() {
+    long tok = dashboardObserverToken;
+    if (tok != 0L) {
+      ArenaBindings.removeLifecycleObserver(tok);
+      dashboardObserverToken = 0L;
     }
   }
 
