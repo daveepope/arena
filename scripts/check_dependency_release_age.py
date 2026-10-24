@@ -17,7 +17,9 @@ from typing import Callable
 WATCHED_FILES: dict[str, str] = {
     "Cargo.Bazel.lock": "cargo",
     "arena-pytest/requirements_lock.txt": "pip",
+    "arena-pytest/requirements_windows.txt": "pip",
     "examples/requirements_lock.txt": "pip",
+    "examples/requirements_windows.txt": "pip",
     "MODULE.bazel": "module",
 }
 
@@ -122,7 +124,8 @@ def parse_requirements_lock(text: str) -> set[tuple[str, str, str]]:
         if not stripped or stripped.startswith("#") or "==" not in stripped:
             continue
         left, right = stripped.split("==", 1)
-        name = left.strip().split()[0].split("[")[0].lower()
+        name = left.strip().split()[0].lower()
+        name = name.split("[", 1)[0]
         version = right.strip().split()[0]
         pairs.add(("pip", name, version))
     return pairs

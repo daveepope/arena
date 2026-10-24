@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `arena-profile`: the python sampler names frames with `co_qualname` where the interpreter has it and `co_name` otherwise, so it profiles any CPython from 3.7 up, refuses to arm below that or in a directory that is not private to this user, samples in the signal handler but flushes from its own serialised thread so nothing it does escapes into the application, skips its own flush thread, abandons sampling in a `fork()`ed child rather than writing over its parent's profile, reports no profile when it sampled nothing, disarms before the final flush, restores a cpu timer another library had already armed, and denies the profile outright when it cannot record why it refused
+- `arena-profile`: the python sampler names frames with `co_qualname` where the interpreter has it and `co_name` otherwise, so it profiles any CPython from 3.7 up, refuses to arm below that or in a directory that is not private to this user, samples in the signal handler but flushes from its own serialised thread so nothing it does escapes into the application, skips its own flush thread, abandons sampling in a `fork()`ed child rather than writing over its parent's profile, disarms before the final flush, restores a cpu timer another library had already armed, and denies the profile outright when it cannot record why it refused
 - `arena-profile`: unit coverage that the generated sampler carries no unfilled placeholder, interpolates only numbers, never names a host path, and that a refusal status cannot be forged by appending to it; plus component coverage that losing `SIGPROF` mid-run faults instead of reporting a profile, and unit coverage that `collect` reports no profile from a file the sampler left empty, its stacks from a filled one, and a fault for another process's file; the cpu profiling component tests share one busy-loop subject per language under `//tools/profile_subjects`, each burning a known budget across ten named functions with one dominant hotspot, and every test waits for the subject to complete a pass rather than sleeping for a guessed interval
 - `arena-profile`: `PythonSiteSampler`, a cpu profiler backend that samples inside the component's own interpreter through a generated `sitecustomize.py` on `PYTHONPATH`, selected for `BuildTool::Python` on macOS where py-spy needs root; it arms `SIGPROF` with `ITIMER_PROF`, collapses every thread's stack on each tick, flushes periodically so a SIGTERM loses at most one interval, caps distinct stacks and bytes against the existing cpu profile limit, and refuses rather than stealing a `SIGPROF` or timer another library already holds
 - `arena-profile`: the sampler payload is compiled into the crate and written out at run time, so it needs no vendored tool, no runfiles and no PATH lookup, and ships identically in the pip wheel, maven jar and nuget package
@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena-profile`, `arena-dashboard`: a rendered profile carries a second hotspot ranking crediting each runtime-leaf sample to its nearest application caller rather than dropping it, so an application function is credited the runtime time spent beneath it and reads higher there than in the leaf-only ranking, both over the same whole-profile denominator; runtime frames are matched against how .NET, the JVM, CPython and native code actually spell them, and the panel's `app only` toggle switches the table between the two rankings while leaving the flamegraph alone, with an info button naming the frames each language hides
 - `arena-profile`: new crate sampling CPU profiles and reporting the captured folded stacks through its own observer
 - `arena-profile`: `perf`, async-profiler, py-spy and dotnet-trace backends selected from the component's build tool; async-profiler writes to a pid-scoped file and the sampler reads back the profiled child's own output, so a launcher process cannot overwrite the component's profile, and its agent travels in `JAVA_TOOL_OPTIONS` rather than ahead of the component's arguments so a Java component launched through a wrapper script is profiled
-- `arena-profile`: `CpuProfileObserver` reports the profiler lifecycle as `RunnableState`, carrying the folded stacks on the `Stopped` transition; a profile flushed before the component was torn down is read even when the process does not exit within the finish budget, and a run that sampled nothing reports a stopped profiler with no profile rather than faulting the arena across every backend, while a genuine profiler failure still faults and py-spy's names its exit status
+- `arena-profile`: `CpuProfileObserver` reports the profiler lifecycle as `RunnableState`, carrying the folded stacks on the `Stopped` transition; a profile flushed before the component was torn down is read even when the process does not exit within the finish budget
 - `arena-profile`: `render_folded` returns the inferno SVG plus hotspots ranked by self time with severity bands
 - `arena-profile`: captured cpu profiles are capped at 8 MiB by default and fault rather than truncate, with the breach reported through `CpuProfileError`
 - `arena-dashboard`: the server sends a `Content-Security-Policy` confining the page to its own origin, with `frame-ancestors`, `base-uri`, `form-action` and `object-src` all denied
@@ -74,7 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `arena-dashboard`: the browser test runs its specs across three playwright workers instead of one, so the suite finishes inside its `small` timeout on the slower macOS runner
-- `arena-profile`: the "sampled nothing" guarantee is covered by unit tests over `collect` rather than by an idle-component test whose own waiting burned the cpu time it asserted had not been sampled
+- `arena-profile`: the empty-profile path is covered by unit tests over each sampler's `collect` rather than by an idle-component test whose own waiting burned the cpu time it asserted had not been sampled
 - `arena-profile`, `arena-executable-component`: profiler environment carries a per-variable merge rule, so `JAVA_TOOL_OPTIONS` is space-joined behind a caller's value while `PYTHONPATH` is path-joined with the platform separator; the previous single space-join would have destroyed a caller's `PYTHONPATH` and produced one unusable `sys.path` entry
 - `arena-profile`: a sampler's `collect` returns the folded stacks rather than a path and takes the byte limit, so the directory holding them can be released once they are read
 - `arena-profile`: perf, py-spy, dotnet-trace and async-profiler all write into a `ScratchDir` held by their session, replacing the predictable `temp_dir/prefix-pid-counter` naming, which `scratch_path` provided and which is now gone
@@ -83,17 +83,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Arena dependency teardown runs in parallel instead of sequentially
 - `arena`: `LifecycleContext` is renamed `ArenaLifecyclePublisher` and moved to `lifecycle/publisher.rs`, since it only ever publishes
 - Example suites name their language in the arena id so the dashboard can tell them apart: the Spring Boot suites became `JavaSpringBootComponentTestSuite` and `JavaSpringBootChainedComponentTestSuite`, and the FastAPI arenas became `example-fastapi-python-arena` and `example-fastapi-python-chained-arena`; and the Java and .NET examples rename their second web app so its name no longer shares a profiler request with the first
-- Example apps: `anyio` 4.14.2 (CVE-2026-63374, CVE-2026-64847), `netty-handler` 4.1.137.Final (CVE-2026-75595, CVE-2026-75596)
-- Example Spring Boot app and the Maven bench tool: `jackson-databind`/`jackson-core` pinned to 2.21.7/2.22.3
 - CI: 24 duplicated Bazel setup and BuildBuddy blocks replaced with a `.github/actions/bazel-setup` composite action
 - Unit test coverage raised across the dependency crates, `arena-junit`, `arena-xunit` and `arena-pytest`
-- Dropped three stale `osv-scanner.toml` ignores (one `@vitest/mocker`, two tinypool) now that vitest is 5.0.4 and tinypool has left the dependency tree
-- `zip` 2.4.2 -> 9.0.3 (RUSTSEC-2026-0367, RUSTSEC-2026-0368, RUSTSEC-2026-0369)
-- `rustls` 0.23.43 -> 0.23.46 (RUSTSEC-2026-0285, RUSTSEC-2026-0346, RUSTSEC-2026-0349)
-- `pyjwt` 2.13.0 -> 2.15.1, `urllib3` 2.7.0 -> 2.8.0 (multiple PyJWT and urllib3 CVEs)
-- `aws-smithy-json` 0.62.5 -> 0.62.7 (GHSA-8ffr-xgwf-xj56, stack overflow via recursive unknown-key skipping)
-- `at.yawk.lz4:lz4-java` 1.11.1 -> 1.11.4 (multiple CVEs, pulled in transitively via `kafka-clients`)
-- Known-unfixable or false-positive CVEs (Spring Framework SSE/XsltView, PyJWT's `decode()` options-reuse bypass, `braces`) documented and suppressed with risk rationale in `osv-scanner.toml` instead of silently ignored
+- Dropped four stale `osv-scanner.toml` ignores (one `@vitest/mocker`, two tinypool, one `braces`) now that vitest is 5.0.4 and neither tinypool nor braces is in the dependency tree
+- `arena-profile`: a profiler that captured no samples faults with a reason naming the backend and what it observed, instead of reporting a stopped profiler with no profile; every sampler's `collect` returns the folded stacks or explains why it has none, and `CpuProfileEvent` carries that reason
+- `arena-profile`, `arena-dashboard`: coverage for the failure reason end to end: each session faults with it, py-spy's missing-file and empty-file cases, the async-profiler and python sampler empty cases, the forwarder's posted payload, `GET /profiles`, the store, the page's live event and on-load fetch, and the node chip and detail dialog that render it
+- `arena-dashboard`: the header's stop control is a power symbol button that reads on while the server is connected and off once it is gone, naming `Stop server` or `Server stopped` on hover, with the stop confirmation unchanged and the off state inert
+- `arena-dashboard`: profiler state reaches the page with its failure reason, so a profiled node reads `cpu profiler faulted` in red with the reason on hover and the component's detail dialog prints it
+- `undici` 8.12.1 -> 8.12.3 in the dashboard pnpm lock (GHSA-xjj6-f33q-929c, GHSA-4qv8-2p9j-2685, GHSA-f72v-6w45-q472)
+- The `crypto-bigint` 0.5.5 timing advisory (RUSTSEC-2026-0387) is documented and suppressed in `osv-scanner.toml` and `.cargo/audit.toml`, since it arrives only through `jsonwebtoken`'s `rust_crypto` feature and even `jsonwebtoken` 11.1.0 pins `p256` 0.13, which cannot reach the 0.7.6 fix
+- cargo-vet watermarks moved to 152 audited and 378 exempted after the 7.0.2 merge and repin
 - Agent rules forbid asserting on log output to prove behaviour, and require the changelog to record internal as well as external changes
 - Agent rules forbid hard-coding a password, secret or key in any test or example; generate it per run the way `examples/tests/pytest-shared/arena_config.py` does
 - Agent rules: never let a sleep or timeout carry an assertion, wait on an observable condition bounded by a named deadline
@@ -113,10 +112,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `arena-ffi`'s `HttpReadinessCheck` now requires a successful (2xx) status instead of treating any HTTP response, including 404/500, as ready
 - macOS release binaries are re-signed ad-hoc after stripping, so the darwin `arena_ffi_shared` no longer ships with an invalidated signature
 - `scripts/repin.py` no longer leaves `MODULE.bazel.lock` stale: `CARGO_BAZEL_REPIN` is scoped to the crate repin step and the lockfile is recorded last
-- `requirements_windows.txt` for `examples` and `arena-pytest` regenerated to carry the same `pyjwt`/`urllib3` fixes as the other platform lockfiles
-- Windows CI jobs no longer use a Bazel disk cache, working around upstream Bazel 7.4.1 bug bazelbuild/bazel#28408 where a concurrent rename into the disk cache CAS fails with "Permission denied"; the BuildBuddy remote cache still applies
 - Windows CI test jobs pass `--nobuild_python_zip` alongside the `--enable_runfiles` they already set, so Python tests run from the runfiles tree instead of building and self-extracting a zip of it; `//arena-pytest:arena_pytest_unit_test` and `//examples:ephemeral_test_runtime_test` no longer exceed the 60s `small` timeout on that overhead alone
-- macOS CI test jobs no longer pass `--local_test_jobs=6`, which over-subscribed the 3-core and 4-core runners and starved tests; Bazel now sizes local test concurrency from `--jobs`
+## [7.0.2]
+
+### Security
+
+- Bumped `pyjwt` to 2.15.1, `urllib3` to 2.8.0, `anyio` to 4.14.2 and `certifi` to 2026.10.19 through `requirements.txt` floor constraints
+- Bumped `rustls` to 0.23.46, `rustls-webpki` to 0.103.16, `webpki-roots` to 1.0.10, `quinn-proto` to 0.11.19 and `aws-smithy-json` to 0.62.7
+- Pinned `zip` to 9.0.3, closing three archive-extraction advisories
+- Bumped `jackson-databind` and `jackson-core` to 2.22.3 across `MODULE.bazel`, the example Spring Boot app and the benches pom, and added `tools.jackson.core` 3.1.7
+- Bumped `lz4-java` to 1.11.4
+- Moved the example Spring Boot app to Spring Boot 4.1.1 on Tomcat 11.0.25 and pinned `netty-handler` 4.1.137.Final
+- Bumped `tokio` to 1.53.3, closing RUSTSEC-2026-0386
+- Documented OSV-Scanner and cargo-audit exceptions for the `rustls` 0.21 and `rustls-webpki` 0.101 advisories with no reachable fix through the `tiberius` chain
+- Deferred the `ctutils` RUSTSEC-2026-0385 fix behind a temporary exception, since 0.4.4 is newer than the 3-day release-age floor; to be removed in the next release
+
+### Added
+
+- `bazel run //scripts:run_osv_scan` runs OSV-Scanner locally against the repo and its generated SBOMs
+
+### Fixed
+
+- Right-sized the `arena-container`, `arena-junit`, `arena-kafka`, `arena-postgres`, `arena-smtp` and `arena-temporal` component tests from `medium` to `small`
+- Dropped the Bazel disk cache on the Windows CI jobs, working around upstream Bazel issue 28408
+- Stopped over-subscribing test jobs on the macOS CI runners
 
 ## [7.0.1]
 

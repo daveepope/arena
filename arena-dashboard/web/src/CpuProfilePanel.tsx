@@ -6,6 +6,8 @@ import {
   formatSelfPct,
   highlightFrames,
   isProfileAvailable,
+  isProfileFailed,
+  profilerFailureReason,
   profilerLabel,
   severityClasses,
   visibleHotspots,
@@ -302,8 +304,16 @@ export function CpuProfileButton({
 }) {
   const openProfileView = useDashboardStore((s) => s.openProfileView);
   const isAvailable = isProfileAvailable(profiler.state, profiler.reportReady);
+  const hasFailed = isProfileFailed(profiler.state);
+  const failureReason = profilerFailureReason(profiler.state, profiler.reason);
 
-  return (
+  const chipClasses = isAvailable
+    ? "cursor-pointer border-teal-500 bg-teal-950/60 text-teal-300"
+    : hasFailed
+      ? "cursor-default border-rose-600 bg-rose-950/60 text-rose-300"
+      : "cursor-default border-slate-600 bg-slate-900/60 text-slate-400";
+
+  const chip = (
     <button
       type="button"
       data-testid={`profiler-label-${componentId}`}
@@ -312,14 +322,32 @@ export function CpuProfileButton({
         e.stopPropagation();
         openProfileView(componentId, { x: e.clientX, y: e.clientY });
       }}
-      className={`${PROFILE_BUTTON_CLASSES[variant]} whitespace-nowrap rounded-sm border uppercase ${
-        isAvailable
-          ? "cursor-pointer border-teal-500 bg-teal-950/60 text-teal-300"
-          : "cursor-default border-slate-600 bg-slate-900/60 text-slate-400"
-      }`}
+      className={`${PROFILE_BUTTON_CLASSES[variant]} whitespace-nowrap rounded-sm border uppercase ${chipClasses}`}
     >
       {profilerLabel(profiler.state, profiler.reportReady)}
     </button>
+  );
+
+  if (failureReason === null) return chip;
+
+  if (variant === "node") {
+    return (
+      <span data-testid={`profiler-failure-${componentId}`} title={failureReason}>
+        {chip}
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {chip}
+      <p
+        data-testid={`profiler-failure-${componentId}`}
+        className="whitespace-pre-wrap text-[10px] leading-snug text-rose-300"
+      >
+        {failureReason}
+      </p>
+    </div>
   );
 }
 

@@ -10,6 +10,9 @@ use std::time::Duration;
 
 const DOTNET_TRACE_RLOCATIONS: &[&str] = &["_main/tools/dotnet_trace/dotnet_trace_tool.sh"];
 const DOTNET_TRACE_PATH_FALLBACK: &str = "dotnet-trace";
+const NO_SAMPLES_REASON: &str = "dotnet-trace recorded no samples for this component; the \
+component may have used no cpu while it was profiled, or its runtime exited before the trace \
+session attached";
 const INSTALL_HINT: &str = "install the dotnet-trace global tool: `dotnet tool install -g dotnet-trace`";
 
 pub struct DotnetTraceSampler;
@@ -46,7 +49,7 @@ impl WrappingSampler for DotnetTraceSampler {
         wrapping_child: &mut Child,
         budget: Duration,
         limit_bytes: usize,
-    ) -> Result<Option<String>, CpuProfileError> {
+    ) -> Result<String, CpuProfileError> {
         let WrapState::DotnetTrace { scratch, nettrace_path } = state else {
             unreachable!("DotnetTraceSampler::collect given a non-dotnet-trace WrapState");
         };
@@ -67,10 +70,12 @@ impl WrappingSampler for DotnetTraceSampler {
 
         let folded_path = convert_nettrace_to_folded(&scratch, &nettrace_path)?;
         if sampled_nothing(&folded_path) {
-            return Ok(None);
+            return Err(CpuProfileError::Finish(
+                NO_SAMPLES_REASON.to_string(),
+            ));
         }
 
-        crate::profiler::read_collected(&folded_path, limit_bytes).map(Some)
+        crate::profiler::read_collected(&folded_path, limit_bytes)
     }
 }
 

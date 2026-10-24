@@ -26,7 +26,7 @@ pub trait WrappingSampler: Send + Sync {
         wrapping_child: &mut Child,
         budget: Duration,
         limit_bytes: usize,
-    ) -> Result<Option<String>, CpuProfileError>;
+    ) -> Result<String, CpuProfileError>;
 }
 
 pub fn wrapping_sampler_for(backend: CpuProfilerBackend) -> Box<dyn WrappingSampler> {
@@ -57,16 +57,12 @@ impl ProfileSession for WrappedProfileSession {
         observer::report(&component_id, RunnableState::Stopping);
         let collected = sampler.collect(state, wrapping_child, FINISH_TIMEOUT, limit_bytes);
         match collected {
-            Ok(Some(folded)) => {
+            Ok(folded) => {
                 observer::report_complete(&component_id, &folded);
                 Ok(())
             }
-            Ok(None) => {
-                observer::report(&component_id, RunnableState::Stopped);
-                Ok(())
-            }
             Err(e) => {
-                observer::report(&component_id, RunnableState::Faulted);
+                observer::report_faulted(&component_id, &e.to_string());
                 Err(e)
             }
         }

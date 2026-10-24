@@ -9,6 +9,7 @@ pub struct CpuProfileEvent {
     pub component_id: String,
     pub state: RunnableState,
     pub folded: Option<String>,
+    pub reason: Option<String>,
 }
 
 impl CpuProfileEvent {
@@ -17,11 +18,17 @@ impl CpuProfileEvent {
             component_id: component_id.into(),
             state,
             folded: None,
+            reason: None,
         }
     }
 
     pub fn with_folded(mut self, folded: impl Into<String>) -> Self {
         self.folded = Some(folded.into());
+        self
+    }
+
+    pub fn with_reason(mut self, reason: impl Into<String>) -> Self {
+        self.reason = Some(reason.into());
         self
     }
 }
@@ -84,4 +91,8 @@ pub fn report(component_id: &str, state: RunnableState) {
 
 pub fn report_complete(component_id: &str, folded: &str) {
     notify(&CpuProfileEvent::new(component_id, RunnableState::Stopped).with_folded(folded));
+}
+
+pub fn report_faulted(component_id: &str, reason: &str) {
+    notify(&CpuProfileEvent::new(component_id, RunnableState::Faulted).with_reason(reason));
 }

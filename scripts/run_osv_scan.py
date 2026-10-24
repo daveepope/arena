@@ -9,8 +9,10 @@ from pathlib import Path
 
 _OSV_SCANNER_APPARENT_REPOS = (
     "osv_scanner_linux_x86_64",
+    "osv_scanner_linux_arm64",
     "osv_scanner_macos_x86_64",
     "osv_scanner_macos_arm64",
+    "osv_scanner_windows_x86_64",
 )
 
 
@@ -68,6 +70,7 @@ def main() -> int:
             "scan",
             "source",
             "--recursive",
+            "--no-ignore",
             "--config",
             str(config_path),
             str(root),

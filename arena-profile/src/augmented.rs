@@ -22,7 +22,7 @@ pub trait ArgAugmentingSampler: Send + Sync {
         budget: Duration,
         profiled_pid: u32,
         limit_bytes: usize,
-    ) -> Result<Option<String>, CpuProfileError>;
+    ) -> Result<String, CpuProfileError>;
 }
 
 pub fn augmenting_sampler_for(
@@ -66,16 +66,12 @@ impl ProfileSession for AugmentedProfileSession {
             (_, collected) => collected,
         };
         match collected {
-            Ok(Some(folded)) => {
+            Ok(folded) => {
                 observer::report_complete(&component_id, &folded);
                 Ok(())
             }
-            Ok(None) => {
-                observer::report(&component_id, RunnableState::Stopped);
-                Ok(())
-            }
             Err(e) => {
-                observer::report(&component_id, RunnableState::Faulted);
+                observer::report_faulted(&component_id, &e.to_string());
                 Err(e)
             }
         }

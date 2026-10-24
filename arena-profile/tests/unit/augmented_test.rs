@@ -53,14 +53,16 @@ impl ArgAugmentingSampler for FakeArgAugmentingSampler {
         _budget: Duration,
         _profiled_pid: u32,
         limit_bytes: usize,
-    ) -> Result<Option<String>, CpuProfileError> {
+    ) -> Result<String, CpuProfileError> {
         match &self.outcome {
             AugmentOutcome::CollectFails => Err(CpuProfileError::Finish("collect failed".into())),
             AugmentOutcome::CollectSucceeds => {
                 let path = write_sample_folded_stacks("augmented-collect-succeeds");
-                arena_profile::profiler::read_collected(&path, limit_bytes).map(Some)
+                arena_profile::profiler::read_collected(&path, limit_bytes)
             }
-            AugmentOutcome::CollectFindsNoSamples => Ok(None),
+            AugmentOutcome::CollectFindsNoSamples => {
+                Err(CpuProfileError::Finish("no samples were recorded".into()))
+            }
             AugmentOutcome::AugmentFails => unreachable!("collect() called after augment() failed"),
         }
     }
@@ -206,7 +208,7 @@ fn async_profiler_written(pattern: &PathBuf) -> PathBuf {
 }
 
 #[test]
-fn async_profiler_collect_empty_output_reports_no_profile() {
+fn async_profiler_collect_empty_output_returns_finish_error() {
     let folded_path = async_profiler_output("empty", "");
     let sampler = augmenting_sampler_for(CpuProfilerBackend::AsyncProfiler, DEFAULT_CPU_PROFILE_LIMIT_BYTES);
 
@@ -220,7 +222,13 @@ fn async_profiler_collect_empty_output_reports_no_profile() {
         DEFAULT_CPU_PROFILE_LIMIT_BYTES,
     );
 
-    assert_eq!(result.unwrap(), None);
+    match result {
+        Err(CpuProfileError::Finish(message)) => assert!(
+            message.contains("recorded no samples"),
+            "the failure must say no samples were recorded, got: {message}"
+        ),
+        other => panic!("an empty profile must fault, got {other:?}"),
+    }
     let _ = std::fs::remove_file(async_profiler_written(&folded_path));
 }
 
@@ -239,7 +247,7 @@ fn async_profiler_collect_sampled_output_returns_the_folded_stacks() {
         DEFAULT_CPU_PROFILE_LIMIT_BYTES,
     );
 
-    assert_eq!(result.unwrap(), Some("main;run;compute 7\n".to_string()));
+    assert_eq!(result.unwrap(), "main;run;compute 7\n".to_string());
     let _ = std::fs::remove_file(async_profiler_written(&folded_path));
 }
 
@@ -263,7 +271,7 @@ fn async_profiler_collect_missing_output_returns_finish_error() {
 }
 
 #[test]
-fn augmented_finish_no_samples_reports_stopped_without_folded_stacks() {
+fn augmented_finish_no_samples_reports_faulted_with_a_reason() {
     let recording = start_recording();
     let sampler = FakeArgAugmentingSampler { outcome: AugmentOutcome::CollectFindsNoSamples };
     let PreparedLaunch::ArgsAugmented { session, .. } = prepare_augmented(
@@ -283,12 +291,20 @@ fn augmented_finish_no_samples_reports_stopped_without_folded_stacks() {
     let result = session.finish(&mut placeholder_child);
     let _ = placeholder_child.wait();
 
-    assert!(result.is_ok());
+    assert!(matches!(result, Err(CpuProfileError::Finish(_))));
     assert_eq!(
         recording.recorded.states_for("augmented-no-samples"),
-        vec![RunnableState::Stopping, RunnableState::Stopped]
+        vec![RunnableState::Stopping, RunnableState::Faulted]
     );
     assert_eq!(recording.recorded.folded_for("augmented-no-samples"), None);
+    let reason = recording
+        .recorded
+        .reason_for("augmented-no-samples")
+        .expect("a faulted profiler must report why it has no profile");
+    assert!(
+        reason.contains("no samples were recorded"),
+        "the reason must name what went wrong, got: {reason}"
+    );
 }
 
 #[test]

@@ -11,6 +11,8 @@ import {
   highlightFrames,
   isProfileAvailable,
   matchesFilter,
+  isProfileFailed,
+  profilerFailureReason,
   profilerLabel,
   severityClasses,
   visibleHotspots,
@@ -56,6 +58,37 @@ describe("isProfileAvailable", () => {
     [undefined, true, false],
   ])("%s with report %s returns %s", (state, reportReady, expected) => {
     expect(isProfileAvailable(state, reportReady)).toBe(expected);
+  });
+});
+
+describe("isProfileFailed", () => {
+  it.each([
+    ["faulted", true],
+    ["stopped", false],
+    [undefined, false],
+  ])("%s returns %s", (state, expected) => {
+    expect(isProfileFailed(state)).toBe(expected);
+  });
+});
+
+describe("profilerFailureReason", () => {
+  it("faulted with a reason returns that reason", () => {
+    expect(profilerFailureReason("faulted", "py-spy recorded no samples")).toBe(
+      "py-spy recorded no samples",
+    );
+  });
+
+  it("faulted without a reason returns a stand-in", () => {
+    expect(profilerFailureReason("faulted", undefined)).toBe(
+      "the profiler reported no reason for the failure",
+    );
+  });
+
+  it.each([
+    ["stopped", "ignored"],
+    [undefined, undefined],
+  ])("%s returns null", (state, reason) => {
+    expect(profilerFailureReason(state, reason)).toBeNull();
   });
 });
 

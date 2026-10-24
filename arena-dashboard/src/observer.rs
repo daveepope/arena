@@ -72,6 +72,7 @@ impl HttpForwardingObserver {
                             component: event.component_id,
                             state: event.state.as_str().to_string(),
                             folded: event.folded,
+                            reason: event.reason,
                         };
                         let _ = client.post(&cpu_profile_url).header(crate::server::CALLER_HEADER, crate::server::CALLER_HEADER_VALUE).json(&payload).send();
                     }

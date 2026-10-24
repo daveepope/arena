@@ -89,6 +89,7 @@ struct CpuProfileRecord {
     state: String,
     folded: Option<String>,
     rendered: Option<String>,
+    reason: Option<String>,
 }
 
 impl Default for AppState {
@@ -411,6 +412,7 @@ async fn cpu_profiles_handler(State(state): State<AppState>) -> impl IntoRespons
                 "component": component,
                 "state": record.state,
                 "report": record.folded.is_some() || record.rendered.is_some(),
+                "reason": record.reason,
             })
         })
         .collect();
@@ -444,6 +446,7 @@ async fn cpu_profile_ingest_handler(
             }
         };
         record.state = payload.state.clone();
+        record.reason = payload.reason.clone();
         match &payload.folded {
             Some(folded) => {
                 record.folded = Some(folded.clone());
@@ -463,6 +466,7 @@ async fn cpu_profile_ingest_handler(
         "component": payload.component,
         "state": payload.state,
         "report": report_ready,
+        "reason": payload.reason,
     });
     let _ = state.tx.send(announcement.to_string());
     StatusCode::ACCEPTED

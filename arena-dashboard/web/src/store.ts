@@ -183,7 +183,12 @@ interface DashboardStore {
   closeDetail: (key: number) => void;
   toggleDetailPin: (key: number) => void;
   clearArenas: () => void;
-  ingestCpuProfile: (componentId: string, state: string, reportReady: boolean) => void;
+  ingestCpuProfile: (
+    componentId: string,
+    state: string,
+    reportReady: boolean,
+    reason?: string,
+  ) => void;
   ingestPlaybook: (arenaId: string, reported: PlaybookEntry) => void;
   openProfileView: (componentId: string, position: { x: number; y: number }) => void;
   closeProfileView: (key: number) => void;
@@ -298,9 +303,9 @@ export const useDashboardStore = create<DashboardStore>((set, get) => ({
     set({ arenas: updated });
   },
 
-  ingestCpuProfile: (componentId, state, reportReady) =>
+  ingestCpuProfile: (componentId, state, reportReady, reason) =>
     set({
-      cpuProfiles: new Map(get().cpuProfiles).set(componentId, { state, reportReady }),
+      cpuProfiles: new Map(get().cpuProfiles).set(componentId, { state, reportReady, reason }),
     }),
 
   openProfileView: (componentId, position) =>

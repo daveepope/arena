@@ -9,6 +9,9 @@ const SAMPLE_INTERVAL_SECONDS: f64 = 0.01;
 const FIRST_FLUSH_SECONDS: f64 = 0.1;
 const FLUSH_CEILING_SECONDS: f64 = 1.0;
 const BYTES_PER_STACK_BUDGET: usize = 256;
+const NO_SAMPLES_REASON: &str = "the python sampler recorded no samples for this component; the \
+component may have used no cpu while it was profiled, or it never reached the sampler armed in its \
+interpreter";
 const PAYLOAD: &str = include_str!("python_site_payload.py");
 
 pub fn folded_name(pid: u32) -> String {
@@ -79,7 +82,7 @@ impl ArgAugmentingSampler for PythonSiteSampler {
         _budget: Duration,
         profiled_pid: u32,
         limit_bytes: usize,
-    ) -> Result<Option<String>, CpuProfileError> {
+    ) -> Result<String, CpuProfileError> {
         let AugmentState::PythonSite { scratch } = state else {
             return Err(CpuProfileError::Finish(
                 "the python sampler was handed another backend's state".to_string(),
@@ -108,8 +111,10 @@ impl ArgAugmentingSampler for PythonSiteSampler {
             )));
         }
         if sampled_nothing(&folded_path) {
-            return Ok(None);
+            return Err(CpuProfileError::Finish(
+                NO_SAMPLES_REASON.to_string(),
+            ));
         }
-        read_collected(&folded_path, limit_bytes).map(Some)
+        read_collected(&folded_path, limit_bytes)
     }
 }

@@ -354,6 +354,25 @@ describe("useDashboardStore cpu profiles", () => {
     expect(useDashboardStore.getState().cpuProfiles.get("worker")).toEqual({ state: "stopped", reportReady: true });
   });
 
+  it("faulted profile keeps the reason it was reported with", () => {
+    useDashboardStore
+      .getState()
+      .ingestCpuProfile("svc", "faulted", false, "py-spy recorded no samples");
+
+    expect(useDashboardStore.getState().cpuProfiles.get("svc")).toEqual({
+      state: "faulted",
+      reportReady: false,
+      reason: "py-spy recorded no samples",
+    });
+  });
+
+  it("state reported without a reason clears a previous one", () => {
+    useDashboardStore.getState().ingestCpuProfile("svc", "faulted", false, "it broke");
+    useDashboardStore.getState().ingestCpuProfile("svc", "started", false);
+
+    expect(useDashboardStore.getState().cpuProfiles.get("svc")?.reason).toBeUndefined();
+  });
+
   it("later state for the same component replaces the earlier one", () => {
     useDashboardStore.getState().ingestCpuProfile("svc", "started", false);
     useDashboardStore.getState().ingestCpuProfile("svc", "stopped", true);

@@ -32,3 +32,6 @@ venv/
 
 # arena-explain-diff skill output (should normally be saved under /tmp, outside the repo)
 arena-explain-*.html
+/arena-rust.cdx.json
+/arena-maven.cdx.json
+/arena-nuget.cdx.json

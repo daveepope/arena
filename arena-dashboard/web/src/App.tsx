@@ -365,6 +365,46 @@ function StopServerConfirmation({
   );
 }
 
+function ServerPowerButton({
+  isOn,
+  onStop,
+}: {
+  isOn: boolean;
+  onStop: () => void;
+}) {
+  const label = isOn ? "Stop server" : "Server stopped";
+
+  return (
+    <span data-testid="server-power-hover" title={label}>
+      <button
+        type="button"
+        data-testid="server-power"
+        aria-label={label}
+        aria-pressed={isOn}
+        onClick={isOn ? onStop : undefined}
+        className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+          isOn
+            ? "cursor-pointer border-teal-500 bg-teal-950/60 text-teal-300 hover:bg-teal-900/50"
+            : "cursor-default border-slate-700 bg-slate-900/60 text-slate-600"
+        }`}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          aria-hidden="true"
+        >
+          <path d="M12 3v8" />
+          <path d="M7.1 6.3a7 7 0 1 0 9.8 0" />
+        </svg>
+      </button>
+    </span>
+  );
+}
+
 export function fullScreenProfileComponentId(search: string): string | null {
   const value = new URLSearchParams(search).get("profile");
   return value !== null && value !== "" ? value : null;
@@ -398,9 +438,24 @@ export function App() {
       .catch(() => {});
     fetch("/profiles")
       .then((response) => (response.ok ? response.json() : []))
-      .then((held: { component: string; state: string; report: boolean }[]) => {
+      .then(
+        (
+          held: {
+            component: string;
+            state: string;
+            report: boolean;
+            reason?: string | null;
+          }[],
+        ) => {
         if (abandoned || !Array.isArray(held)) return;
-        held.forEach((entry) => ingestCpuProfile(entry.component, entry.state, entry.report));
+        held.forEach((entry) =>
+          ingestCpuProfile(
+            entry.component,
+            entry.state,
+            entry.report,
+            entry.reason ?? undefined,
+          ),
+        );
       })
       .catch(() => {});
     return () => {
@@ -431,7 +486,12 @@ export function App() {
           return;
         }
         if (data && data.type === "cpu_profile") {
-          ingestCpuProfile(data.component, data.state, data.report === true);
+          ingestCpuProfile(
+            data.component,
+            data.state,
+            data.report === true,
+            typeof data.reason === "string" ? data.reason : undefined,
+          );
           return;
         }
         if (data && data.type === "playbook") {
@@ -523,23 +583,18 @@ export function App() {
           </span>
         )}
         {status === "connected" && (
-          <>
-            <button
-              type="button"
-              onClick={handleClearServerState}
-              className="cursor-pointer rounded-md border border-slate-600 bg-[#121735] px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-slate-300 transition-colors hover:bg-slate-700/60"
-            >
-              Clear server state
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsStopConfirmOpen(true)}
-              className="cursor-pointer rounded-md border border-rose-800 bg-rose-950/40 px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-rose-300 transition-colors hover:bg-rose-900/40"
-            >
-              Stop server
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={handleClearServerState}
+            className="cursor-pointer rounded-md border border-slate-600 bg-[#121735] px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-slate-300 transition-colors hover:bg-slate-700/60"
+          >
+            Clear server state
+          </button>
         )}
+        <ServerPowerButton
+          isOn={status === "connected"}
+          onStop={() => setIsStopConfirmOpen(true)}
+        />
           </div>
         </div>
         <Legend />

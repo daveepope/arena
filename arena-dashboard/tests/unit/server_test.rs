@@ -965,6 +965,31 @@ async fn get_profiles_statewithoutsamples_reportsnoreport() {
 }
 
 #[tokio::test]
+async fn get_profiles_faultedprofiler_carriesitsreason() {
+    let (base_url, _state) = serve_dashboard().await;
+    post_cpu_profile(
+        &base_url,
+        serde_json::json!({
+            "component": "svc",
+            "state": "faulted",
+            "reason": "py-spy recorded no samples for this component",
+        }),
+    )
+    .await;
+
+    let held: serde_json::Value = reqwest::get(format!("{base_url}/profiles"))
+        .await
+        .expect("get profiles")
+        .json()
+        .await
+        .expect("json body");
+
+    assert_eq!(held[0]["state"], "faulted");
+    assert_eq!(held[0]["report"], false);
+    assert_eq!(held[0]["reason"], "py-spy recorded no samples for this component");
+}
+
+#[tokio::test]
 async fn get_cpu_profile_rendered_carriesanapplicationonlyranking() {
     let (base_url, _state) = serve_dashboard().await;
     post_cpu_profile(

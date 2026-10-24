@@ -47,6 +47,7 @@ export interface RenderedProfile {
 export interface CpuProfilerState {
   state: string;
   reportReady: boolean;
+  reason?: string;
 }
 
 export interface PlaybookRowState {

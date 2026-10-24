@@ -201,6 +201,26 @@ async fn on_cpu_profile_completedprofile_poststhefoldedstacks() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn on_cpu_profile_faultedprofiler_poststhereason() {
+    let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
+    let url = start_profile_capture_server(Arc::clone(&bodies)).await;
+
+    let observer = HttpForwardingObserver::new(url);
+    observer.on_cpu_profile(
+        &CpuProfileEvent::new("svc", RunnableState::Faulted)
+            .with_reason("py-spy recorded no samples for this component"),
+    );
+    drop(observer);
+
+    let captured = bodies.lock().expect("capture lock").clone();
+    assert_eq!(captured.len(), 1);
+    let payload: serde_json::Value = serde_json::from_str(&captured[0]).expect("json payload");
+    assert_eq!(payload["state"], "faulted");
+    assert_eq!(payload["reason"], "py-spy recorded no samples for this component");
+    assert!(payload.get("folded").is_none());
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn on_cpu_profile_everytransition_isforwardedinorder() {
     let bodies: CapturedBodies = Arc::new(Mutex::new(Vec::new()));
     let url = start_profile_capture_server(Arc::clone(&bodies)).await;

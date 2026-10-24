@@ -14,6 +14,9 @@ const LIBASYNC_PROFILER_PATH_FALLBACK: &str = "libasyncProfiler.dylib";
 #[cfg(not(target_os = "macos"))]
 const LIBASYNC_PROFILER_PATH_FALLBACK: &str = "libasyncProfiler.so";
 const JAVA_TOOL_OPTIONS: &str = "JAVA_TOOL_OPTIONS";
+const NO_SAMPLES_REASON: &str = "async-profiler recorded no samples for this component; the \
+component may have used no cpu while it was profiled, or the jvm never loaded the agent handed to \
+it in JAVA_TOOL_OPTIONS";
 #[cfg(target_os = "macos")]
 const INSTALL_HINT: &str = "install async-profiler and ensure libasyncProfiler.dylib is on PATH";
 #[cfg(not(target_os = "macos"))]
@@ -58,7 +61,7 @@ impl ArgAugmentingSampler for AsyncProfilerSampler {
         _budget: Duration,
         profiled_pid: u32,
         limit_bytes: usize,
-    ) -> Result<Option<String>, CpuProfileError> {
+    ) -> Result<String, CpuProfileError> {
         let AugmentState::AsyncProfiler { scratch: _scratch, folded_path } = state else {
             return Err(CpuProfileError::Finish(
                 "async-profiler was handed another backend's state".to_string(),
@@ -73,9 +76,11 @@ impl ArgAugmentingSampler for AsyncProfilerSampler {
             )));
         }
         if sampled_nothing(&folded_path) {
-            return Ok(None);
+            return Err(CpuProfileError::Finish(
+                NO_SAMPLES_REASON.to_string(),
+            ));
         }
 
-        crate::profiler::read_collected(&folded_path, limit_bytes).map(Some)
+        crate::profiler::read_collected(&folded_path, limit_bytes)
     }
 }

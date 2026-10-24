@@ -1,6 +1,7 @@
 import type { Hotspot, Severity } from "./types";
 
 export const PROFILE_AVAILABLE_STATE = "stopped";
+export const PROFILE_FAILED_STATE = "faulted";
 
 const FRAME_SELECTOR = "#frames g";
 const DIMMED_OPACITY = "0.15";
@@ -12,6 +13,18 @@ export const PROFILE_REPORT_LABEL = "cpu profile report";
 export function profilerLabel(state: string, reportReady: boolean): string {
   if (isProfileAvailable(state, reportReady)) return PROFILE_REPORT_LABEL;
   return `cpu profiler ${state}`;
+}
+
+export function isProfileFailed(state: string | undefined): boolean {
+  return state === PROFILE_FAILED_STATE;
+}
+
+export function profilerFailureReason(
+  state: string | undefined,
+  reason: string | undefined,
+): string | null {
+  if (!isProfileFailed(state)) return null;
+  return reason ?? "the profiler reported no reason for the failure";
 }
 
 export function isProfileAvailable(

@@ -28,6 +28,16 @@ impl RecordedProfiles {
             .collect()
     }
 
+    #[allow(dead_code)]
+    pub fn reason_for(&self, component_id: &str) -> Option<String> {
+        self.events
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .find(|event| event.component_id == component_id && event.reason.is_some())
+            .and_then(|event| event.reason.clone())
+    }
+
     pub fn folded_for(&self, component_id: &str) -> Option<String> {
         self.events
             .lock()

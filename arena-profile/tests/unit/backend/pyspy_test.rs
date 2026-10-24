@@ -75,7 +75,7 @@ fn collect_non_zero_exit_status_with_folded_file_present_is_not_treated_as_failu
         DEFAULT_CPU_PROFILE_LIMIT_BYTES,
     );
 
-    assert_eq!(result.unwrap(), Some("main;compute 3\n".to_string()));
+    assert_eq!(result.unwrap(), "main;compute 3\n".to_string());
 }
 
 #[cfg(unix)]
@@ -97,7 +97,7 @@ fn collect_wrong_wrap_state_panics_unreachable() {
 
 #[cfg(unix)]
 #[test]
-fn collect_clean_exit_without_folded_file_reports_no_profile() {
+fn collect_clean_exit_without_folded_file_returns_finish_error() {
     let mut child = Command::new("true").spawn().expect("spawn true");
     let _ = child.wait();
     let scratch = ScratchDir::create("arena-profile-pyspy-test").expect("scratch");
@@ -111,12 +111,18 @@ fn collect_clean_exit_without_folded_file_reports_no_profile() {
         DEFAULT_CPU_PROFILE_LIMIT_BYTES,
     );
 
-    assert_eq!(result.unwrap(), None);
+    match result {
+        Err(CpuProfileError::Finish(message)) => assert!(
+            message.contains("wrote no folded stacks"),
+            "the failure must say py-spy wrote nothing, got: {message}"
+        ),
+        other => panic!("a missing profile must fault, got {other:?}"),
+    }
 }
 
 #[cfg(unix)]
 #[test]
-fn collect_interrupted_exit_with_empty_folded_file_reports_no_profile() {
+fn collect_interrupted_exit_with_empty_folded_file_returns_finish_error() {
     let scratch = ScratchDir::create("arena-profile-pyspy-test").expect("scratch");
     let (folded_path, _file) = scratch.create_file("profile.folded").expect("create folded file");
     let mut child = Command::new("sleep").arg("30").spawn().expect("spawn sleep");
@@ -133,5 +139,11 @@ fn collect_interrupted_exit_with_empty_folded_file_reports_no_profile() {
         DEFAULT_CPU_PROFILE_LIMIT_BYTES,
     );
 
-    assert_eq!(result.unwrap(), None);
+    match result {
+        Err(CpuProfileError::Finish(message)) => assert!(
+            message.contains("recorded no samples"),
+            "the failure must say py-spy recorded nothing, got: {message}"
+        ),
+        other => panic!("an empty profile must fault, got {other:?}"),
+    }
 }

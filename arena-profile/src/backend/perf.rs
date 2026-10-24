@@ -11,6 +11,9 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 const PERF_BINARY: &str = "perf";
+const NO_SAMPLES_REASON: &str = "perf recorded no samples for this component; the component may \
+have used no cpu while it was profiled, or the host denied perf the access it needs (see \
+/proc/sys/kernel/perf_event_paranoid)";
 const INSTALL_HINT: &str =
     "install the linux-tools package matching your running kernel (e.g. linux-tools-generic)";
 const PERF_RLOCATIONS: &[&str] = &["perf"];
@@ -49,7 +52,7 @@ impl WrappingSampler for PerfSampler {
         wrapping_child: &mut Child,
         budget: Duration,
         limit_bytes: usize,
-    ) -> Result<Option<String>, CpuProfileError> {
+    ) -> Result<String, CpuProfileError> {
         let WrapState::Perf { scratch, data_path } = state else {
             unreachable!("PerfSampler::collect given a non-perf WrapState");
         };
@@ -99,9 +102,11 @@ impl WrappingSampler for PerfSampler {
             .map_err(|e| CpuProfileError::Finish(format!("failed to flush folded stacks file: {e}")))?;
 
         if sampled_nothing(&folded_path) {
-            return Ok(None);
+            return Err(CpuProfileError::Finish(
+                NO_SAMPLES_REASON.to_string(),
+            ));
         }
 
-        crate::profiler::read_collected(&folded_path, limit_bytes).map(Some)
+        crate::profiler::read_collected(&folded_path, limit_bytes)
     }
 }

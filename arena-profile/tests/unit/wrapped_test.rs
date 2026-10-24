@@ -53,14 +53,16 @@ impl WrappingSampler for FakeWrappingSampler {
         _wrapping_child: &mut Child,
         _budget: Duration,
         limit_bytes: usize,
-    ) -> Result<Option<String>, CpuProfileError> {
+    ) -> Result<String, CpuProfileError> {
         match &self.outcome {
             WrapOutcome::CollectFails => Err(CpuProfileError::Finish("collect failed".into())),
             WrapOutcome::CollectSucceeds => {
                 let path = write_sample_folded_stacks("wrapped-collect-succeeds");
-                arena_profile::profiler::read_collected(&path, limit_bytes).map(Some)
+                arena_profile::profiler::read_collected(&path, limit_bytes)
             }
-            WrapOutcome::CollectFindsNoSamples => Ok(None),
+            WrapOutcome::CollectFindsNoSamples => {
+                Err(CpuProfileError::Finish("no samples were recorded".into()))
+            }
             WrapOutcome::WrapFails(_) => unreachable!("collect() called after wrap() failed"),
         }
     }
@@ -209,7 +211,7 @@ fn wrapped_sampling_called_reports_started() {
 
 #[cfg(unix)]
 #[test]
-fn wrapped_finish_no_samples_reports_stopped_without_folded_stacks() {
+fn wrapped_finish_no_samples_reports_faulted_with_a_reason() {
     let recording = start_recording();
     let sampler = FakeWrappingSampler {
         outcome: WrapOutcome::CollectFindsNoSamples,
@@ -232,10 +234,18 @@ fn wrapped_finish_no_samples_reports_stopped_without_folded_stacks() {
     let result = session.finish(&mut placeholder_child);
     let _ = placeholder_child.wait();
 
-    assert!(result.is_ok());
+    assert!(matches!(result, Err(CpuProfileError::Finish(_))));
     assert_eq!(
         recording.recorded.states_for("finish-no-samples"),
-        vec![RunnableState::Stopping, RunnableState::Stopped]
+        vec![RunnableState::Stopping, RunnableState::Faulted]
     );
     assert_eq!(recording.recorded.folded_for("finish-no-samples"), None);
+    let reason = recording
+        .recorded
+        .reason_for("finish-no-samples")
+        .expect("a faulted profiler must report why it has no profile");
+    assert!(
+        reason.contains("no samples were recorded"),
+        "the reason must name what went wrong, got: {reason}"
+    );
 }

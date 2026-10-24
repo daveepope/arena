@@ -47,7 +47,7 @@ impl WrappingSampler for PySpySampler {
         wrapping_child: &mut Child,
         budget: Duration,
         limit_bytes: usize,
-    ) -> Result<Option<String>, CpuProfileError> {
+    ) -> Result<String, CpuProfileError> {
         let WrapState::PySpy { scratch: _scratch, folded_path } = state else {
             unreachable!("PySpySampler::collect given a non-py-spy WrapState");
         };
@@ -63,34 +63,21 @@ impl WrappingSampler for PySpySampler {
         // whether sampling itself succeeded, so success is judged by whether it actually
         // wrote the folded stacks file.
         if !folded_path.exists() {
-            if stopped_before_sampling(status) {
-                return Ok(None);
-            }
             return Err(CpuProfileError::Finish(format!(
-                "py-spy did not write folded stacks at {} and exited with {status}",
+                "py-spy wrote no folded stacks at {} and exited with {status}; it attaches to the \
+                 process it launches, so a component whose command re-executes into another \
+                 process or exits before sampling starts leaves nothing to record",
                 folded_path.display()
             )));
         }
         if sampled_nothing(&folded_path) {
-            return Ok(None);
+            return Err(CpuProfileError::Finish(format!(
+                "py-spy recorded no samples for this component and exited with {status}; the \
+                 component may have used no cpu while it was profiled, or its python frames were \
+                 never visible to py-spy",
+            )));
         }
 
-        crate::profiler::read_collected(&folded_path, limit_bytes).map(Some)
+        crate::profiler::read_collected(&folded_path, limit_bytes)
     }
-}
-
-fn stopped_before_sampling(status: std::process::ExitStatus) -> bool {
-    status.success() || terminated_by_interrupt(status)
-}
-
-#[cfg(unix)]
-fn terminated_by_interrupt(status: std::process::ExitStatus) -> bool {
-    use std::os::unix::process::ExitStatusExt;
-    const SIGINT: i32 = 2;
-    status.signal() == Some(SIGINT)
-}
-
-#[cfg(not(unix))]
-fn terminated_by_interrupt(_status: std::process::ExitStatus) -> bool {
-    false
 }

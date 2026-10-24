@@ -43,6 +43,8 @@ pub struct CpuProfilePayload {
     pub state: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub folded: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub reason: Option<String>,
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]

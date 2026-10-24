@@ -17,7 +17,7 @@ fn sampler_directory_holding(pid: u32, folded: &str) -> ScratchDir {
     scratch
 }
 
-fn collect_from(scratch: ScratchDir, pid: u32) -> Result<Option<String>, CpuProfileError> {
+fn collect_from(scratch: ScratchDir, pid: u32) -> Result<String, CpuProfileError> {
     augmenting_sampler_for(CpuProfilerBackend::PythonSiteSampler, DEFAULT_CPU_PROFILE_LIMIT_BYTES)
         .collect(
             AugmentState::PythonSite { scratch },
@@ -169,13 +169,18 @@ fn payload_source_skips_the_samplers_own_flush_thread() {
 }
 
 #[test]
-fn collect_a_profile_the_sampler_left_empty_reports_no_profile() {
+fn collect_a_profile_the_sampler_left_empty_returns_finish_error() {
     let pid = 4321;
 
-    let collected = collect_from(sampler_directory_holding(pid, ""), pid)
-        .expect("a component that sampled nothing must not fault");
+    let result = collect_from(sampler_directory_holding(pid, ""), pid);
 
-    assert_eq!(collected, None, "an empty profile must not be reported as one");
+    match result {
+        Err(CpuProfileError::Finish(message)) => assert!(
+            message.contains("recorded no samples"),
+            "the failure must say the sampler recorded nothing, got: {message}"
+        ),
+        other => panic!("an empty profile must fault, got {other:?}"),
+    }
 }
 
 #[test]
@@ -186,7 +191,7 @@ fn collect_a_profile_the_sampler_filled_reports_its_stacks() {
     let collected =
         collect_from(sampler_directory_holding(pid, folded), pid).expect("collect the profile");
 
-    assert_eq!(collected.as_deref(), Some(folded));
+    assert_eq!(collected, folded);
 }
 
 #[test]

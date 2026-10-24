@@ -141,7 +141,7 @@ describe("App", () => {
 
     expect(screen.getByTestId("disconnected-notice")).toBeDefined();
     expect(screen.queryByText("Clear server state")).toBeNull();
-    expect(screen.queryByText("Stop server")).toBeNull();
+    expect(screen.getByTestId("server-power").getAttribute("aria-pressed")).toBe("false");
 
     vi.useRealTimers();
   });
@@ -196,7 +196,7 @@ describe("App", () => {
     });
 
     expect(screen.getByText("Clear server state")).toBeDefined();
-    expect(screen.getByText("Stop server")).toBeDefined();
+    expect(screen.getByTestId("server-power").getAttribute("aria-pressed")).toBe("true");
   });
 
   it("appEventSourceErrorsWhileOpenReportsErrorState", () => {
@@ -501,7 +501,7 @@ describe("App", () => {
     });
 
     act(() => {
-      screen.getByText("Stop server").click();
+      screen.getByTestId("server-power").click();
     });
 
     expect(screen.getByRole("dialog")).toBeDefined();
@@ -520,7 +520,7 @@ describe("App", () => {
     });
 
     act(() => {
-      screen.getByText("Stop server").click();
+      screen.getByTestId("server-power").click();
     });
     await act(async () => {
       within(screen.getByRole("dialog")).getByText("Stop server").click();
@@ -541,7 +541,7 @@ describe("App", () => {
     });
 
     act(() => {
-      screen.getByText("Stop server").click();
+      screen.getByTestId("server-power").click();
     });
     act(() => {
       screen.getByText("Cancel").click();
@@ -562,7 +562,7 @@ describe("App", () => {
     });
 
     act(() => {
-      screen.getByText("Stop server").click();
+      screen.getByTestId("server-power").click();
     });
     act(() => {
       fireEvent.keyDown(window, { key: "Escape" });
@@ -702,7 +702,7 @@ describe("App", () => {
     });
 
     act(() => {
-      screen.getByText("Stop server").click();
+      screen.getByTestId("server-power").click();
     });
     await act(async () => {
       within(screen.getByRole("dialog")).getByText("Stop server").click();
@@ -734,7 +734,7 @@ describe("App", () => {
     });
 
     act(() => {
-      screen.getByText("Stop server").click();
+      screen.getByTestId("server-power").click();
     });
     await act(async () => {
       within(screen.getByRole("dialog")).getByText("Stop server").click();
@@ -743,11 +743,43 @@ describe("App", () => {
     expect(screen.getByText("Server stopped")).toBeDefined();
   });
 
-  it("clear server state and stop server buttons are hidden while not connected", () => {
+  it("clearServerStateIsHiddenAndThePowerButtonReadsOffWhileNotConnected", () => {
     render(<App />);
 
     expect(screen.queryByText("Clear server state")).toBeNull();
-    expect(screen.queryByText("Stop server")).toBeNull();
+    const power = screen.getByTestId("server-power");
+    expect(power.getAttribute("aria-pressed")).toBe("false");
+    expect(power.getAttribute("aria-label")).toBe("Server stopped");
+    expect(screen.getByTestId("server-power-hover").getAttribute("title")).toBe("Server stopped");
+  });
+
+  it("powerButtonWhileConnectedReadsOnAndOffersToStop", () => {
+    render(<App />);
+
+    act(() => {
+      latestEventSource().onopen?.();
+    });
+
+    const power = screen.getByTestId("server-power");
+    expect(power.getAttribute("aria-pressed")).toBe("true");
+    expect(power.getAttribute("aria-label")).toBe("Stop server");
+    expect(screen.getByTestId("server-power-hover").getAttribute("title")).toBe("Stop server");
+
+    act(() => {
+      power.click();
+    });
+
+    expect(screen.getByRole("dialog")).toBeDefined();
+  });
+
+  it("powerButtonWhileOffDoesNotOpenTheStopConfirmation", () => {
+    render(<App />);
+
+    act(() => {
+      screen.getByTestId("server-power").click();
+    });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("a clear message from the server empties the arena map", () => {
@@ -865,7 +897,7 @@ describe("App", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("connection reset")));
 
     act(() => {
-      screen.getByText("Stop server").click();
+      screen.getByTestId("server-power").click();
     });
     await act(async () => {
       within(screen.getByRole("dialog")).getByText("Stop server").click();
@@ -921,6 +953,28 @@ describe("App cpu profile events", () => {
     expect(useDashboardStore.getState().cpuProfiles.get("svc")).toEqual({
       state: "stopped",
       reportReady: true,
+    });
+  });
+
+  it("appFaultedCpuProfileEventRecordsItsReason", () => {
+    render(<App />);
+
+    act(() => {
+      latestEventSource().onmessage?.({
+        data: JSON.stringify({
+          type: "cpu_profile",
+          component: "svc",
+          state: "faulted",
+          report: false,
+          reason: "py-spy recorded no samples for this component",
+        }),
+      });
+    });
+
+    expect(useDashboardStore.getState().cpuProfiles.get("svc")).toEqual({
+      state: "faulted",
+      reportReady: false,
+      reason: "py-spy recorded no samples for this component",
     });
   });
 
@@ -1034,6 +1088,39 @@ describe("App full screen profile", () => {
     expect(screen.getByTestId("playbook-apply-schema").textContent).toContain("startup");
     expect(screen.getByTestId("playbook-apply-schema").textContent).toContain("managed");
     expect(screen.getByTestId("playbook-apply-schema").textContent).toContain("2 runs");
+  });
+
+  it("appHeldFaultedProfilerKeepsItsReasonOnLoad", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((input: string) => {
+        if (input === "/profiles") {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve([
+                {
+                  component: "svc",
+                  state: "faulted",
+                  report: false,
+                  reason: "the python sampler recorded no samples",
+                },
+              ]),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }),
+    );
+
+    render(<App />);
+
+    await waitFor(() =>
+      expect(useDashboardStore.getState().cpuProfiles.get("svc")).toEqual({
+        state: "faulted",
+        reportReady: false,
+        reason: "the python sampler recorded no samples",
+      }),
+    );
   });
 
   it("appHeldProfilerStateIsFetchedOnLoad", async () => {

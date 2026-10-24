@@ -3,7 +3,7 @@ import "./testSetup";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CpuProfilePopover, CpuProfileView } from "./CpuProfilePanel";
+import { CpuProfileButton, CpuProfilePopover, CpuProfileView } from "./CpuProfilePanel";
 import { snapToViewportCorner } from "./FloatingPanel";
 import { useDashboardStore } from "./store";
 import type { RenderedProfile } from "./types";
@@ -39,6 +39,46 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+describe("CpuProfileButton", () => {
+  const faulted = {
+    state: "faulted",
+    reportReady: false,
+    reason: "py-spy recorded no samples for this component",
+  };
+
+  it("faultedProfilerInDetail_showsTheReason", () => {
+    render(<CpuProfileButton componentId="svc" profiler={faulted} variant="detail" />);
+
+    expect(screen.getByTestId("profiler-failure-svc").textContent).toContain(
+      "py-spy recorded no samples for this component",
+    );
+    expect((screen.getByTestId("profiler-label-svc") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("faultedProfilerOnNode_hoversTheReasonOnAnEnabledWrapper", () => {
+    render(<CpuProfileButton componentId="svc" profiler={faulted} variant="node" />);
+
+    const hovered = screen.getByTestId("profiler-failure-svc");
+    expect(hovered.getAttribute("title")).toBe("py-spy recorded no samples for this component");
+    expect(hovered.tagName).toBe("SPAN");
+    expect(hovered.textContent).toContain("cpu profiler faulted");
+    expect(screen.getByTestId("profiler-label-svc").getAttribute("title")).toBeNull();
+  });
+
+  it("stoppedProfilerWithAReport_showsNoFailureText", () => {
+    render(
+      <CpuProfileButton
+        componentId="svc"
+        profiler={{ state: "stopped", reportReady: true }}
+        variant="detail"
+      />,
+    );
+
+    expect(screen.queryByTestId("profiler-failure-svc")).toBeNull();
+    expect((screen.getByTestId("profiler-label-svc") as HTMLButtonElement).disabled).toBe(false);
+  });
 });
 
 describe("CpuProfileView", () => {

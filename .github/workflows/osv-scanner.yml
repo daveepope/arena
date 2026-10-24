@@ -73,6 +73,7 @@ jobs:
       scan-args: |-
         -r
         --config=./osv-scanner.toml
+        --no-ignore
         ./
   scan-pr:
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
