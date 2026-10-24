@@ -220,17 +220,15 @@ _CHROME_FILES = select({
     "//conditions:default": [],
 })
 
-_BROWSER_TEST_DATA = [
+_BROWSER_SPEC_DATA = [
     "playwright.config.ts",
     "tsconfig.json",
     "browser/tsconfig.json",
     ":node_modules/@playwright/test",
     "//arena-dashboard:demo_lifecycle",
-    "//arena-dashboard:server",
 ] + glob(["browser/**/*.ts"]) + _CHROME_FILES
 
-_BROWSER_TEST_ENV = {
-    "ARENA_DASHBOARD_SERVER_BIN": "$(rlocationpath //arena-dashboard:server)",
+_BROWSER_SPEC_ENV = {
     "ARENA_DEMO_LIFECYCLE_BIN": "$(rlocationpath //arena-dashboard:demo_lifecycle)",
 } | select({
     ":linux_x86_64": {
@@ -244,6 +242,12 @@ _BROWSER_TEST_ENV = {
     },
     "//conditions:default": {},
 })
+
+_BROWSER_TEST_DATA = _BROWSER_SPEC_DATA + ["//arena-dashboard:server"]
+
+_BROWSER_TEST_ENV = _BROWSER_SPEC_ENV | {
+    "ARENA_DASHBOARD_SERVER_BIN": "$(rlocationpath //arena-dashboard:server)",
+}
 
 _BROWSER_TEST_NO_COPY_TO_BIN = _CHROME_FILES
 
@@ -269,6 +273,26 @@ playwright_bin.playwright_test(
     tags = [
         "component_test",
         "cpu_profile_test",
+    ],
+    target_compatible_with = _BROWSER_TEST_PLATFORM,
+)
+
+playwright_bin.playwright_test(
+    name = "browser_test_staged_server",
+    size = "small",
+    args = [
+        "test",
+        "--config",
+        "playwright.config.ts",
+    ],
+    chdir = package_name(),
+    data = _BROWSER_SPEC_DATA,
+    env = _BROWSER_SPEC_ENV,
+    no_copy_to_bin = _BROWSER_TEST_NO_COPY_TO_BIN,
+    tags = [
+        "component_test",
+        "manual",
+        "no-sandbox",
     ],
     target_compatible_with = _BROWSER_TEST_PLATFORM,
 )

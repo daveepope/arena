@@ -270,6 +270,9 @@ jobs:
         if: steps.paths.outputs.version_file == 'true'
         run: python3 scripts/check_release_lockfiles.py
 
+      - name: Build the staged-server browser test
+        run: bazel build //arena-dashboard/web:browser_test_staged_server --config=ci
+
       - name: Verify lockfiles
         if: >-
           steps.paths.outputs.rust_crates == 'true' ||
@@ -1368,6 +1371,17 @@ jobs:
         shell: bash
         run: bazel run --config=ci --config=release //tools/predeploy_smoke/pypi:pypi_smoke_test
 
+      - name: Browser smoke test the staged dashboard server
+        if: matrix.runner != 'windows-latest'
+        shell: bash
+        run: |
+          staged="$PWD/arena-pytest/prebuilt-dashboard/${{ matrix.dashboard-server-prebuilt-dir }}/arena-dashboard-server"
+          chmod +x "$staged"
+          bazel test //arena-dashboard/web:browser_test_staged_server \
+            --config=ci --config=release --nocache_test_results \
+            --test_env=ARENA_DASHBOARD_SERVER_BIN="$staged" \
+            --test_output=errors
+
       - name: Verify wheel packaging (Windows)
         if: matrix.runner == 'windows-latest'
         shell: bash
@@ -1521,6 +1535,16 @@ jobs:
       - name: Smoke test Maven artifact
         shell: bash
         run: bazel run --config=ci --config=release --enable_runfiles ${{ matrix.smoke-test-target }}
+
+      - name: Browser smoke test the staged dashboard server
+        shell: bash
+        run: |
+          staged="$PWD/arena-junit/prebuilt/src/main/resources/${{ matrix.prebuilt-dir }}/arena-dashboard-server-macos"
+          chmod +x "$staged"
+          bazel test //arena-dashboard/web:browser_test_staged_server \
+            --config=ci --config=release --nocache_test_results \
+            --test_env=ARENA_DASHBOARD_SERVER_BIN="$staged" \
+            --test_output=errors
 
   publish_maven_snapshot:
     name: Publish Maven snapshot (Ubuntu 24.04)
@@ -1765,8 +1789,10 @@ jobs:
         include:
           - runner: macos-latest
             disk-cache: build-test-publish-arena-macos-arm64
+            prebuilt-dir: darwin-aarch64
           - runner: macos-15-intel
             disk-cache: build-test-publish-arena-macos-intel
+            prebuilt-dir: darwin-x86-64
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -1845,6 +1871,16 @@ jobs:
       - name: Smoke test Bazel consumer (csharp_import)
         shell: bash
         run: bazel test --config=ci --config=release --enable_runfiles //tools/predeploy_smoke/dotnet:bazel_consumer_smoke_test
+
+      - name: Browser smoke test the staged dashboard server
+        shell: bash
+        run: |
+          staged="$PWD/arena-xunit/prebuilt/${{ matrix.prebuilt-dir }}/arena-dashboard-server-macos"
+          chmod +x "$staged"
+          bazel test //arena-dashboard/web:browser_test_staged_server \
+            --config=ci --config=release --nocache_test_results \
+            --test_env=ARENA_DASHBOARD_SERVER_BIN="$staged" \
+            --test_output=errors
 
   publish_nuget_snapshot:
     name: Publish NuGet snapshot (Ubuntu 24.04)

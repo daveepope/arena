@@ -15,12 +15,15 @@ const FAST_STEP_DELAY_MS = 50;
 export const NESTED_DEPENDENCY_EDGE_SUFFIX =
   "dependency:queen-of-hearts-db (postgres)>dependency:mad-hatter-service (http)";
 
-function binaryPath(variable: string): string {
-  const relative = process.env[variable];
-  if (!relative) throw new Error(`${variable} is not set`);
-  const runfiles = process.env.JS_BINARY__RUNFILES;
+export function binaryLocation(configured: string | undefined, runfiles: string | undefined, variable: string): string {
+  if (!configured) throw new Error(`${variable} is not set`);
+  if (path.isAbsolute(configured)) return configured;
   if (!runfiles) throw new Error("JS_BINARY__RUNFILES is not set");
-  return path.join(runfiles, relative);
+  return path.join(runfiles, configured);
+}
+
+function binaryPath(variable: string): string {
+  return binaryLocation(process.env[variable], process.env.JS_BINARY__RUNFILES, variable);
 }
 
 function awaitOutput(
