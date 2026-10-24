@@ -6,4 +6,5 @@ sh_binary(
         "src/main/java/bench/Bench.java",
     ],
     tags = ["manual"],
+    visibility = ["//tools/benches:__pkg__"],
 )

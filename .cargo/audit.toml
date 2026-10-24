@@ -20,4 +20,38 @@ ignore = [
 
     # rustls-pemfile 1.0.4 unmaintained warning, same tiberius 0.12.3 chain as above.
     "RUSTSEC-2025-0134",
+
+    # rustls 0.21.12 `Debug` impls on client session values expose the TLS 1.2
+    # master secret / TLS 1.3 resumption PSK, and a pre-authentication record of
+    # the server-selected key exchange group allows a downgrade to classical key
+    # exchange. Both are fixed in rustls 0.23.46, which the workspace already
+    # uses directly; the 0.21.12 copy is the same tiberius 0.12.3 chain as above
+    # and cannot reach 0.23.x. tiberius 0.13.0 does drop this chain, but its
+    # rustls feature forces the aws-lc-rs provider, adding a cmake/C build on
+    # every platform, so that bump is deferred. Arena implements no
+    # ClientSessionStore and never debug-formats session values, and MSSQL
+    # connections are to ephemeral local containers. Note these IDs also cover
+    # rustls 0.23.x, so re-check that the direct pin stays at or above 0.23.46.
+    "RUSTSEC-2026-0346",
+    "RUSTSEC-2026-0349",
+
+    # rustls-webpki may accept certificate paths containing distrusted emSign
+    # intermediate public keys. Fixed in 0.103.16, which the workspace already
+    # uses directly; the remaining 0.101.7 copy is the same tiberius 0.12.3
+    # chain as above and has no fix on the 0.101 line. Arena's MSSQL
+    # connections are to ephemeral local containers, not to public certificate
+    # authorities. Note this ID also covers rustls-webpki 0.103.x, so re-check
+    # that the direct pin stays at or above 0.103.16.
+    "RUSTSEC-2026-0382",
+
+    # TEMPORARY, remove in the release after 7.0.2.
+    # ctutils 0.4.2 generates non-constant-time masks on some platforms, a
+    # timing side-channel reached only through digest -> hmac -> aws-sigv4 ->
+    # the AWS SDK in arena-localstack, which signs requests to ephemeral local
+    # containers rather than to an attacker-observable network path. A fix
+    # exists in 0.4.4, but it was published on 2026-10-22 and so sits inside
+    # the 3-day ARENA_MIN_RELEASE_AGE_DAYS floor; 7.0.2 ships the other 248
+    # alert fixes now rather than waiting. Bump ctutils and delete this entry
+    # once 0.4.4 is older than three days.
+    "RUSTSEC-2026-0385",
 ]

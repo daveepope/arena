@@ -22,7 +22,7 @@ members = [
 ]
 
 [workspace.package]
-version = "7.0.1"
+version = "7.0.2"
 [workspace.dependencies]
 arena = { path = "arena" }
 arena-kafka = { path = "arena-kafka" }
@@ -81,11 +81,11 @@ jsonwebtoken = { version = "10.3.0", default-features = false, features = ["use_
 rand = "0.8.6"
 rsa = { version = "0.9.10", features = ["pem", "sha2"] }
 rcgen = "0.14"
-rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rustls = { version = ">=0.23.46, <0.24", default-features = false, features = ["ring", "std"] }
 oauth2 = { version = "5", default-features = false, features = ["reqwest"] }
 wiremock = "0.6.5"
 axum-server = { version = "0.8", default-features = false, features = ["tls-rustls-no-provider"] }
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.3", default-features = false, features = ["deflate"] }
 
 [profile.dev.package.rsa]
 opt-level = 2

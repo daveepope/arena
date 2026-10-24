@@ -1,7 +1,6 @@
 package arena.examples.readings.springboot;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
@@ -44,8 +43,7 @@ public class ReadingEventBridge {
     this.client = b.build();
   }
 
-  public void publishReadingCreated(long id, String userName, int value, String comment)
-      throws JsonProcessingException {
+  public void publishReadingCreated(long id, String userName, int value, String comment) {
     Map<String, Object> detail = new HashMap<>();
     detail.put("id", id);
     detail.put("user_name", userName);

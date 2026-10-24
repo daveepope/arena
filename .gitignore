@@ -28,3 +28,7 @@ venv/
 /tools/benches/dotnet/obj/
 
 /.claude/worktrees/
+
+/arena-rust.cdx.json
+/arena-maven.cdx.json
+/arena-nuget.cdx.json

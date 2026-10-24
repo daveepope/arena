@@ -5,4 +5,5 @@ py_binary(
     srcs = ["bench_pypi.py"],
     main = "bench_pypi.py",
     tags = ["manual"],
+    visibility = ["//tools/benches:__pkg__"],
 )
