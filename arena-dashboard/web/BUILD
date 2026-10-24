@@ -258,13 +258,22 @@ _BROWSER_TEST_PLATFORM = select({
     "//conditions:default": ["@platforms//:incompatible"],
 })
 
-playwright_bin.playwright_test(
-    name = "browser_test",
+_BROWSER_SPECS = [
+    "disconnect",
+    "graph",
+    "happyPath",
+    "profile",
+    "replay",
+]
+
+[playwright_bin.playwright_test(
+    name = "browser_test_" + spec,
     size = "small",
     args = [
         "test",
         "--config",
         "playwright.config.ts",
+        "browser/" + spec + ".spec.ts",
     ],
     chdir = package_name(),
     data = _BROWSER_TEST_DATA,
@@ -275,15 +284,21 @@ playwright_bin.playwright_test(
         "cpu_profile_test",
     ],
     target_compatible_with = _BROWSER_TEST_PLATFORM,
+) for spec in _BROWSER_SPECS]
+
+test_suite(
+    name = "browser_test",
+    tests = ["browser_test_" + spec for spec in _BROWSER_SPECS],
 )
 
-playwright_bin.playwright_test(
-    name = "browser_test_staged_server",
+[playwright_bin.playwright_test(
+    name = "browser_test_staged_server_" + spec,
     size = "small",
     args = [
         "test",
         "--config",
         "playwright.config.ts",
+        "browser/" + spec + ".spec.ts",
     ],
     chdir = package_name(),
     data = _BROWSER_SPEC_DATA,
@@ -295,6 +310,12 @@ playwright_bin.playwright_test(
         "no-sandbox",
     ],
     target_compatible_with = _BROWSER_TEST_PLATFORM,
+) for spec in _BROWSER_SPECS]
+
+test_suite(
+    name = "browser_test_staged_server",
+    tags = ["manual"],
+    tests = ["browser_test_staged_server_" + spec for spec in _BROWSER_SPECS],
 )
 
 playwright_bin.playwright_test(

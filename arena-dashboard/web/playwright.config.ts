@@ -13,7 +13,7 @@ function runfile(variable: string): string {
 export default defineConfig({
   testDir: "./browser",
   fullyParallel: false,
-  workers: 3,
+  workers: 1,
   forbidOnly: true,
   retries: 0,
   timeout: 30_000,
